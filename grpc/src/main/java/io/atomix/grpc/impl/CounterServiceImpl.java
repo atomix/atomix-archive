@@ -20,12 +20,18 @@ import java.util.function.Function;
 
 import io.atomix.core.Atomix;
 import io.atomix.core.counter.AsyncAtomicCounter;
-import io.atomix.grpc.counter.CounterDelta;
+import io.atomix.grpc.counter.CasRequest;
+import io.atomix.grpc.counter.CasResponse;
 import io.atomix.grpc.counter.CounterId;
 import io.atomix.grpc.counter.CounterServiceGrpc;
-import io.atomix.grpc.counter.CounterSuccess;
-import io.atomix.grpc.counter.CounterUpdate;
-import io.atomix.grpc.counter.CounterValue;
+import io.atomix.grpc.counter.DecrementRequest;
+import io.atomix.grpc.counter.DecrementResponse;
+import io.atomix.grpc.counter.GetRequest;
+import io.atomix.grpc.counter.GetResponse;
+import io.atomix.grpc.counter.IncrementRequest;
+import io.atomix.grpc.counter.IncrementResponse;
+import io.atomix.grpc.counter.SetRequest;
+import io.atomix.grpc.counter.SetResponse;
 import io.atomix.primitive.protocol.ProxyProtocol;
 import io.atomix.protocols.backup.MultiPrimaryProtocol;
 import io.atomix.protocols.log.DistributedLogProtocol;
@@ -82,60 +88,33 @@ public class CounterServiceImpl extends CounterServiceGrpc.CounterServiceImplBas
     });
   }
 
-  private CounterValue toCounterValue(long value) {
-    return CounterValue.newBuilder()
-        .setValue(value)
-        .build();
-  }
-
-  private CounterSuccess toCounterSuccess(boolean success) {
-    return CounterSuccess.newBuilder()
-        .setSuccess(success)
-        .build();
+  @Override
+  public void set(SetRequest request, StreamObserver<SetResponse> responseObserver) {
+    run(request.getId(), counter -> counter.set(request.getValue())
+        .thenApply(v -> SetResponse.newBuilder().build()), responseObserver);
   }
 
   @Override
-  public void set(CounterDelta request, StreamObserver<CounterValue> responseObserver) {
-    run(request.getId(), counter -> counter.set(request.getDelta()).thenApply(v -> toCounterValue(request.getDelta())), responseObserver);
+  public void get(GetRequest request, StreamObserver<GetResponse> responseObserver) {
+    run(request.getId(), counter -> counter.get()
+        .thenApply(value -> GetResponse.newBuilder().setValue(value).build()), responseObserver);
   }
 
   @Override
-  public void get(CounterId request, StreamObserver<CounterValue> responseObserver) {
-    run(request, counter -> counter.get().thenApply(this::toCounterValue), responseObserver);
+  public void cas(CasRequest request, StreamObserver<CasResponse> responseObserver) {
+    run(request.getId(), counter -> counter.compareAndSet(request.getExpect(), request.getUpdate())
+        .thenApply(succeeded -> CasResponse.newBuilder().setSucceeded(succeeded).build()), responseObserver);
   }
 
   @Override
-  public void compareAndSet(CounterUpdate request, StreamObserver<CounterSuccess> responseObserver) {
-    run(request.getId(), counter -> counter.compareAndSet(request.getExpect(), request.getUpdate()).thenApply(this::toCounterSuccess), responseObserver);
+  public void increment(IncrementRequest request, StreamObserver<IncrementResponse> responseObserver) {
+    run(request.getId(), counter -> counter.addAndGet(request.getDelta() != 0 ? request.getDelta() : 1)
+        .thenApply(value -> IncrementResponse.newBuilder().setValue(value).build()), responseObserver);
   }
 
   @Override
-  public void incrementAndGet(CounterId request, StreamObserver<CounterValue> responseObserver) {
-    run(request, counter -> counter.incrementAndGet().thenApply(this::toCounterValue), responseObserver);
-  }
-
-  @Override
-  public void decrementAndGet(CounterId request, StreamObserver<CounterValue> responseObserver) {
-    run(request, counter -> counter.decrementAndGet().thenApply(this::toCounterValue), responseObserver);
-  }
-
-  @Override
-  public void getAndIncrement(CounterId request, StreamObserver<CounterValue> responseObserver) {
-    run(request, counter -> counter.getAndIncrement().thenApply(this::toCounterValue), responseObserver);
-  }
-
-  @Override
-  public void getAndDecrement(CounterId request, StreamObserver<CounterValue> responseObserver) {
-    run(request, counter -> counter.getAndDecrement().thenApply(this::toCounterValue), responseObserver);
-  }
-
-  @Override
-  public void getAndAdd(CounterDelta request, StreamObserver<CounterValue> responseObserver) {
-    run(request.getId(), counter -> counter.getAndAdd(request.getDelta()).thenApply(this::toCounterValue), responseObserver);
-  }
-
-  @Override
-  public void addAndGet(CounterDelta request, StreamObserver<CounterValue> responseObserver) {
-    run(request.getId(), counter -> counter.getAndAdd(request.getDelta()).thenApply(this::toCounterValue), responseObserver);
+  public void decrement(DecrementRequest request, StreamObserver<DecrementResponse> responseObserver) {
+    run(request.getId(), counter -> counter.addAndGet(-(request.getDelta() != 0 ? request.getDelta() : 1))
+        .thenApply(value -> DecrementResponse.newBuilder().setValue(value).build()), responseObserver);
   }
 }

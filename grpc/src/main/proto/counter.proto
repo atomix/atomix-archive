@@ -18,48 +18,61 @@ message CounterId {
     }
 }
 
-// Counter update
-message CounterUpdate {
+message SetRequest {
+    CounterId id = 1;
+    int64 value = 2;
+}
+
+message SetResponse {
+}
+
+message GetRequest {
+    CounterId id = 1;
+}
+
+message GetResponse {
+    int64 value = 2;
+}
+
+message IncrementRequest {
+    CounterId id = 1;
+    int64 delta = 2;
+}
+
+message IncrementResponse {
+    int64 value = 2;
+}
+
+message DecrementRequest {
+    CounterId id = 1;
+    int64 delta = 2;
+}
+
+message DecrementResponse {
+    int64 value = 2;
+}
+
+message CasRequest {
     CounterId id = 1;
     int64 expect = 2;
     int64 update = 3;
 }
 
-// Counter success
-message CounterSuccess {
-    bool success = 1;
-}
-
-// Counter delta
-message CounterDelta {
-    CounterId id = 1;
-    int64 delta = 2;
-}
-
-// Counter value
-message CounterValue {
-    int64 value = 1;
+message CasResponse {
+    bool succeeded = 1;
 }
 
 // Counter service
 service CounterService {
 
-    rpc set(CounterDelta) returns (CounterValue) {}
+    rpc set(SetRequest) returns (SetResponse) {}
 
-    rpc get(CounterId) returns (CounterValue) {}
+    rpc get(GetRequest) returns (GetResponse) {}
 
-    rpc compareAndSet(CounterUpdate) returns (CounterSuccess) {}
+    rpc increment(IncrementRequest) returns (IncrementResponse) {}
 
-    rpc incrementAndGet(CounterId) returns (CounterValue) {}
+    rpc decrement(DecrementRequest) returns (DecrementResponse) {}
 
-    rpc decrementAndGet(CounterId) returns (CounterValue) {}
-
-    rpc getAndIncrement(CounterId) returns (CounterValue) {}
-
-    rpc getAndDecrement(CounterId) returns (CounterValue) {}
-
-    rpc getAndAdd(CounterDelta) returns (CounterValue) {}
-
-    rpc addAndGet(CounterDelta) returns (CounterValue) {}
+    rpc cas(CasRequest) returns (CasResponse) {}
 
 }
