@@ -55,9 +55,10 @@ message MapValueResponse {
 
 // Map event
 message MapEvent {
-    string key = 1;
-    MapValueResponse oldValue = 2;
-    MapValueResponse newValue = 3;
+    MapId id = 1;
+    string key = 2;
+    MapValueResponse oldValue = 3;
+    MapValueResponse newValue = 4;
 
     enum Type {
         INSERT = 0;

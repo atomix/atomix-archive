@@ -173,12 +173,14 @@ public class MapServiceImpl extends MapServiceGrpc.MapServiceImplBase {
           switch (event.type()) {
             case INSERT:
               responseObserver.onNext(MapEvent.newBuilder()
+                  .setId(id)
                   .setKey(event.key())
                   .setNewValue(toValueResponse(event.newValue()))
                   .build());
               break;
             case UPDATE:
               responseObserver.onNext(MapEvent.newBuilder()
+                  .setId(id)
                   .setKey(event.key())
                   .setOldValue(toValueResponse(event.oldValue()))
                   .setNewValue(toValueResponse(event.newValue()))
@@ -186,6 +188,7 @@ public class MapServiceImpl extends MapServiceGrpc.MapServiceImplBase {
               break;
             case REMOVE:
               responseObserver.onNext(MapEvent.newBuilder()
+                  .setId(id)
                   .setKey(event.key())
                   .setOldValue(toValueResponse(event.oldValue()))
                   .build());

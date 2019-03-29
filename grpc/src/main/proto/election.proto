@@ -1,0 +1,67 @@
+syntax = "proto3";
+
+import "google/protobuf/empty.proto";
+import "protocol.proto";
+
+package atomix.map;
+
+option java_package = "io.atomix.grpc.election";
+option java_multiple_files = true;
+
+// Election ID
+message ElectionId {
+    string name = 1;
+    oneof proto {
+        protocol.MultiRaftProtocol raft = 2;
+        protocol.MultiPrimaryProtocol multi_primary = 3;
+        protocol.DistributedLogProtocol log = 4;
+    }
+}
+
+// Candidate ID
+message CandidateId {
+    ElectionId election_id = 1;
+    string id = 2;
+}
+
+// Leader ID
+message LeaderId {
+    string id = 1;
+    uint64 term = 2;
+}
+
+// Leadership info
+message Leadership {
+    LeaderId leader = 1;
+    repeated CandidateId candidates = 2;
+}
+
+// Whether the operation succeeded
+message Succeeded {
+    bool succeeded = 1;
+}
+
+// Leader election event
+message ElectionEvent {
+    ElectionId id = 1;
+    Leadership leadership = 2;
+}
+
+// Election service
+service ElectionService {
+
+    rpc getLeadership(ElectionId) returns (Leadership) {}
+
+    rpc run(CandidateId) returns (Leadership) {}
+
+    rpc withdraw(CandidateId) returns (google.protobuf.Empty) {}
+
+    rpc anoint(CandidateId) returns (Succeeded) {}
+
+    rpc promote(CandidateId) returns (Succeeded) {}
+
+    rpc evict(CandidateId) returns (google.protobuf.Empty) {}
+
+    rpc listen(stream ElectionId) returns (stream ElectionEvent) {}
+
+}
