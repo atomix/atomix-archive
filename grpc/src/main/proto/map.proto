@@ -1,6 +1,8 @@
 syntax = "proto3";
 
+import "google/protobuf/empty.proto";
 import "protocol.proto";
+import "collection.proto";
 
 package atomix.map;
 
@@ -15,16 +17,6 @@ message MapId {
         protocol.MultiPrimaryProtocol multi_primary = 3;
         protocol.DistributedLogProtocol log = 4;
     }
-}
-
-// Collection size
-message Size {
-    uint32 size = 1;
-}
-
-// Boolean result
-message Boolean {
-    bool result = 1;
 }
 
 // Map key request
@@ -56,9 +48,10 @@ message MapValueResponse {
 // Map event
 message MapEvent {
     MapId id = 1;
-    string key = 2;
-    MapValueResponse oldValue = 3;
-    MapValueResponse newValue = 4;
+    Type type = 2;
+    string key = 3;
+    MapValueResponse oldValue = 4;
+    MapValueResponse newValue = 5;
 
     enum Type {
         INSERT = 0;
@@ -70,13 +63,13 @@ message MapEvent {
 // Map service
 service MapService {
 
-    rpc size(MapId) returns (Size) {}
+    rpc size(MapId) returns (collection.Size) {}
 
-    rpc isEmpty(MapId) returns (Boolean) {}
+    rpc isEmpty(MapId) returns (collection.IsEmpty) {}
 
-    rpc containsKey(MapKeyRequest) returns (Boolean) {}
+    rpc containsKey(MapKeyRequest) returns (collection.Contains) {}
 
-    rpc containsValue(MapValueRequest) returns (Boolean) {}
+    rpc containsValue(MapValueRequest) returns (collection.Contains) {}
 
     rpc put(MapEntryRequest) returns (MapValueResponse) {}
 
@@ -86,7 +79,7 @@ service MapService {
 
     rpc remove(MapKeyRequest) returns (MapValueResponse) {}
 
-    rpc clear(MapId) returns (MapId) {}
+    rpc clear(MapId) returns (google.protobuf.Empty) {}
 
     rpc listen(stream MapId) returns (stream MapEvent) {}
 

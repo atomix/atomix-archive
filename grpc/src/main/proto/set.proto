@@ -1,0 +1,70 @@
+syntax = "proto3";
+
+import "google/protobuf/empty.proto";
+import "protocol.proto";
+import "collection.proto";
+
+package atomix.set;
+
+option java_package = "io.atomix.grpc.set";
+option java_multiple_files = true;
+
+// Set ID
+message SetId {
+    string name = 1;
+    oneof proto {
+        protocol.MultiRaftProtocol raft = 2;
+        protocol.MultiPrimaryProtocol multi_primary = 3;
+        protocol.DistributedLogProtocol log = 4;
+    }
+}
+
+// Set value
+message SetValue {
+    SetId id = 1;
+    bytes value = 2;
+}
+
+// Set values
+message SetValues {
+    SetId id = 1;
+    repeated bytes values = 2;
+}
+
+// Set event
+message SetEvent {
+    SetId id = 1;
+    Type type = 2;
+    bytes value = 3;
+
+    // Set event type
+    enum Type {
+        ADDED = 0;
+        REMOVED = 1;
+    }
+}
+
+// Set service
+service SetService {
+
+    rpc add(SetValue) returns (collection.Added) {}
+
+    rpc addAll(SetValues) returns (collection.Added) {}
+
+    rpc remove(SetValue) returns (collection.Removed) {}
+
+    rpc removeAll(SetValues) returns (collection.Removed) {}
+
+    rpc contains(SetValue) returns (collection.Contains) {}
+
+    rpc containsAll(SetValues) returns (collection.Contains) {}
+
+    rpc size(SetId) returns (collection.Size) {}
+
+    rpc isEmpty(SetId) returns (collection.IsEmpty) {}
+
+    rpc clear(SetId) returns (google.protobuf.Empty) {}
+
+    rpc listen(stream SetId) returns (stream SetEvent) {}
+
+}

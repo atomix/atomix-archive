@@ -21,10 +21,13 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 
 import com.google.protobuf.ByteString;
+import com.google.protobuf.Empty;
 import io.atomix.core.Atomix;
 import io.atomix.core.map.AsyncAtomicMap;
 import io.atomix.core.map.AtomicMapEventListener;
-import io.atomix.grpc.map.Boolean;
+import io.atomix.grpc.collection.Contains;
+import io.atomix.grpc.collection.IsEmpty;
+import io.atomix.grpc.collection.Size;
 import io.atomix.grpc.map.MapEntryRequest;
 import io.atomix.grpc.map.MapEvent;
 import io.atomix.grpc.map.MapId;
@@ -32,7 +35,6 @@ import io.atomix.grpc.map.MapKeyRequest;
 import io.atomix.grpc.map.MapServiceGrpc;
 import io.atomix.grpc.map.MapValueRequest;
 import io.atomix.grpc.map.MapValueResponse;
-import io.atomix.grpc.map.Size;
 import io.atomix.primitive.protocol.ProxyProtocol;
 import io.atomix.protocols.backup.MultiPrimaryProtocol;
 import io.atomix.protocols.log.DistributedLogProtocol;
@@ -90,12 +92,22 @@ public class MapServiceImpl extends MapServiceGrpc.MapServiceImplBase {
     });
   }
 
-  private Size toSize(int size) {
-    return Size.newBuilder().setSize(size).build();
+  private Contains toContains(boolean contains) {
+    return Contains.newBuilder()
+        .setContains(contains)
+        .build();
   }
 
-  private Boolean toBoolean(boolean value) {
-    return Boolean.newBuilder().setResult(value).build();
+  private Size toSize(int size) {
+    return Size.newBuilder()
+        .setSize(size)
+        .build();
+  }
+
+  private IsEmpty toIsEmpty(boolean isEmpty) {
+    return IsEmpty.newBuilder()
+        .setIsEmpty(isEmpty)
+        .build();
   }
 
   private MapValueResponse toValueResponse(Versioned<byte[]> value) {
@@ -111,18 +123,18 @@ public class MapServiceImpl extends MapServiceGrpc.MapServiceImplBase {
   }
 
   @Override
-  public void isEmpty(MapId request, StreamObserver<Boolean> responseObserver) {
-    run(request, map -> map.isEmpty().thenApply(this::toBoolean), responseObserver);
+  public void isEmpty(MapId request, StreamObserver<IsEmpty> responseObserver) {
+    run(request, map -> map.isEmpty().thenApply(this::toIsEmpty), responseObserver);
   }
 
   @Override
-  public void containsKey(MapKeyRequest request, StreamObserver<Boolean> responseObserver) {
-    run(request.getId(), map -> map.containsKey(request.getKey()).thenApply(this::toBoolean), responseObserver);
+  public void containsKey(MapKeyRequest request, StreamObserver<Contains> responseObserver) {
+    run(request.getId(), map -> map.containsKey(request.getKey()).thenApply(this::toContains), responseObserver);
   }
 
   @Override
-  public void containsValue(MapValueRequest request, StreamObserver<Boolean> responseObserver) {
-    run(request.getId(), map -> map.containsValue(request.getValue().toByteArray()).thenApply(this::toBoolean), responseObserver);
+  public void containsValue(MapValueRequest request, StreamObserver<Contains> responseObserver) {
+    run(request.getId(), map -> map.containsValue(request.getValue().toByteArray()).thenApply(this::toContains), responseObserver);
   }
 
   @Override
@@ -159,8 +171,8 @@ public class MapServiceImpl extends MapServiceGrpc.MapServiceImplBase {
   }
 
   @Override
-  public void clear(MapId request, StreamObserver<MapId> responseObserver) {
-    run(request, map -> map.clear().thenApply(v -> request), responseObserver);
+  public void clear(MapId request, StreamObserver<Empty> responseObserver) {
+    run(request, map -> map.clear().thenApply(v -> Empty.newBuilder().build()), responseObserver);
   }
 
   @Override
@@ -174,6 +186,7 @@ public class MapServiceImpl extends MapServiceGrpc.MapServiceImplBase {
             case INSERT:
               responseObserver.onNext(MapEvent.newBuilder()
                   .setId(id)
+                  .setType(MapEvent.Type.INSERT)
                   .setKey(event.key())
                   .setNewValue(toValueResponse(event.newValue()))
                   .build());
@@ -181,6 +194,7 @@ public class MapServiceImpl extends MapServiceGrpc.MapServiceImplBase {
             case UPDATE:
               responseObserver.onNext(MapEvent.newBuilder()
                   .setId(id)
+                  .setType(MapEvent.Type.UPDATE)
                   .setKey(event.key())
                   .setOldValue(toValueResponse(event.oldValue()))
                   .setNewValue(toValueResponse(event.newValue()))
@@ -189,6 +203,7 @@ public class MapServiceImpl extends MapServiceGrpc.MapServiceImplBase {
             case REMOVE:
               responseObserver.onNext(MapEvent.newBuilder()
                   .setId(id)
+                  .setType(MapEvent.Type.REMOVE)
                   .setKey(event.key())
                   .setOldValue(toValueResponse(event.oldValue()))
                   .build());
