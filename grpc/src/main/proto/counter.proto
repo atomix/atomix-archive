@@ -1,0 +1,65 @@
+syntax = "proto3";
+
+import "google/protobuf/empty.proto";
+import "protocol.proto";
+
+package atomix.counter;
+
+option java_package = "io.atomix.grpc.counter";
+option java_multiple_files = true;
+
+// Counter ID
+message CounterId {
+    string name = 1;
+    oneof proto {
+        protocol.MultiRaftProtocol raft = 2;
+        protocol.MultiPrimaryProtocol multi_primary = 3;
+        protocol.DistributedLogProtocol log = 4;
+    }
+}
+
+// Counter update
+message CounterUpdate {
+    CounterId id = 1;
+    int64 expect = 2;
+    int64 update = 3;
+}
+
+// Counter success
+message CounterSuccess {
+    bool success = 1;
+}
+
+// Counter delta
+message CounterDelta {
+    CounterId id = 1;
+    int64 delta = 2;
+}
+
+// Counter value
+message CounterValue {
+    int64 value = 1;
+}
+
+// Counter service
+service CounterService {
+
+    rpc set(CounterDelta) returns (CounterValue) {}
+
+    rpc get(CounterId) returns (CounterValue) {}
+
+    rpc compareAndSet(CounterUpdate) returns (CounterSuccess) {}
+
+    rpc incrementAndGet(CounterId) returns (CounterValue) {}
+
+    rpc decrementAndGet(CounterId) returns (CounterValue) {}
+
+    rpc getAndIncrement(CounterId) returns (CounterValue) {}
+
+    rpc getAndDecrement(CounterId) returns (CounterValue) {}
+
+    rpc getAndAdd(CounterDelta) returns (CounterValue) {}
+
+    rpc addAndGet(CounterDelta) returns (CounterValue) {}
+
+}

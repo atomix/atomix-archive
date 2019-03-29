@@ -67,9 +67,9 @@ public class LockServiceImpl extends LockServiceGrpc.LockServiceImplBase {
   }
 
   private <T> void run(LockId id, Function<AsyncAtomicLock, CompletableFuture<T>> function, StreamObserver<T> responseObserver) {
-    getLock(id).whenComplete((map, getError) -> {
+    getLock(id).whenComplete((lock, getError) -> {
       if (getError == null) {
-        function.apply(map).whenComplete((result, funcError) -> {
+        function.apply(lock).whenComplete((result, funcError) -> {
           if (funcError == null) {
             responseObserver.onNext(result);
             responseObserver.onCompleted();
