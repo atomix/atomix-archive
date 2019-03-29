@@ -16,18 +16,19 @@
 package io.atomix.grpc.impl;
 
 import java.time.Duration;
-import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
 
 import io.atomix.core.Atomix;
 import io.atomix.core.lock.AsyncAtomicLock;
-import io.atomix.grpc.lock.IsLocked;
-import io.atomix.grpc.lock.Lock;
+import io.atomix.grpc.lock.IsLockedRequest;
+import io.atomix.grpc.lock.IsLockedResponse;
 import io.atomix.grpc.lock.LockId;
+import io.atomix.grpc.lock.LockRequest;
+import io.atomix.grpc.lock.LockResponse;
 import io.atomix.grpc.lock.LockServiceGrpc;
-import io.atomix.grpc.lock.LockTimeout;
-import io.atomix.grpc.lock.Unlocked;
+import io.atomix.grpc.lock.UnlockRequest;
+import io.atomix.grpc.lock.UnlockResponse;
 import io.atomix.primitive.protocol.ProxyProtocol;
 import io.atomix.protocols.backup.MultiPrimaryProtocol;
 import io.atomix.protocols.log.DistributedLogProtocol;
@@ -85,50 +86,49 @@ public class LockServiceImpl extends LockServiceGrpc.LockServiceImplBase {
     });
   }
 
-  private Lock toLock(Version version) {
-    return Lock.newBuilder()
-        .setVersion(version.value())
-        .build();
-  }
-
-  private Lock toLock(Optional<Version> version) {
-    return version.isPresent() ? toLock(version.get()) : null;
-  }
-
-  private IsLocked toIsLocked(boolean isLocked) {
-    return IsLocked.newBuilder()
-        .setIsLocked(isLocked)
-        .build();
-  }
-
-  private Unlocked toUnlocked(boolean unlocked) {
-    return Unlocked.newBuilder()
-        .setUnlocked(unlocked)
-        .build();
-  }
-
   @Override
-  public void lock(LockTimeout request, StreamObserver<Lock> responseObserver) {
+  public void lock(LockRequest request, StreamObserver<LockResponse> responseObserver) {
     if (request.hasTimeout()) {
-      Duration timeout = Duration.ofSeconds(request.getTimeout().getSeconds())
-          .plusNanos(request.getTimeout().getNanos());
-      run(request.getId(), lock -> lock.tryLock(timeout).thenApply(this::toLock), responseObserver);
+      if (request.getTimeout().getSeconds() == 0 && request.getTimeout().getNanos() == 0) {
+        run(request.getId(), lock -> lock.tryLock()
+            .thenApply(result -> LockResponse.newBuilder()
+                .setVersion(result.isPresent() ? result.get().value() : 0)
+                .build()), responseObserver);
+      } else {
+        Duration timeout = Duration.ofSeconds(request.getTimeout().getSeconds())
+            .plusNanos(request.getTimeout().getNanos());
+        run(request.getId(), lock -> lock.tryLock(timeout)
+            .thenApply(result -> LockResponse.newBuilder()
+                .setVersion(result.isPresent() ? result.get().value() : 0)
+                .build()), responseObserver);
+      }
     } else {
-      run(request.getId(), lock -> lock.lock().thenApply(this::toLock), responseObserver);
+      run(request.getId(), lock -> lock.lock().thenApply(version -> LockResponse.newBuilder()
+          .setVersion(version.value())
+          .build()), responseObserver);
     }
   }
 
   @Override
-  public void unlock(Lock request, StreamObserver<Unlocked> responseObserver) {
-    run(request.getId(), lock -> lock.unlock(new Version(request.getVersion())).thenApply(this::toUnlocked), responseObserver);
+  public void unlock(UnlockRequest request, StreamObserver<UnlockResponse> responseObserver) {
+    run(request.getId(), lock -> lock.unlock(new Version(request.getVersion()))
+        .thenApply(succeeded -> UnlockResponse.newBuilder()
+            .setUnlocked(succeeded)
+            .build()), responseObserver);
   }
 
   @Override
-  public void isLocked(Lock request, StreamObserver<IsLocked> responseObserver) {
+  public void isLocked(IsLockedRequest request, StreamObserver<IsLockedResponse> responseObserver) {
     if (request.getVersion() > 0) {
-      run(request.getId(), lock -> lock.isLocked(new Version(request.getVersion())).thenApply(this::toIsLocked), responseObserver);
+      run(request.getId(), lock -> lock.isLocked(new Version(request.getVersion()))
+          .thenApply(isLocked -> IsLockedResponse.newBuilder()
+              .setIsLocked(isLocked)
+              .build()), responseObserver);
     } else {
-      run(request.getId(), lock -> lock.isLocked().thenApply(this::toIsLocked), responseObserver);
+      run(request.getId(), lock -> lock.isLocked()
+          .thenApply(isLocked -> IsLockedResponse.newBuilder()
+              .setIsLocked(isLocked)
+              .build()), responseObserver);
     }
   }
 }

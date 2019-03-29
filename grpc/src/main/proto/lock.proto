@@ -19,35 +19,40 @@ message LockId {
     }
 }
 
-// Lock timeout
-message LockTimeout {
+message LockRequest {
     LockId id = 1;
     google.protobuf.Duration timeout = 2;
 }
 
-// Lock version
-message Lock {
+message LockResponse {
+    uint64 version = 1;
+}
+
+message UnlockRequest {
     LockId id = 1;
     uint64 version = 2;
 }
 
-// Unlock response
-message Unlocked {
+message UnlockResponse {
     bool unlocked = 1;
 }
 
-// Is locked response
-message IsLocked {
+message IsLockedRequest {
+    LockId id = 1;
+    uint64 version = 2;
+}
+
+message IsLockedResponse {
     bool isLocked = 1;
 }
 
 // Lock service
 service LockService {
 
-    rpc lock(LockTimeout) returns (Lock) {}
+    rpc lock(LockRequest) returns (LockResponse) {}
 
-    rpc unlock(Lock) returns (Unlocked) {}
+    rpc unlock(UnlockRequest) returns (UnlockResponse) {}
 
-    rpc isLocked(Lock) returns (IsLocked) {}
+    rpc isLocked(IsLockedRequest) returns (IsLockedResponse) {}
 
 }
