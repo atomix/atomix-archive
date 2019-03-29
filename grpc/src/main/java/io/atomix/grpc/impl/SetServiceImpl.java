@@ -22,20 +22,22 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import com.google.protobuf.ByteString;
-import com.google.protobuf.Empty;
 import io.atomix.core.Atomix;
 import io.atomix.core.collection.CollectionEventListener;
 import io.atomix.core.set.AsyncDistributedSet;
-import io.atomix.grpc.collection.Added;
-import io.atomix.grpc.collection.Contains;
-import io.atomix.grpc.collection.IsEmpty;
-import io.atomix.grpc.collection.Removed;
-import io.atomix.grpc.collection.Size;
+import io.atomix.grpc.set.AddRequest;
+import io.atomix.grpc.set.AddResponse;
+import io.atomix.grpc.set.ClearRequest;
+import io.atomix.grpc.set.ClearResponse;
+import io.atomix.grpc.set.ContainsRequest;
+import io.atomix.grpc.set.ContainsResponse;
+import io.atomix.grpc.set.RemoveRequest;
+import io.atomix.grpc.set.RemoveResponse;
 import io.atomix.grpc.set.SetEvent;
 import io.atomix.grpc.set.SetId;
 import io.atomix.grpc.set.SetServiceGrpc;
-import io.atomix.grpc.set.SetValue;
-import io.atomix.grpc.set.SetValues;
+import io.atomix.grpc.set.SizeRequest;
+import io.atomix.grpc.set.SizeResponse;
 import io.atomix.primitive.protocol.ProxyProtocol;
 import io.atomix.protocols.backup.MultiPrimaryProtocol;
 import io.atomix.protocols.log.DistributedLogProtocol;
@@ -92,91 +94,77 @@ public class SetServiceImpl extends SetServiceGrpc.SetServiceImplBase {
     });
   }
 
-  private Added toAdded(boolean added) {
-    return Added.newBuilder()
-        .setAdded(added)
-        .build();
-  }
-
-  private Removed toRemoved(boolean removed) {
-    return Removed.newBuilder()
-        .setRemoved(removed)
-        .build();
-  }
-
-  private Contains toContains(boolean contains) {
-    return Contains.newBuilder()
-        .setContains(contains)
-        .build();
-  }
-
-  private Size toSize(int size) {
-    return Size.newBuilder()
-        .setSize(size)
-        .build();
-  }
-
-  private IsEmpty toIsEmpty(boolean isEmpty) {
-    return IsEmpty.newBuilder()
-        .setIsEmpty(isEmpty)
-        .build();
+  @Override
+  public void add(AddRequest request, StreamObserver<AddResponse> responseObserver) {
+    if (request.getValuesCount() == 0) {
+      responseObserver.onNext(AddResponse.newBuilder().setAdded(false).build());
+      responseObserver.onCompleted();
+    } else if (request.getValuesCount() == 1) {
+      run(request.getId(), set -> set.add(request.getValues(0).toByteArray())
+          .thenApply(added -> AddResponse.newBuilder()
+              .setAdded(added)
+              .build()), responseObserver);
+    } else {
+      run(request.getId(), set -> set.addAll(request.getValuesList()
+          .stream()
+          .map(ByteString::toByteArray)
+          .collect(Collectors.toSet()))
+          .thenApply(added -> AddResponse.newBuilder()
+              .setAdded(added)
+              .build()), responseObserver);
+    }
   }
 
   @Override
-  public void add(SetValue request, StreamObserver<Added> responseObserver) {
-    run(request.getId(), set -> set.add(request.getValue().toByteArray()).thenApply(this::toAdded), responseObserver);
+  public void remove(RemoveRequest request, StreamObserver<RemoveResponse> responseObserver) {
+    if (request.getValuesCount() == 0) {
+      responseObserver.onNext(RemoveResponse.newBuilder().setRemoved(false).build());
+      responseObserver.onCompleted();
+    } else if (request.getValuesCount() == 1) {
+      run(request.getId(), set -> set.remove(request.getValues(0).toByteArray())
+          .thenApply(removed -> RemoveResponse.newBuilder()
+              .setRemoved(removed)
+              .build()), responseObserver);
+    } else {
+      run(request.getId(), set -> set.removeAll(request.getValuesList()
+          .stream()
+          .map(ByteString::toByteArray)
+          .collect(Collectors.toSet()))
+          .thenApply(removed -> RemoveResponse.newBuilder()
+              .setRemoved(removed)
+              .build()), responseObserver);
+    }
   }
 
   @Override
-  public void addAll(SetValues request, StreamObserver<Added> responseObserver) {
-    run(request.getId(), set -> set.addAll(request.getValuesList()
-        .stream()
-        .map(ByteString::toByteArray)
-        .collect(Collectors.toSet()))
-        .thenApply(this::toAdded), responseObserver);
+  public void contains(ContainsRequest request, StreamObserver<ContainsResponse> responseObserver) {
+    if (request.getValuesCount() == 0) {
+      responseObserver.onNext(ContainsResponse.newBuilder().setContains(false).build());
+      responseObserver.onCompleted();
+    } else if (request.getValuesCount() == 1) {
+      run(request.getId(), set -> set.contains(request.getValues(0).toByteArray())
+          .thenApply(contains -> ContainsResponse.newBuilder()
+              .setContains(contains)
+              .build()), responseObserver);
+    } else {
+      run(request.getId(), set -> set.containsAll(request.getValuesList()
+          .stream()
+          .map(ByteString::toByteArray)
+          .collect(Collectors.toSet()))
+          .thenApply(contains -> ContainsResponse.newBuilder()
+              .setContains(contains)
+              .build()), responseObserver);
+    }
   }
 
   @Override
-  public void remove(SetValue request, StreamObserver<Removed> responseObserver) {
-    run(request.getId(), set -> set.remove(request.getValue().toByteArray()).thenApply(this::toRemoved), responseObserver);
+  public void size(SizeRequest request, StreamObserver<SizeResponse> responseObserver) {
+    run(request.getId(), set -> set.size().thenApply(size -> SizeResponse.newBuilder().setSize(size).build()), responseObserver);
   }
 
   @Override
-  public void removeAll(SetValues request, StreamObserver<Removed> responseObserver) {
-    run(request.getId(), set -> set.removeAll(request.getValuesList()
-        .stream()
-        .map(ByteString::toByteArray)
-        .collect(Collectors.toSet()))
-        .thenApply(this::toRemoved), responseObserver);
-  }
-
-  @Override
-  public void contains(SetValue request, StreamObserver<Contains> responseObserver) {
-    run(request.getId(), set -> set.contains(request.getValue().toByteArray()).thenApply(this::toContains), responseObserver);
-  }
-
-  @Override
-  public void containsAll(SetValues request, StreamObserver<Contains> responseObserver) {
-    run(request.getId(), set -> set.containsAll(request.getValuesList()
-        .stream()
-        .map(ByteString::toByteArray)
-        .collect(Collectors.toSet()))
-        .thenApply(this::toContains), responseObserver);
-  }
-
-  @Override
-  public void size(SetId request, StreamObserver<Size> responseObserver) {
-    run(request, set -> set.size().thenApply(this::toSize), responseObserver);
-  }
-
-  @Override
-  public void isEmpty(SetId request, StreamObserver<IsEmpty> responseObserver) {
-    run(request, set -> set.isEmpty().thenApply(this::toIsEmpty), responseObserver);
-  }
-
-  @Override
-  public void clear(SetId request, StreamObserver<Empty> responseObserver) {
-    run(request, set -> set.clear().thenApply(v -> Empty.newBuilder().build()), responseObserver);
+  public void clear(ClearRequest request, StreamObserver<ClearResponse> responseObserver) {
+    run(request.getId(), set -> set.clear().thenApply(v -> ClearResponse.newBuilder().build()), responseObserver);
   }
 
   @Override

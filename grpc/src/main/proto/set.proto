@@ -2,7 +2,6 @@ syntax = "proto3";
 
 import "google/protobuf/empty.proto";
 import "protocol.proto";
-import "collection.proto";
 
 package atomix.set;
 
@@ -19,16 +18,46 @@ message SetId {
     }
 }
 
-// Set value
-message SetValue {
-    SetId id = 1;
-    bytes value = 2;
-}
-
-// Set values
-message SetValues {
+message AddRequest {
     SetId id = 1;
     repeated bytes values = 2;
+}
+
+message AddResponse {
+    bool added = 1;
+}
+
+message RemoveRequest {
+    SetId id = 1;
+    repeated bytes values = 2;
+}
+
+message RemoveResponse {
+    bool removed = 1;
+}
+
+message ContainsRequest {
+    SetId id = 1;
+    repeated bytes values = 2;
+}
+
+message ContainsResponse {
+    bool contains = 1;
+}
+
+message SizeRequest {
+    SetId id = 1;
+}
+
+message SizeResponse {
+    uint32 size = 1;
+}
+
+message ClearRequest {
+    SetId id = 1;
+}
+
+message ClearResponse {
 }
 
 // Set event
@@ -47,23 +76,15 @@ message SetEvent {
 // Set service
 service SetService {
 
-    rpc add(SetValue) returns (collection.Added) {}
+    rpc add(AddRequest) returns (AddResponse) {}
 
-    rpc addAll(SetValues) returns (collection.Added) {}
+    rpc remove(RemoveRequest) returns (RemoveResponse) {}
 
-    rpc remove(SetValue) returns (collection.Removed) {}
+    rpc contains(ContainsRequest) returns (ContainsResponse) {}
 
-    rpc removeAll(SetValues) returns (collection.Removed) {}
+    rpc size(SizeRequest) returns (SizeResponse) {}
 
-    rpc contains(SetValue) returns (collection.Contains) {}
-
-    rpc containsAll(SetValues) returns (collection.Contains) {}
-
-    rpc size(SetId) returns (collection.Size) {}
-
-    rpc isEmpty(SetId) returns (collection.IsEmpty) {}
-
-    rpc clear(SetId) returns (google.protobuf.Empty) {}
+    rpc clear(ClearRequest) returns (ClearResponse) {}
 
     rpc listen(stream SetId) returns (stream SetEvent) {}
 

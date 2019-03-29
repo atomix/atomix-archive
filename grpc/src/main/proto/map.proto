@@ -2,7 +2,6 @@ syntax = "proto3";
 
 import "google/protobuf/empty.proto";
 import "protocol.proto";
-import "collection.proto";
 
 package atomix.map;
 
@@ -45,13 +44,70 @@ message MapValueResponse {
     uint64 version = 2;
 }
 
+message SizeRequest {
+    MapId id = 1;
+}
+
+message SizeResponse {
+    uint32 size = 1;
+}
+
+message PutRequest {
+    MapId id = 1;
+    string key = 2;
+    bytes value = 3;
+}
+
+message PutResponse {
+    uint64 version = 1;
+}
+
+message ReplaceRequest {
+    MapId id = 1;
+    string key = 2;
+    bytes value = 3;
+    uint64 version = 4;
+}
+
+message ReplaceResponse {
+    bool succeeded = 1;
+}
+
+message GetRequest {
+    MapId id = 1;
+    string key = 2;
+}
+
+message GetResponse {
+    bytes value = 3;
+    uint64 version = 4;
+}
+
+message RemoveRequest {
+    MapId id = 1;
+    string key = 2;
+    bytes value = 3;
+    uint64 version = 4;
+}
+
+message RemoveResponse {
+    bool succeeded = 1;
+}
+
+message ClearRequest {
+    MapId id = 1;
+}
+
+message ClearResponse {
+}
+
 // Map event
 message MapEvent {
     MapId id = 1;
     Type type = 2;
     string key = 3;
-    MapValueResponse oldValue = 4;
-    MapValueResponse newValue = 5;
+    bytes value = 4;
+    uint64 version = 5;
 
     enum Type {
         INSERT = 0;
@@ -63,23 +119,17 @@ message MapEvent {
 // Map service
 service MapService {
 
-    rpc size(MapId) returns (collection.Size) {}
+    rpc size(SizeRequest) returns (SizeResponse) {}
 
-    rpc isEmpty(MapId) returns (collection.IsEmpty) {}
+    rpc put(PutRequest) returns (PutResponse) {}
 
-    rpc containsKey(MapKeyRequest) returns (collection.Contains) {}
+    rpc replace(ReplaceRequest) returns (ReplaceResponse) {}
 
-    rpc containsValue(MapValueRequest) returns (collection.Contains) {}
+    rpc get(GetRequest) returns (GetResponse) {}
 
-    rpc put(MapEntryRequest) returns (MapValueResponse) {}
+    rpc remove(RemoveRequest) returns (RemoveResponse) {}
 
-    rpc get(MapKeyRequest) returns (MapValueResponse) {}
-
-    rpc replace(MapEntryRequest) returns (MapValueResponse) {}
-
-    rpc remove(MapKeyRequest) returns (MapValueResponse) {}
-
-    rpc clear(MapId) returns (google.protobuf.Empty) {}
+    rpc clear(ClearRequest) returns (ClearResponse) {}
 
     rpc listen(stream MapId) returns (stream MapEvent) {}
 

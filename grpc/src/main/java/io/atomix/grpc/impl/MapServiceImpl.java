@@ -21,25 +21,28 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 
 import com.google.protobuf.ByteString;
-import com.google.protobuf.Empty;
 import io.atomix.core.Atomix;
 import io.atomix.core.map.AsyncAtomicMap;
 import io.atomix.core.map.AtomicMapEventListener;
-import io.atomix.grpc.collection.Contains;
-import io.atomix.grpc.collection.IsEmpty;
-import io.atomix.grpc.collection.Size;
-import io.atomix.grpc.map.MapEntryRequest;
+import io.atomix.grpc.map.ClearRequest;
+import io.atomix.grpc.map.ClearResponse;
+import io.atomix.grpc.map.GetRequest;
+import io.atomix.grpc.map.GetResponse;
 import io.atomix.grpc.map.MapEvent;
 import io.atomix.grpc.map.MapId;
-import io.atomix.grpc.map.MapKeyRequest;
 import io.atomix.grpc.map.MapServiceGrpc;
-import io.atomix.grpc.map.MapValueRequest;
-import io.atomix.grpc.map.MapValueResponse;
+import io.atomix.grpc.map.PutRequest;
+import io.atomix.grpc.map.PutResponse;
+import io.atomix.grpc.map.RemoveRequest;
+import io.atomix.grpc.map.RemoveResponse;
+import io.atomix.grpc.map.ReplaceRequest;
+import io.atomix.grpc.map.ReplaceResponse;
+import io.atomix.grpc.map.SizeRequest;
+import io.atomix.grpc.map.SizeResponse;
 import io.atomix.primitive.protocol.ProxyProtocol;
 import io.atomix.protocols.backup.MultiPrimaryProtocol;
 import io.atomix.protocols.log.DistributedLogProtocol;
 import io.atomix.protocols.raft.MultiRaftProtocol;
-import io.atomix.utils.time.Versioned;
 import io.grpc.stub.StreamObserver;
 
 /**
@@ -92,87 +95,54 @@ public class MapServiceImpl extends MapServiceGrpc.MapServiceImplBase {
     });
   }
 
-  private Contains toContains(boolean contains) {
-    return Contains.newBuilder()
-        .setContains(contains)
-        .build();
-  }
-
-  private Size toSize(int size) {
-    return Size.newBuilder()
-        .setSize(size)
-        .build();
-  }
-
-  private IsEmpty toIsEmpty(boolean isEmpty) {
-    return IsEmpty.newBuilder()
-        .setIsEmpty(isEmpty)
-        .build();
-  }
-
-  private MapValueResponse toValueResponse(Versioned<byte[]> value) {
-    return value == null ? null : MapValueResponse.newBuilder()
-        .setValue(ByteString.copyFrom(value.value()))
-        .setVersion(value.version())
-        .build();
+  @Override
+  public void size(SizeRequest request, StreamObserver<SizeResponse> responseObserver) {
+    run(request.getId(), map -> map.size().thenApply(size -> SizeResponse.newBuilder().setSize(size).build()), responseObserver);
   }
 
   @Override
-  public void size(MapId request, StreamObserver<Size> responseObserver) {
-    run(request, map -> map.size().thenApply(this::toSize), responseObserver);
+  public void put(PutRequest request, StreamObserver<PutResponse> responseObserver) {
+    run(request.getId(), map -> map.putAndGet(request.getKey(), request.getValue().toByteArray())
+        .thenApply(versioned -> PutResponse.newBuilder()
+            .setVersion(versioned.version())
+            .build()), responseObserver);
   }
 
   @Override
-  public void isEmpty(MapId request, StreamObserver<IsEmpty> responseObserver) {
-    run(request, map -> map.isEmpty().thenApply(this::toIsEmpty), responseObserver);
+  public void get(GetRequest request, StreamObserver<GetResponse> responseObserver) {
+    run(request.getId(), map -> map.get(request.getKey())
+        .thenApply(versioned -> GetResponse.newBuilder()
+            .setValue(ByteString.copyFrom(versioned.value()))
+            .setVersion(versioned.version())
+            .build()), responseObserver);
   }
 
   @Override
-  public void containsKey(MapKeyRequest request, StreamObserver<Contains> responseObserver) {
-    run(request.getId(), map -> map.containsKey(request.getKey()).thenApply(this::toContains), responseObserver);
+  public void replace(ReplaceRequest request, StreamObserver<ReplaceResponse> responseObserver) {
+    run(request.getId(), map -> map.replace(request.getKey(), request.getVersion(), request.getValue().toByteArray())
+        .thenApply(succeeded -> ReplaceResponse.newBuilder()
+            .setSucceeded(succeeded)
+            .build()), responseObserver);
   }
 
   @Override
-  public void containsValue(MapValueRequest request, StreamObserver<Contains> responseObserver) {
-    run(request.getId(), map -> map.containsValue(request.getValue().toByteArray()).thenApply(this::toContains), responseObserver);
-  }
-
-  @Override
-  public void put(MapEntryRequest request, StreamObserver<MapValueResponse> responseObserver) {
-    run(request.getId(), map -> map.put(request.getKey(), request.getValue().toByteArray()).thenApply(this::toValueResponse), responseObserver);
-  }
-
-  @Override
-  public void get(MapKeyRequest request, StreamObserver<MapValueResponse> responseObserver) {
-    run(request.getId(), map -> map.get(request.getKey()).thenApply(this::toValueResponse), responseObserver);
-  }
-
-  @Override
-  public void replace(MapEntryRequest request, StreamObserver<MapValueResponse> responseObserver) {
-    if (request.getVersion() > 0) {
-      run(
-          request.getId(),
-          map -> map.replace(request.getKey(), request.getVersion(), request.getValue().toByteArray())
-              .thenCompose(v -> map.get(request.getKey()))
-              .thenApply(this::toValueResponse),
-          responseObserver);
+  public void remove(RemoveRequest request, StreamObserver<RemoveResponse> responseObserver) {
+    if (request.getVersion() == 0) {
+      run(request.getId(), map -> map.remove(request.getKey())
+          .thenApply(succeeded -> RemoveResponse.newBuilder()
+              .setSucceeded(true)
+              .build()), responseObserver);
     } else {
-      run(
-          request.getId(),
-          map -> map.replace(request.getKey(), request.getValue().toByteArray())
-              .thenApply(this::toValueResponse),
-          responseObserver);
+      run(request.getId(), map -> map.remove(request.getKey(), request.getVersion())
+          .thenApply(succeeded -> RemoveResponse.newBuilder()
+              .setSucceeded(succeeded)
+              .build()), responseObserver);
     }
   }
 
   @Override
-  public void remove(MapKeyRequest request, StreamObserver<MapValueResponse> responseObserver) {
-    run(request.getId(), map -> map.remove(request.getKey()).thenApply(this::toValueResponse), responseObserver);
-  }
-
-  @Override
-  public void clear(MapId request, StreamObserver<Empty> responseObserver) {
-    run(request, map -> map.clear().thenApply(v -> Empty.newBuilder().build()), responseObserver);
+  public void clear(ClearRequest request, StreamObserver<ClearResponse> responseObserver) {
+    run(request.getId(), map -> map.clear().thenApply(v -> ClearResponse.newBuilder().build()), responseObserver);
   }
 
   @Override
@@ -188,7 +158,8 @@ public class MapServiceImpl extends MapServiceGrpc.MapServiceImplBase {
                   .setId(id)
                   .setType(MapEvent.Type.INSERT)
                   .setKey(event.key())
-                  .setNewValue(toValueResponse(event.newValue()))
+                  .setValue(ByteString.copyFrom(event.newValue().value()))
+                  .setVersion(event.newValue().version())
                   .build());
               break;
             case UPDATE:
@@ -196,8 +167,8 @@ public class MapServiceImpl extends MapServiceGrpc.MapServiceImplBase {
                   .setId(id)
                   .setType(MapEvent.Type.UPDATE)
                   .setKey(event.key())
-                  .setOldValue(toValueResponse(event.oldValue()))
-                  .setNewValue(toValueResponse(event.newValue()))
+                  .setValue(ByteString.copyFrom(event.newValue().value()))
+                  .setVersion(event.newValue().version())
                   .build());
               break;
             case REMOVE:
@@ -205,7 +176,6 @@ public class MapServiceImpl extends MapServiceGrpc.MapServiceImplBase {
                   .setId(id)
                   .setType(MapEvent.Type.REMOVE)
                   .setKey(event.key())
-                  .setOldValue(toValueResponse(event.oldValue()))
                   .build());
               break;
           }
