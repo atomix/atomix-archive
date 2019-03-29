@@ -58,6 +58,14 @@ public interface AsyncAtomicLock extends AsyncPrimitive {
   CompletableFuture<Void> unlock();
 
   /**
+   * Unlocks the lock.
+   *
+   * @param version the lock version
+   * @return future to be completed once the lock has been released
+   */
+  CompletableFuture<Boolean> unlock(Version version);
+
+  /**
    * Returns a boolean indicating whether the lock is locked.
    *
    * @return indicates whether the lock is locked

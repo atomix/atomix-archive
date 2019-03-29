@@ -68,6 +68,14 @@ public interface AtomicLock extends SyncPrimitive {
    */
   void unlock();
 
+  /**
+   * Unlocks the lock.
+   *
+   * @param version the lock version
+   * @return indicates whether the lock was successfully unlocked
+   */
+  boolean unlock(Version version);
+
   @Override
   AsyncAtomicLock async();
 

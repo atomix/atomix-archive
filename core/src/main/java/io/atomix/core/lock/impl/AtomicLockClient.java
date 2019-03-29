@@ -32,6 +32,15 @@ public interface AtomicLockClient {
   void locked(int id, long version);
 
   /**
+   * Called when the client has lost a lock.
+   *
+   * @param id      the lock identifier
+   * @param version the lock version
+   */
+  @Event("unlocked")
+  void unlocked(int id, long version);
+
+  /**
    * Called when a lock attempt has failed.
    *
    * @param id the lock identifier

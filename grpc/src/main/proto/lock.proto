@@ -1,0 +1,53 @@
+syntax = "proto3";
+
+import "google/protobuf/empty.proto";
+import "google/protobuf/duration.proto";
+import "protocol.proto";
+
+package atomix.lock;
+
+option java_package = "io.atomix.grpc.lock";
+option java_multiple_files = true;
+
+// Lock ID
+message LockId {
+    string name = 1;
+    oneof proto {
+        protocol.MultiRaftProtocol raft = 2;
+        protocol.MultiPrimaryProtocol multi_primary = 3;
+        protocol.DistributedLogProtocol log = 4;
+    }
+}
+
+// Lock timeout
+message LockTimeout {
+    LockId id = 1;
+    google.protobuf.Duration timeout = 2;
+}
+
+// Lock version
+message Lock {
+    LockId id = 1;
+    uint64 version = 2;
+}
+
+// Unlock response
+message Unlocked {
+    bool unlocked = 1;
+}
+
+// Is locked response
+message IsLocked {
+    bool isLocked = 1;
+}
+
+// Lock service
+service LockService {
+
+    rpc lock(LockTimeout) returns (Lock) {}
+
+    rpc unlock(Lock) returns (Unlocked) {}
+
+    rpc isLocked(Lock) returns (IsLocked) {}
+
+}

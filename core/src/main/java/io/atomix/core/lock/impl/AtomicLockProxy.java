@@ -31,6 +31,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 
 /**
@@ -67,6 +68,12 @@ public class AtomicLockProxy
     } else {
       getProxyClient().acceptBy(name(), service -> service.unlock(id));
     }
+  }
+
+  @Override
+  public void unlocked(int id, long version) {
+    // If the given lock ID is currently held, unlock it.
+    lock.compareAndSet(id, 0);
   }
 
   @Override
@@ -147,6 +154,11 @@ public class AtomicLockProxy
       return getProxyClient().acceptBy(name(), service -> service.unlock(lock));
     }
     return CompletableFuture.completedFuture(null);
+  }
+
+  @Override
+  public CompletableFuture<Boolean> unlock(Version version) {
+    return getProxyClient().applyBy(name(), service -> service.unlock(version.value()));
   }
 
   @Override
