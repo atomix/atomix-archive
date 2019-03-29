@@ -20,18 +20,25 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 
-import com.google.protobuf.Empty;
 import io.atomix.core.Atomix;
 import io.atomix.core.election.AsyncLeaderElection;
-import io.atomix.core.election.Leader;
 import io.atomix.core.election.LeadershipEventListener;
-import io.atomix.grpc.election.CandidateId;
+import io.atomix.grpc.election.AnointRequest;
+import io.atomix.grpc.election.AnointResponse;
 import io.atomix.grpc.election.ElectionEvent;
 import io.atomix.grpc.election.ElectionId;
 import io.atomix.grpc.election.ElectionServiceGrpc;
-import io.atomix.grpc.election.LeaderId;
+import io.atomix.grpc.election.EvictRequest;
+import io.atomix.grpc.election.EvictResponse;
+import io.atomix.grpc.election.GetLeadershipRequest;
+import io.atomix.grpc.election.GetLeadershipResponse;
 import io.atomix.grpc.election.Leadership;
-import io.atomix.grpc.election.Succeeded;
+import io.atomix.grpc.election.PromoteRequest;
+import io.atomix.grpc.election.PromoteResponse;
+import io.atomix.grpc.election.RunRequest;
+import io.atomix.grpc.election.RunResponse;
+import io.atomix.grpc.election.WithdrawRequest;
+import io.atomix.grpc.election.WithdrawResponse;
 import io.atomix.primitive.protocol.ProxyProtocol;
 import io.atomix.protocols.backup.MultiPrimaryProtocol;
 import io.atomix.protocols.log.DistributedLogProtocol;
@@ -88,64 +95,56 @@ public class ElectionServiceImpl extends ElectionServiceGrpc.ElectionServiceImpl
     });
   }
 
-  private LeaderId toLeader(Leader<String> leader) {
-    return LeaderId.newBuilder()
-        .setId(leader.id())
-        .setTerm(leader.term())
-        .build();
-  }
-
-  private CandidateId toCandidate(String candidate) {
-    return CandidateId.newBuilder()
-        .setId(candidate)
-        .build();
-  }
-
   private Leadership toLeadership(io.atomix.core.election.Leadership<String> leadership) {
     Leadership.Builder builder = Leadership.newBuilder();
-    builder.setLeader(toLeader(leadership.leader()));
+    if (leadership.leader() != null) {
+      builder.setLeader(leadership.leader().id());
+      builder.setTerm(leadership.leader().term());
+    }
     for (int i = 0; i < leadership.candidates().size(); i++) {
-      builder.setCandidates(i, toCandidate(leadership.candidates().get(i)));
+      builder.setCandidates(i, leadership.candidates().get(i));
     }
     return builder.build();
   }
 
-  private Succeeded toSucceeded(boolean succeeded) {
-    return Succeeded.newBuilder().setSucceeded(succeeded).build();
-  }
-
-  private Empty toEmpty(Object value) {
-    return Empty.newBuilder().build();
+  @Override
+  public void getLeadership(GetLeadershipRequest request, StreamObserver<GetLeadershipResponse> responseObserver) {
+    run(request.getId(), election -> election.getLeadership()
+        .thenApply(leadership -> GetLeadershipResponse.newBuilder()
+            .setLeadership(toLeadership(leadership))
+            .build()), responseObserver);
   }
 
   @Override
-  public void getLeadership(ElectionId request, StreamObserver<Leadership> responseObserver) {
-    run(request, election -> election.getLeadership().thenApply(this::toLeadership), responseObserver);
+  public void run(RunRequest request, StreamObserver<RunResponse> responseObserver) {
+    run(request.getId(), election -> election.run(request.getCandidate())
+        .thenApply(leadership -> RunResponse.newBuilder()
+            .setLeadership(toLeadership(leadership))
+            .build()), responseObserver);
   }
 
   @Override
-  public void run(CandidateId request, StreamObserver<Leadership> responseObserver) {
-    run(request.getElectionId(), election -> election.run(request.getId()).thenApply(this::toLeadership), responseObserver);
+  public void withdraw(WithdrawRequest request, StreamObserver<WithdrawResponse> responseObserver) {
+    run(request.getId(), election -> election.withdraw(request.getCandidate())
+        .thenApply(v -> WithdrawResponse.newBuilder().build()), responseObserver);
   }
 
   @Override
-  public void withdraw(CandidateId request, StreamObserver<Empty> responseObserver) {
-    run(request.getElectionId(), election -> election.withdraw(request.getId()).thenApply(this::toEmpty), responseObserver);
+  public void anoint(AnointRequest request, StreamObserver<AnointResponse> responseObserver) {
+    run(request.getId(), election -> election.anoint(request.getCandidate())
+        .thenApply(succeeded -> AnointResponse.newBuilder().setSucceeded(succeeded).build()), responseObserver);
   }
 
   @Override
-  public void anoint(CandidateId request, StreamObserver<Succeeded> responseObserver) {
-    run(request.getElectionId(), election -> election.anoint(request.getId()).thenApply(this::toSucceeded), responseObserver);
+  public void promote(PromoteRequest request, StreamObserver<PromoteResponse> responseObserver) {
+    run(request.getId(), election -> election.promote(request.getCandidate())
+        .thenApply(succeeded -> PromoteResponse.newBuilder().setSucceeded(succeeded).build()), responseObserver);
   }
 
   @Override
-  public void promote(CandidateId request, StreamObserver<Succeeded> responseObserver) {
-    run(request.getElectionId(), election -> election.promote(request.getId()).thenApply(this::toSucceeded), responseObserver);
-  }
-
-  @Override
-  public void evict(CandidateId request, StreamObserver<Empty> responseObserver) {
-    run(request.getElectionId(), election -> election.evict(request.getId()).thenApply(this::toEmpty), responseObserver);
+  public void evict(EvictRequest request, StreamObserver<EvictResponse> responseObserver) {
+    run(request.getId(), election -> election.evict(request.getCandidate())
+        .thenApply(v -> EvictResponse.newBuilder().build()), responseObserver);
   }
 
   @Override
