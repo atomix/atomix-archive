@@ -47,6 +47,7 @@ public class NettyGrpcService implements ManagedGrpcService {
   public CompletableFuture<GrpcService> start() {
     server = ServerBuilder.forPort(address.port())
         .addService(new ClusterImpl(atomix))
+        .addService(new MapServiceImpl(atomix))
         .build();
     try {
       server.start();

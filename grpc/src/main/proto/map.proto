@@ -1,0 +1,92 @@
+syntax = "proto3";
+
+import "protocol.proto";
+
+package atomix.map;
+
+option java_package = "io.atomix.grpc.map";
+option java_multiple_files = true;
+
+// Basic map request
+message MapId {
+    string name = 1;
+    oneof proto {
+        protocol.MultiRaftProtocol raft = 2;
+        protocol.MultiPrimaryProtocol multi_primary = 3;
+        protocol.DistributedLogProtocol log = 4;
+    }
+}
+
+// Collection size
+message Size {
+    uint32 size = 1;
+}
+
+// Boolean result
+message Boolean {
+    bool result = 1;
+}
+
+// Map key request
+message MapKeyRequest {
+    MapId id = 1;
+    string key = 2;
+}
+
+// Map value request
+message MapValueRequest {
+    MapId id = 1;
+    bytes value = 2;
+}
+
+// Map entry request
+message MapEntryRequest {
+    MapId id = 1;
+    string key = 2;
+    bytes value = 3;
+    uint64 version = 4;
+}
+
+// Map value response
+message MapValueResponse {
+    bytes value = 1;
+    uint64 version = 2;
+}
+
+// Map event
+message MapEvent {
+    string key = 1;
+    MapValueResponse oldValue = 2;
+    MapValueResponse newValue = 3;
+
+    enum Type {
+        INSERT = 0;
+        UPDATE = 1;
+        REMOVE = 2;
+    }
+}
+
+// Map service
+service MapService {
+
+    rpc size(MapId) returns (Size) {}
+
+    rpc isEmpty(MapId) returns (Boolean) {}
+
+    rpc containsKey(MapKeyRequest) returns (Boolean) {}
+
+    rpc containsValue(MapValueRequest) returns (Boolean) {}
+
+    rpc put(MapEntryRequest) returns (MapValueResponse) {}
+
+    rpc get(MapKeyRequest) returns (MapValueResponse) {}
+
+    rpc replace(MapEntryRequest) returns (MapValueResponse) {}
+
+    rpc remove(MapKeyRequest) returns (MapValueResponse) {}
+
+    rpc clear(MapId) returns (MapId) {}
+
+    rpc listen(stream MapId) returns (stream MapEvent) {}
+
+}
