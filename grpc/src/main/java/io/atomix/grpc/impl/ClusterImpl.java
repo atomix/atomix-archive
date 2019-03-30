@@ -53,13 +53,6 @@ public class ClusterImpl extends ClusterGrpc.ClusterImplBase {
   }
 
   @Override
-  public void getLocalMember(Empty request, StreamObserver<Member> responseObserver) {
-    io.atomix.cluster.Member member = atomix.getMembershipService().getLocalMember();
-    responseObserver.onNext(toMember(member));
-    responseObserver.onCompleted();
-  }
-
-  @Override
   public void getMembers(Empty request, StreamObserver<GetMembersResponse> responseObserver) {
     Collection<io.atomix.cluster.Member> members = atomix.getMembershipService().getMembers();
     responseObserver.onNext(GetMembersResponse.newBuilder()
@@ -78,7 +71,7 @@ public class ClusterImpl extends ClusterGrpc.ClusterImplBase {
     } else if (request.getHost() != null) {
       member = atomix.getMembershipService().getMember(Address.from(request.getHost(), request.getPort()));
     } else {
-      member = null;
+      member = atomix.getMembershipService().getLocalMember();
     }
     responseObserver.onNext(GetMemberResponse.newBuilder()
         .setMember(toMember(member))

@@ -48,9 +48,6 @@ message MemberEvent {
 
 // The cluster service
 service Cluster {
-    // Obtains the local member info
-    rpc GetLocalMember(google.protobuf.Empty) returns (Member) {}
-
     // Gets a list of members in the cluster
     rpc GetMembers(google.protobuf.Empty) returns (GetMembersResponse) {}
 

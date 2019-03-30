@@ -43,9 +43,9 @@ message ReleaseResponse {
 service SemaphoreService {
 
     // Acquires permit(s) from the semaphore
-    rpc acquire(AcquireRequest) returns (AcquireResponse) {}
+    rpc Acquire(AcquireRequest) returns (AcquireResponse) {}
 
     // Releases permit(s) from the semaphore
-    rpc release(ReleaseRequest) returns (ReleaseResponse) {}
+    rpc Release(ReleaseRequest) returns (ReleaseResponse) {}
 
 }

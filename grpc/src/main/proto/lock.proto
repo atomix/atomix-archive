@@ -49,10 +49,10 @@ message IsLockedResponse {
 // Lock service
 service LockService {
 
-    rpc lock(LockRequest) returns (LockResponse) {}
+    rpc Lock(LockRequest) returns (LockResponse) {}
 
-    rpc unlock(UnlockRequest) returns (UnlockResponse) {}
+    rpc Unlock(UnlockRequest) returns (UnlockResponse) {}
 
-    rpc isLocked(IsLockedRequest) returns (IsLockedResponse) {}
+    rpc IsLocked(IsLockedRequest) returns (IsLockedResponse) {}
 
 }

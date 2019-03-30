@@ -65,14 +65,14 @@ message CasResponse {
 // Counter service
 service CounterService {
 
-    rpc set(SetRequest) returns (SetResponse) {}
+    rpc Set(SetRequest) returns (SetResponse) {}
 
-    rpc get(GetRequest) returns (GetResponse) {}
+    rpc Get(GetRequest) returns (GetResponse) {}
 
-    rpc increment(IncrementRequest) returns (IncrementResponse) {}
+    rpc Increment(IncrementRequest) returns (IncrementResponse) {}
 
-    rpc decrement(DecrementRequest) returns (DecrementResponse) {}
+    rpc Decrement(DecrementRequest) returns (DecrementResponse) {}
 
-    rpc cas(CasRequest) returns (CasResponse) {}
+    rpc Cas(CasRequest) returns (CasResponse) {}
 
 }

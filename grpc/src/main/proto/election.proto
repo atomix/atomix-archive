@@ -85,18 +85,18 @@ message ElectionEvent {
 // Election service
 service ElectionService {
 
-    rpc getLeadership(GetLeadershipRequest) returns (GetLeadershipResponse) {}
+    rpc GetLeadership(GetLeadershipRequest) returns (GetLeadershipResponse) {}
 
-    rpc run(RunRequest) returns (RunResponse) {}
+    rpc Run(RunRequest) returns (RunResponse) {}
 
-    rpc withdraw(WithdrawRequest) returns (WithdrawResponse) {}
+    rpc Withdraw(WithdrawRequest) returns (WithdrawResponse) {}
 
-    rpc anoint(AnointRequest) returns (AnointResponse) {}
+    rpc Anoint(AnointRequest) returns (AnointResponse) {}
 
-    rpc promote(PromoteRequest) returns (PromoteResponse) {}
+    rpc Promote(PromoteRequest) returns (PromoteResponse) {}
 
-    rpc evict(EvictRequest) returns (EvictResponse) {}
+    rpc Evict(EvictRequest) returns (EvictResponse) {}
 
-    rpc listen(stream ElectionId) returns (stream ElectionEvent) {}
+    rpc Listen(stream ElectionId) returns (stream ElectionEvent) {}
 
 }

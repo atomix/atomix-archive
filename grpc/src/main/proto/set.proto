@@ -76,16 +76,16 @@ message SetEvent {
 // Set service
 service SetService {
 
-    rpc add(AddRequest) returns (AddResponse) {}
+    rpc Add(AddRequest) returns (AddResponse) {}
 
-    rpc remove(RemoveRequest) returns (RemoveResponse) {}
+    rpc Remove(RemoveRequest) returns (RemoveResponse) {}
 
-    rpc contains(ContainsRequest) returns (ContainsResponse) {}
+    rpc Contains(ContainsRequest) returns (ContainsResponse) {}
 
-    rpc size(SizeRequest) returns (SizeResponse) {}
+    rpc Size(SizeRequest) returns (SizeResponse) {}
 
-    rpc clear(ClearRequest) returns (ClearResponse) {}
+    rpc Clear(ClearRequest) returns (ClearResponse) {}
 
-    rpc listen(stream SetId) returns (stream SetEvent) {}
+    rpc Listen(stream SetId) returns (stream SetEvent) {}
 
 }

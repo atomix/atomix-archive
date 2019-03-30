@@ -119,18 +119,18 @@ message MapEvent {
 // Map service
 service MapService {
 
-    rpc size(SizeRequest) returns (SizeResponse) {}
+    rpc Size(SizeRequest) returns (SizeResponse) {}
 
-    rpc put(PutRequest) returns (PutResponse) {}
+    rpc Put(PutRequest) returns (PutResponse) {}
 
-    rpc replace(ReplaceRequest) returns (ReplaceResponse) {}
+    rpc Replace(ReplaceRequest) returns (ReplaceResponse) {}
 
-    rpc get(GetRequest) returns (GetResponse) {}
+    rpc Get(GetRequest) returns (GetResponse) {}
 
-    rpc remove(RemoveRequest) returns (RemoveResponse) {}
+    rpc Remove(RemoveRequest) returns (RemoveResponse) {}
 
-    rpc clear(ClearRequest) returns (ClearResponse) {}
+    rpc Clear(ClearRequest) returns (ClearResponse) {}
 
-    rpc listen(stream MapId) returns (stream MapEvent) {}
+    rpc Listen(stream MapId) returns (stream MapEvent) {}
 
 }
