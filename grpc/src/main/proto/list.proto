@@ -2,13 +2,13 @@ syntax = "proto3";
 
 import "protocol.proto";
 
-package atomix.set;
+package atomix.list;
 
-option java_package = "io.atomix.grpc.set";
+option java_package = "io.atomix.grpc.list";
 option java_multiple_files = true;
 
-// Set ID
-message SetId {
+// List ID
+message ListId {
     string name = 1;
     oneof proto {
         protocol.MultiRaftProtocol raft = 2;
@@ -18,7 +18,7 @@ message SetId {
 }
 
 message AddRequest {
-    SetId id = 1;
+    ListId id = 1;
     repeated bytes values = 2;
 }
 
@@ -26,8 +26,17 @@ message AddResponse {
     bool added = 1;
 }
 
+message GetRequest {
+    ListId id = 1;
+    uint32 index = 2;
+}
+
+message GetResponse {
+    bytes value = 1;
+}
+
 message RemoveRequest {
-    SetId id = 1;
+    ListId id = 1;
     repeated bytes values = 2;
 }
 
@@ -36,7 +45,7 @@ message RemoveResponse {
 }
 
 message ContainsRequest {
-    SetId id = 1;
+    ListId id = 1;
     repeated bytes values = 2;
 }
 
@@ -45,7 +54,7 @@ message ContainsResponse {
 }
 
 message SizeRequest {
-    SetId id = 1;
+    ListId id = 1;
 }
 
 message SizeResponse {
@@ -53,29 +62,31 @@ message SizeResponse {
 }
 
 message ClearRequest {
-    SetId id = 1;
+    ListId id = 1;
 }
 
 message ClearResponse {
 }
 
-// Set event
-message SetEvent {
-    SetId id = 1;
+// List event
+message ListEvent {
+    ListId id = 1;
     Type type = 2;
     bytes value = 3;
 
-    // Set event type
+    // List event type
     enum Type {
         ADDED = 0;
         REMOVED = 1;
     }
 }
 
-// Set service
-service SetService {
+// List service
+service ListService {
 
     rpc Add(AddRequest) returns (AddResponse) {}
+
+    rpc Get(GetRequest) returns (GetResponse) {}
 
     rpc Remove(RemoveRequest) returns (RemoveResponse) {}
 
@@ -85,6 +96,6 @@ service SetService {
 
     rpc Clear(ClearRequest) returns (ClearResponse) {}
 
-    rpc Listen(stream SetId) returns (stream SetEvent) {}
+    rpc Listen(stream ListId) returns (stream ListEvent) {}
 
 }

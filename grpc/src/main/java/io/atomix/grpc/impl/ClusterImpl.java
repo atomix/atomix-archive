@@ -18,14 +18,15 @@ package io.atomix.grpc.impl;
 import java.util.Collection;
 import java.util.stream.Collectors;
 
-import com.google.protobuf.Empty;
 import io.atomix.cluster.ClusterMembershipEvent;
 import io.atomix.cluster.ClusterMembershipEventListener;
 import io.atomix.core.Atomix;
 import io.atomix.grpc.cluster.ClusterGrpc;
 import io.atomix.grpc.cluster.GetMemberRequest;
 import io.atomix.grpc.cluster.GetMemberResponse;
+import io.atomix.grpc.cluster.GetMembersRequest;
 import io.atomix.grpc.cluster.GetMembersResponse;
+import io.atomix.grpc.cluster.ListenRequest;
 import io.atomix.grpc.cluster.Member;
 import io.atomix.grpc.cluster.MemberEvent;
 import io.atomix.utils.net.Address;
@@ -53,7 +54,7 @@ public class ClusterImpl extends ClusterGrpc.ClusterImplBase {
   }
 
   @Override
-  public void getMembers(Empty request, StreamObserver<GetMembersResponse> responseObserver) {
+  public void getMembers(GetMembersRequest request, StreamObserver<GetMembersResponse> responseObserver) {
     Collection<io.atomix.cluster.Member> members = atomix.getMembershipService().getMembers();
     responseObserver.onNext(GetMembersResponse.newBuilder()
         .addAllMembers(members.stream()
@@ -80,7 +81,7 @@ public class ClusterImpl extends ClusterGrpc.ClusterImplBase {
   }
 
   @Override
-  public StreamObserver<Empty> listen(StreamObserver<MemberEvent> responseObserver) {
+  public StreamObserver<ListenRequest> listen(StreamObserver<MemberEvent> responseObserver) {
     ClusterMembershipEventListener listener = e -> {
       MemberEvent event = toEvent(e);
       if (event != null) {
@@ -89,9 +90,9 @@ public class ClusterImpl extends ClusterGrpc.ClusterImplBase {
     };
     atomix.getMembershipService().addListener(listener);
 
-    return new StreamObserver<Empty>() {
+    return new StreamObserver<ListenRequest>() {
       @Override
-      public void onNext(Empty value) {
+      public void onNext(ListenRequest value) {
       }
 
       @Override

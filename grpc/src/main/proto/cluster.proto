@@ -1,7 +1,5 @@
 syntax = "proto3";
 
-import "google/protobuf/empty.proto";
-
 package atomix.cluster;
 
 option java_package = "io.atomix.grpc.cluster";
@@ -16,6 +14,10 @@ message Member {
     string rackId = 5;
     string hostId = 6;
     map<string, string> properties = 7;
+}
+
+// Get members request
+message GetMembersRequest {
 }
 
 // Get members response
@@ -35,6 +37,10 @@ message GetMemberResponse {
     Member member = 1;
 }
 
+// Cluster listen request.
+message ListenRequest {
+}
+
 // Cluster membership event
 message MemberEvent {
     Type type = 1;
@@ -49,11 +55,11 @@ message MemberEvent {
 // The cluster service
 service Cluster {
     // Gets a list of members in the cluster
-    rpc GetMembers(google.protobuf.Empty) returns (GetMembersResponse) {}
+    rpc GetMembers(GetMembersRequest) returns (GetMembersResponse) {}
 
     // Gets a member
     rpc GetMember(GetMemberRequest) returns (GetMemberResponse) {}
 
     // Listens for events from the service
-    rpc Listen(stream google.protobuf.Empty) returns (stream MemberEvent) {}
+    rpc Listen(stream ListenRequest) returns (stream MemberEvent) {}
 }
