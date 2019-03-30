@@ -2,13 +2,13 @@ syntax = "proto3";
 
 import "protocol.proto";
 
-package atomix.map;
+package atomix.multimap;
 
-option java_package = "io.atomix.grpc.map";
+option java_package = "io.atomix.grpc.multimap";
 option java_multiple_files = true;
 
-// Basic map request
-message MapId {
+// Basic multimap request
+message MultimapId {
     string name = 1;
     oneof proto {
         protocol.MultiRaftProtocol raft = 2;
@@ -18,7 +18,7 @@ message MapId {
 }
 
 message SizeRequest {
-    MapId id = 1;
+    MultimapId id = 1;
 }
 
 message SizeResponse {
@@ -26,41 +26,29 @@ message SizeResponse {
 }
 
 message PutRequest {
-    MapId id = 1;
+    MultimapId id = 1;
     string key = 2;
     bytes value = 3;
 }
 
 message PutResponse {
-    uint64 version = 1;
-}
-
-message ReplaceRequest {
-    MapId id = 1;
-    string key = 2;
-    bytes value = 3;
-    uint64 version = 4;
-}
-
-message ReplaceResponse {
     bool succeeded = 1;
 }
 
 message GetRequest {
-    MapId id = 1;
+    MultimapId id = 1;
     string key = 2;
 }
 
 message GetResponse {
-    bytes value = 1;
+    repeated bytes values = 1;
     uint64 version = 2;
 }
 
 message RemoveRequest {
-    MapId id = 1;
+    MultimapId id = 1;
     string key = 2;
-    bytes value = 3;
-    uint64 version = 4;
+    repeated bytes values = 3;
 }
 
 message RemoveResponse {
@@ -68,35 +56,31 @@ message RemoveResponse {
 }
 
 message ClearRequest {
-    MapId id = 1;
+    MultimapId id = 1;
 }
 
 message ClearResponse {
 }
 
-// Map event
-message MapEvent {
-    MapId id = 1;
+// Multimap event
+message MultimapEvent {
+    MultimapId id = 1;
     Type type = 2;
     string key = 3;
     bytes value = 4;
-    uint64 version = 5;
 
     enum Type {
         INSERT = 0;
-        UPDATE = 1;
         REMOVE = 2;
     }
 }
 
-// Map service
-service MapService {
+// Multimap service
+service MultimapService {
 
     rpc Size(SizeRequest) returns (SizeResponse) {}
 
     rpc Put(PutRequest) returns (PutResponse) {}
-
-    rpc Replace(ReplaceRequest) returns (ReplaceResponse) {}
 
     rpc Get(GetRequest) returns (GetResponse) {}
 
@@ -104,6 +88,6 @@ service MapService {
 
     rpc Clear(ClearRequest) returns (ClearResponse) {}
 
-    rpc Listen(stream MapId) returns (stream MapEvent) {}
+    rpc Listen(stream MultimapId) returns (stream MultimapEvent) {}
 
 }
