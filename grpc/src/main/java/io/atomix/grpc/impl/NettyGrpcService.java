@@ -51,11 +51,13 @@ public class NettyGrpcService implements ManagedGrpcService {
         .addService(new ElectionServiceImpl(atomix))
         .addService(new ListServiceImpl(atomix))
         .addService(new LockServiceImpl(atomix))
+        .addService(new LogServiceImpl(atomix))
         .addService(new MapServiceImpl(atomix))
         .addService(new MultimapServiceImpl(atomix))
         .addService(new MultisetServiceImpl(atomix))
         .addService(new SemaphoreServiceImpl(atomix))
         .addService(new SetServiceImpl(atomix))
+        .addService(new TreeServiceImpl(atomix))
         .build();
     try {
       server.start();

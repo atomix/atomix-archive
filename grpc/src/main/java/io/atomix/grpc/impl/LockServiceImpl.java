@@ -51,10 +51,10 @@ public class LockServiceImpl extends LockServiceGrpc.LockServiceImplBase {
       return MultiRaftProtocol.builder(id.getRaft().getGroup())
           .build();
     } else if (id.hasMultiPrimary()) {
-      return MultiPrimaryProtocol.builder(id.getRaft().getGroup())
+      return MultiPrimaryProtocol.builder(id.getMultiPrimary().getGroup())
           .build();
     } else if (id.hasLog()) {
-      return DistributedLogProtocol.builder(id.getRaft().getGroup())
+      return DistributedLogProtocol.builder(id.getLog().getGroup())
           .build();
     }
     return null;
