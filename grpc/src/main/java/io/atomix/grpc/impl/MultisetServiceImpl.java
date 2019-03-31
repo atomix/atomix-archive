@@ -178,13 +178,13 @@ public class MultisetServiceImpl extends MultisetServiceGrpc.MultisetServiceImpl
 
       @Override
       public void onError(Throwable t) {
-        listeners.forEach((id, listener) -> getMultiset(id).thenAccept(map -> map.removeListener(listener)));
+        listeners.forEach((id, listener) -> getMultiset(id).thenAccept(multiset -> multiset.removeListener(listener)));
         responseObserver.onCompleted();
       }
 
       @Override
       public void onCompleted() {
-        listeners.forEach((id, listener) -> getMultiset(id).thenAccept(map -> map.removeListener(listener)));
+        listeners.forEach((id, listener) -> getMultiset(id).thenAccept(multiset -> multiset.removeListener(listener)));
         responseObserver.onCompleted();
       }
     };

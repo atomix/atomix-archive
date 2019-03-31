@@ -179,13 +179,13 @@ public class TreeServiceImpl extends TreeServiceGrpc.TreeServiceImplBase {
 
       @Override
       public void onError(Throwable t) {
-        listeners.forEach((id, listener) -> getTree(id).thenAccept(map -> map.removeListener(listener)));
+        listeners.forEach((id, listener) -> getTree(id).thenAccept(tree -> tree.removeListener(listener)));
         responseObserver.onCompleted();
       }
 
       @Override
       public void onCompleted() {
-        listeners.forEach((id, listener) -> getTree(id).thenAccept(map -> map.removeListener(listener)));
+        listeners.forEach((id, listener) -> getTree(id).thenAccept(tree -> tree.removeListener(listener)));
         responseObserver.onCompleted();
       }
     };

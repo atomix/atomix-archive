@@ -96,13 +96,11 @@ public class ElectionServiceImpl extends ElectionServiceGrpc.ElectionServiceImpl
   }
 
   private Leadership toLeadership(io.atomix.core.election.Leadership<String> leadership) {
-    Leadership.Builder builder = Leadership.newBuilder();
+    Leadership.Builder builder = Leadership.newBuilder()
+        .addAllCandidates(leadership.candidates());
     if (leadership.leader() != null) {
       builder.setLeader(leadership.leader().id());
       builder.setTerm(leadership.leader().term());
-    }
-    for (int i = 0; i < leadership.candidates().size(); i++) {
-      builder.setCandidates(i, leadership.candidates().get(i));
     }
     return builder.build();
   }
@@ -160,18 +158,18 @@ public class ElectionServiceImpl extends ElectionServiceGrpc.ElectionServiceImpl
               .build());
         };
         listeners.put(id, listener);
-        getElection(id).thenAccept(map -> map.addListener(listener));
+        getElection(id).thenAccept(election -> election.addListener(listener));
       }
 
       @Override
       public void onError(Throwable t) {
-        listeners.forEach((id, listener) -> getElection(id).thenAccept(map -> map.removeListener(listener)));
+        listeners.forEach((id, listener) -> getElection(id).thenAccept(election -> election.removeListener(listener)));
         responseObserver.onCompleted();
       }
 
       @Override
       public void onCompleted() {
-        listeners.forEach((id, listener) -> getElection(id).thenAccept(map -> map.removeListener(listener)));
+        listeners.forEach((id, listener) -> getElection(id).thenAccept(election -> election.removeListener(listener)));
         responseObserver.onCompleted();
       }
     };

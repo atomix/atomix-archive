@@ -76,9 +76,9 @@ public class SetServiceImpl extends SetServiceGrpc.SetServiceImplBase {
   }
 
   private <T> void run(SetId id, Function<AsyncDistributedSet<byte[]>, CompletableFuture<T>> function, StreamObserver<T> responseObserver) {
-    getSet(id).whenComplete((map, getError) -> {
+    getSet(id).whenComplete((set, getError) -> {
       if (getError == null) {
-        function.apply(map).whenComplete((result, funcError) -> {
+        function.apply(set).whenComplete((result, funcError) -> {
           if (funcError == null) {
             responseObserver.onNext(result);
             responseObserver.onCompleted();
@@ -197,13 +197,13 @@ public class SetServiceImpl extends SetServiceGrpc.SetServiceImplBase {
 
       @Override
       public void onError(Throwable t) {
-        listeners.forEach((id, listener) -> getSet(id).thenAccept(map -> map.removeListener(listener)));
+        listeners.forEach((id, listener) -> getSet(id).thenAccept(set -> set.removeListener(listener)));
         responseObserver.onCompleted();
       }
 
       @Override
       public void onCompleted() {
-        listeners.forEach((id, listener) -> getSet(id).thenAccept(map -> map.removeListener(listener)));
+        listeners.forEach((id, listener) -> getSet(id).thenAccept(set -> set.removeListener(listener)));
         responseObserver.onCompleted();
       }
     };

@@ -96,12 +96,12 @@ public class MultimapServiceImpl extends MultimapServiceGrpc.MultimapServiceImpl
 
   @Override
   public void size(SizeRequest request, StreamObserver<SizeResponse> responseObserver) {
-    run(request.getId(), map -> map.size().thenApply(size -> SizeResponse.newBuilder().setSize(size).build()), responseObserver);
+    run(request.getId(), multimap -> multimap.size().thenApply(size -> SizeResponse.newBuilder().setSize(size).build()), responseObserver);
   }
 
   @Override
   public void put(PutRequest request, StreamObserver<PutResponse> responseObserver) {
-    run(request.getId(), map -> map.put(request.getKey(), request.getValue().toByteArray())
+    run(request.getId(), multimap -> multimap.put(request.getKey(), request.getValue().toByteArray())
         .thenApply(succeeded -> PutResponse.newBuilder()
             .setSucceeded(succeeded)
             .build()), responseObserver);
@@ -109,7 +109,7 @@ public class MultimapServiceImpl extends MultimapServiceGrpc.MultimapServiceImpl
 
   @Override
   public void get(GetRequest request, StreamObserver<GetResponse> responseObserver) {
-    run(request.getId(), map -> map.get(request.getKey())
+    run(request.getId(), multimap -> multimap.get(request.getKey())
         .thenApply(versioned ->  GetResponse.newBuilder()
               .addAllValues(versioned.value().stream().map(ByteString::copyFrom).collect(Collectors.toSet()))
               .setVersion(versioned.version())
@@ -124,12 +124,12 @@ public class MultimapServiceImpl extends MultimapServiceGrpc.MultimapServiceImpl
               .setSucceeded(true)
               .build()), responseObserver);
     } else if (request.getValuesCount() == 1) {
-      run(request.getId(), map -> map.remove(request.getKey(), request.getValues(0).toByteArray())
+      run(request.getId(), multimap -> multimap.remove(request.getKey(), request.getValues(0).toByteArray())
           .thenApply(succeeded -> RemoveResponse.newBuilder()
               .setSucceeded(true)
               .build()), responseObserver);
     } else {
-      run(request.getId(), map -> map.removeAll(request.getKey(), request.getValuesList()
+      run(request.getId(), multimap -> multimap.removeAll(request.getKey(), request.getValuesList()
           .stream()
           .map(ByteString::toByteArray)
           .collect(Collectors.toSet()))
@@ -141,7 +141,7 @@ public class MultimapServiceImpl extends MultimapServiceGrpc.MultimapServiceImpl
 
   @Override
   public void clear(ClearRequest request, StreamObserver<ClearResponse> responseObserver) {
-    run(request.getId(), map -> map.clear().thenApply(v -> ClearResponse.newBuilder().build()), responseObserver);
+    run(request.getId(), multimap -> multimap.clear().thenApply(v -> ClearResponse.newBuilder().build()), responseObserver);
   }
 
   @Override
@@ -176,13 +176,13 @@ public class MultimapServiceImpl extends MultimapServiceGrpc.MultimapServiceImpl
 
       @Override
       public void onError(Throwable t) {
-        listeners.forEach((id, listener) -> getMultimap(id).thenAccept(map -> map.removeListener(listener)));
+        listeners.forEach((id, listener) -> getMultimap(id).thenAccept(multimap -> multimap.removeListener(listener)));
         responseObserver.onCompleted();
       }
 
       @Override
       public void onCompleted() {
-        listeners.forEach((id, listener) -> getMultimap(id).thenAccept(map -> map.removeListener(listener)));
+        listeners.forEach((id, listener) -> getMultimap(id).thenAccept(multimap -> multimap.removeListener(listener)));
         responseObserver.onCompleted();
       }
     };
