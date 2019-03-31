@@ -30,11 +30,15 @@ import io.atomix.grpc.multiset.ClearRequest;
 import io.atomix.grpc.multiset.ClearResponse;
 import io.atomix.grpc.multiset.ContainsRequest;
 import io.atomix.grpc.multiset.ContainsResponse;
+import io.atomix.grpc.multiset.CountRequest;
+import io.atomix.grpc.multiset.CountResponse;
 import io.atomix.grpc.multiset.MultisetEvent;
 import io.atomix.grpc.multiset.MultisetId;
 import io.atomix.grpc.multiset.MultisetServiceGrpc;
 import io.atomix.grpc.multiset.RemoveRequest;
 import io.atomix.grpc.multiset.RemoveResponse;
+import io.atomix.grpc.multiset.SetRequest;
+import io.atomix.grpc.multiset.SetResponse;
 import io.atomix.grpc.multiset.SizeRequest;
 import io.atomix.grpc.multiset.SizeResponse;
 import io.atomix.primitive.protocol.ProxyProtocol;
@@ -98,6 +102,19 @@ public class MultisetServiceImpl extends MultisetServiceGrpc.MultisetServiceImpl
     run(request.getId(), multiset -> multiset.add(
         request.getValue().toByteArray(), request.getOccurrences() > 0 ? request.getOccurrences() : 1)
         .thenApply(count -> AddResponse.newBuilder().setCount(count).build()), responseObserver);
+  }
+
+  @Override
+  public void set(SetRequest request, StreamObserver<SetResponse> responseObserver) {
+    run(request.getId(), multiset -> multiset.setCount(
+        request.getValue().toByteArray(), request.getCount())
+        .thenApply(count -> SetResponse.newBuilder().setCount(count).build()), responseObserver);
+  }
+
+  @Override
+  public void count(CountRequest request, StreamObserver<CountResponse> responseObserver) {
+    run(request.getId(), multiset -> multiset.count(request.getValue().toByteArray())
+        .thenApply(count -> CountResponse.newBuilder().setCount(count).build()), responseObserver);
   }
 
   @Override
