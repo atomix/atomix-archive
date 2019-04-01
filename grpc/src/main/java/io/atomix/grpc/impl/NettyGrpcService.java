@@ -55,6 +55,7 @@ public class NettyGrpcService implements ManagedGrpcService {
         .addService(new MapServiceImpl(atomix))
         .addService(new MultimapServiceImpl(atomix))
         .addService(new MultisetServiceImpl(atomix))
+        .addService(new PrimitivesServiceImpl(atomix))
         .addService(new SemaphoreServiceImpl(atomix))
         .addService(new SetServiceImpl(atomix))
         .addService(new TreeServiceImpl(atomix))
