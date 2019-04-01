@@ -102,4 +102,61 @@ public class LogServiceImplTest extends GrpcServiceTest<LogServiceGrpc.LogServic
     latch.await(5, TimeUnit.SECONDS);
     assertEquals(0, latch.getCount());
   }
+
+  @Test
+  public void testLogPartitionService() throws Exception {
+    LogServiceGrpc.LogServiceStub log1 = getStub(1);
+    LogServiceGrpc.LogServiceStub log2 = getStub(2);
+
+    LogId logId = LogId.newBuilder()
+        .setLog(DistributedLogProtocol.newBuilder().build())
+        .build();
+
+    CountDownLatch latch = new CountDownLatch(1);
+    log1.consume(ConsumeRequest.newBuilder()
+        .setId(logId)
+        .setPartition(1)
+        .build(), new StreamObserver<LogRecord>() {
+      @Override
+      public void onNext(LogRecord value) {
+        latch.countDown();
+      }
+
+      @Override
+      public void onError(Throwable t) {
+
+      }
+
+      @Override
+      public void onCompleted() {
+
+      }
+    });
+
+    StreamObserver<ProduceRequest> produce = log2.produce(new StreamObserver<ProduceResponse>() {
+      @Override
+      public void onNext(ProduceResponse value) {
+
+      }
+
+      @Override
+      public void onError(Throwable t) {
+
+      }
+
+      @Override
+      public void onCompleted() {
+
+      }
+    });
+
+    produce.onNext(ProduceRequest.newBuilder()
+        .setId(logId)
+        .setPartition(1)
+        .setValue(ByteString.copyFrom("Hello world!".getBytes()))
+        .build());
+
+    latch.await(5, TimeUnit.SECONDS);
+    assertEquals(0, latch.getCount());
+  }
 }

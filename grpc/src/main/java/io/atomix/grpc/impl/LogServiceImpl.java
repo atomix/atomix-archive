@@ -66,12 +66,21 @@ public class LogServiceImpl extends LogServiceGrpc.LogServiceImplBase {
         logs.computeIfAbsent(request.getId(), id -> getLog(id))
             .whenComplete((log, error) -> {
               if (error == null) {
-                log.produce(request.getValue().toByteArray())
-                    .whenComplete((produceResult, produceError) -> {
-                      if (produceError != null) {
-                        responseObserver.onError(produceError);
-                      }
-                    });
+                if (request.getPartition() == 0) {
+                  log.produce(request.getValue().toByteArray())
+                      .whenComplete((produceResult, produceError) -> {
+                        if (produceError != null) {
+                          responseObserver.onError(produceError);
+                        }
+                      });
+                } else {
+                  log.getPartition(request.getPartition()).produce(request.getValue().toByteArray())
+                      .whenComplete((produceResult, produceError) -> {
+                        if (produceError != null) {
+                          responseObserver.onError(produceError);
+                        }
+                      });
+                }
               } else {
                 responseObserver.onError(error);
               }
