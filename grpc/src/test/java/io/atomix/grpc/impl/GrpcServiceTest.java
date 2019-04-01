@@ -31,6 +31,7 @@ import java.util.concurrent.TimeUnit;
 import io.atomix.cluster.Node;
 import io.atomix.cluster.discovery.BootstrapDiscoveryProvider;
 import io.atomix.core.Atomix;
+import io.atomix.protocols.log.partition.LogPartitionGroup;
 import io.atomix.protocols.raft.partition.RaftPartitionGroup;
 import io.grpc.BindableService;
 import io.grpc.Channel;
@@ -56,7 +57,7 @@ public abstract class GrpcServiceTest<T extends AbstractStub<T>> {
    * @return the Atomix instance
    */
   protected Atomix atomix(int instance) {
-    return instances.get(instance-1);
+    return instances.get(instance - 1);
   }
 
   /**
@@ -110,7 +111,7 @@ public abstract class GrpcServiceTest<T extends AbstractStub<T>> {
   @After
   public void afterTest() throws Exception {
     for (Server server : servers) {
-      server.shutdown();
+      server.shutdownNow();
       server.awaitTermination();
     }
 
@@ -159,6 +160,11 @@ public abstract class GrpcServiceTest<T extends AbstractStub<T>> {
             .withPartitionSize(3)
             .withMembers("1", "2", "3")
             .withDataDirectory(new File("target/test-logs/" + memberId + "/data"))
+            .build())
+        .addPartitionGroup(LogPartitionGroup.builder("log")
+            .withNumPartitions(3)
+            .withDataDirectory(new File("target/test-logs/" + memberId + "/log"))
+            .withMaxSize(1024 * 1024)
             .build())
         .build();
   }

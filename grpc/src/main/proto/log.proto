@@ -37,8 +37,8 @@ message LogRecord {
 // Distributed log service
 service LogService {
 
-    rpc Produce(stream ProduceRequest) returns (stream ProduceResponse) {}
+    rpc Produce(stream ProduceRequest) returns (ProduceResponse) {}
 
-    rpc Consume(stream ConsumeRequest) returns (stream LogRecord) {}
+    rpc Consume(ConsumeRequest) returns (stream LogRecord) {}
 
 }

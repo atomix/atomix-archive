@@ -66,7 +66,12 @@ public class LogServiceImpl extends LogServiceGrpc.LogServiceImplBase {
         logs.computeIfAbsent(request.getId(), id -> getLog(id))
             .whenComplete((log, error) -> {
               if (error == null) {
-                log.produce(request.getValue().toByteArray());
+                log.produce(request.getValue().toByteArray())
+                    .whenComplete((produceResult, produceError) -> {
+                      if (produceError != null) {
+                        responseObserver.onError(produceError);
+                      }
+                    });
               } else {
                 responseObserver.onError(error);
               }
@@ -90,46 +95,24 @@ public class LogServiceImpl extends LogServiceGrpc.LogServiceImplBase {
   }
 
   @Override
-  public StreamObserver<ConsumeRequest> consume(StreamObserver<LogRecord> responseObserver) {
-    Map<LogId, CompletableFuture<AsyncDistributedLog<byte[]>>> logs = new ConcurrentHashMap<>();
-    return new StreamObserver<ConsumeRequest>() {
-      @Override
-      public void onNext(ConsumeRequest request) {
-        Consumer<Record<byte[]>> consumer = record -> {
-          responseObserver.onNext(LogRecord.newBuilder()
-              .setOffset(record.offset())
-              .setTimestamp(record.timestamp())
-              .setValue(ByteString.copyFrom(record.value()))
-              .build());
-        };
-
-        logs.computeIfAbsent(request.getId(), id -> getLog(id))
-            .whenComplete((log, error) -> {
-              if (error == null) {
-                if (request.getPartition() == 0) {
-                  log.consume(consumer);
-                } else {
-                  log.getPartition(request.getPartition()).consume(consumer);
-                }
-              } else {
-                responseObserver.onError(error);
-              }
-            });
-      }
-
-      @Override
-      public void onError(Throwable t) {
-        Futures.allOf(logs.values().stream())
-            .thenAccept(logs -> Futures.allOf(logs.map(AsyncDistributedLog::close)))
-            .whenComplete((r, e) -> responseObserver.onCompleted());
-      }
-
-      @Override
-      public void onCompleted() {
-        Futures.allOf(logs.values().stream())
-            .thenAccept(logs -> Futures.allOf(logs.map(AsyncDistributedLog::close)))
-            .whenComplete((r, e) -> responseObserver.onCompleted());
-      }
+  public void consume(ConsumeRequest request, StreamObserver<LogRecord> responseObserver) {
+    Consumer<Record<byte[]>> consumer = record -> {
+      responseObserver.onNext(LogRecord.newBuilder()
+          .setOffset(record.offset())
+          .setTimestamp(record.timestamp())
+          .setValue(ByteString.copyFrom(record.value()))
+          .build());
     };
+    getLog(request.getId()).whenComplete((log, error) -> {
+      if (error == null) {
+        if (request.getPartition() == 0) {
+          log.consume(consumer);
+        } else {
+          log.getPartition(request.getPartition()).consume(consumer);
+        }
+      } else {
+        responseObserver.onError(error);
+      }
+    });
   }
 }
