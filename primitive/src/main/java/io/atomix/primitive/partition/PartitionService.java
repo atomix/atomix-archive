@@ -62,7 +62,7 @@ public interface PartitionService {
    */
   @SuppressWarnings("unchecked")
   default PartitionGroup getPartitionGroup(ProxyProtocol protocol) {
-    if (protocol.group() != null) {
+    if (protocol.group() != null && !protocol.group().equals("")) {
       PartitionGroup group = getPartitionGroup(protocol.group());
       if (group != null) {
         return group;

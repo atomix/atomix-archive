@@ -112,8 +112,8 @@ public class MapServiceImpl extends MapServiceGrpc.MapServiceImplBase {
   public void get(GetRequest request, StreamObserver<GetResponse> responseObserver) {
     run(request.getId(), map -> map.get(request.getKey())
         .thenApply(versioned -> GetResponse.newBuilder()
-            .setValue(ByteString.copyFrom(versioned.value()))
-            .setVersion(versioned.version())
+            .setValue(versioned != null ? ByteString.copyFrom(versioned.value()) : ByteString.EMPTY)
+            .setVersion(versioned != null ? versioned.version() : 0)
             .build()), responseObserver);
   }
 
