@@ -53,7 +53,7 @@ message MemberEvent {
 }
 
 // The cluster service
-service Cluster {
+service ClusterService {
     // Gets a list of members in the cluster
     rpc GetMembers(GetMembersRequest) returns (GetMembersResponse) {}
 

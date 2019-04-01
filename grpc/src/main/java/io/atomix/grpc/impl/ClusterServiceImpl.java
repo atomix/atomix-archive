@@ -21,7 +21,7 @@ import java.util.stream.Collectors;
 import io.atomix.cluster.ClusterMembershipEvent;
 import io.atomix.cluster.ClusterMembershipEventListener;
 import io.atomix.core.Atomix;
-import io.atomix.grpc.cluster.ClusterGrpc;
+import io.atomix.grpc.cluster.ClusterServiceGrpc;
 import io.atomix.grpc.cluster.GetMemberRequest;
 import io.atomix.grpc.cluster.GetMemberResponse;
 import io.atomix.grpc.cluster.GetMembersRequest;
@@ -35,10 +35,10 @@ import io.grpc.stub.StreamObserver;
 /**
  * gRPC cluster service implementation.
  */
-public class ClusterImpl extends ClusterGrpc.ClusterImplBase {
+public class ClusterServiceImpl extends ClusterServiceGrpc.ClusterServiceImplBase {
   private final Atomix atomix;
 
-  public ClusterImpl(Atomix atomix) {
+  public ClusterServiceImpl(Atomix atomix) {
     this.atomix = atomix;
   }
 
