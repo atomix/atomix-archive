@@ -61,21 +61,21 @@ public class LogServiceImplTest extends GrpcServiceTest<LogServiceGrpc.LogServic
     log1.consume(ConsumeRequest.newBuilder()
         .setId(logId)
         .build(), new StreamObserver<LogRecord>() {
-      @Override
-      public void onNext(LogRecord value) {
-        latch.countDown();
-      }
+          @Override
+          public void onNext(LogRecord value) {
+            latch.countDown();
+          }
 
-      @Override
-      public void onError(Throwable t) {
+          @Override
+          public void onError(Throwable t) {
 
-      }
+          }
 
-      @Override
-      public void onCompleted() {
+          @Override
+          public void onCompleted() {
 
-      }
-    });
+          }
+        });
 
     StreamObserver<ProduceRequest> produce = log2.produce(new StreamObserver<ProduceResponse>() {
       @Override
@@ -117,21 +117,21 @@ public class LogServiceImplTest extends GrpcServiceTest<LogServiceGrpc.LogServic
         .setId(logId)
         .setPartition(1)
         .build(), new StreamObserver<LogRecord>() {
-      @Override
-      public void onNext(LogRecord value) {
-        latch.countDown();
-      }
+          @Override
+          public void onNext(LogRecord value) {
+            latch.countDown();
+          }
 
-      @Override
-      public void onError(Throwable t) {
+          @Override
+          public void onError(Throwable t) {
 
-      }
+          }
 
-      @Override
-      public void onCompleted() {
+          @Override
+          public void onCompleted() {
 
-      }
-    });
+          }
+        });
 
     StreamObserver<ProduceRequest> produce = log2.produce(new StreamObserver<ProduceResponse>() {
       @Override
