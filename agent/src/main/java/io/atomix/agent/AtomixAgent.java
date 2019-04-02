@@ -23,6 +23,8 @@ import io.atomix.cluster.discovery.BootstrapDiscoveryConfig;
 import io.atomix.cluster.discovery.MulticastDiscoveryConfig;
 import io.atomix.core.Atomix;
 import io.atomix.core.AtomixConfig;
+import io.atomix.grpc.GrpcService;
+import io.atomix.grpc.ManagedGrpcService;
 import io.atomix.rest.ManagedRestService;
 import io.atomix.rest.RestService;
 import io.atomix.utils.net.Address;
@@ -72,6 +74,11 @@ public class AtomixAgent {
     rest.start().join();
     logger.warn("The Atomix HTTP API is BETA and is intended for development and debugging purposes only!");
     logger.info("HTTP server listening at {}", rest.address());
+
+    final ManagedGrpcService grpc = buildGrpcService(atomix, namespace);
+    grpc.start().join();
+    logger.warn("The Atomix gRPC API is BETA and is intended for development and debugging purposes only!");
+    logger.info("gRPC server listening at {}", grpc.address());
 
     synchronized (Atomix.class) {
       while (atomix.isRunning()) {
@@ -263,6 +270,18 @@ public class AtomixAgent {
         .required(false)
         .setDefault(5678)
         .help("Sets the port on which to run the HTTP server. Defaults to 5678");
+    parser.addArgument("--grpc-host")
+        .type(String.class)
+        .metavar("HOST")
+        .required(false)
+        .setDefault("0.0.0.0")
+        .help("Sets the host to which to bind the gRPC server. Defaults to 0.0.0.0 (all interfaces)");
+    parser.addArgument("--grpc-port")
+        .type(Integer.class)
+        .metavar("PORT")
+        .required(false)
+        .setDefault(5680)
+        .help("Sets the port on which to run the gRPC server. Defaults to 5680");
     return parser;
   }
 
@@ -373,6 +392,22 @@ public class AtomixAgent {
     return RestService.builder()
         .withAtomix(atomix)
         .withAddress(Address.from(httpHost, httpPort))
+        .build();
+  }
+
+  /**
+   * Builds a gRPC service for the given Atomix instance from the given namespace.
+   *
+   * @param atomix the Atomix instance
+   * @param namespace the namespace from which to build the service
+   * @return the managed gRPC service
+   */
+  private static ManagedGrpcService buildGrpcService(Atomix atomix, Namespace namespace) {
+    final String grpcHost = namespace.getString("grpc_host");
+    final Integer grpcPort = namespace.getInt("grpc_port");
+    return GrpcService.builder()
+        .withAtomix(atomix)
+        .withAddress(Address.from(grpcHost, grpcPort))
         .build();
   }
 
