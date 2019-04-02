@@ -48,7 +48,6 @@ import org.junit.Before;
 public abstract class GrpcServiceTest<T extends AbstractStub<T>> {
   private List<Atomix> instances;
   private List<Server> servers;
-  private String serverName;
 
   /**
    * Returns the Atomix instance with the given ID.
@@ -78,6 +77,25 @@ public abstract class GrpcServiceTest<T extends AbstractStub<T>> {
     Atomix atomix = atomix(instance);
     return getStub(InProcessChannelBuilder.forName(atomix.getMembershipService().getLocalMember().id().id())
         .directExecutor().build());
+  }
+
+  /**
+   * Creates a new Atomix client instance and stub.
+   *
+   * @return a new stub
+   * @throws Exception if the Atomix instance could not be started
+   */
+  protected T createStub() throws Exception {
+    Atomix atomix = buildClient(instances.size() + 1);
+    instances.add(atomix);
+    atomix.start().get(10, TimeUnit.SECONDS);
+    Server server = InProcessServerBuilder.forName(atomix.getMembershipService().getLocalMember().id().id())
+        .directExecutor()
+        .addService(getService(atomix))
+        .build()
+        .start();
+    servers.add(server);
+    return getStub(instances.size());
   }
 
   /**
@@ -166,6 +184,31 @@ public abstract class GrpcServiceTest<T extends AbstractStub<T>> {
             .withDataDirectory(new File("target/test-logs/" + memberId + "/log"))
             .withMaxSize(1024 * 1024)
             .build())
+        .build();
+  }
+
+  protected Atomix buildClient(int memberId) {
+    return Atomix.builder()
+        .withClusterId("test")
+        .withMemberId(String.valueOf(memberId))
+        .withHost("localhost")
+        .withPort(5000 + memberId)
+        .withMembershipProvider(new BootstrapDiscoveryProvider(
+            Node.builder()
+                .withId("1")
+                .withHost("localhost")
+                .withPort(5001)
+                .build(),
+            Node.builder()
+                .withId("2")
+                .withHost("localhost")
+                .withPort(5002)
+                .build(),
+            Node.builder()
+                .withId("3")
+                .withHost("localhost")
+                .withPort(5003)
+                .build()))
         .build();
   }
 
