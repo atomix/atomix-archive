@@ -23,6 +23,8 @@ import java.util.function.Consumer;
 import com.google.protobuf.ByteString;
 import io.atomix.core.Atomix;
 import io.atomix.core.log.AsyncDistributedLog;
+import io.atomix.core.log.DistributedLog;
+import io.atomix.core.log.DistributedLogType;
 import io.atomix.core.log.Record;
 import io.atomix.grpc.log.ConsumeRequest;
 import io.atomix.grpc.log.LogId;
@@ -30,8 +32,6 @@ import io.atomix.grpc.log.LogRecord;
 import io.atomix.grpc.log.LogServiceGrpc;
 import io.atomix.grpc.log.ProduceRequest;
 import io.atomix.grpc.log.ProduceResponse;
-import io.atomix.primitive.protocol.LogProtocol;
-import io.atomix.protocols.log.DistributedLogProtocol;
 import io.atomix.utils.concurrent.Futures;
 import io.grpc.stub.StreamObserver;
 
@@ -39,22 +39,10 @@ import io.grpc.stub.StreamObserver;
  * Log service implementation.
  */
 public class LogServiceImpl extends LogServiceGrpc.LogServiceImplBase {
-  private final Atomix atomix;
+  private final PrimitiveExecutor<DistributedLog<byte[]>, AsyncDistributedLog<byte[]>> executor;
 
   public LogServiceImpl(Atomix atomix) {
-    this.atomix = atomix;
-  }
-
-  private LogProtocol toProtocol(LogId id) {
-    return DistributedLogProtocol.builder(id.getLog().getGroup())
-        .build();
-  }
-
-  private CompletableFuture<AsyncDistributedLog<byte[]>> getLog(LogId id) {
-    return atomix.<byte[]>logBuilder()
-        .withProtocol(toProtocol(id))
-        .getAsync()
-        .thenApply(log -> log.async());
+    this.executor = new PrimitiveExecutor<>(atomix, DistributedLogType.instance(), DistributedLog::async);
   }
 
   @Override
@@ -63,28 +51,30 @@ public class LogServiceImpl extends LogServiceGrpc.LogServiceImplBase {
     return new StreamObserver<ProduceRequest>() {
       @Override
       public void onNext(ProduceRequest request) {
-        logs.computeIfAbsent(request.getId(), id -> getLog(id))
-            .whenComplete((log, error) -> {
-              if (error == null) {
-                if (request.getPartition() == 0) {
-                  log.produce(request.getValue().toByteArray())
-                      .whenComplete((produceResult, produceError) -> {
-                        if (produceError != null) {
-                          responseObserver.onError(produceError);
-                        }
-                      });
+        if (executor.isValidRequest(request, ProduceResponse::getDefaultInstance, responseObserver)) {
+          logs.computeIfAbsent(request.getId(), executor::getPrimitive)
+              .whenComplete((log, error) -> {
+                if (error == null) {
+                  if (request.getPartition() == 0) {
+                    log.produce(request.getValue().toByteArray())
+                        .whenComplete((produceResult, produceError) -> {
+                          if (produceError != null) {
+                            responseObserver.onError(produceError);
+                          }
+                        });
+                  } else {
+                    log.getPartition(request.getPartition()).produce(request.getValue().toByteArray())
+                        .whenComplete((produceResult, produceError) -> {
+                          if (produceError != null) {
+                            responseObserver.onError(produceError);
+                          }
+                        });
+                  }
                 } else {
-                  log.getPartition(request.getPartition()).produce(request.getValue().toByteArray())
-                      .whenComplete((produceResult, produceError) -> {
-                        if (produceError != null) {
-                          responseObserver.onError(produceError);
-                        }
-                      });
+                  responseObserver.onError(error);
                 }
-              } else {
-                responseObserver.onError(error);
-              }
-            });
+              });
+        }
       }
 
       @Override
@@ -105,23 +95,25 @@ public class LogServiceImpl extends LogServiceGrpc.LogServiceImplBase {
 
   @Override
   public void consume(ConsumeRequest request, StreamObserver<LogRecord> responseObserver) {
-    Consumer<Record<byte[]>> consumer = record -> {
-      responseObserver.onNext(LogRecord.newBuilder()
-          .setOffset(record.offset())
-          .setTimestamp(record.timestamp())
-          .setValue(ByteString.copyFrom(record.value()))
-          .build());
-    };
-    getLog(request.getId()).whenComplete((log, error) -> {
-      if (error == null) {
-        if (request.getPartition() == 0) {
-          log.consume(consumer);
+    if (executor.isValidRequest(request, LogRecord::getDefaultInstance, responseObserver)) {
+      Consumer<Record<byte[]>> consumer = record -> {
+        responseObserver.onNext(LogRecord.newBuilder()
+            .setOffset(record.offset())
+            .setTimestamp(record.timestamp())
+            .setValue(ByteString.copyFrom(record.value()))
+            .build());
+      };
+      executor.getPrimitive(request.getId()).whenComplete((log, error) -> {
+        if (error == null) {
+          if (request.getPartition() == 0) {
+            log.consume(consumer);
+          } else {
+            log.getPartition(request.getPartition()).consume(consumer);
+          }
         } else {
-          log.getPartition(request.getPartition()).consume(consumer);
+          responseObserver.onError(error);
         }
-      } else {
-        responseObserver.onError(error);
-      }
-    });
+      });
+    }
   }
 }
