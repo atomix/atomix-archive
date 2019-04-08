@@ -16,14 +16,14 @@
 package io.atomix.grpc.impl;
 
 import java.util.Map;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.function.Function;
 
 import com.google.protobuf.ByteString;
 import io.atomix.core.Atomix;
 import io.atomix.core.map.AsyncAtomicMap;
+import io.atomix.core.map.AtomicMap;
 import io.atomix.core.map.AtomicMapEventListener;
+import io.atomix.core.map.AtomicMapType;
 import io.atomix.grpc.map.ClearRequest;
 import io.atomix.grpc.map.ClearResponse;
 import io.atomix.grpc.map.GetRequest;
@@ -39,110 +39,73 @@ import io.atomix.grpc.map.ReplaceRequest;
 import io.atomix.grpc.map.ReplaceResponse;
 import io.atomix.grpc.map.SizeRequest;
 import io.atomix.grpc.map.SizeResponse;
-import io.atomix.primitive.protocol.ProxyProtocol;
-import io.atomix.protocols.backup.MultiPrimaryProtocol;
-import io.atomix.protocols.log.DistributedLogProtocol;
-import io.atomix.protocols.raft.MultiRaftProtocol;
 import io.grpc.stub.StreamObserver;
 
 /**
  * Map service implementation.
  */
 public class MapServiceImpl extends MapServiceGrpc.MapServiceImplBase {
-  private final Atomix atomix;
+  private final PrimitiveExecutor<AtomicMap<String, byte[]>, AsyncAtomicMap<String, byte[]>> executor;
 
   public MapServiceImpl(Atomix atomix) {
-    this.atomix = atomix;
-  }
-
-  private ProxyProtocol toProtocol(MapId id) {
-    if (id.hasRaft()) {
-      return MultiRaftProtocol.builder(id.getRaft().getGroup())
-          .build();
-    } else if (id.hasMultiPrimary()) {
-      return MultiPrimaryProtocol.builder(id.getMultiPrimary().getGroup())
-          .build();
-    } else if (id.hasLog()) {
-      return DistributedLogProtocol.builder(id.getLog().getGroup())
-          .build();
-    }
-    return null;
-  }
-
-  private CompletableFuture<AsyncAtomicMap<String, byte[]>> getMap(MapId id) {
-    return atomix.<String, byte[]>atomicMapBuilder(id.getName())
-        .withProtocol(toProtocol(id))
-        .getAsync()
-        .thenApply(map -> map.async());
-  }
-
-  private <T> void run(MapId id, Function<AsyncAtomicMap<String, byte[]>, CompletableFuture<T>> function, StreamObserver<T> responseObserver) {
-    getMap(id).whenComplete((map, getError) -> {
-      if (getError == null) {
-        function.apply(map).whenComplete((result, funcError) -> {
-          if (funcError == null) {
-            responseObserver.onNext(result);
-            responseObserver.onCompleted();
-          } else {
-            responseObserver.onError(funcError);
-            responseObserver.onCompleted();
-          }
-        });
-      } else {
-        responseObserver.onError(getError);
-        responseObserver.onCompleted();
-      }
-    });
+    this.executor = new PrimitiveExecutor<>(atomix, AtomicMapType.instance(), AtomicMap::async);
   }
 
   @Override
   public void size(SizeRequest request, StreamObserver<SizeResponse> responseObserver) {
-    run(request.getId(), map -> map.size().thenApply(size -> SizeResponse.newBuilder().setSize(size).build()), responseObserver);
+    executor.execute(request, SizeResponse::getDefaultInstance, responseObserver,
+        map -> map.size().thenApply(size -> SizeResponse.newBuilder().setSize(size).build()));
   }
 
   @Override
   public void put(PutRequest request, StreamObserver<PutResponse> responseObserver) {
-    run(request.getId(), map -> map.putAndGet(request.getKey(), request.getValue().toByteArray())
-        .thenApply(versioned -> PutResponse.newBuilder()
-            .setVersion(versioned.version())
-            .build()), responseObserver);
+    executor.execute(request, PutResponse::getDefaultInstance, responseObserver,
+        map -> map.putAndGet(request.getKey(), request.getValue().toByteArray())
+            .thenApply(versioned -> PutResponse.newBuilder()
+                .setVersion(versioned.version())
+                .build()));
   }
 
   @Override
   public void get(GetRequest request, StreamObserver<GetResponse> responseObserver) {
-    run(request.getId(), map -> map.get(request.getKey())
-        .thenApply(versioned -> GetResponse.newBuilder()
-            .setValue(versioned != null ? ByteString.copyFrom(versioned.value()) : ByteString.EMPTY)
-            .setVersion(versioned != null ? versioned.version() : 0)
-            .build()), responseObserver);
+    executor.execute(request, GetResponse::getDefaultInstance, responseObserver,
+        map -> map.get(request.getKey())
+            .thenApply(versioned -> GetResponse.newBuilder()
+                .setValue(versioned != null ? ByteString.copyFrom(versioned.value()) : ByteString.EMPTY)
+                .setVersion(versioned != null ? versioned.version() : 0)
+                .build()));
   }
 
   @Override
   public void replace(ReplaceRequest request, StreamObserver<ReplaceResponse> responseObserver) {
-    run(request.getId(), map -> map.replace(request.getKey(), request.getVersion(), request.getValue().toByteArray())
-        .thenApply(succeeded -> ReplaceResponse.newBuilder()
-            .setSucceeded(succeeded)
-            .build()), responseObserver);
+    executor.execute(request, ReplaceResponse::getDefaultInstance, responseObserver,
+        map -> map.replace(request.getKey(), request.getVersion(), request.getValue().toByteArray())
+            .thenApply(succeeded -> ReplaceResponse.newBuilder()
+                .setSucceeded(succeeded)
+                .build()));
   }
 
   @Override
   public void remove(RemoveRequest request, StreamObserver<RemoveResponse> responseObserver) {
     if (request.getVersion() == 0) {
-      run(request.getId(), map -> map.remove(request.getKey())
-          .thenApply(succeeded -> RemoveResponse.newBuilder()
-              .setSucceeded(true)
-              .build()), responseObserver);
+      executor.execute(request, RemoveResponse::getDefaultInstance, responseObserver,
+          map -> map.remove(request.getKey())
+              .thenApply(succeeded -> RemoveResponse.newBuilder()
+                  .setSucceeded(true)
+                  .build()));
     } else {
-      run(request.getId(), map -> map.remove(request.getKey(), request.getVersion())
-          .thenApply(succeeded -> RemoveResponse.newBuilder()
-              .setSucceeded(succeeded)
-              .build()), responseObserver);
+      executor.execute(request, RemoveResponse::getDefaultInstance, responseObserver,
+          map -> map.remove(request.getKey(), request.getVersion())
+              .thenApply(succeeded -> RemoveResponse.newBuilder()
+                  .setSucceeded(succeeded)
+                  .build()));
     }
   }
 
   @Override
   public void clear(ClearRequest request, StreamObserver<ClearResponse> responseObserver) {
-    run(request.getId(), map -> map.clear().thenApply(v -> ClearResponse.newBuilder().build()), responseObserver);
+    executor.execute(request, ClearResponse::getDefaultInstance, responseObserver,
+        map -> map.clear().thenApply(v -> ClearResponse.newBuilder().build()));
   }
 
   @Override
@@ -151,6 +114,10 @@ public class MapServiceImpl extends MapServiceGrpc.MapServiceImplBase {
     return new StreamObserver<MapId>() {
       @Override
       public void onNext(MapId id) {
+        if (!executor.isValidId(id, MapEvent::getDefaultInstance, responseObserver)) {
+          return;
+        }
+
         AtomicMapEventListener<String, byte[]> listener = event -> {
           switch (event.type()) {
             case INSERT:
@@ -181,18 +148,18 @@ public class MapServiceImpl extends MapServiceGrpc.MapServiceImplBase {
           }
         };
         listeners.put(id, listener);
-        getMap(id).thenAccept(map -> map.addListener(listener));
+        executor.getPrimitive(id).thenAccept(map -> map.addListener(listener));
       }
 
       @Override
       public void onError(Throwable t) {
-        listeners.forEach((id, listener) -> getMap(id).thenAccept(map -> map.removeListener(listener)));
+        listeners.forEach((id, listener) -> executor.getPrimitive(id).thenAccept(map -> map.removeListener(listener)));
         responseObserver.onCompleted();
       }
 
       @Override
       public void onCompleted() {
-        listeners.forEach((id, listener) -> getMap(id).thenAccept(map -> map.removeListener(listener)));
+        listeners.forEach((id, listener) -> executor.getPrimitive(id).thenAccept(map -> map.removeListener(listener)));
         responseObserver.onCompleted();
       }
     };
