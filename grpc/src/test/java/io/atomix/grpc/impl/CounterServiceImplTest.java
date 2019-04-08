@@ -52,7 +52,7 @@ public class CounterServiceImplTest extends GrpcServiceTest<CounterServiceGrpc.C
   }
 
   @Test
-  public void testGrpcMap() throws Exception {
+  public void testGrpcCounter() throws Exception {
     CounterServiceGrpc.CounterServiceBlockingStub counter1 = getStub(1);
     CounterServiceGrpc.CounterServiceBlockingStub counter2 = getStub(2);
 
@@ -92,6 +92,7 @@ public class CounterServiceImplTest extends GrpcServiceTest<CounterServiceGrpc.C
         .setDelta(2)
         .build())
         .getValue());
+    Thread.sleep(100);
     assertEquals(4, counter1.get(GetRequest.newBuilder().setId(counterId).build()).getValue());
     assertEquals(2, counter2.decrement(DecrementRequest.newBuilder()
         .setId(counterId)

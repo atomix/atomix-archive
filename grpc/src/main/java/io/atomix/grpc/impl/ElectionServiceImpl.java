@@ -16,12 +16,12 @@
 package io.atomix.grpc.impl;
 
 import java.util.Map;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.function.Function;
 
 import io.atomix.core.Atomix;
 import io.atomix.core.election.AsyncLeaderElection;
+import io.atomix.core.election.LeaderElection;
+import io.atomix.core.election.LeaderElectionType;
 import io.atomix.core.election.LeadershipEventListener;
 import io.atomix.grpc.election.AnointRequest;
 import io.atomix.grpc.election.AnointResponse;
@@ -39,60 +39,16 @@ import io.atomix.grpc.election.RunRequest;
 import io.atomix.grpc.election.RunResponse;
 import io.atomix.grpc.election.WithdrawRequest;
 import io.atomix.grpc.election.WithdrawResponse;
-import io.atomix.primitive.protocol.ProxyProtocol;
-import io.atomix.protocols.backup.MultiPrimaryProtocol;
-import io.atomix.protocols.log.DistributedLogProtocol;
-import io.atomix.protocols.raft.MultiRaftProtocol;
 import io.grpc.stub.StreamObserver;
 
 /**
  * Election service implementation.
  */
 public class ElectionServiceImpl extends ElectionServiceGrpc.ElectionServiceImplBase {
-  private final Atomix atomix;
+  private final PrimitiveExecutor<LeaderElection<String>, AsyncLeaderElection<String>> executor;
 
   public ElectionServiceImpl(Atomix atomix) {
-    this.atomix = atomix;
-  }
-
-  private ProxyProtocol toProtocol(ElectionId id) {
-    if (id.hasRaft()) {
-      return MultiRaftProtocol.builder(id.getRaft().getGroup())
-          .build();
-    } else if (id.hasMultiPrimary()) {
-      return MultiPrimaryProtocol.builder(id.getMultiPrimary().getGroup())
-          .build();
-    } else if (id.hasLog()) {
-      return DistributedLogProtocol.builder(id.getLog().getGroup())
-          .build();
-    }
-    return null;
-  }
-
-  private CompletableFuture<AsyncLeaderElection<String>> getElection(ElectionId id) {
-    return atomix.<String>leaderElectionBuilder(id.getName())
-        .withProtocol(toProtocol(id))
-        .getAsync()
-        .thenApply(election -> election.async());
-  }
-
-  private <T> void run(ElectionId id, Function<AsyncLeaderElection<String>, CompletableFuture<T>> function, StreamObserver<T> responseObserver) {
-    getElection(id).whenComplete((election, getError) -> {
-      if (getError == null) {
-        function.apply(election).whenComplete((result, funcError) -> {
-          if (funcError == null) {
-            responseObserver.onNext(result);
-            responseObserver.onCompleted();
-          } else {
-            responseObserver.onError(funcError);
-            responseObserver.onCompleted();
-          }
-        });
-      } else {
-        responseObserver.onError(getError);
-        responseObserver.onCompleted();
-      }
-    });
+    this.executor = new PrimitiveExecutor<>(atomix, LeaderElectionType.instance(), LeaderElection::async);
   }
 
   private Leadership toLeadership(io.atomix.core.election.Leadership<String> leadership) {
@@ -107,42 +63,48 @@ public class ElectionServiceImpl extends ElectionServiceGrpc.ElectionServiceImpl
 
   @Override
   public void getLeadership(GetLeadershipRequest request, StreamObserver<GetLeadershipResponse> responseObserver) {
-    run(request.getId(), election -> election.getLeadership()
-        .thenApply(leadership -> GetLeadershipResponse.newBuilder()
-            .setLeadership(toLeadership(leadership))
-            .build()), responseObserver);
+    executor.execute(request, GetLeadershipResponse::getDefaultInstance, responseObserver,
+        election -> election.getLeadership()
+            .thenApply(leadership -> GetLeadershipResponse.newBuilder()
+                .setLeadership(toLeadership(leadership))
+                .build()));
   }
 
   @Override
   public void run(RunRequest request, StreamObserver<RunResponse> responseObserver) {
-    run(request.getId(), election -> election.run(request.getCandidate())
-        .thenApply(leadership -> RunResponse.newBuilder()
-            .setLeadership(toLeadership(leadership))
-            .build()), responseObserver);
+    executor.execute(request, RunResponse::getDefaultInstance, responseObserver,
+        election -> election.run(request.getCandidate())
+            .thenApply(leadership -> RunResponse.newBuilder()
+                .setLeadership(toLeadership(leadership))
+                .build()));
   }
 
   @Override
   public void withdraw(WithdrawRequest request, StreamObserver<WithdrawResponse> responseObserver) {
-    run(request.getId(), election -> election.withdraw(request.getCandidate())
-        .thenApply(v -> WithdrawResponse.newBuilder().build()), responseObserver);
+    executor.execute(request, WithdrawResponse::getDefaultInstance, responseObserver,
+        election -> election.withdraw(request.getCandidate())
+            .thenApply(v -> WithdrawResponse.newBuilder().build()));
   }
 
   @Override
   public void anoint(AnointRequest request, StreamObserver<AnointResponse> responseObserver) {
-    run(request.getId(), election -> election.anoint(request.getCandidate())
-        .thenApply(succeeded -> AnointResponse.newBuilder().setSucceeded(succeeded).build()), responseObserver);
+    executor.execute(request, AnointResponse::getDefaultInstance, responseObserver,
+        election -> election.anoint(request.getCandidate())
+            .thenApply(succeeded -> AnointResponse.newBuilder().setSucceeded(succeeded).build()));
   }
 
   @Override
   public void promote(PromoteRequest request, StreamObserver<PromoteResponse> responseObserver) {
-    run(request.getId(), election -> election.promote(request.getCandidate())
-        .thenApply(succeeded -> PromoteResponse.newBuilder().setSucceeded(succeeded).build()), responseObserver);
+    executor.execute(request, PromoteResponse::getDefaultInstance, responseObserver,
+        election -> election.promote(request.getCandidate())
+            .thenApply(succeeded -> PromoteResponse.newBuilder().setSucceeded(succeeded).build()));
   }
 
   @Override
   public void evict(EvictRequest request, StreamObserver<EvictResponse> responseObserver) {
-    run(request.getId(), election -> election.evict(request.getCandidate())
-        .thenApply(v -> EvictResponse.newBuilder().build()), responseObserver);
+    executor.execute(request, EvictResponse::getDefaultInstance, responseObserver,
+        election -> election.evict(request.getCandidate())
+            .thenApply(v -> EvictResponse.newBuilder().build()));
   }
 
   @Override
@@ -151,25 +113,27 @@ public class ElectionServiceImpl extends ElectionServiceGrpc.ElectionServiceImpl
     return new StreamObserver<ElectionId>() {
       @Override
       public void onNext(ElectionId id) {
-        LeadershipEventListener<String> listener = event -> {
-          responseObserver.onNext(ElectionEvent.newBuilder()
-              .setId(id)
-              .setLeadership(toLeadership(event.newLeadership()))
-              .build());
-        };
-        listeners.put(id, listener);
-        getElection(id).thenAccept(election -> election.addListener(listener));
+        if (executor.isValidId(id, ElectionEvent::getDefaultInstance, responseObserver)) {
+          LeadershipEventListener<String> listener = event -> {
+            responseObserver.onNext(ElectionEvent.newBuilder()
+                .setId(id)
+                .setLeadership(toLeadership(event.newLeadership()))
+                .build());
+          };
+          listeners.put(id, listener);
+          executor.getPrimitive(id).thenAccept(election -> election.addListener(listener));
+        }
       }
 
       @Override
       public void onError(Throwable t) {
-        listeners.forEach((id, listener) -> getElection(id).thenAccept(election -> election.removeListener(listener)));
+        listeners.forEach((id, listener) -> executor.getPrimitive(id).thenAccept(election -> election.removeListener(listener)));
         responseObserver.onCompleted();
       }
 
       @Override
       public void onCompleted() {
-        listeners.forEach((id, listener) -> getElection(id).thenAccept(election -> election.removeListener(listener)));
+        listeners.forEach((id, listener) -> executor.getPrimitive(id).thenAccept(election -> election.removeListener(listener)));
         responseObserver.onCompleted();
       }
     };
