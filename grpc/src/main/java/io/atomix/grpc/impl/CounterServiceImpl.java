@@ -17,7 +17,10 @@ package io.atomix.grpc.impl;
 
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
+import java.util.function.Predicate;
+import java.util.function.Supplier;
 
+import com.google.protobuf.Message;
 import io.atomix.core.Atomix;
 import io.atomix.core.counter.AsyncAtomicCounter;
 import io.atomix.grpc.counter.CasRequest;
@@ -36,6 +39,9 @@ import io.atomix.primitive.protocol.ProxyProtocol;
 import io.atomix.protocols.backup.MultiPrimaryProtocol;
 import io.atomix.protocols.log.DistributedLogProtocol;
 import io.atomix.protocols.raft.MultiRaftProtocol;
+import io.grpc.Metadata;
+import io.grpc.Status;
+import io.grpc.protobuf.ProtoUtils;
 import io.grpc.stub.StreamObserver;
 
 /**
@@ -88,33 +94,76 @@ public class CounterServiceImpl extends CounterServiceGrpc.CounterServiceImplBas
     });
   }
 
+  private <T extends Message, U extends Message> boolean isValidRequest(
+      T request,
+      Predicate<T> idPredicate,
+      Predicate<T> protocolPredicate,
+      Supplier<U> responseSupplier,
+      StreamObserver<U> responseObserver) {
+    if (!idPredicate.test(request)) {
+      U response = responseSupplier.get();
+      Metadata.Key<U> key = ProtoUtils.keyForProto(response);
+      Metadata metadata = new Metadata();
+      metadata.put(key, response);
+      responseObserver.onError(Status.INVALID_ARGUMENT
+          .withDescription("Set ID not specified")
+          .asRuntimeException(metadata));
+      return false;
+    }
+    if (!protocolPredicate.test(request)) {
+      U response = responseSupplier.get();
+      Metadata.Key<U> key = ProtoUtils.keyForProto(response);
+      Metadata metadata = new Metadata();
+      metadata.put(key, response);
+      responseObserver.onError(Status.INVALID_ARGUMENT
+          .withDescription("Set protocol not specified")
+          .asRuntimeException(metadata));
+      return false;
+    }
+    return true;
+  }
+
+  private boolean hasProtocol(CounterId id) {
+    return id.hasOneof(id.getDescriptorForType().getOneofs().get(0));
+  }
+
   @Override
   public void set(SetRequest request, StreamObserver<SetResponse> responseObserver) {
-    run(request.getId(), counter -> counter.set(request.getValue())
-        .thenApply(v -> SetResponse.newBuilder().build()), responseObserver);
+    if (isValidRequest(request, SetRequest::hasId, r -> hasProtocol(r.getId()), SetResponse::getDefaultInstance, responseObserver)) {
+      run(request.getId(), counter -> counter.set(request.getValue())
+          .thenApply(v -> SetResponse.newBuilder().build()), responseObserver);
+    }
   }
 
   @Override
   public void get(GetRequest request, StreamObserver<GetResponse> responseObserver) {
-    run(request.getId(), counter -> counter.get()
-        .thenApply(value -> GetResponse.newBuilder().setValue(value).build()), responseObserver);
+    if (isValidRequest(request, GetRequest::hasId, r -> hasProtocol(r.getId()), GetResponse::getDefaultInstance, responseObserver)) {
+      run(request.getId(), counter -> counter.get()
+          .thenApply(value -> GetResponse.newBuilder().setValue(value).build()), responseObserver);
+    }
   }
 
   @Override
   public void cas(CasRequest request, StreamObserver<CasResponse> responseObserver) {
-    run(request.getId(), counter -> counter.compareAndSet(request.getExpect(), request.getUpdate())
-        .thenApply(succeeded -> CasResponse.newBuilder().setSucceeded(succeeded).build()), responseObserver);
+    if (isValidRequest(request, CasRequest::hasId, r -> hasProtocol(r.getId()), CasResponse::getDefaultInstance, responseObserver)) {
+      run(request.getId(), counter -> counter.compareAndSet(request.getExpect(), request.getUpdate())
+          .thenApply(succeeded -> CasResponse.newBuilder().setSucceeded(succeeded).build()), responseObserver);
+    }
   }
 
   @Override
   public void increment(IncrementRequest request, StreamObserver<IncrementResponse> responseObserver) {
-    run(request.getId(), counter -> counter.addAndGet(request.getDelta() != 0 ? request.getDelta() : 1)
-        .thenApply(value -> IncrementResponse.newBuilder().setValue(value).build()), responseObserver);
+    if (isValidRequest(request, IncrementRequest::hasId, r -> hasProtocol(r.getId()), IncrementResponse::getDefaultInstance, responseObserver)) {
+      run(request.getId(), counter -> counter.addAndGet(request.getDelta() != 0 ? request.getDelta() : 1)
+          .thenApply(value -> IncrementResponse.newBuilder().setValue(value).build()), responseObserver);
+    }
   }
 
   @Override
   public void decrement(DecrementRequest request, StreamObserver<DecrementResponse> responseObserver) {
-    run(request.getId(), counter -> counter.addAndGet(-(request.getDelta() != 0 ? request.getDelta() : 1))
-        .thenApply(value -> DecrementResponse.newBuilder().setValue(value).build()), responseObserver);
+    if (isValidRequest(request, DecrementRequest::hasId, r -> hasProtocol(r.getId()), DecrementResponse::getDefaultInstance, responseObserver)) {
+      run(request.getId(), counter -> counter.addAndGet(-(request.getDelta() != 0 ? request.getDelta() : 1))
+          .thenApply(value -> DecrementResponse.newBuilder().setValue(value).build()), responseObserver);
+    }
   }
 }
