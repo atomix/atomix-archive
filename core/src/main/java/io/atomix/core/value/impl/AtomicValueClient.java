@@ -16,6 +16,7 @@
 package io.atomix.core.value.impl;
 
 import io.atomix.primitive.event.Event;
+import io.atomix.utils.time.Versioned;
 
 /**
  * Atomic value client.
@@ -29,6 +30,6 @@ public interface AtomicValueClient {
    * @param oldValue the previous value
    */
   @Event
-  void change(byte[] newValue, byte[] oldValue);
+  void change(Versioned<byte[]> newValue, Versioned<byte[]> oldValue);
 
 }

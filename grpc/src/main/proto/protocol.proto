@@ -19,3 +19,11 @@ message MultiPrimaryProtocol {
 message DistributedLogProtocol {
     string group = 1;
 }
+
+// Gossip protocol
+message GossipProtocol {
+}
+
+// CRDT protocol
+message CrdtProtocol {
+}

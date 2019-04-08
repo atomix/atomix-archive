@@ -61,6 +61,7 @@ public class NettyGrpcService implements ManagedGrpcService {
         .addService(new SemaphoreServiceImpl(atomix))
         .addService(new SetServiceImpl(atomix))
         .addService(new TreeServiceImpl(atomix))
+        .addService(new ValueServiceImpl(atomix))
         .build();
     try {
       server.start();

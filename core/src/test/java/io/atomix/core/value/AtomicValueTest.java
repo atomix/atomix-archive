@@ -16,6 +16,7 @@
 package io.atomix.core.value;
 
 import io.atomix.core.AbstractPrimitiveTest;
+import io.atomix.utils.time.Versioned;
 import org.junit.Test;
 
 import java.util.concurrent.BlockingQueue;
@@ -35,14 +36,14 @@ public class AtomicValueTest extends AbstractPrimitiveTest {
     AtomicValue<String> value = atomix().<String>atomicValueBuilder("test-value")
         .withProtocol(protocol())
         .build();
-    assertNull(value.get());
+    assertNull(value.get().value());
     value.set("a");
-    assertEquals("a", value.get());
-    assertFalse(value.compareAndSet("b", "c"));
-    assertTrue(value.compareAndSet("a", "b"));
-    assertEquals("b", value.get());
-    assertEquals("b", value.getAndSet("c"));
-    assertEquals("c", value.get());
+    assertEquals("a", value.get().value());
+    assertFalse(value.compareAndSet("b", "c").isPresent());
+    assertTrue(value.compareAndSet("a", "b").isPresent());
+    assertEquals("b", value.get().value());
+    assertEquals("b", value.getAndSet("c").value());
+    assertEquals("c", value.get().value());
   }
 
   @Test
@@ -59,17 +60,29 @@ public class AtomicValueTest extends AbstractPrimitiveTest {
 
     value2.addListener(listener2);
 
-    value1.set("Hello world!");
-    assertEquals("Hello world!", listener2.nextEvent().newValue());
+    Versioned<String> value;
+    AtomicValueEvent<String> event;
 
-    value1.set("Hello world again!");
-    assertEquals("Hello world again!", listener2.nextEvent().newValue());
+    value = value1.set("Hello world!");
+    event = listener2.nextEvent();
+    assertEquals("Hello world!", event.newValue().value());
+    assertEquals(value.version(), event.newValue().version());
+
+    value = value1.set("Hello world again!");
+    event = listener2.nextEvent();
+    assertEquals("Hello world again!", event.newValue().value());
+    assertEquals(value.version(), event.newValue().version());
 
     value1.addListener(listener1);
 
-    value2.set("Hello world back!");
-    assertEquals("Hello world back!", listener1.nextEvent().newValue());
-    assertEquals("Hello world back!", listener2.nextEvent().newValue());
+    value = value2.set("Hello world back!");
+    event = listener1.nextEvent();
+    assertEquals("Hello world back!", event.newValue().value());
+    assertEquals(value.version(), event.newValue().version());
+
+    event = listener2.nextEvent();
+    assertEquals("Hello world back!", event.newValue().value());
+    assertEquals(value.version(), event.newValue().version());
   }
 
   private static class BlockingAtomicValueListener<T> implements AtomicValueEventListener<T> {

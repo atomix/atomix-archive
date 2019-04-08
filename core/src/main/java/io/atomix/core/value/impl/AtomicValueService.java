@@ -17,6 +17,7 @@ package io.atomix.core.value.impl;
 
 import io.atomix.primitive.operation.Command;
 import io.atomix.primitive.operation.Query;
+import io.atomix.utils.time.Versioned;
 
 /**
  * Atomic value service.
@@ -27,9 +28,10 @@ public interface AtomicValueService {
    * Sets the value.
    *
    * @param value the value
+   * @return the updated value
    */
   @Command
-  void set(byte[] value);
+  Versioned<byte[]> set(byte[] value);
 
   /**
    * Gets the current value
@@ -37,7 +39,7 @@ public interface AtomicValueService {
    * @return the current value
    */
   @Query
-  byte[] get();
+  Versioned<byte[]> get();
 
   /**
    * Updates the value if is matches the given expected value.
@@ -46,8 +48,18 @@ public interface AtomicValueService {
    * @param update the updated value
    * @return indicates whether the update was successful
    */
-  @Command
-  boolean compareAndSet(byte[] expect, byte[] update);
+  @Command("cas")
+  Versioned<byte[]> compareAndSet(byte[] expect, byte[] update);
+
+  /**
+   * Updates the value if is matches the given expected value.
+   *
+   * @param version the expected version
+   * @param value the updated value
+   * @return indicates whether the update was successful
+   */
+  @Command("casVersion")
+  Versioned<byte[]> compareAndSet(long version, byte[] value);
 
   /**
    * Updates the value and returns the previous value.
@@ -56,7 +68,7 @@ public interface AtomicValueService {
    * @return the previous value
    */
   @Command
-  byte[] getAndSet(byte[] value);
+  Versioned<byte[]> getAndSet(byte[] value);
 
   /**
    * Adds a listener to the service.

@@ -65,17 +65,17 @@ public class DefaultAtomicValueServiceTest {
     assertNull(service.get());
 
     service.set("Hello world!".getBytes());
-    assertArrayEquals("Hello world!".getBytes(), service.get());
+    assertArrayEquals("Hello world!".getBytes(), service.get().value());
 
     buffer = HeapBuffer.allocate();
     service.backup(new DefaultBackupOutput(buffer, service.serializer()));
 
-    assertArrayEquals("Hello world!".getBytes(), service.get());
+    assertArrayEquals("Hello world!".getBytes(), service.get().value());
 
     service = new DefaultAtomicValueService();
     service.restore(new DefaultBackupInput(buffer.flip(), service.serializer()));
 
-    assertArrayEquals("Hello world!".getBytes(), service.get());
+    assertArrayEquals("Hello world!".getBytes(), service.get().value());
 
     service.set(null);
     assertNull(service.get());
