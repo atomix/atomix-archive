@@ -16,15 +16,15 @@
 package io.atomix.grpc.impl;
 
 import java.util.Map;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import com.google.protobuf.ByteString;
 import io.atomix.core.Atomix;
 import io.atomix.core.multimap.AsyncAtomicMultimap;
+import io.atomix.core.multimap.AtomicMultimap;
 import io.atomix.core.multimap.AtomicMultimapEventListener;
+import io.atomix.core.multimap.AtomicMultimapType;
 import io.atomix.grpc.multimap.ClearRequest;
 import io.atomix.grpc.multimap.ClearResponse;
 import io.atomix.grpc.multimap.GetRequest;
@@ -38,110 +38,73 @@ import io.atomix.grpc.multimap.RemoveRequest;
 import io.atomix.grpc.multimap.RemoveResponse;
 import io.atomix.grpc.multimap.SizeRequest;
 import io.atomix.grpc.multimap.SizeResponse;
-import io.atomix.primitive.protocol.ProxyProtocol;
-import io.atomix.protocols.backup.MultiPrimaryProtocol;
-import io.atomix.protocols.log.DistributedLogProtocol;
-import io.atomix.protocols.raft.MultiRaftProtocol;
 import io.grpc.stub.StreamObserver;
 
 /**
  * Multimap service implementation.
  */
 public class MultimapServiceImpl extends MultimapServiceGrpc.MultimapServiceImplBase {
-  private final Atomix atomix;
+  private final PrimitiveExecutor<AtomicMultimap<String, byte[]>, AsyncAtomicMultimap<String, byte[]>> executor;
 
   public MultimapServiceImpl(Atomix atomix) {
-    this.atomix = atomix;
-  }
-
-  private ProxyProtocol toProtocol(MultimapId id) {
-    if (id.hasRaft()) {
-      return MultiRaftProtocol.builder(id.getRaft().getGroup())
-          .build();
-    } else if (id.hasMultiPrimary()) {
-      return MultiPrimaryProtocol.builder(id.getMultiPrimary().getGroup())
-          .build();
-    } else if (id.hasLog()) {
-      return DistributedLogProtocol.builder(id.getLog().getGroup())
-          .build();
-    }
-    return null;
-  }
-
-  private CompletableFuture<AsyncAtomicMultimap<String, byte[]>> getMultimap(MultimapId id) {
-    return atomix.<String, byte[]>atomicMultimapBuilder(id.getName())
-        .withProtocol(toProtocol(id))
-        .getAsync()
-        .thenApply(multimap -> multimap.async());
-  }
-
-  private <T> void run(MultimapId id, Function<AsyncAtomicMultimap<String, byte[]>, CompletableFuture<T>> function, StreamObserver<T> responseObserver) {
-    getMultimap(id).whenComplete((multimap, getError) -> {
-      if (getError == null) {
-        function.apply(multimap).whenComplete((result, funcError) -> {
-          if (funcError == null) {
-            responseObserver.onNext(result);
-            responseObserver.onCompleted();
-          } else {
-            responseObserver.onError(funcError);
-            responseObserver.onCompleted();
-          }
-        });
-      } else {
-        responseObserver.onError(getError);
-        responseObserver.onCompleted();
-      }
-    });
+    this.executor = new PrimitiveExecutor<>(atomix, AtomicMultimapType.instance(), AtomicMultimap::async);
   }
 
   @Override
   public void size(SizeRequest request, StreamObserver<SizeResponse> responseObserver) {
-    run(request.getId(), multimap -> multimap.size().thenApply(size -> SizeResponse.newBuilder().setSize(size).build()), responseObserver);
+    executor.execute(request, SizeResponse::getDefaultInstance, responseObserver,
+        multimap -> multimap.size().thenApply(size -> SizeResponse.newBuilder().setSize(size).build()));
   }
 
   @Override
   public void put(PutRequest request, StreamObserver<PutResponse> responseObserver) {
-    run(request.getId(), multimap -> multimap.put(request.getKey(), request.getValue().toByteArray())
-        .thenApply(succeeded -> PutResponse.newBuilder()
-            .setSucceeded(succeeded)
-            .build()), responseObserver);
+    executor.execute(request, PutResponse::getDefaultInstance, responseObserver,
+        multimap -> multimap.put(request.getKey(), request.getValue().toByteArray())
+            .thenApply(succeeded -> PutResponse.newBuilder()
+                .setSucceeded(succeeded)
+                .build()));
   }
 
   @Override
   public void get(GetRequest request, StreamObserver<GetResponse> responseObserver) {
-    run(request.getId(), multimap -> multimap.get(request.getKey())
-        .thenApply(versioned ->  GetResponse.newBuilder()
-              .addAllValues(versioned.value().stream().map(ByteString::copyFrom).collect(Collectors.toSet()))
-              .setVersion(versioned.version())
-              .build()), responseObserver);
+    executor.execute(request, GetResponse::getDefaultInstance, responseObserver,
+        multimap -> multimap.get(request.getKey())
+            .thenApply(versioned ->  GetResponse.newBuilder()
+                .addAllValues(versioned.value().stream().map(ByteString::copyFrom).collect(Collectors.toSet()))
+                .setVersion(versioned.version())
+                .build()));
   }
 
   @Override
   public void remove(RemoveRequest request, StreamObserver<RemoveResponse> responseObserver) {
     if (request.getValuesCount() == 0) {
-      run(request.getId(), multimap -> multimap.removeAll(request.getKey())
-          .thenApply(succeeded -> RemoveResponse.newBuilder()
-              .setSucceeded(true)
-              .build()), responseObserver);
+      executor.execute(request, RemoveResponse::getDefaultInstance, responseObserver,
+          multimap -> multimap.removeAll(request.getKey())
+              .thenApply(succeeded -> RemoveResponse.newBuilder()
+                  .setSucceeded(true)
+                  .build()));
     } else if (request.getValuesCount() == 1) {
-      run(request.getId(), multimap -> multimap.remove(request.getKey(), request.getValues(0).toByteArray())
-          .thenApply(succeeded -> RemoveResponse.newBuilder()
-              .setSucceeded(true)
-              .build()), responseObserver);
+      executor.execute(request, RemoveResponse::getDefaultInstance, responseObserver,
+          multimap -> multimap.remove(request.getKey(), request.getValues(0).toByteArray())
+              .thenApply(succeeded -> RemoveResponse.newBuilder()
+                  .setSucceeded(true)
+                  .build()));
     } else {
-      run(request.getId(), multimap -> multimap.removeAll(request.getKey(), request.getValuesList()
-          .stream()
-          .map(ByteString::toByteArray)
-          .collect(Collectors.toSet()))
-          .thenApply(succeeded -> RemoveResponse.newBuilder()
-              .setSucceeded(true)
-              .build()), responseObserver);
+      executor.execute(request, RemoveResponse::getDefaultInstance, responseObserver,
+          multimap -> multimap.removeAll(request.getKey(), request.getValuesList()
+              .stream()
+              .map(ByteString::toByteArray)
+              .collect(Collectors.toSet()))
+              .thenApply(succeeded -> RemoveResponse.newBuilder()
+                  .setSucceeded(true)
+                  .build()));
     }
   }
 
   @Override
   public void clear(ClearRequest request, StreamObserver<ClearResponse> responseObserver) {
-    run(request.getId(), multimap -> multimap.clear().thenApply(v -> ClearResponse.newBuilder().build()), responseObserver);
+    executor.execute(request, ClearResponse::getDefaultInstance, responseObserver,
+        multimap -> multimap.clear().thenApply(v -> ClearResponse.newBuilder().build()));
   }
 
   @Override
@@ -150,6 +113,10 @@ public class MultimapServiceImpl extends MultimapServiceGrpc.MultimapServiceImpl
     return new StreamObserver<MultimapId>() {
       @Override
       public void onNext(MultimapId id) {
+        if (!executor.isValidId(id, MultimapEvent::getDefaultInstance, responseObserver)) {
+          return;
+        }
+
         AtomicMultimapEventListener<String, byte[]> listener = event -> {
           switch (event.type()) {
             case INSERT:
@@ -171,18 +138,18 @@ public class MultimapServiceImpl extends MultimapServiceGrpc.MultimapServiceImpl
           }
         };
         listeners.put(id, listener);
-        getMultimap(id).thenAccept(multimap -> multimap.addListener(listener));
+        executor.getPrimitive(id).thenAccept(multimap -> multimap.addListener(listener));
       }
 
       @Override
       public void onError(Throwable t) {
-        listeners.forEach((id, listener) -> getMultimap(id).thenAccept(multimap -> multimap.removeListener(listener)));
+        listeners.forEach((id, listener) -> executor.getPrimitive(id).thenAccept(multimap -> multimap.removeListener(listener)));
         responseObserver.onCompleted();
       }
 
       @Override
       public void onCompleted() {
-        listeners.forEach((id, listener) -> getMultimap(id).thenAccept(multimap -> multimap.removeListener(listener)));
+        listeners.forEach((id, listener) -> executor.getPrimitive(id).thenAccept(multimap -> multimap.removeListener(listener)));
         responseObserver.onCompleted();
       }
     };
