@@ -1,0 +1,90 @@
+syntax = "proto3";
+
+import "protocol.proto";
+
+package atomix.set;
+
+option java_package = "io.atomix.grpc.set";
+option java_multiple_files = true;
+
+// Set ID
+message SetId {
+    string name = 1;
+    oneof proto {
+        protocol.MultiRaftProtocol raft = 2;
+        protocol.MultiPrimaryProtocol multi_primary = 3;
+        protocol.DistributedLogProtocol log = 4;
+    }
+}
+
+message AddRequest {
+    SetId id = 1;
+    repeated bytes values = 2;
+}
+
+message AddResponse {
+    bool added = 1;
+}
+
+message RemoveRequest {
+    SetId id = 1;
+    repeated bytes values = 2;
+}
+
+message RemoveResponse {
+    bool removed = 1;
+}
+
+message ContainsRequest {
+    SetId id = 1;
+    repeated bytes values = 2;
+}
+
+message ContainsResponse {
+    bool contains = 1;
+}
+
+message SizeRequest {
+    SetId id = 1;
+}
+
+message SizeResponse {
+    uint32 size = 1;
+}
+
+message ClearRequest {
+    SetId id = 1;
+}
+
+message ClearResponse {
+}
+
+// Set event
+message SetEvent {
+    SetId id = 1;
+    Type type = 2;
+    bytes value = 3;
+
+    // Set event type
+    enum Type {
+        ADDED = 0;
+        REMOVED = 1;
+    }
+}
+
+// Set service
+service SetService {
+
+    rpc Add(AddRequest) returns (AddResponse) {}
+
+    rpc Remove(RemoveRequest) returns (RemoveResponse) {}
+
+    rpc Contains(ContainsRequest) returns (ContainsResponse) {}
+
+    rpc Size(SizeRequest) returns (SizeResponse) {}
+
+    rpc Clear(ClearRequest) returns (ClearResponse) {}
+
+    rpc Listen(stream SetId) returns (stream SetEvent) {}
+
+}

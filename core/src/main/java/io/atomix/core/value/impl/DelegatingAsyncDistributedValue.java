@@ -23,6 +23,7 @@ import io.atomix.core.value.DistributedValue;
 import io.atomix.core.value.ValueEvent;
 import io.atomix.core.value.ValueEventListener;
 import io.atomix.primitive.impl.DelegatingAsyncPrimitive;
+import io.atomix.utils.time.Versioned;
 
 import java.time.Duration;
 import java.util.Map;
@@ -40,22 +41,25 @@ public class DelegatingAsyncDistributedValue<V> extends DelegatingAsyncPrimitive
 
   @Override
   public CompletableFuture<V> get() {
-    return delegate().get();
+    return delegate().get().thenApply(Versioned::valueOrNull);
   }
 
   @Override
   public CompletableFuture<V> getAndSet(V value) {
-    return delegate().getAndSet(value);
+    return delegate().getAndSet(value).thenApply(Versioned::valueOrNull);
   }
 
   @Override
   public CompletableFuture<Void> set(V value) {
-    return delegate().set(value);
+    return delegate().set(value).thenApply(v -> null);
   }
 
   @Override
   public CompletableFuture<Void> addListener(ValueEventListener<V> listener) {
-    AtomicValueEventListener<V> eventListener = event -> listener.event(new ValueEvent<>(ValueEvent.Type.valueOf(event.type().name()), event.newValue(), event.oldValue()));
+    AtomicValueEventListener<V> eventListener = event -> listener.event(new ValueEvent<>(
+        ValueEvent.Type.valueOf(event.type().name()),
+        Versioned.valueOrNull(event.newValue()),
+        Versioned.valueOrNull(event.oldValue())));
     if (listenerMap.putIfAbsent(listener, eventListener) == null) {
       return delegate().addListener(eventListener);
     }

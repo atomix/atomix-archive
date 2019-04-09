@@ -146,4 +146,26 @@ public class AtomicLockTest extends AbstractPrimitiveTest {
 
     lock2.lock();
   }
+
+  /**
+   * Tests unlocking another process's lock.
+   */
+  @Test
+  public void testUnlockOtherLock() throws Throwable {
+    AtomicLock lock1 = atomix().atomicLockBuilder("test-blocking-unlock")
+        .withProtocol(protocol())
+        .build();
+    AtomicLock lock2 = atomix().atomicLockBuilder("test-blocking-unlock")
+        .withProtocol(protocol())
+        .build();
+
+    Version version = lock1.lock();
+    assertTrue(lock2.isLocked());
+    assertTrue(lock2.isLocked(version));
+    assertTrue(lock2.unlock(version));
+    assertFalse(lock1.isLocked());
+    assertFalse(lock1.isLocked(version));
+    assertFalse(lock2.isLocked());
+    assertFalse(lock2.isLocked(version));
+  }
 }

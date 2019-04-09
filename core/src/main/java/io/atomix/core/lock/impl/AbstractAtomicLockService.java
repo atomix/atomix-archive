@@ -192,8 +192,43 @@ public abstract class AbstractAtomicLockService extends AbstractPrimitiveService
   }
 
   @Override
-  public boolean isLocked(long version) {
-    return lock != null && (version == 0 || lock.index == version);
+  public boolean unlock(long index) {
+    // If the lock is not currently held, just return false.
+    if (lock == null) {
+      return false;
+    }
+
+    // If the index does not match the current lock index, reject the request.
+    if (index > 0 && lock.index != index) {
+      return false;
+    }
+
+    // Notify the lock holder that it has lost the lock.
+    getSession(lock.session).accept(service -> service.unlocked(lock.id, getCurrentIndex()));
+
+    // The lock has been released. Populate the lock from the queue.
+    lock = queue.poll();
+    while (lock != null) {
+      // If the waiter has a lock timer, cancel the timer.
+      Scheduled timer = timers.remove(lock.index);
+      if (timer != null) {
+        timer.cancel();
+      }
+
+      // Notify the client that it has acquired the lock.
+      Session lockSession = getSession(lock.session);
+      if (lockSession != null && lockSession.getState().active()) {
+        getSession(lock.session).accept(service -> service.locked(lock.id, getCurrentIndex()));
+        break;
+      }
+      lock = queue.poll();
+    }
+    return true;
+  }
+
+  @Override
+  public boolean isLocked(long index) {
+    return lock != null && (index == 0 || lock.index == index);
   }
 
   /**

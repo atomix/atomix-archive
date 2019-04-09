@@ -1,0 +1,77 @@
+syntax = "proto3";
+
+import "protocol.proto";
+
+package atomix.counter;
+
+option java_package = "io.atomix.grpc.counter";
+option java_multiple_files = true;
+
+// Counter ID
+message CounterId {
+    string name = 1;
+    oneof proto {
+        protocol.MultiRaftProtocol raft = 2;
+        protocol.MultiPrimaryProtocol multi_primary = 3;
+        protocol.DistributedLogProtocol log = 4;
+    }
+}
+
+message SetRequest {
+    CounterId id = 1;
+    int64 value = 2;
+}
+
+message SetResponse {
+}
+
+message GetRequest {
+    CounterId id = 1;
+}
+
+message GetResponse {
+    int64 value = 2;
+}
+
+message IncrementRequest {
+    CounterId id = 1;
+    int64 delta = 2;
+}
+
+message IncrementResponse {
+    int64 value = 2;
+}
+
+message DecrementRequest {
+    CounterId id = 1;
+    int64 delta = 2;
+}
+
+message DecrementResponse {
+    int64 value = 2;
+}
+
+message CasRequest {
+    CounterId id = 1;
+    int64 expect = 2;
+    int64 update = 3;
+}
+
+message CasResponse {
+    bool succeeded = 1;
+}
+
+// Counter service
+service CounterService {
+
+    rpc Set(SetRequest) returns (SetResponse) {}
+
+    rpc Get(GetRequest) returns (GetResponse) {}
+
+    rpc Increment(IncrementRequest) returns (IncrementResponse) {}
+
+    rpc Decrement(DecrementRequest) returns (DecrementResponse) {}
+
+    rpc Cas(CasRequest) returns (CasResponse) {}
+
+}

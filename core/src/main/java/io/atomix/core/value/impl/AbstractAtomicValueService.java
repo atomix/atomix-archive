@@ -25,6 +25,7 @@ import io.atomix.primitive.session.Session;
 import io.atomix.primitive.session.SessionId;
 import io.atomix.utils.serializer.Namespace;
 import io.atomix.utils.serializer.Serializer;
+import io.atomix.utils.time.Versioned;
 
 import java.util.Arrays;
 import java.util.Set;
@@ -38,7 +39,7 @@ public abstract class AbstractAtomicValueService extends AbstractPrimitiveServic
       .register(SessionId.class)
       .build());
 
-  private byte[] value;
+  private Versioned<byte[]> value = new Versioned<>(null, 0);
   private Set<SessionId> listeners = Sets.newHashSet();
 
   protected AbstractAtomicValueService(PrimitiveType primitiveType) {
@@ -52,54 +53,63 @@ public abstract class AbstractAtomicValueService extends AbstractPrimitiveServic
 
   @Override
   public void backup(BackupOutput writer) {
-    byte[] value = this.value;
+    Versioned<byte[]> value = this.value;
     if (value == null) {
-      value = new byte[0];
+      value = new Versioned<>(null, 0);
     }
-    writer.writeInt(value.length).writeBytes(value);
+    writer.writeObject(value);
     writer.writeObject(listeners);
   }
 
   @Override
   public void restore(BackupInput reader) {
-    value = reader.readBytes(reader.readInt());
-    if (value.length == 0) {
-      value = null;
-    }
+    value = reader.readObject();
     listeners = reader.readObject();
   }
 
-  private byte[] updateAndNotify(byte[] value) {
-    byte[] oldValue = this.value;
-    this.value = value;
-    listeners.forEach(session -> getSession(session).accept(client -> client.change(value, oldValue)));
+  private Versioned<byte[]> updateAndNotify(byte[] value) {
+    Versioned<byte[]> oldValue = this.value;
+    this.value = new Versioned<>(value, getCurrentIndex());
+    listeners.forEach(session -> getSession(session).accept(client -> client.change(this.value, oldValue)));
     return oldValue;
   }
 
   @Override
-  public void set(byte[] value) {
-    if (!Arrays.equals(this.value, value)) {
+  public Versioned<byte[]> set(byte[] value) {
+    if (!Arrays.equals(this.value.value(), value)) {
       updateAndNotify(value);
     }
+    return this.value;
   }
 
   @Override
-  public byte[] get() {
+  public Versioned<byte[]> get() {
     return value;
   }
 
   @Override
-  public boolean compareAndSet(byte[] expect, byte[] update) {
-    if (Arrays.equals(value, expect)) {
+  public Versioned<byte[]> compareAndSet(byte[] expect, byte[] update) {
+    if (Arrays.equals(value.value(), expect)) {
       updateAndNotify(update);
-      return true;
+      return value;
     }
-    return false;
+    return null;
   }
 
   @Override
-  public byte[] getAndSet(byte[] value) {
-    if (!Arrays.equals(this.value, value)) {
+  public Versioned<byte[]> compareAndSet(long version, byte[] value) {
+    if (this.value.version() == version) {
+      if (!Arrays.equals(this.value.value(), value)) {
+        updateAndNotify(value);
+      }
+      return this.value;
+    }
+    return null;
+  }
+
+  @Override
+  public Versioned<byte[]> getAndSet(byte[] value) {
+    if (!Arrays.equals(this.value.value(), value)) {
       return updateAndNotify(value);
     }
     return this.value;

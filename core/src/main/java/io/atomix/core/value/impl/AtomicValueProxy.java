@@ -23,8 +23,10 @@ import io.atomix.core.value.AtomicValueEventListener;
 import io.atomix.primitive.AbstractAsyncPrimitive;
 import io.atomix.primitive.PrimitiveRegistry;
 import io.atomix.primitive.proxy.ProxyClient;
+import io.atomix.utils.time.Versioned;
 
 import java.time.Duration;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 
@@ -39,27 +41,34 @@ public class AtomicValueProxy extends AbstractAsyncPrimitive<AsyncAtomicValue<by
   }
 
   @Override
-  public void change(byte[] newValue, byte[] oldValue) {
+  public void change(Versioned<byte[]> newValue, Versioned<byte[]> oldValue) {
     eventListeners.forEach(l -> l.event(new AtomicValueEvent<>(AtomicValueEvent.Type.UPDATE, newValue, oldValue)));
   }
 
   @Override
-  public CompletableFuture<byte[]> get() {
+  public CompletableFuture<Versioned<byte[]>> get() {
     return getProxyClient().applyBy(name(), service -> service.get());
   }
 
   @Override
-  public CompletableFuture<Void> set(byte[] value) {
-    return getProxyClient().acceptBy(name(), service -> service.set(value));
+  public CompletableFuture<Versioned<byte[]>> set(byte[] value) {
+    return getProxyClient().applyBy(name(), service -> service.set(value));
   }
 
   @Override
-  public CompletableFuture<Boolean> compareAndSet(byte[] expect, byte[] update) {
-    return getProxyClient().applyBy(name(), service -> service.compareAndSet(expect, update));
+  public CompletableFuture<Optional<Versioned<byte[]>>> compareAndSet(byte[] expect, byte[] update) {
+    return getProxyClient().applyBy(name(), service -> service.compareAndSet(expect, update))
+        .thenApply(Optional::ofNullable);
   }
 
   @Override
-  public CompletableFuture<byte[]> getAndSet(byte[] value) {
+  public CompletableFuture<Optional<Versioned<byte[]>>> compareAndSet(long version, byte[] value) {
+    return getProxyClient().applyBy(name(), service -> service.compareAndSet(version, value))
+        .thenApply(Optional::ofNullable);
+  }
+
+  @Override
+  public CompletableFuture<Versioned<byte[]>> getAndSet(byte[] value) {
     return getProxyClient().applyBy(name(), service -> service.getAndSet(value));
   }
 

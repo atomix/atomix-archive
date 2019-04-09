@@ -1,0 +1,59 @@
+syntax = "proto3";
+
+import "protocol.proto";
+
+package atomix.value;
+
+option java_package = "io.atomix.grpc.value";
+option java_multiple_files = true;
+
+// Value ID
+message ValueId {
+    string name = 1;
+    oneof proto {
+        protocol.MultiRaftProtocol raft = 2;
+        protocol.MultiPrimaryProtocol multi_primary = 3;
+        protocol.DistributedLogProtocol log = 4;
+    }
+}
+
+message SetRequest {
+    ValueId id = 1;
+    bytes value = 2;
+}
+
+message SetResponse {
+    int64 version = 1;
+}
+
+message GetRequest {
+    ValueId id = 1;
+}
+
+message GetResponse {
+    bytes value = 1;
+    int64 version = 2;
+}
+
+message CasRequest {
+    ValueId id = 1;
+    int64 version = 2;
+    bytes expect = 3;
+    bytes update = 4;
+}
+
+message CasResponse {
+    bool succeeded = 1;
+    int64 version = 2;
+}
+
+// Value service
+service ValueService {
+
+    rpc Set(SetRequest) returns (SetResponse) {}
+
+    rpc Get(GetRequest) returns (GetResponse) {}
+
+    rpc Cas(CasRequest) returns (CasResponse) {}
+
+}

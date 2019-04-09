@@ -21,6 +21,9 @@ import io.atomix.primitive.PrimitiveManagementService;
 import io.atomix.primitive.PrimitiveType;
 import io.atomix.primitive.service.PrimitiveService;
 import io.atomix.primitive.service.ServiceConfig;
+import io.atomix.utils.serializer.Namespace;
+import io.atomix.utils.serializer.Namespaces;
+import io.atomix.utils.time.Versioned;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
 
@@ -45,6 +48,17 @@ public class DistributedValueType<V> implements PrimitiveType<DistributedValueBu
   @Override
   public String name() {
     return NAME;
+  }
+
+  @Override
+  public Namespace namespace() {
+    return Namespace.builder()
+        .register(PrimitiveType.super.namespace())
+        .register(Namespaces.BASIC)
+        .nextId(Namespaces.BEGIN_USER_CUSTOM_ID)
+        .register(Versioned.class)
+        .register(byte[].class)
+        .build();
   }
 
   @Override

@@ -70,6 +70,12 @@ public class AtomicLockProxy
   }
 
   @Override
+  public void unlocked(int id, long version) {
+    // If the given lock ID is currently held, unlock it.
+    lock.compareAndSet(id, 0);
+  }
+
+  @Override
   public void failed(int id) {
     // Remove the LockAttempt from the attempts map and complete it with a null value if it exists.
     // If the attempt no longer exists, it likely was expired by a client-side timer.
@@ -147,6 +153,11 @@ public class AtomicLockProxy
       return getProxyClient().acceptBy(name(), service -> service.unlock(lock));
     }
     return CompletableFuture.completedFuture(null);
+  }
+
+  @Override
+  public CompletableFuture<Boolean> unlock(Version version) {
+    return getProxyClient().applyBy(name(), service -> service.unlock(version.value()));
   }
 
   @Override
