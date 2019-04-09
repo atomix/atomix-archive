@@ -42,10 +42,10 @@ import io.atomix.protocols.gossip.AntiEntropyProtocol;
 import io.atomix.protocols.gossip.CrdtProtocol;
 import io.atomix.protocols.log.DistributedLogProtocol;
 import io.atomix.protocols.raft.MultiRaftProtocol;
+import io.grpc.Metadata;
 import io.grpc.Status;
+import io.grpc.protobuf.ProtoUtils;
 import io.grpc.stub.StreamObserver;
-
-import static io.atomix.grpc.impl.Errors.fail;
 
 /**
  * Primitive helpers.
@@ -72,8 +72,8 @@ public class PrimitiveExecutor<S extends SyncPrimitive, A extends AsyncPrimitive
   /**
    * Executes the given function on the primitive.
    *
-   * @param request the primitive request
-   * @param function the function to execute
+   * @param request          the primitive request
+   * @param function         the function to execute
    * @param responseObserver the response observer
    */
   @SuppressWarnings("unchecked")
@@ -105,7 +105,7 @@ public class PrimitiveExecutor<S extends SyncPrimitive, A extends AsyncPrimitive
   /**
    * Validates the given request.
    *
-   * @param request the request to validate
+   * @param request          the request to validate
    * @param responseSupplier the default response supplier
    * @param responseObserver the response observer
    * @return indicates whether the request is valid
@@ -121,7 +121,7 @@ public class PrimitiveExecutor<S extends SyncPrimitive, A extends AsyncPrimitive
   /**
    * Validates the given ID.
    *
-   * @param id the primitive ID
+   * @param id               the primitive ID
    * @param responseSupplier the default response supplier
    * @param responseObserver the response observer
    * @return indicates whetehr the ID is valid
@@ -277,5 +277,22 @@ public class PrimitiveExecutor<S extends SyncPrimitive, A extends AsyncPrimitive
       return CrdtProtocol.builder().build();
     }
     return null;
+  }
+
+  /**
+   * Sends a failure response to the given observer.
+   *
+   * @param status           the response status
+   * @param message          the failure message
+   * @param responseSupplier the default response supplier
+   * @param responseObserver the response observer on which to send the error
+   */
+  private static <R extends Message> void fail(Status status, String message, Supplier<R> responseSupplier, StreamObserver<R> responseObserver) {
+    R response = responseSupplier.get();
+    Metadata.Key<R> key = ProtoUtils.keyForProto(response);
+    Metadata metadata = new Metadata();
+    metadata.put(key, response);
+    responseObserver.onError(status.withDescription(message)
+        .asRuntimeException(metadata));
   }
 }
