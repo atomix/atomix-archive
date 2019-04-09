@@ -16,15 +16,15 @@
 package io.atomix.grpc.impl;
 
 import java.util.Map;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import com.google.common.collect.Maps;
 import com.google.protobuf.ByteString;
 import io.atomix.core.Atomix;
 import io.atomix.core.tree.AsyncAtomicDocumentTree;
+import io.atomix.core.tree.AtomicDocumentTree;
+import io.atomix.core.tree.AtomicDocumentTreeType;
 import io.atomix.core.tree.DocumentTreeEventListener;
 import io.atomix.grpc.tree.GetChildrenRequest;
 import io.atomix.grpc.tree.GetChildrenResponse;
@@ -38,105 +38,66 @@ import io.atomix.grpc.tree.TreeEvent;
 import io.atomix.grpc.tree.TreeId;
 import io.atomix.grpc.tree.TreeNode;
 import io.atomix.grpc.tree.TreeServiceGrpc;
-import io.atomix.primitive.protocol.ProxyProtocol;
-import io.atomix.protocols.backup.MultiPrimaryProtocol;
-import io.atomix.protocols.log.DistributedLogProtocol;
-import io.atomix.protocols.raft.MultiRaftProtocol;
 import io.grpc.stub.StreamObserver;
 
 /**
  * Tree service implementation.
  */
 public class TreeServiceImpl extends TreeServiceGrpc.TreeServiceImplBase {
-  private final Atomix atomix;
+  private final PrimitiveExecutor<AtomicDocumentTree<byte[]>, AsyncAtomicDocumentTree<byte[]>> executor;
 
   public TreeServiceImpl(Atomix atomix) {
-    this.atomix = atomix;
-  }
-
-  private ProxyProtocol toProtocol(TreeId id) {
-    if (id.hasRaft()) {
-      return MultiRaftProtocol.builder(id.getRaft().getGroup())
-          .build();
-    } else if (id.hasMultiPrimary()) {
-      return MultiPrimaryProtocol.builder(id.getMultiPrimary().getGroup())
-          .build();
-    } else if (id.hasLog()) {
-      return DistributedLogProtocol.builder(id.getLog().getGroup())
-          .build();
-    }
-    return null;
-  }
-
-  private CompletableFuture<AsyncAtomicDocumentTree<byte[]>> getTree(TreeId id) {
-    return atomix.<byte[]>atomicDocumentTreeBuilder(id.getName())
-        .withProtocol(toProtocol(id))
-        .getAsync()
-        .thenApply(tree -> tree.async());
-  }
-
-  private <T> void run(TreeId id, Function<AsyncAtomicDocumentTree<byte[]>, CompletableFuture<T>> function, StreamObserver<T> responseObserver) {
-    getTree(id).whenComplete((tree, getError) -> {
-      if (getError == null) {
-        function.apply(tree).whenComplete((result, funcError) -> {
-          if (funcError == null) {
-            responseObserver.onNext(result);
-            responseObserver.onCompleted();
-          } else {
-            responseObserver.onError(funcError);
-            responseObserver.onCompleted();
-          }
-        });
-      } else {
-        responseObserver.onError(getError);
-        responseObserver.onCompleted();
-      }
-    });
+    this.executor = new PrimitiveExecutor<>(atomix, AtomicDocumentTreeType.instance(), AtomicDocumentTree::async);
   }
 
   @Override
   public void getChildren(GetChildrenRequest request, StreamObserver<GetChildrenResponse> responseObserver) {
-    run(request.getId(), tree -> tree.getChildren(request.getPath())
-        .thenApply(children -> GetChildrenResponse.newBuilder()
-            .putAllChildren(children.entrySet()
-                .stream()
-                .map(e -> Maps.immutableEntry(e.getKey(), TreeNode.newBuilder()
-                    .setValue(ByteString.copyFrom(e.getValue().value()))
-                    .setVersion(e.getValue().version())
-                    .build())).collect(Collectors.toMap(e -> e.getKey(), e -> e.getValue())))
-            .build()), responseObserver);
+    executor.execute(request, GetChildrenResponse::getDefaultInstance, responseObserver,
+        tree -> tree.getChildren(request.getPath())
+            .thenApply(children -> GetChildrenResponse.newBuilder()
+                .putAllChildren(children.entrySet()
+                    .stream()
+                    .map(e -> Maps.immutableEntry(e.getKey(), TreeNode.newBuilder()
+                        .setValue(ByteString.copyFrom(e.getValue().value()))
+                        .setVersion(e.getValue().version())
+                        .build())).collect(Collectors.toMap(e -> e.getKey(), e -> e.getValue())))
+                .build()));
   }
 
   @Override
   public void get(GetRequest request, StreamObserver<GetResponse> responseObserver) {
-    run(request.getId(), tree -> tree.get(request.getPath())
-        .thenApply(value -> GetResponse.newBuilder()
-            .setNode(TreeNode.newBuilder()
-                .setValue(ByteString.copyFrom(value.value()))
-                .setVersion(value.version())
-                .build())
-            .build()), responseObserver);
+    executor.execute(request, GetResponse::getDefaultInstance, responseObserver,
+        tree -> tree.get(request.getPath())
+            .thenApply(value -> GetResponse.newBuilder()
+                .setNode(TreeNode.newBuilder()
+                    .setValue(ByteString.copyFrom(value.value()))
+                    .setVersion(value.version())
+                    .build())
+                .build()));
   }
 
   @Override
   public void set(SetRequest request, StreamObserver<SetResponse> responseObserver) {
     if (request.getVersion() == 0) {
-      run(request.getId(), tree -> tree.set(request.getPath(), request.getValue().toByteArray())
-          .thenApply(result -> SetResponse.newBuilder()
-              .setSucceeded(true)
-              .build()), responseObserver);
+      executor.execute(request, SetResponse::getDefaultInstance, responseObserver,
+          tree -> tree.set(request.getPath(), request.getValue().toByteArray())
+              .thenApply(result -> SetResponse.newBuilder()
+                  .setSucceeded(true)
+                  .build()));
     } else {
-      run(request.getId(), tree -> tree.replace(request.getPath(), request.getValue().toByteArray(), request.getVersion())
-          .thenApply(succeeded -> SetResponse.newBuilder()
-              .setSucceeded(succeeded)
-              .build()), responseObserver);
+      executor.execute(request, SetResponse::getDefaultInstance, responseObserver,
+          tree -> tree.replace(request.getPath(), request.getValue().toByteArray(), request.getVersion())
+              .thenApply(succeeded -> SetResponse.newBuilder()
+                  .setSucceeded(succeeded)
+                  .build()));
     }
   }
 
   @Override
   public void remove(RemoveRequest request, StreamObserver<RemoveResponse> responseObserver) {
-    run(request.getId(), tree -> tree.remove(request.getPath())
-        .thenApply(result -> RemoveResponse.newBuilder().build()), responseObserver);
+    executor.execute(request, RemoveResponse::getDefaultInstance, responseObserver,
+        tree -> tree.remove(request.getPath())
+            .thenApply(result -> RemoveResponse.newBuilder().build()));
   }
 
   @Override
@@ -145,6 +106,10 @@ public class TreeServiceImpl extends TreeServiceGrpc.TreeServiceImplBase {
     return new StreamObserver<TreeId>() {
       @Override
       public void onNext(TreeId id) {
+        if (!executor.isValidId(id, TreeEvent::getDefaultInstance, responseObserver)) {
+          return;
+        }
+
         DocumentTreeEventListener<byte[]> listener = event -> {
           switch (event.type()) {
             case CREATED:
@@ -174,18 +139,18 @@ public class TreeServiceImpl extends TreeServiceGrpc.TreeServiceImplBase {
           }
         };
         listeners.put(id, listener);
-        getTree(id).thenAccept(tree -> tree.addListener(listener));
+        executor.getPrimitive(id).thenAccept(tree -> tree.addListener(listener));
       }
 
       @Override
       public void onError(Throwable t) {
-        listeners.forEach((id, listener) -> getTree(id).thenAccept(tree -> tree.removeListener(listener)));
+        listeners.forEach((id, listener) -> executor.getPrimitive(id).thenAccept(tree -> tree.removeListener(listener)));
         responseObserver.onCompleted();
       }
 
       @Override
       public void onCompleted() {
-        listeners.forEach((id, listener) -> getTree(id).thenAccept(tree -> tree.removeListener(listener)));
+        listeners.forEach((id, listener) -> executor.getPrimitive(id).thenAccept(tree -> tree.removeListener(listener)));
         responseObserver.onCompleted();
       }
     };
