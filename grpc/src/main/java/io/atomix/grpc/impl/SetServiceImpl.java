@@ -16,15 +16,15 @@
 package io.atomix.grpc.impl;
 
 import java.util.Map;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import com.google.protobuf.ByteString;
 import io.atomix.core.Atomix;
 import io.atomix.core.collection.CollectionEventListener;
 import io.atomix.core.set.AsyncDistributedSet;
+import io.atomix.core.set.DistributedSet;
+import io.atomix.core.set.DistributedSetType;
 import io.atomix.grpc.set.AddRequest;
 import io.atomix.grpc.set.AddResponse;
 import io.atomix.grpc.set.ClearRequest;
@@ -38,60 +38,16 @@ import io.atomix.grpc.set.SetId;
 import io.atomix.grpc.set.SetServiceGrpc;
 import io.atomix.grpc.set.SizeRequest;
 import io.atomix.grpc.set.SizeResponse;
-import io.atomix.primitive.protocol.ProxyProtocol;
-import io.atomix.protocols.backup.MultiPrimaryProtocol;
-import io.atomix.protocols.log.DistributedLogProtocol;
-import io.atomix.protocols.raft.MultiRaftProtocol;
 import io.grpc.stub.StreamObserver;
 
 /**
  * Set service implementation.
  */
 public class SetServiceImpl extends SetServiceGrpc.SetServiceImplBase {
-  private final Atomix atomix;
+  private final PrimitiveExecutor<DistributedSet<byte[]>, AsyncDistributedSet<byte[]>> executor;
 
   public SetServiceImpl(Atomix atomix) {
-    this.atomix = atomix;
-  }
-
-  private ProxyProtocol toProtocol(SetId id) {
-    if (id.hasRaft()) {
-      return MultiRaftProtocol.builder(id.getRaft().getGroup())
-          .build();
-    } else if (id.hasMultiPrimary()) {
-      return MultiPrimaryProtocol.builder(id.getMultiPrimary().getGroup())
-          .build();
-    } else if (id.hasLog()) {
-      return DistributedLogProtocol.builder(id.getLog().getGroup())
-          .build();
-    }
-    return null;
-  }
-
-  private CompletableFuture<AsyncDistributedSet<byte[]>> getSet(SetId id) {
-    return atomix.<byte[]>setBuilder(id.getName())
-        .withProtocol(toProtocol(id))
-        .getAsync()
-        .thenApply(set -> set.async());
-  }
-
-  private <T> void run(SetId id, Function<AsyncDistributedSet<byte[]>, CompletableFuture<T>> function, StreamObserver<T> responseObserver) {
-    getSet(id).whenComplete((set, getError) -> {
-      if (getError == null) {
-        function.apply(set).whenComplete((result, funcError) -> {
-          if (funcError == null) {
-            responseObserver.onNext(result);
-            responseObserver.onCompleted();
-          } else {
-            responseObserver.onError(funcError);
-            responseObserver.onCompleted();
-          }
-        });
-      } else {
-        responseObserver.onError(getError);
-        responseObserver.onCompleted();
-      }
-    });
+    this.executor = new PrimitiveExecutor<>(atomix, DistributedSetType.instance(), DistributedSet::async);
   }
 
   @Override
@@ -100,18 +56,20 @@ public class SetServiceImpl extends SetServiceGrpc.SetServiceImplBase {
       responseObserver.onNext(AddResponse.newBuilder().setAdded(false).build());
       responseObserver.onCompleted();
     } else if (request.getValuesCount() == 1) {
-      run(request.getId(), set -> set.add(request.getValues(0).toByteArray())
+      executor.execute(request, AddResponse::getDefaultInstance, responseObserver,
+          set -> set.add(request.getValues(0).toByteArray())
           .thenApply(added -> AddResponse.newBuilder()
               .setAdded(added)
-              .build()), responseObserver);
+              .build()));
     } else {
-      run(request.getId(), set -> set.addAll(request.getValuesList()
+      executor.execute(request, AddResponse::getDefaultInstance, responseObserver,
+          set -> set.addAll(request.getValuesList()
           .stream()
           .map(ByteString::toByteArray)
           .collect(Collectors.toSet()))
           .thenApply(added -> AddResponse.newBuilder()
               .setAdded(added)
-              .build()), responseObserver);
+              .build()));
     }
   }
 
@@ -121,18 +79,20 @@ public class SetServiceImpl extends SetServiceGrpc.SetServiceImplBase {
       responseObserver.onNext(RemoveResponse.newBuilder().setRemoved(false).build());
       responseObserver.onCompleted();
     } else if (request.getValuesCount() == 1) {
-      run(request.getId(), set -> set.remove(request.getValues(0).toByteArray())
+      executor.execute(request, RemoveResponse::getDefaultInstance, responseObserver,
+          set -> set.remove(request.getValues(0).toByteArray())
           .thenApply(removed -> RemoveResponse.newBuilder()
               .setRemoved(removed)
-              .build()), responseObserver);
+              .build()));
     } else {
-      run(request.getId(), set -> set.removeAll(request.getValuesList()
+      executor.execute(request, RemoveResponse::getDefaultInstance, responseObserver,
+          set -> set.removeAll(request.getValuesList()
           .stream()
           .map(ByteString::toByteArray)
           .collect(Collectors.toSet()))
           .thenApply(removed -> RemoveResponse.newBuilder()
               .setRemoved(removed)
-              .build()), responseObserver);
+              .build()));
     }
   }
 
@@ -142,29 +102,33 @@ public class SetServiceImpl extends SetServiceGrpc.SetServiceImplBase {
       responseObserver.onNext(ContainsResponse.newBuilder().setContains(false).build());
       responseObserver.onCompleted();
     } else if (request.getValuesCount() == 1) {
-      run(request.getId(), set -> set.contains(request.getValues(0).toByteArray())
+      executor.execute(request, ContainsResponse::getDefaultInstance, responseObserver,
+          set -> set.contains(request.getValues(0).toByteArray())
           .thenApply(contains -> ContainsResponse.newBuilder()
               .setContains(contains)
-              .build()), responseObserver);
+              .build()));
     } else {
-      run(request.getId(), set -> set.containsAll(request.getValuesList()
+      executor.execute(request, ContainsResponse::getDefaultInstance, responseObserver,
+          set -> set.containsAll(request.getValuesList()
           .stream()
           .map(ByteString::toByteArray)
           .collect(Collectors.toSet()))
           .thenApply(contains -> ContainsResponse.newBuilder()
               .setContains(contains)
-              .build()), responseObserver);
+              .build()));
     }
   }
 
   @Override
   public void size(SizeRequest request, StreamObserver<SizeResponse> responseObserver) {
-    run(request.getId(), set -> set.size().thenApply(size -> SizeResponse.newBuilder().setSize(size).build()), responseObserver);
+    executor.execute(request, SizeResponse::getDefaultInstance, responseObserver,
+        set -> set.size().thenApply(size -> SizeResponse.newBuilder().setSize(size).build()));
   }
 
   @Override
   public void clear(ClearRequest request, StreamObserver<ClearResponse> responseObserver) {
-    run(request.getId(), set -> set.clear().thenApply(v -> ClearResponse.newBuilder().build()), responseObserver);
+    executor.execute(request, ClearResponse::getDefaultInstance, responseObserver,
+        set -> set.clear().thenApply(v -> ClearResponse.newBuilder().build()));
   }
 
   @Override
@@ -173,6 +137,10 @@ public class SetServiceImpl extends SetServiceGrpc.SetServiceImplBase {
     return new StreamObserver<SetId>() {
       @Override
       public void onNext(SetId id) {
+        if (!executor.isValidId(id, SetEvent::getDefaultInstance, responseObserver)) {
+          return;
+        }
+
         CollectionEventListener<byte[]> listener = event -> {
           switch (event.type()) {
             case ADD:
@@ -192,18 +160,18 @@ public class SetServiceImpl extends SetServiceGrpc.SetServiceImplBase {
           }
         };
         listeners.put(id, listener);
-        getSet(id).thenAccept(set -> set.addListener(listener));
+        executor.getPrimitive(id).thenAccept(set -> set.addListener(listener));
       }
 
       @Override
       public void onError(Throwable t) {
-        listeners.forEach((id, listener) -> getSet(id).thenAccept(set -> set.removeListener(listener)));
+        listeners.forEach((id, listener) -> executor.getPrimitive(id).thenAccept(set -> set.removeListener(listener)));
         responseObserver.onCompleted();
       }
 
       @Override
       public void onCompleted() {
-        listeners.forEach((id, listener) -> getSet(id).thenAccept(set -> set.removeListener(listener)));
+        listeners.forEach((id, listener) -> executor.getPrimitive(id).thenAccept(set -> set.removeListener(listener)));
         responseObserver.onCompleted();
       }
     };
