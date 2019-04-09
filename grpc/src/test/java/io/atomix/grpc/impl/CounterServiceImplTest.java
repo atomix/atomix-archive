@@ -15,7 +15,6 @@
  */
 package io.atomix.grpc.impl;
 
-import com.google.common.util.concurrent.ListenableFuture;
 import io.atomix.core.Atomix;
 import io.atomix.grpc.counter.CounterId;
 import io.atomix.grpc.counter.CounterServiceGrpc;
@@ -23,18 +22,12 @@ import io.atomix.grpc.counter.DecrementRequest;
 import io.atomix.grpc.counter.GetRequest;
 import io.atomix.grpc.counter.IncrementRequest;
 import io.atomix.grpc.counter.SetRequest;
-import io.atomix.grpc.lock.IsLockedRequest;
-import io.atomix.grpc.lock.LockRequest;
-import io.atomix.grpc.lock.LockResponse;
-import io.atomix.grpc.lock.UnlockRequest;
 import io.atomix.grpc.protocol.MultiRaftProtocol;
 import io.grpc.BindableService;
 import io.grpc.Channel;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 /**

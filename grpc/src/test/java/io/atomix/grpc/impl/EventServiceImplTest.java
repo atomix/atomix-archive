@@ -31,7 +31,6 @@ import io.grpc.Channel;
 import io.grpc.stub.StreamObserver;
 import org.junit.Test;
 
-import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 
 /**
