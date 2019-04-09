@@ -28,6 +28,7 @@ public final class SnapshotFile {
   private static final char PART_SEPARATOR = '-';
   private static final char EXTENSION_SEPARATOR = '.';
   private static final String EXTENSION = "snapshot";
+  private static final String LOCKED = "lock";
   private final File file;
 
   /**
@@ -65,6 +66,17 @@ public final class SnapshotFile {
 
     // Otherwise, assume this is a snapshot file.
     return true;
+  }
+
+  /**
+   * Returns a boolean indicating whether the given file appears to be a locked snapshot file.
+   *
+   * @param file the file to check
+   * @return indicates whether the given file is a locked snapshot file
+   */
+  public static boolean isLockedSnapshotFile(File file) {
+    String fileName = file.getName();
+    return fileName.endsWith("." + EXTENSION + "." + LOCKED);
   }
 
   /**
@@ -106,6 +118,15 @@ public final class SnapshotFile {
    */
   SnapshotFile(File file) {
     this.file = file;
+  }
+
+  /**
+   * Returns the snapshot lock file name.
+   *
+   * @return the snapshot lock file name
+   */
+  public File temporaryFile() {
+    return new File(file.getParent(), String.format("%s.%s", file.getName(), LOCKED));
   }
 
   /**

@@ -20,6 +20,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.file.Files;
 import java.util.Objects;
 
 import io.atomix.utils.time.WallClockTimestamp;
@@ -27,6 +28,7 @@ import io.atomix.utils.time.WallClockTimestamp;
 import static com.google.common.base.MoreObjects.toStringHelper;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
+import static java.nio.file.StandardCopyOption.ATOMIC_MOVE;
 
 /**
  * Manages reading and writing a single snapshot file.
@@ -35,7 +37,6 @@ public class Snapshot implements AutoCloseable {
   private final SnapshotFile file;
   private final SnapshotDescriptor descriptor;
   private final SnapshotStore store;
-  private OutputStream output;
 
   protected Snapshot(SnapshotFile file, SnapshotDescriptor descriptor, SnapshotStore store) {
     this.file = checkNotNull(file, "file cannot be null");
@@ -72,34 +73,15 @@ public class Snapshot implements AutoCloseable {
    * @throws IllegalStateException if a writer was already created or the snapshot is {@link #complete() complete}
    */
   public OutputStream openOutputStream() throws IOException {
-    checkOutput();
-    OutputStream outputStream = new FileOutputStream(file.file());
-    descriptor.writeTo(outputStream);
-    return openOutputStream(outputStream, descriptor);
-  }
-
-  /**
-   * Checks that the snapshot can be written.
-   */
-  protected void checkOutput() {
-    checkState(output == null, "cannot create multiple output streams for the same snapshot");
-  }
-
-  /**
-   * Opens the given snapshot output stream.
-   */
-  protected OutputStream openOutputStream(OutputStream output, SnapshotDescriptor descriptor) {
-    checkOutput();
-    checkState(!descriptor.getLocked(), "cannot write to locked snapshot descriptor");
-    this.output = checkNotNull(output, "output cannot be null");
-    return output;
-  }
-
-  /**
-   * Closes the current snapshot output.
-   */
-  protected void closeOutputStream(OutputStream output) {
-    this.output = null;
+    checkState(!file.file().exists(), "Cannot write to completed snapshot");
+    OutputStream outputStream;
+    if (file.temporaryFile().exists()) {
+      outputStream = new FileOutputStream(file.temporaryFile(), true);
+    } else {
+      outputStream = new FileOutputStream(file.temporaryFile());
+      descriptor.writeDelimitedTo(outputStream);
+    }
+    return outputStream;
   }
 
   /**
@@ -111,16 +93,9 @@ public class Snapshot implements AutoCloseable {
   public InputStream openInputStream() throws IOException {
     checkState(file.file().exists(), "missing snapshot file: %s", file.file());
     InputStream inputStream = new FileInputStream(file.file());
-    SnapshotDescriptor descriptor = SnapshotDescriptor.parseDelimitedFrom(inputStream);
-    return openInputStream(inputStream, descriptor);
-  }
-
-  /**
-   * Opens the given snapshot input stream.
-   */
-  protected InputStream openInputStream(InputStream input, SnapshotDescriptor descriptor) {
-    checkState(descriptor.getLocked(), "cannot read from unlocked snapshot descriptor");
-    return input;
+    SnapshotDescriptor.parseDelimitedFrom(inputStream);
+    checkState(file.file().exists(), "Cannot read from locked snapshot");
+    return inputStream;
   }
 
   /**
@@ -128,36 +103,13 @@ public class Snapshot implements AutoCloseable {
    *
    * @return The completed snapshot.
    */
-  public Snapshot complete() {
+  public synchronized Snapshot complete() throws IOException {
+    checkState(!descriptor.getLocked(), "Snapshot is already complete");
+    if (file.temporaryFile().exists()) {
+      Files.move(file.temporaryFile().toPath(), file.file().toPath(), ATOMIC_MOVE);
+    }
     store.completeSnapshot(this);
     return this;
-  }
-
-  /**
-   * Persists the snapshot to disk if necessary.
-   * <p>
-   * If the snapshot store is backed by disk, the snapshot will be persisted.
-   *
-   * @return The persisted snapshot.
-   */
-  public Snapshot persist() {
-    OutputStream output = this.output;
-    if (output != null) {
-      try {
-        output.flush();
-      } catch (IOException e) {
-      }
-    }
-    return this;
-  }
-
-  /**
-   * Returns whether the snapshot is persisted.
-   *
-   * @return Whether the snapshot is persisted.
-   */
-  public boolean isPersisted() {
-    return true;
   }
 
   /**

@@ -15,6 +15,11 @@
  */
 package io.atomix.protocols.raft.roles;
 
+import java.io.IOException;
+import java.io.OutputStream;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+
 import io.atomix.primitive.PrimitiveException;
 import io.atomix.protocols.raft.RaftError;
 import io.atomix.protocols.raft.RaftException;
@@ -59,11 +64,6 @@ import io.atomix.protocols.raft.storage.snapshot.Snapshot;
 import io.atomix.storage.StorageException;
 import io.atomix.storage.journal.Indexed;
 import io.atomix.utils.time.WallClockTimestamp;
-
-import java.io.IOException;
-import java.io.OutputStream;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionException;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
 
@@ -788,7 +788,7 @@ public class PassiveRole extends InactiveRole {
   /**
    * Pending snapshot.
    */
-  private static class PendingSnapshot {
+  private class PendingSnapshot {
     private final Snapshot snapshot;
     private long nextOffset;
 
@@ -825,7 +825,11 @@ public class PassiveRole extends InactiveRole {
      * Commits the snapshot to disk.
      */
     public void commit() {
-      snapshot.persist().complete();
+      try {
+        snapshot.complete();
+      } catch (IOException e) {
+        log.error("Failed to persist snapshot", e);
+      }
     }
 
     /**

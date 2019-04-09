@@ -206,7 +206,7 @@ public class RaftServiceManager implements AutoCloseable {
       // Wait for snapshots in all state machines to be completed before compacting the log at the last applied index.
       takeSnapshots().whenComplete((snapshot, error) -> {
         if (error == null) {
-          scheduleCompletion(snapshot.persist());
+          scheduleCompletion(snapshot);
         }
       });
 
@@ -251,7 +251,11 @@ public class RaftServiceManager implements AutoCloseable {
     stateContext.schedule(SNAPSHOT_COMPLETION_DELAY, () -> {
       if (completeSnapshot(snapshot.index())) {
         logger.debug("Completing snapshot {}", snapshot.index());
-        snapshot.complete();
+        try {
+          snapshot.complete();
+        } catch (IOException e) {
+          logger.error("Failed to persist snapshot", e);
+        }
         // If log compaction is being forced, immediately compact the logs.
         if (!raft.getLoadMonitor().isUnderHighLoad() || isRunningOutOfDiskSpace() || isRunningOutOfMemory()) {
           compactLogs(snapshot.index());

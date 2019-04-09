@@ -35,9 +35,9 @@ import org.junit.Before;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
 
 /**
  * Snapshot store test.
@@ -68,7 +68,11 @@ public class SnapshotStoreTest {
 
     Snapshot snapshot = store.newSnapshot(2, new WallClockTimestamp());
     try (OutputStream writer = snapshot.openOutputStream()) {
-      writer.write(new byte[]{1});
+      writer.write(new byte[]{1, 2, 3, 4});
+      writer.write(new byte[]{2, 3, 4, 5});
+      writer.write(new byte[]{3, 4, 5, 6});
+      writer.write(new byte[]{4, 5, 6, 7});
+      writer.flush();
     }
     snapshot.complete();
     assertNotNull(store.getSnapshot(2));
@@ -79,7 +83,9 @@ public class SnapshotStoreTest {
     assertEquals(2, store.getSnapshot(2).index());
 
     try (InputStream reader = snapshot.openInputStream()) {
-      assertEquals(1, reader.read());
+      byte[] bytes = new byte[1];
+      assertNotEquals(-1, reader.read(bytes));
+      assertEquals(1, bytes[0]);
     }
   }
 
@@ -95,17 +101,15 @@ public class SnapshotStoreTest {
       writer.write(new byte[]{1});
     }
 
-    snapshot = snapshot.persist();
-
-    assertTrue(snapshot.isPersisted());
-
     assertNull(store.getSnapshot(2));
 
     snapshot.complete();
     assertNotNull(store.getSnapshot(2));
 
     try (InputStream reader = snapshot.openInputStream()) {
-      assertEquals(1, reader.read());
+      byte[] bytes = new byte[1];
+      reader.read(bytes);
+      assertEquals(1, bytes[0]);
     }
 
     store.close();
@@ -116,7 +120,9 @@ public class SnapshotStoreTest {
 
     snapshot = store.getSnapshot(2);
     try (InputStream reader = snapshot.openInputStream()) {
-      assertEquals(1, reader.read());
+      byte[] bytes = new byte[1];
+      reader.read(bytes);
+      assertEquals(1, bytes[0]);
     }
   }
 
@@ -137,32 +143,12 @@ public class SnapshotStoreTest {
 
     snapshot = store.getSnapshot(1);
     try (InputStream reader = snapshot.openInputStream()) {
+      byte[] bytes = new byte[1];
       for (byte i = 1; i <= 10; i++) {
-        assertEquals(i, reader.read());
+        reader.read(bytes);
+        assertEquals(i, bytes[0]);
       }
     }
-  }
-
-  @Before
-  @After
-  public void cleanupStorage() throws IOException {
-    Path directory = Paths.get("target/test-logs/");
-    if (Files.exists(directory)) {
-      Files.walkFileTree(directory, new SimpleFileVisitor<Path>() {
-        @Override
-        public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
-          Files.delete(file);
-          return FileVisitResult.CONTINUE;
-        }
-
-        @Override
-        public FileVisitResult postVisitDirectory(Path dir, IOException exc) throws IOException {
-          Files.delete(dir);
-          return FileVisitResult.CONTINUE;
-        }
-      });
-    }
-    testId = UUID.randomUUID().toString();
   }
 
   /**
@@ -200,10 +186,35 @@ public class SnapshotStoreTest {
     assertEquals(2, store.getSnapshot(2).index());
 
     try (InputStream reader = store.getSnapshot(2).openInputStream()) {
-      assertEquals(1, reader.read());
-      assertEquals(2, reader.read());
-      assertEquals(3, reader.read());
+      byte[] bytes = new byte[1];
+      reader.read(bytes);
+      assertEquals(1, bytes[0]);
+      reader.read(bytes);
+      assertEquals(2, bytes[0]);
+      reader.read(bytes);
+      assertEquals(3, bytes[0]);
     }
   }
 
+  @Before
+  @After
+  public void cleanupStorage() throws IOException {
+    Path directory = Paths.get("target/test-logs/");
+    if (Files.exists(directory)) {
+      Files.walkFileTree(directory, new SimpleFileVisitor<Path>() {
+        @Override
+        public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
+          Files.delete(file);
+          return FileVisitResult.CONTINUE;
+        }
+
+        @Override
+        public FileVisitResult postVisitDirectory(Path dir, IOException exc) throws IOException {
+          Files.delete(dir);
+          return FileVisitResult.CONTINUE;
+        }
+      });
+    }
+    testId = UUID.randomUUID().toString();
+  }
 }

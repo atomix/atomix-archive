@@ -128,25 +128,19 @@ public class SnapshotStore implements AutoCloseable {
         SnapshotFile snapshotFile = new SnapshotFile(file);
         SnapshotDescriptor descriptor = null;
         try (InputStream is = new FileInputStream(file)) {
-          descriptor = SnapshotDescriptor.parseFrom(is);
+          descriptor = SnapshotDescriptor.parseDelimitedFrom(is);
         } catch (IOException e) {
         }
 
         if (descriptor != null) {
-          // Valid segments will have been locked. Segments that resulting from failures during log cleaning will be
-          // unlocked and should ultimately be deleted from disk.
-          if (descriptor.getLocked()) {
-            log.debug("Loaded disk snapshot: {} ({})", descriptor.getIndex(), snapshotFile.file().getName());
-            snapshots.add(new Snapshot(snapshotFile, descriptor, this));
-          }
-          // If the segment descriptor wasn't locked, close and delete the descriptor.
-          else {
-            log.debug("Deleting partial snapshot: {} ({})", descriptor.getIndex(), snapshotFile.file().getName());
-            try {
-              Files.delete(file.toPath());
-            } catch (IOException e) {
-            }
-          }
+          log.debug("Loaded disk snapshot: {} ({})", descriptor.getIndex(), snapshotFile.file().getName());
+          snapshots.add(new Snapshot(snapshotFile, descriptor, this));
+        }
+      } else if (SnapshotFile.isLockedSnapshotFile(file)) {
+        log.debug("Deleting partial snapshot: {}", file.getName());
+        try {
+          Files.delete(file.toPath());
+        } catch (IOException e) {
         }
       }
     }
