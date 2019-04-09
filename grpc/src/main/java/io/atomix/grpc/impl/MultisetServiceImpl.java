@@ -16,14 +16,14 @@
 package io.atomix.grpc.impl;
 
 import java.util.Map;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.function.Function;
 
 import com.google.protobuf.ByteString;
 import io.atomix.core.Atomix;
 import io.atomix.core.collection.CollectionEventListener;
 import io.atomix.core.multiset.AsyncDistributedMultiset;
+import io.atomix.core.multiset.DistributedMultiset;
+import io.atomix.core.multiset.DistributedMultisetType;
 import io.atomix.grpc.multiset.AddRequest;
 import io.atomix.grpc.multiset.AddResponse;
 import io.atomix.grpc.multiset.ClearRequest;
@@ -41,111 +41,75 @@ import io.atomix.grpc.multiset.SetRequest;
 import io.atomix.grpc.multiset.SetResponse;
 import io.atomix.grpc.multiset.SizeRequest;
 import io.atomix.grpc.multiset.SizeResponse;
-import io.atomix.primitive.protocol.ProxyProtocol;
-import io.atomix.protocols.backup.MultiPrimaryProtocol;
-import io.atomix.protocols.log.DistributedLogProtocol;
-import io.atomix.protocols.raft.MultiRaftProtocol;
 import io.grpc.stub.StreamObserver;
 
 /**
  * Multiset service implementation.
  */
 public class MultisetServiceImpl extends MultisetServiceGrpc.MultisetServiceImplBase {
-  private final Atomix atomix;
+  private final PrimitiveExecutor<DistributedMultiset<byte[]>, AsyncDistributedMultiset<byte[]>> executor;
 
   public MultisetServiceImpl(Atomix atomix) {
-    this.atomix = atomix;
-  }
-
-  private ProxyProtocol toProtocol(MultisetId id) {
-    if (id.hasRaft()) {
-      return MultiRaftProtocol.builder(id.getRaft().getGroup())
-          .build();
-    } else if (id.hasMultiPrimary()) {
-      return MultiPrimaryProtocol.builder(id.getMultiPrimary().getGroup())
-          .build();
-    } else if (id.hasLog()) {
-      return DistributedLogProtocol.builder(id.getLog().getGroup())
-          .build();
-    }
-    return null;
-  }
-
-  private CompletableFuture<AsyncDistributedMultiset<byte[]>> getMultiset(MultisetId id) {
-    return atomix.<byte[]>multisetBuilder(id.getName())
-        .withProtocol(toProtocol(id))
-        .getAsync()
-        .thenApply(multiset -> multiset.async());
-  }
-
-  private <T> void run(MultisetId id, Function<AsyncDistributedMultiset<byte[]>, CompletableFuture<T>> function, StreamObserver<T> responseObserver) {
-    getMultiset(id).whenComplete((multiset, getError) -> {
-      if (getError == null) {
-        function.apply(multiset).whenComplete((result, funcError) -> {
-          if (funcError == null) {
-            responseObserver.onNext(result);
-            responseObserver.onCompleted();
-          } else {
-            responseObserver.onError(funcError);
-            responseObserver.onCompleted();
-          }
-        });
-      } else {
-        responseObserver.onError(getError);
-        responseObserver.onCompleted();
-      }
-    });
+    this.executor = new PrimitiveExecutor<>(atomix, DistributedMultisetType.instance(), DistributedMultiset::async);
   }
 
   @Override
   public void add(AddRequest request, StreamObserver<AddResponse> responseObserver) {
-    run(request.getId(), multiset -> multiset.add(
-        request.getValue().toByteArray(), request.getOccurrences() > 0 ? request.getOccurrences() : 1)
-        .thenApply(count -> AddResponse.newBuilder().setCount(count).build()), responseObserver);
+    executor.execute(request, AddResponse::getDefaultInstance, responseObserver,
+        multiset -> multiset.add(
+            request.getValue().toByteArray(), request.getOccurrences() > 0 ? request.getOccurrences() : 1)
+            .thenApply(count -> AddResponse.newBuilder().setCount(count).build()));
   }
 
   @Override
   public void set(SetRequest request, StreamObserver<SetResponse> responseObserver) {
-    run(request.getId(), multiset -> multiset.setCount(
-        request.getValue().toByteArray(), request.getCount())
-        .thenApply(count -> SetResponse.newBuilder().setCount(count).build()), responseObserver);
+    executor.execute(request, SetResponse::getDefaultInstance, responseObserver,
+        multiset -> multiset.setCount(
+            request.getValue().toByteArray(), request.getCount())
+            .thenApply(count -> SetResponse.newBuilder().setCount(count).build()));
   }
 
   @Override
   public void count(CountRequest request, StreamObserver<CountResponse> responseObserver) {
-    run(request.getId(), multiset -> multiset.count(request.getValue().toByteArray())
-        .thenApply(count -> CountResponse.newBuilder().setCount(count).build()), responseObserver);
+    executor.execute(request, CountResponse::getDefaultInstance, responseObserver,
+        multiset -> multiset.count(request.getValue().toByteArray())
+            .thenApply(count -> CountResponse.newBuilder().setCount(count).build()));
   }
 
   @Override
   public void remove(RemoveRequest request, StreamObserver<RemoveResponse> responseObserver) {
     if (request.getOccurrences() == 0) {
-      run(request.getId(), multiset -> multiset.remove(request.getValue().toByteArray())
-          .thenApply(count -> RemoveResponse.newBuilder().build()), responseObserver);
+      executor.execute(request, RemoveResponse::getDefaultInstance, responseObserver,
+          multiset -> multiset.remove(request.getValue().toByteArray())
+              .thenApply(count -> RemoveResponse.newBuilder().build()));
     } else {
-      run(request.getId(), multiset -> multiset.remove(request.getValue().toByteArray(), request.getOccurrences())
-          .thenApply(count -> RemoveResponse.newBuilder()
-              .setCount(count)
-              .build()), responseObserver);
+      executor.execute(request, RemoveResponse::getDefaultInstance, responseObserver,
+          multiset -> multiset.remove(request.getValue().toByteArray(), request.getOccurrences())
+              .thenApply(count -> RemoveResponse.newBuilder()
+                  .setCount(count)
+                  .build()));
     }
   }
 
   @Override
   public void contains(ContainsRequest request, StreamObserver<ContainsResponse> responseObserver) {
-    run(request.getId(), multiset -> multiset.contains(request.getValue().toByteArray())
-        .thenApply(contains -> ContainsResponse.newBuilder()
-            .setContains(contains)
-            .build()), responseObserver);
+    executor.execute(request, ContainsResponse::getDefaultInstance, responseObserver,
+        multiset -> multiset.contains(request.getValue().toByteArray())
+            .thenApply(contains -> ContainsResponse.newBuilder()
+                .setContains(contains)
+                .build()));
   }
 
   @Override
   public void size(SizeRequest request, StreamObserver<SizeResponse> responseObserver) {
-    run(request.getId(), multiset -> multiset.size().thenApply(size -> SizeResponse.newBuilder().setSize(size).build()), responseObserver);
+    executor.execute(request, SizeResponse::getDefaultInstance, responseObserver,
+        multiset -> multiset.size().thenApply(size -> SizeResponse.newBuilder().setSize(size).build()));
   }
 
   @Override
   public void clear(ClearRequest request, StreamObserver<ClearResponse> responseObserver) {
-    run(request.getId(), multiset -> multiset.clear().thenApply(v -> ClearResponse.newBuilder().build()), responseObserver);
+    executor.execute(request, ClearResponse::getDefaultInstance, responseObserver,
+        multiset -> multiset.clear().thenApply(v -> ClearResponse.newBuilder().build()));
   }
 
   @Override
@@ -154,6 +118,10 @@ public class MultisetServiceImpl extends MultisetServiceGrpc.MultisetServiceImpl
     return new StreamObserver<MultisetId>() {
       @Override
       public void onNext(MultisetId id) {
+        if (!executor.isValidId(id, MultisetEvent::getDefaultInstance, responseObserver)) {
+          return;
+        }
+
         CollectionEventListener<byte[]> listener = event -> {
           switch (event.type()) {
             case ADD:
@@ -173,18 +141,18 @@ public class MultisetServiceImpl extends MultisetServiceGrpc.MultisetServiceImpl
           }
         };
         listeners.put(id, listener);
-        getMultiset(id).thenAccept(multiset -> multiset.addListener(listener));
+        executor.getPrimitive(id).thenAccept(multiset -> multiset.addListener(listener));
       }
 
       @Override
       public void onError(Throwable t) {
-        listeners.forEach((id, listener) -> getMultiset(id).thenAccept(multiset -> multiset.removeListener(listener)));
+        listeners.forEach((id, listener) -> executor.getPrimitive(id).thenAccept(multiset -> multiset.removeListener(listener)));
         responseObserver.onCompleted();
       }
 
       @Override
       public void onCompleted() {
-        listeners.forEach((id, listener) -> getMultiset(id).thenAccept(multiset -> multiset.removeListener(listener)));
+        listeners.forEach((id, listener) -> executor.getPrimitive(id).thenAccept(multiset -> multiset.removeListener(listener)));
         responseObserver.onCompleted();
       }
     };
