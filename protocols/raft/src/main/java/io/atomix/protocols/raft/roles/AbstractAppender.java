@@ -30,12 +30,13 @@ import io.atomix.protocols.raft.protocol.RaftResponse;
 import io.atomix.protocols.raft.storage.log.RaftLogReader;
 import io.atomix.protocols.raft.storage.log.entry.RaftLogEntry;
 import io.atomix.protocols.raft.storage.snapshot.Snapshot;
-import io.atomix.protocols.raft.storage.snapshot.SnapshotReader;
 import io.atomix.storage.journal.Indexed;
 import io.atomix.utils.logging.ContextualLoggerFactory;
 import io.atomix.utils.logging.LoggerContext;
 import org.slf4j.Logger;
 
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -413,14 +414,14 @@ abstract class AbstractAppender implements AutoCloseable {
       member.setNextSnapshotOffset(0);
     }
 
-    InstallRequest request;
+    InstallRequest request = null;
     synchronized (snapshot) {
       // Open a new snapshot reader.
-      try (SnapshotReader reader = snapshot.openReader()) {
+      try (InputStream input = snapshot.openInputStream()) {
         // Skip to the next batch of bytes according to the snapshot chunk size and current offset.
-        reader.skip(member.getNextSnapshotOffset() * MAX_BATCH_SIZE);
-        byte[] data = new byte[Math.min(MAX_BATCH_SIZE, reader.remaining())];
-        reader.read(data);
+        input.skip(member.getNextSnapshotOffset() * MAX_BATCH_SIZE);
+        byte[] data = new byte[Math.min(MAX_BATCH_SIZE, input.available())];
+        input.read(data);
 
         // Create the install request, indicating whether this is the last chunk of data based on the number
         // of bytes remaining in the buffer.
@@ -430,11 +431,12 @@ abstract class AbstractAppender implements AutoCloseable {
             .withLeader(leader != null ? leader.memberId() : null)
             .withIndex(snapshot.index())
             .withTimestamp(snapshot.timestamp().unixTimestamp())
-            .withVersion(snapshot.version())
             .withOffset(member.getNextSnapshotOffset())
             .withData(data)
-            .withComplete(!reader.hasRemaining())
+            .withComplete(input.available() == 0)
             .build();
+      } catch (IOException e) {
+        log.error("Failed to read snapshot chunk");
       }
     }
 

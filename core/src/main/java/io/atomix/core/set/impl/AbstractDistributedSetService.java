@@ -15,6 +15,17 @@
  */
 package io.atomix.core.set.impl;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashSet;
+import java.util.LinkedHashSet;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
+
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import io.atomix.core.collection.impl.CollectionUpdateResult;
@@ -25,21 +36,16 @@ import io.atomix.core.transaction.impl.CommitResult;
 import io.atomix.core.transaction.impl.PrepareResult;
 import io.atomix.core.transaction.impl.RollbackResult;
 import io.atomix.primitive.PrimitiveType;
-import io.atomix.primitive.service.BackupInput;
-import io.atomix.primitive.service.BackupOutput;
-
-import java.util.Collection;
-import java.util.Map;
-import java.util.Set;
+import io.atomix.primitive.session.SessionId;
 
 import static io.atomix.core.collection.impl.CollectionUpdateResult.writeLockConflict;
 
 /**
  * Default distributed set service.
  */
-public abstract class AbstractDistributedSetService<S extends Collection<E>, E> extends DefaultDistributedCollectionService<S, E> implements DistributedSetService<E> {
-  protected Set<E> lockedElements = Sets.newHashSet();
-  protected Map<TransactionId, TransactionLog<SetUpdate<E>>> transactions = Maps.newHashMap();
+public abstract class AbstractDistributedSetService<S extends Collection<String>> extends DefaultDistributedCollectionService<S, String> implements DistributedSetService<String> {
+  protected Set<String> lockedElements = Sets.newHashSet();
+  protected Map<TransactionId, TransactionLog<SetUpdate<String>>> transactions = Maps.newHashMap();
 
   public AbstractDistributedSetService(PrimitiveType primitiveType, S collection) {
     super(primitiveType, collection);
@@ -50,23 +56,53 @@ public abstract class AbstractDistributedSetService<S extends Collection<E>, E> 
   }
 
   @Override
-  public void backup(BackupOutput output) {
-    output.writeObject(Sets.newHashSet(collection));
-    output.writeObject(lockedElements);
-    output.writeObject(transactions);
+  public void backup(OutputStream output) throws IOException {
+    DistributedSetSnapshot.newBuilder()
+        .addAllValues(new ArrayList<>(set()))
+        .addAllListeners(listeners.stream()
+            .map(SessionId::id)
+            .collect(Collectors.toList()))
+        .putAllIterators(iterators.entrySet().stream()
+            .map(e -> Maps.immutableEntry(e.getKey(), e.getValue().sessionId()))
+            .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue)))
+        .addAllLockedElements(lockedElements)
+        .putAllTransactions(transactions.entrySet().stream()
+            .map(e -> Maps.immutableEntry(e.getKey().id(), DistributedSetTransaction.newBuilder()
+                .setVersion(e.getValue().version())
+                .addAllUpdates(e.getValue().records().stream()
+                    .map(record -> DistributedSetUpdate.newBuilder()
+                        .setType(DistributedSetUpdate.Type.valueOf(record.type().name()))
+                        .setValue(record.element())
+                        .build())
+                    .collect(Collectors.toList()))
+                .build()))
+            .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue)))
+        .build()
+        .writeTo(output);
   }
 
   @Override
-  public void restore(BackupInput input) {
-    Set<E> elements = input.readObject();
+  public void restore(InputStream input) throws IOException {
+    DistributedSetSnapshot snapshot = DistributedSetSnapshot.parseFrom(input);
     collection.clear();
-    collection.addAll(elements);
-    lockedElements = input.readObject();
-    transactions = input.readObject();
+    collection.addAll(snapshot.getValuesList());
+    listeners = snapshot.getListenersList().stream()
+        .map(SessionId::from)
+        .collect(Collectors.toCollection(LinkedHashSet::new));
+    iterators = snapshot.getIteratorsMap().entrySet().stream()
+        .map(e -> Maps.immutableEntry(e.getKey(), new IteratorContext(e.getValue())))
+        .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+    lockedElements = new HashSet<>(snapshot.getLockedElementsList());
+    transactions = snapshot.getTransactionsMap().entrySet().stream()
+        .map(e -> Maps.immutableEntry(TransactionId.from(e.getKey()),
+            new TransactionLog<>(TransactionId.from(e.getKey()), e.getValue().getVersion(), e.getValue().getUpdatesList().stream()
+                .map(update -> new SetUpdate<>(SetUpdate.Type.valueOf(update.getType().name()), update.getValue()))
+                .collect(Collectors.toList()))))
+        .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
   }
 
   @Override
-  public CollectionUpdateResult<Boolean> add(E element) {
+  public CollectionUpdateResult<Boolean> add(String element) {
     if (lockedElements.contains(element)) {
       return writeLockConflict();
     }
@@ -74,7 +110,7 @@ public abstract class AbstractDistributedSetService<S extends Collection<E>, E> 
   }
 
   @Override
-  public CollectionUpdateResult<Boolean> remove(E element) {
+  public CollectionUpdateResult<Boolean> remove(String element) {
     if (lockedElements.contains(element)) {
       return writeLockConflict();
     }
@@ -82,8 +118,8 @@ public abstract class AbstractDistributedSetService<S extends Collection<E>, E> 
   }
 
   @Override
-  public CollectionUpdateResult<Boolean> addAll(Collection<? extends E> c) {
-    for (E element : c) {
+  public CollectionUpdateResult<Boolean> addAll(Collection<? extends String> c) {
+    for (String element : c) {
       if (lockedElements.contains(element)) {
         return writeLockConflict();
       }
@@ -93,7 +129,7 @@ public abstract class AbstractDistributedSetService<S extends Collection<E>, E> 
 
   @Override
   public CollectionUpdateResult<Boolean> retainAll(Collection<?> c) {
-    for (E element : set()) {
+    for (String element : set()) {
       if (lockedElements.contains(element) && !c.contains(element)) {
         return writeLockConflict();
       }
@@ -120,7 +156,7 @@ public abstract class AbstractDistributedSetService<S extends Collection<E>, E> 
   }
 
   @Override
-  public PrepareResult prepareAndCommit(TransactionLog<SetUpdate<E>> transactionLog) {
+  public PrepareResult prepareAndCommit(TransactionLog<SetUpdate<String>> transactionLog) {
     PrepareResult result = prepare(transactionLog);
     if (result == PrepareResult.OK) {
       commit(transactionLog.transactionId());
@@ -129,15 +165,15 @@ public abstract class AbstractDistributedSetService<S extends Collection<E>, E> 
   }
 
   @Override
-  public PrepareResult prepare(TransactionLog<SetUpdate<E>> transactionLog) {
-    for (SetUpdate<E> update : transactionLog.records()) {
+  public PrepareResult prepare(TransactionLog<SetUpdate<String>> transactionLog) {
+    for (SetUpdate<String> update : transactionLog.records()) {
       if (lockedElements.contains(update.element())) {
         return PrepareResult.CONCURRENT_TRANSACTION;
       }
     }
 
-    for (SetUpdate<E> update : transactionLog.records()) {
-      E element = update.element();
+    for (SetUpdate<String> update : transactionLog.records()) {
+      String element = update.element();
       switch (update.type()) {
         case ADD:
         case NOT_CONTAINS:
@@ -154,7 +190,7 @@ public abstract class AbstractDistributedSetService<S extends Collection<E>, E> 
       }
     }
 
-    for (SetUpdate<E> update : transactionLog.records()) {
+    for (SetUpdate<String> update : transactionLog.records()) {
       lockedElements.add(update.element());
     }
     transactions.put(transactionLog.transactionId(), transactionLog);
@@ -163,12 +199,12 @@ public abstract class AbstractDistributedSetService<S extends Collection<E>, E> 
 
   @Override
   public CommitResult commit(TransactionId transactionId) {
-    TransactionLog<SetUpdate<E>> transactionLog = transactions.remove(transactionId);
+    TransactionLog<SetUpdate<String>> transactionLog = transactions.remove(transactionId);
     if (transactionLog == null) {
       return CommitResult.UNKNOWN_TRANSACTION_ID;
     }
 
-    for (SetUpdate<E> update : transactionLog.records()) {
+    for (SetUpdate<String> update : transactionLog.records()) {
       switch (update.type()) {
         case ADD:
           set().add(update.element());
@@ -186,12 +222,12 @@ public abstract class AbstractDistributedSetService<S extends Collection<E>, E> 
 
   @Override
   public RollbackResult rollback(TransactionId transactionId) {
-    TransactionLog<SetUpdate<E>> transactionLog = transactions.remove(transactionId);
+    TransactionLog<SetUpdate<String>> transactionLog = transactions.remove(transactionId);
     if (transactionLog == null) {
       return RollbackResult.UNKNOWN_TRANSACTION_ID;
     }
 
-    for (SetUpdate<E> update : transactionLog.records()) {
+    for (SetUpdate<String> update : transactionLog.records()) {
       lockedElements.remove(update.element());
     }
     return RollbackResult.OK;

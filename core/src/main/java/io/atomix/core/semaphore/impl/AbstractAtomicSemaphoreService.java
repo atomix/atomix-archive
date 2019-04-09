@@ -15,26 +15,28 @@
  */
 package io.atomix.core.semaphore.impl;
 
-import com.google.common.base.MoreObjects;
-import com.google.common.base.Objects;
-import io.atomix.core.semaphore.AtomicSemaphoreType;
-import io.atomix.core.semaphore.QueueStatus;
-import io.atomix.primitive.PrimitiveType;
-import io.atomix.primitive.service.AbstractPrimitiveService;
-import io.atomix.primitive.service.BackupInput;
-import io.atomix.primitive.service.BackupOutput;
-import io.atomix.primitive.session.Session;
-import io.atomix.primitive.session.SessionId;
-import io.atomix.utils.concurrent.Scheduled;
-import io.atomix.utils.serializer.Namespace;
-import io.atomix.utils.serializer.Serializer;
-
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
+
+import com.google.common.base.MoreObjects;
+import com.google.common.base.Objects;
+import io.atomix.core.semaphore.AtomicSemaphoreType;
+import io.atomix.core.semaphore.QueueStatus;
+import io.atomix.primitive.PrimitiveType;
+import io.atomix.primitive.service.AbstractPrimitiveService;
+import io.atomix.primitive.session.Session;
+import io.atomix.primitive.session.SessionId;
+import io.atomix.utils.concurrent.Scheduled;
+import io.atomix.utils.serializer.Namespace;
+import io.atomix.utils.serializer.Serializer;
 
 public abstract class AbstractAtomicSemaphoreService extends AbstractPrimitiveService<AtomicSemaphoreClient> implements AtomicSemaphoreService {
   private static final Serializer SERIALIZER = Serializer.using(Namespace.builder()
@@ -47,24 +49,41 @@ public abstract class AbstractAtomicSemaphoreService extends AbstractPrimitiveSe
   private LinkedList<Waiter> waiterQueue = new LinkedList<>();
   private final Map<Long, Scheduled> timers = new HashMap<>();
 
-  public AbstractAtomicSemaphoreService(PrimitiveType primitiveType, int initialCapacity) {
+  public AbstractAtomicSemaphoreService(PrimitiveType primitiveType) {
     super(primitiveType, AtomicSemaphoreClient.class);
-    this.available = initialCapacity;
   }
 
   @Override
-  public void backup(BackupOutput output) {
-    output.writeInt(available);
-    output.writeObject(holders, SERIALIZER::encode);
-    output.writeObject(waiterQueue, SERIALIZER::encode);
+  public void backup(OutputStream output) throws IOException {
+    AtomicSemaphoreSnapshot.newBuilder()
+        .setAvailable(available)
+        .putAllHolders(holders)
+        .addAllWaiters(waiterQueue.stream()
+            .map(waiter -> AtomicSemaphoreWaiter.newBuilder()
+                .setSessionId(waiter.session.id())
+                .setIndex(waiter.index)
+                .setId(waiter.id)
+                .setAcquirePermits(waiter.acquirePermits)
+                .setExpire(waiter.expire)
+                .build())
+            .collect(Collectors.toList()))
+        .build()
+        .writeTo(output);
   }
 
   @Override
-  public void restore(BackupInput input) {
-    available = input.readInt();
-
-    holders = input.readObject(SERIALIZER::decode);
-    waiterQueue = input.readObject(SERIALIZER::decode);
+  public void restore(InputStream input) throws IOException {
+    AtomicSemaphoreSnapshot snapshot = AtomicSemaphoreSnapshot.parseFrom(input);
+    available = snapshot.getAvailable();
+    holders = new HashMap<>(snapshot.getHoldersMap());
+    waiterQueue = snapshot.getWaitersList().stream()
+        .map(waiter -> new Waiter(
+            SessionId.from(waiter.getSessionId()),
+            waiter.getIndex(),
+            waiter.getId(),
+            waiter.getAcquirePermits(),
+            waiter.getExpire()))
+        .collect(Collectors.toCollection(LinkedList::new));
 
     timers.values().forEach(Scheduled::cancel);
     timers.clear();

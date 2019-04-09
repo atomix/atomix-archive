@@ -15,6 +15,13 @@
  */
 package io.atomix.core.test.protocol;
 
+import java.util.Collection;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
+
 import io.atomix.primitive.PrimitiveType;
 import io.atomix.primitive.partition.PartitionId;
 import io.atomix.primitive.partition.PartitionService;
@@ -22,19 +29,11 @@ import io.atomix.primitive.protocol.PrimitiveProtocol;
 import io.atomix.primitive.protocol.ProxyProtocol;
 import io.atomix.primitive.proxy.ProxyClient;
 import io.atomix.primitive.proxy.impl.DefaultProxyClient;
-import io.atomix.primitive.service.ServiceConfig;
 import io.atomix.primitive.session.SessionClient;
 import io.atomix.primitive.session.SessionId;
 import io.atomix.utils.concurrent.ThreadPoolContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.util.Collection;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 
 import static io.atomix.utils.concurrent.Threads.namedThreads;
 
@@ -103,7 +102,6 @@ public class TestProtocol implements ProxyProtocol {
       String primitiveName,
       PrimitiveType primitiveType,
       Class<S> serviceType,
-      ServiceConfig serviceConfig,
       PartitionService partitionService) {
     Collection<SessionClient> partitions = IntStream.range(0, config.getPartitions())
         .mapToObj(partition -> {
@@ -117,8 +115,7 @@ public class TestProtocol implements ProxyProtocol {
               registry.getOrCreateService(
                   PartitionId.from(group(), partition),
                   primitiveName,
-                  primitiveType,
-                  serviceConfig));
+                  primitiveType));
         })
         .collect(Collectors.toList());
     return new DefaultProxyClient<>(

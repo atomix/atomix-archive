@@ -15,20 +15,24 @@
  */
 package io.atomix.core.value.impl;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.util.Arrays;
+import java.util.LinkedHashSet;
+import java.util.Set;
+import java.util.stream.Collectors;
+
 import com.google.common.collect.Sets;
+import com.google.protobuf.ByteString;
 import io.atomix.core.value.AtomicValueType;
 import io.atomix.primitive.PrimitiveType;
 import io.atomix.primitive.service.AbstractPrimitiveService;
-import io.atomix.primitive.service.BackupInput;
-import io.atomix.primitive.service.BackupOutput;
 import io.atomix.primitive.session.Session;
 import io.atomix.primitive.session.SessionId;
 import io.atomix.utils.serializer.Namespace;
 import io.atomix.utils.serializer.Serializer;
 import io.atomix.utils.time.Versioned;
-
-import java.util.Arrays;
-import java.util.Set;
 
 /**
  * Abstract atomic value service.
@@ -52,19 +56,26 @@ public abstract class AbstractAtomicValueService extends AbstractPrimitiveServic
   }
 
   @Override
-  public void backup(BackupOutput writer) {
-    Versioned<byte[]> value = this.value;
-    if (value == null) {
-      value = new Versioned<>(null, 0);
+  public void backup(OutputStream output) throws IOException {
+    AtomicValueSnapshot.Builder builder = AtomicValueSnapshot.newBuilder();
+    if (value.value() != null) {
+      builder.setValue(ByteString.copyFrom(value.value()));
+      builder.setVersion(value.version());
     }
-    writer.writeObject(value);
-    writer.writeObject(listeners);
+    builder.addAllListeners(listeners.stream().map(SessionId::id).collect(Collectors.toList()));
   }
 
   @Override
-  public void restore(BackupInput reader) {
-    value = reader.readObject();
-    listeners = reader.readObject();
+  public void restore(InputStream input) throws IOException {
+    AtomicValueSnapshot snapshot = AtomicValueSnapshot.parseFrom(input);
+    if (snapshot.getVersion() > 0) {
+      value = new Versioned<>(snapshot.getValue().toByteArray(), snapshot.getVersion());
+    } else {
+      value = new Versioned<>(null, 0);
+    }
+    listeners = snapshot.getListenersList().stream()
+        .map(SessionId::from)
+        .collect(Collectors.toCollection(LinkedHashSet::new));
   }
 
   private Versioned<byte[]> updateAndNotify(byte[] value) {

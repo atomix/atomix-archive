@@ -1,0 +1,41 @@
+syntax = "proto3";
+
+package atomix.raft.storage;
+
+option java_package = "io.atomix.protocols.raft.storage.snapshot";
+option java_outer_classname = "SnapshotProto";
+option java_multiple_files = true;
+
+// Snapshot descriptor
+message SnapshotDescriptor {
+    int64 index = 1;
+    int64 timestamp = 2;
+    bool locked = 3;
+}
+
+// Service snapshot
+message ServiceSnapshot {
+    int64 id = 1;
+    string type = 2;
+    string name = 3;
+    int64 index = 4;
+    int64 timestamp = 5;
+    int64 delta = 6;
+    repeated ServiceSession sessions = 7;
+    bytes snapshot = 8;
+}
+
+// Service session
+message ServiceSession {
+    int64 session_id = 1;
+    string member_id = 2;
+    string read_consistency = 3;
+    int64 min_timeout = 4;
+    int64 max_timeout = 5;
+    int64 timestamp = 6;
+    int64 request_sequence = 7;
+    int64 command_sequence = 8;
+    int64 event_index = 9;
+    int64 last_completed = 10;
+    int64 last_applied = 11;
+}

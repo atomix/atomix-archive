@@ -15,19 +15,6 @@
  */
 package io.atomix.core.collection.impl;
 
-import com.google.common.collect.Maps;
-import com.google.common.collect.Sets;
-import io.atomix.core.collection.CollectionEvent;
-import io.atomix.core.iterator.impl.IteratorBatch;
-import io.atomix.primitive.PrimitiveType;
-import io.atomix.primitive.service.AbstractPrimitiveService;
-import io.atomix.primitive.service.BackupInput;
-import io.atomix.primitive.service.BackupOutput;
-import io.atomix.primitive.session.Session;
-import io.atomix.primitive.session.SessionId;
-import io.atomix.utils.serializer.Namespace;
-import io.atomix.utils.serializer.Serializer;
-
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Iterator;
@@ -35,6 +22,17 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
+
+import com.google.common.collect.Maps;
+import com.google.common.collect.Sets;
+import io.atomix.core.collection.CollectionEvent;
+import io.atomix.core.iterator.impl.IteratorBatch;
+import io.atomix.primitive.PrimitiveType;
+import io.atomix.primitive.service.AbstractPrimitiveService;
+import io.atomix.primitive.session.Session;
+import io.atomix.primitive.session.SessionId;
+import io.atomix.utils.serializer.Namespace;
+import io.atomix.utils.serializer.Serializer;
 
 import static io.atomix.core.collection.impl.CollectionUpdateResult.noop;
 import static io.atomix.core.collection.impl.CollectionUpdateResult.ok;
@@ -51,7 +49,7 @@ public abstract class DefaultDistributedCollectionService<T extends Collection<E
   private final Serializer serializer;
   protected T collection;
   protected Map<Long, AbstractIteratorContext> iterators = Maps.newHashMap();
-  private Set<SessionId> listeners = Sets.newHashSet();
+  protected Set<SessionId> listeners = Sets.newHashSet();
 
   protected DefaultDistributedCollectionService(PrimitiveType primitiveType, T collection) {
     super(primitiveType, DistributedCollectionClient.class);
@@ -75,16 +73,6 @@ public abstract class DefaultDistributedCollectionService<T extends Collection<E
    */
   protected T collection() {
     return collection;
-  }
-
-  @Override
-  public void backup(BackupOutput output) {
-    output.writeObject(collection);
-  }
-
-  @Override
-  public void restore(BackupInput input) {
-    collection = input.readObject();
   }
 
   protected void added(E element) {

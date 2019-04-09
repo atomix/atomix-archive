@@ -15,11 +15,12 @@
  */
 package io.atomix.protocols.log.partition.impl;
 
+import java.util.concurrent.CompletableFuture;
+
 import io.atomix.primitive.PrimitiveType;
 import io.atomix.primitive.log.LogSession;
 import io.atomix.primitive.partition.PartitionClient;
 import io.atomix.primitive.partition.PartitionManagementService;
-import io.atomix.primitive.service.ServiceConfig;
 import io.atomix.primitive.session.SessionClient;
 import io.atomix.protocols.log.DistributedLogSessionClient;
 import io.atomix.protocols.log.partition.LogPartition;
@@ -29,8 +30,6 @@ import io.atomix.utils.concurrent.ThreadContextFactory;
 import io.atomix.utils.serializer.Serializer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.util.concurrent.CompletableFuture;
 
 /**
  * Primary-backup partition client.
@@ -61,7 +60,7 @@ public class LogPartitionClient implements PartitionClient, Managed<LogPartition
   }
 
   @Override
-  public SessionClient.Builder sessionBuilder(String primitiveName, PrimitiveType primitiveType, ServiceConfig serviceConfig) {
+  public SessionClient.Builder sessionBuilder(String primitiveName, PrimitiveType primitiveType) {
     throw new UnsupportedOperationException();
   }
 

@@ -15,15 +15,10 @@
  */
 package io.atomix.protocols.raft.storage.snapshot;
 
-import io.atomix.protocols.raft.storage.RaftStorage;
-import io.atomix.storage.StorageLevel;
-import io.atomix.utils.time.WallClockTimestamp;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
-
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -32,23 +27,30 @@ import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.UUID;
 
+import io.atomix.protocols.raft.storage.RaftStorage;
+import io.atomix.storage.StorageLevel;
+import io.atomix.utils.time.WallClockTimestamp;
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Test;
+
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 /**
- * File snapshot store test.
+ * Snapshot store test.
  *
  * @author <a href="http://github.com/kuujo">Jordan Halterman</a>
  */
-public class FileSnapshotStoreTest extends AbstractSnapshotStoreTest {
+public class SnapshotStoreTest {
   private String testId;
 
   /**
    * Returns a new snapshot store.
    */
-  protected SnapshotStore createSnapshotStore() {
+  private SnapshotStore createSnapshotStore() {
     RaftStorage storage = RaftStorage.builder()
         .withPrefix("test")
         .withDirectory(new File(String.format("target/test-logs/%s", testId)))
@@ -61,12 +63,12 @@ public class FileSnapshotStoreTest extends AbstractSnapshotStoreTest {
    * Tests storing and loading snapshots.
    */
   @Test
-  public void testStoreLoadSnapshot() {
+  public void testStoreLoadSnapshot() throws Exception {
     SnapshotStore store = createSnapshotStore();
 
     Snapshot snapshot = store.newSnapshot(2, new WallClockTimestamp());
-    try (SnapshotWriter writer = snapshot.openWriter()) {
-      writer.writeLong(10);
+    try (OutputStream writer = snapshot.openOutputStream()) {
+      writer.write(new byte[]{1});
     }
     snapshot.complete();
     assertNotNull(store.getSnapshot(2));
@@ -76,8 +78,8 @@ public class FileSnapshotStoreTest extends AbstractSnapshotStoreTest {
     assertNotNull(store.getSnapshot(2));
     assertEquals(2, store.getSnapshot(2).index());
 
-    try (SnapshotReader reader = snapshot.openReader()) {
-      assertEquals(10, reader.readLong());
+    try (InputStream reader = snapshot.openInputStream()) {
+      assertEquals(1, reader.read());
     }
   }
 
@@ -85,12 +87,12 @@ public class FileSnapshotStoreTest extends AbstractSnapshotStoreTest {
    * Tests persisting and loading snapshots.
    */
   @Test
-  public void testPersistLoadSnapshot() {
+  public void testPersistLoadSnapshot() throws Exception {
     SnapshotStore store = createSnapshotStore();
 
-    Snapshot snapshot = store.newTemporarySnapshot(2, new WallClockTimestamp());
-    try (SnapshotWriter writer = snapshot.openWriter()) {
-      writer.writeLong(10);
+    Snapshot snapshot = store.newSnapshot(2, new WallClockTimestamp());
+    try (OutputStream writer = snapshot.openOutputStream()) {
+      writer.write(new byte[]{1});
     }
 
     snapshot = snapshot.persist();
@@ -102,8 +104,8 @@ public class FileSnapshotStoreTest extends AbstractSnapshotStoreTest {
     snapshot.complete();
     assertNotNull(store.getSnapshot(2));
 
-    try (SnapshotReader reader = snapshot.openReader()) {
-      assertEquals(10, reader.readLong());
+    try (InputStream reader = snapshot.openInputStream()) {
+      assertEquals(1, reader.read());
     }
 
     store.close();
@@ -113,8 +115,8 @@ public class FileSnapshotStoreTest extends AbstractSnapshotStoreTest {
     assertEquals(2, store.getSnapshot(2).index());
 
     snapshot = store.getSnapshot(2);
-    try (SnapshotReader reader = snapshot.openReader()) {
-      assertEquals(10, reader.readLong());
+    try (InputStream reader = snapshot.openInputStream()) {
+      assertEquals(1, reader.read());
     }
   }
 
@@ -126,17 +128,17 @@ public class FileSnapshotStoreTest extends AbstractSnapshotStoreTest {
     SnapshotStore store = createSnapshotStore();
 
     Snapshot snapshot = store.newSnapshot(1, new WallClockTimestamp());
-    for (long i = 1; i <= 10; i++) {
-      try (SnapshotWriter writer = snapshot.openWriter()) {
-        writer.writeLong(i);
+    for (byte i = 1; i <= 10; i++) {
+      try (OutputStream writer = snapshot.openOutputStream()) {
+        writer.write(new byte[]{i});
       }
     }
     snapshot.complete();
 
     snapshot = store.getSnapshot(1);
-    try (SnapshotReader reader = snapshot.openReader()) {
-      for (long i = 1; i <= 10; i++) {
-        assertEquals(i, reader.readLong());
+    try (InputStream reader = snapshot.openInputStream()) {
+      for (byte i = 1; i <= 10; i++) {
+        assertEquals(i, reader.read());
       }
     }
   }
@@ -161,6 +163,47 @@ public class FileSnapshotStoreTest extends AbstractSnapshotStoreTest {
       });
     }
     testId = UUID.randomUUID().toString();
+  }
+
+  /**
+   * Tests writing a snapshot.
+   */
+  @Test
+  public void testWriteSnapshotChunks() throws IOException {
+    SnapshotStore store = createSnapshotStore();
+    WallClockTimestamp timestamp = new WallClockTimestamp();
+    Snapshot snapshot = store.newSnapshot(2, timestamp);
+    assertEquals(2, snapshot.index());
+    assertEquals(timestamp, snapshot.timestamp());
+
+    assertNull(store.getSnapshot(2));
+
+    try (OutputStream writer = snapshot.openOutputStream()) {
+      writer.write(new byte[]{1});
+    }
+
+    assertNull(store.getSnapshot(2));
+
+    try (OutputStream writer = snapshot.openOutputStream()) {
+      writer.write(new byte[]{2});
+    }
+
+    assertNull(store.getSnapshot(2));
+
+    try (OutputStream writer = snapshot.openOutputStream()) {
+      writer.write(new byte[]{3});
+    }
+
+    assertNull(store.getSnapshot(2));
+    snapshot.complete();
+
+    assertEquals(2, store.getSnapshot(2).index());
+
+    try (InputStream reader = store.getSnapshot(2).openInputStream()) {
+      assertEquals(1, reader.read());
+      assertEquals(2, reader.read());
+      assertEquals(3, reader.read());
+    }
   }
 
 }

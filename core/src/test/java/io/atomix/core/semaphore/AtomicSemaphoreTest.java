@@ -15,20 +15,8 @@
  */
 package io.atomix.core.semaphore;
 
-import io.atomix.core.AbstractPrimitiveTest;
-import io.atomix.core.Atomix;
-import io.atomix.core.semaphore.impl.AbstractAtomicSemaphoreService;
-import io.atomix.core.semaphore.impl.AtomicSemaphoreProxy;
-import io.atomix.core.semaphore.impl.AtomicSemaphoreServiceConfig;
-import io.atomix.core.semaphore.impl.DefaultAtomicSemaphoreService;
-import io.atomix.primitive.PrimitiveException;
-import io.atomix.primitive.service.impl.DefaultBackupInput;
-import io.atomix.primitive.service.impl.DefaultBackupOutput;
-import io.atomix.storage.buffer.Buffer;
-import io.atomix.storage.buffer.HeapBuffer;
-import io.atomix.utils.time.Version;
-import org.junit.Test;
-
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.lang.reflect.Field;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -43,6 +31,15 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+
+import io.atomix.core.AbstractPrimitiveTest;
+import io.atomix.core.Atomix;
+import io.atomix.core.semaphore.impl.AbstractAtomicSemaphoreService;
+import io.atomix.core.semaphore.impl.AtomicSemaphoreProxy;
+import io.atomix.core.semaphore.impl.DefaultAtomicSemaphoreService;
+import io.atomix.primitive.PrimitiveException;
+import io.atomix.utils.time.Version;
+import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -413,8 +410,8 @@ public class AtomicSemaphoreTest extends AbstractPrimitiveTest {
 
   @Test
   public void testSnapshot() throws Exception {
-    AbstractAtomicSemaphoreService service = new DefaultAtomicSemaphoreService(
-        new AtomicSemaphoreServiceConfig().setInitialCapacity(10));
+    AbstractAtomicSemaphoreService service = new DefaultAtomicSemaphoreService();
+    service.increase(10);
 
     Field available = AbstractAtomicSemaphoreService.class.getDeclaredField("available");
     available.setAccessible(true);
@@ -439,12 +436,11 @@ public class AtomicSemaphoreTest extends AbstractPrimitiveTest {
 //    waiterLinkedList.add(waiter.getConstructors()[0].newInstance(service,10L, 20L, 30L, 40, Long.MAX_VALUE));
 //    waiterQueue.set(service, waiterLinkedList);
 
-    Buffer buffer = HeapBuffer.allocate();
-    service.backup(new DefaultBackupOutput(buffer, service.serializer()));
+    ByteArrayOutputStream os = new ByteArrayOutputStream();
+    service.backup(os);
 
-    AbstractAtomicSemaphoreService serviceRestore = new DefaultAtomicSemaphoreService(
-        new AtomicSemaphoreServiceConfig().setInitialCapacity(10));
-    serviceRestore.restore(new DefaultBackupInput(buffer.flip(), service.serializer()));
+    AbstractAtomicSemaphoreService serviceRestore = new DefaultAtomicSemaphoreService();
+    serviceRestore.restore(new ByteArrayInputStream(os.toByteArray()));
 
     assertEquals(10, available.get(serviceRestore));
     assertEquals(holdersMap, holders.get(serviceRestore));

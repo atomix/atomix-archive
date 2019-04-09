@@ -16,11 +16,10 @@
 package io.atomix.protocols.raft;
 
 import io.atomix.primitive.PrimitiveBuilder;
-import io.atomix.primitive.config.PrimitiveConfig;
 import io.atomix.primitive.PrimitiveManagementService;
 import io.atomix.primitive.PrimitiveType;
+import io.atomix.primitive.config.PrimitiveConfig;
 import io.atomix.primitive.service.PrimitiveService;
-import io.atomix.primitive.service.ServiceConfig;
 
 /**
  * Test primitive type.
@@ -43,7 +42,7 @@ public class TestPrimitiveType implements PrimitiveType {
   }
 
   @Override
-  public PrimitiveService newService(ServiceConfig config) {
+  public PrimitiveService newService() {
     throw new UnsupportedOperationException();
   }
 

@@ -15,11 +15,10 @@
  */
 package io.atomix.core.tree.impl;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+
 import io.atomix.core.tree.DocumentPath;
-import io.atomix.primitive.service.impl.DefaultBackupInput;
-import io.atomix.primitive.service.impl.DefaultBackupOutput;
-import io.atomix.storage.buffer.Buffer;
-import io.atomix.storage.buffer.HeapBuffer;
 import io.atomix.utils.time.Versioned;
 import org.junit.Test;
 
@@ -35,11 +34,11 @@ public class DefaultAtomicDocumentTreeServiceTest {
     DefaultDocumentTreeService service = new DefaultDocumentTreeService();
     service.set(DocumentPath.from("/foo"), "Hello world!".getBytes());
 
-    Buffer buffer = HeapBuffer.allocate();
-    service.backup(new DefaultBackupOutput(buffer, service.serializer()));
+    ByteArrayOutputStream os = new ByteArrayOutputStream();
+    service.backup(os);
 
     service = new DefaultDocumentTreeService();
-    service.restore(new DefaultBackupInput(buffer.flip(), service.serializer()));
+    service.restore(new ByteArrayInputStream(os.toByteArray()));
 
     Versioned<byte[]> value = service.get(DocumentPath.from("/foo"));
     assertNotNull(value);

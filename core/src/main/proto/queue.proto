@@ -1,0 +1,14 @@
+syntax = "proto3";
+
+package atomix.queue.service;
+
+option java_package = "io.atomix.core.queue.impl";
+option java_outer_classname = "DistributedQueueProto";
+option java_multiple_files = true;
+
+// Distributed queue snapshot
+message DistributedQueueSnapshot {
+    repeated string values = 1;
+    repeated int64 listeners = 2;
+    map<int64, int64> iterators = 3;
+}

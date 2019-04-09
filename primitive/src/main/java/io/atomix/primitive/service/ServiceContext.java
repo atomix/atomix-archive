@@ -63,14 +63,6 @@ public interface ServiceContext {
   MemberId localMemberId();
 
   /**
-   * Returns the service configuration.
-   *
-   * @param <C> the configuration type
-   * @return the service configuration
-   */
-  <C extends ServiceConfig> C serviceConfig();
-
-  /**
    * Returns the current state machine index.
    * <p>
    * The state index is indicative of the index of the current operation

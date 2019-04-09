@@ -15,6 +15,8 @@
  */
 package io.atomix.core.value.impl;
 
+import java.util.concurrent.CompletableFuture;
+
 import io.atomix.core.value.AsyncDistributedValue;
 import io.atomix.core.value.DistributedValue;
 import io.atomix.core.value.DistributedValueBuilder;
@@ -23,11 +25,8 @@ import io.atomix.primitive.PrimitiveManagementService;
 import io.atomix.primitive.protocol.GossipProtocol;
 import io.atomix.primitive.protocol.PrimitiveProtocol;
 import io.atomix.primitive.protocol.value.ValueProtocol;
-import io.atomix.primitive.service.ServiceConfig;
 import io.atomix.utils.concurrent.Futures;
 import io.atomix.utils.serializer.Serializer;
-
-import java.util.concurrent.CompletableFuture;
 
 /**
  * Default implementation of DistributedValueBuilder.
@@ -53,7 +52,7 @@ public class DefaultDistributedValueBuilder<V> extends DistributedValueBuilder<V
         return Futures.exceptionalFuture(new UnsupportedOperationException("Values are not supported by the provided gossip protocol"));
       }
     } else {
-      return newProxy(AtomicValueService.class, new ServiceConfig())
+      return newProxy(AtomicValueService.class)
           .thenCompose(proxy -> new AtomicValueProxy(proxy, managementService.getPrimitiveRegistry()).connect())
           .thenApply(elector -> {
             Serializer serializer = serializer();

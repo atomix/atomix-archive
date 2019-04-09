@@ -21,7 +21,7 @@ import io.atomix.core.semaphore.DistributedSemaphoreType;
  * Default distributed semaphore service.
  */
 public class DefaultDistributedSemaphoreService extends AbstractAtomicSemaphoreService {
-  public DefaultDistributedSemaphoreService(AtomicSemaphoreServiceConfig config) {
-    super(DistributedSemaphoreType.instance(), config.initialCapacity());
+  public DefaultDistributedSemaphoreService() {
+    super(DistributedSemaphoreType.instance());
   }
 }

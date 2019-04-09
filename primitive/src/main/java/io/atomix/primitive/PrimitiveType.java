@@ -60,8 +60,7 @@ public interface PrimitiveType<B extends PrimitiveBuilder, C extends PrimitiveCo
   /**
    * Creates a new service instance from the given configuration.
    *
-   * @param config the service configuration
    * @return the service instance
    */
-  PrimitiveService newService(ServiceConfig config);
+  PrimitiveService newService();
 }

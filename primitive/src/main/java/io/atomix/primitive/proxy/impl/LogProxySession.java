@@ -15,6 +15,18 @@
  */
 package io.atomix.primitive.proxy.impl;
 
+import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.util.LinkedList;
+import java.util.Map;
+import java.util.Queue;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Consumer;
+import java.util.function.Function;
+
 import com.google.common.base.Defaults;
 import com.google.common.collect.Maps;
 import io.atomix.cluster.MemberId;
@@ -34,7 +46,6 @@ import io.atomix.primitive.operation.impl.DefaultOperationId;
 import io.atomix.primitive.partition.PartitionId;
 import io.atomix.primitive.proxy.ProxySession;
 import io.atomix.primitive.service.PrimitiveService;
-import io.atomix.primitive.service.ServiceConfig;
 import io.atomix.primitive.service.ServiceContext;
 import io.atomix.primitive.service.impl.DefaultCommit;
 import io.atomix.primitive.session.Session;
@@ -51,18 +62,6 @@ import io.atomix.utils.time.WallClock;
 import io.atomix.utils.time.WallClockTimestamp;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.lang.reflect.InvocationHandler;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
-import java.util.LinkedList;
-import java.util.Map;
-import java.util.Queue;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.function.Consumer;
-import java.util.function.Function;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -83,7 +82,6 @@ public class LogProxySession<S> implements ProxySession<S> {
   private final String name;
   private final PrimitiveType type;
   private final PrimitiveService service;
-  private final ServiceConfig serviceConfig;
   private final ServiceContext context = new LogServiceContext();
   private final Serializer userSerializer;
   private final LogSession session;
@@ -102,11 +100,10 @@ public class LogProxySession<S> implements ProxySession<S> {
   private long currentTimestamp;
 
   @SuppressWarnings("unchecked")
-  public LogProxySession(String name, PrimitiveType type, Class<S> serviceType, ServiceConfig serviceConfig, Serializer serializer, LogSession session) {
+  public LogProxySession(String name, PrimitiveType type, Class<S> serviceType, Serializer serializer, LogSession session) {
     this.name = checkNotNull(name, "name cannot be null");
     this.type = checkNotNull(type, "type cannot be null");
-    this.service = type.newService(serviceConfig);
-    this.serviceConfig = serviceConfig;
+    this.service = type.newService();
     this.userSerializer = checkNotNull(serializer, "serializer cannot be null");
     this.session = checkNotNull(session, "session cannot be null");
     ServiceProxyHandler serviceProxyHandler = new ServiceProxyHandler(serviceType);
@@ -341,12 +338,6 @@ public class LogProxySession<S> implements ProxySession<S> {
     @Override
     public MemberId localMemberId() {
       return null;
-    }
-
-    @Override
-    @SuppressWarnings("unchecked")
-    public <C extends ServiceConfig> C serviceConfig() {
-      return (C) serviceConfig;
     }
 
     @Override

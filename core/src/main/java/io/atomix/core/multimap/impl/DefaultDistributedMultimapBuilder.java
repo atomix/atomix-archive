@@ -16,16 +16,15 @@
 
 package io.atomix.core.multimap.impl;
 
+import java.util.concurrent.CompletableFuture;
+
 import com.google.common.io.BaseEncoding;
 import io.atomix.core.multimap.AsyncAtomicMultimap;
 import io.atomix.core.multimap.DistributedMultimap;
 import io.atomix.core.multimap.DistributedMultimapBuilder;
 import io.atomix.core.multimap.DistributedMultimapConfig;
 import io.atomix.primitive.PrimitiveManagementService;
-import io.atomix.primitive.service.ServiceConfig;
 import io.atomix.utils.serializer.Serializer;
-
-import java.util.concurrent.CompletableFuture;
 
 /**
  * Default {@link DistributedMultimap} builder.
@@ -38,7 +37,7 @@ public class DefaultDistributedMultimapBuilder<K, V> extends DistributedMultimap
   @Override
   @SuppressWarnings("unchecked")
   public CompletableFuture<DistributedMultimap<K, V>> buildAsync() {
-    return newProxy(AtomicMultimapService.class, new ServiceConfig())
+    return newProxy(AtomicMultimapService.class)
         .thenCompose(proxy -> new AtomicMultimapProxy(proxy, managementService.getPrimitiveRegistry()).connect())
         .thenApply(rawMultimap -> {
           Serializer serializer = serializer();

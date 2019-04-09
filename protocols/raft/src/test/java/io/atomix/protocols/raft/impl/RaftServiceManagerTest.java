@@ -15,6 +15,22 @@
  */
 package io.atomix.protocols.raft.impl;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.nio.file.FileVisitResult;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.SimpleFileVisitor;
+import java.nio.file.attribute.BasicFileAttributes;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.concurrent.atomic.AtomicBoolean;
+
 import io.atomix.cluster.ClusterMembershipService;
 import io.atomix.cluster.MemberId;
 import io.atomix.primitive.PrimitiveBuilder;
@@ -27,10 +43,7 @@ import io.atomix.primitive.operation.OperationType;
 import io.atomix.primitive.operation.PrimitiveOperation;
 import io.atomix.primitive.operation.impl.DefaultOperationId;
 import io.atomix.primitive.service.AbstractPrimitiveService;
-import io.atomix.primitive.service.BackupInput;
-import io.atomix.primitive.service.BackupOutput;
 import io.atomix.primitive.service.PrimitiveService;
-import io.atomix.primitive.service.ServiceConfig;
 import io.atomix.primitive.service.ServiceExecutor;
 import io.atomix.protocols.raft.RaftServer;
 import io.atomix.protocols.raft.ReadConsistency;
@@ -54,20 +67,6 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.slf4j.LoggerFactory;
-
-import java.io.IOException;
-import java.nio.file.FileVisitResult;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.SimpleFileVisitor;
-import java.nio.file.attribute.BasicFileAttributes;
-import java.time.Instant;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -115,7 +114,6 @@ public class RaftServiceManagerTest {
         "test-1",
         "test",
         "test",
-        null,
         ReadConsistency.LINEARIZABLE,
         100,
         1000));
@@ -147,7 +145,6 @@ public class RaftServiceManagerTest {
         "test-1",
         "test",
         "test",
-        null,
         ReadConsistency.LINEARIZABLE,
         100,
         1000));
@@ -185,14 +182,12 @@ public class RaftServiceManagerTest {
     }
 
     @Override
-    public void backup(BackupOutput output) {
-      output.writeLong(10);
+    public void backup(OutputStream output) {
       snapshotTaken.set(true);
     }
 
     @Override
-    public void restore(BackupInput input) {
-      assertEquals(10, input.readLong());
+    public void restore(InputStream input) {
       snapshotInstalled.set(true);
     }
 
@@ -213,7 +208,7 @@ public class RaftServiceManagerTest {
     }
 
     @Override
-    public PrimitiveService newService(ServiceConfig config) {
+    public PrimitiveService newService() {
       return new TestService(this);
     }
 

@@ -15,8 +15,14 @@
  */
 package io.atomix.protocols.backup.roles;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.time.Duration;
+import java.util.concurrent.CompletableFuture;
+import java.util.stream.Collectors;
+
+import com.google.protobuf.ByteString;
 import io.atomix.primitive.operation.OperationType;
-import io.atomix.primitive.service.impl.DefaultBackupOutput;
 import io.atomix.primitive.service.impl.DefaultCommit;
 import io.atomix.primitive.session.Session;
 import io.atomix.protocols.backup.PrimaryBackupServer.Role;
@@ -30,13 +36,10 @@ import io.atomix.protocols.backup.protocol.HeartbeatOperation;
 import io.atomix.protocols.backup.protocol.RestoreRequest;
 import io.atomix.protocols.backup.protocol.RestoreResponse;
 import io.atomix.protocols.backup.service.impl.PrimaryBackupServiceContext;
-import io.atomix.storage.buffer.HeapBuffer;
+import io.atomix.protocols.backup.snapshot.ServiceSession;
+import io.atomix.protocols.backup.snapshot.ServiceSnapshot;
 import io.atomix.utils.concurrent.Futures;
 import io.atomix.utils.concurrent.Scheduled;
-
-import java.time.Duration;
-import java.util.Collection;
-import java.util.concurrent.CompletableFuture;
 
 /**
  * Primary role.
@@ -159,24 +162,33 @@ public class PrimaryRole extends PrimaryBackupRole {
       return CompletableFuture.completedFuture(logResponse(RestoreResponse.error()));
     }
 
-    HeapBuffer buffer = HeapBuffer.allocate();
+    ByteArrayOutputStream output = new ByteArrayOutputStream();
     try {
-      Collection<PrimaryBackupSession> sessions = context.getSessions();
-      buffer.writeInt(sessions.size());
-      for (Session session : sessions) {
-        buffer.writeLong(session.sessionId().id());
-        buffer.writeString(session.memberId().id());
-      }
-
-      context.service().backup(new DefaultBackupOutput(buffer, context.service().serializer()));
-      buffer.flip();
-      byte[] bytes = buffer.readBytes(buffer.remaining());
-      return CompletableFuture.completedFuture(
-              RestoreResponse.ok(context.currentIndex(), context.currentTimestamp(), bytes))
-              .thenApply(this::logResponse);
-    } finally {
-      buffer.release();
+      context.service().backup(output);
+    } catch (IOException e) {
+      log.error("Failed to snapshot service {}", context.serviceName(), e);
     }
+
+    ServiceSnapshot snapshot = ServiceSnapshot.newBuilder()
+        .addAllSessions(context.getSessions().stream()
+            .map(session -> ServiceSession.newBuilder()
+                .setSessionId(session.sessionId().id())
+                .setMemberId(session.memberId().id())
+                .build())
+            .collect(Collectors.toList()))
+        .setSnapshot(ByteString.copyFrom(output.toByteArray()))
+        .build();
+
+    output = new ByteArrayOutputStream();
+    try {
+      snapshot.writeTo(output);
+    } catch (IOException e) {
+      log.error("Failed to serialize snapshot", e);
+    }
+
+    return CompletableFuture.completedFuture(
+        RestoreResponse.ok(context.currentIndex(), context.currentTimestamp(), output.toByteArray()))
+        .thenApply(this::logResponse);
   }
 
   @Override

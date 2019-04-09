@@ -20,7 +20,7 @@ import io.atomix.core.map.DistributedNavigableMapType;
 /**
  * Default distributed tree map service.
  */
-public class DefaultDistributedNavigableMapService<K extends Comparable<K>> extends AbstractAtomicNavigableMapService<K> {
+public class DefaultDistributedNavigableMapService extends AbstractAtomicNavigableMapService {
   public DefaultDistributedNavigableMapService() {
     super(DistributedNavigableMapType.instance());
   }

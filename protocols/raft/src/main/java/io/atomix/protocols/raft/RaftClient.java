@@ -15,22 +15,21 @@
  */
 package io.atomix.protocols.raft;
 
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+
 import io.atomix.cluster.MemberId;
 import io.atomix.primitive.PrimitiveType;
 import io.atomix.primitive.partition.PartitionId;
-import io.atomix.primitive.service.ServiceConfig;
 import io.atomix.protocols.raft.impl.DefaultRaftClient;
 import io.atomix.protocols.raft.protocol.RaftClientProtocol;
 import io.atomix.protocols.raft.session.CommunicationStrategy;
 import io.atomix.protocols.raft.session.RaftSessionClient;
 import io.atomix.utils.concurrent.ThreadContextFactory;
 import io.atomix.utils.concurrent.ThreadModel;
-
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -115,10 +114,9 @@ public interface RaftClient {
    *
    * @param primitiveName the primitive name
    * @param primitiveType the primitive type
-   * @param serviceConfig the service configuration
    * @return the Raft proxy session builder
    */
-  RaftSessionClient.Builder sessionBuilder(String primitiveName, PrimitiveType primitiveType, ServiceConfig serviceConfig);
+  RaftSessionClient.Builder sessionBuilder(String primitiveName, PrimitiveType primitiveType);
 
   /**
    * Connects the client to Raft cluster via the default server address.

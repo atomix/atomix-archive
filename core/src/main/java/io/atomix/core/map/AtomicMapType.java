@@ -28,7 +28,6 @@ import io.atomix.core.transaction.impl.RollbackResult;
 import io.atomix.primitive.PrimitiveManagementService;
 import io.atomix.primitive.PrimitiveType;
 import io.atomix.primitive.service.PrimitiveService;
-import io.atomix.primitive.service.ServiceConfig;
 import io.atomix.utils.serializer.Namespace;
 import io.atomix.utils.serializer.Namespaces;
 import io.atomix.utils.time.Versioned;
@@ -85,7 +84,7 @@ public class AtomicMapType<K, V> implements PrimitiveType<AtomicMapBuilder<K, V>
   }
 
   @Override
-  public PrimitiveService newService(ServiceConfig config) {
+  public PrimitiveService newService() {
     return new DefaultAtomicMapService();
   }
 

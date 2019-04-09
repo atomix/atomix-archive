@@ -15,6 +15,16 @@
  */
 package io.atomix.core.multiset.impl;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
 import com.google.common.collect.HashMultiset;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Multiset;
@@ -23,18 +33,10 @@ import io.atomix.core.collection.impl.CollectionUpdateResult;
 import io.atomix.core.collection.impl.DefaultDistributedCollectionService;
 import io.atomix.core.iterator.impl.IteratorBatch;
 import io.atomix.core.multiset.DistributedMultisetType;
-import io.atomix.primitive.service.BackupInput;
-import io.atomix.primitive.service.BackupOutput;
 import io.atomix.primitive.session.Session;
 import io.atomix.primitive.session.SessionId;
 import io.atomix.utils.serializer.Namespace;
 import io.atomix.utils.serializer.Serializer;
-
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
 
 import static io.atomix.core.collection.impl.CollectionUpdateResult.ok;
 
@@ -67,15 +69,36 @@ public class DefaultDistributedMultisetService extends DefaultDistributedCollect
   }
 
   @Override
-  public void backup(BackupOutput output) {
-    super.backup(output);
-    output.writeObject(entryIterators);
+  public void backup(OutputStream output) throws IOException {
+    DistributedMultisetSnapshot.newBuilder()
+        .addAllValues(new ArrayList<>(multiset()))
+        .addAllListeners(listeners.stream()
+            .map(SessionId::id)
+            .collect(Collectors.toList()))
+        .putAllIterators(iterators.entrySet().stream()
+            .map(e -> Maps.immutableEntry(e.getKey(), e.getValue().sessionId()))
+            .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue)))
+        .putAllEntryIterators(entryIterators.entrySet().stream()
+            .map(e -> Maps.immutableEntry(e.getKey(), e.getValue().sessionId))
+            .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue)))
+        .build()
+        .writeTo(output);
   }
 
   @Override
-  public void restore(BackupInput input) {
-    super.restore(input);
-    entryIterators = input.readObject();
+  public void restore(InputStream input) throws IOException {
+    DistributedMultisetSnapshot snapshot = DistributedMultisetSnapshot.parseFrom(input);
+    collection = snapshot.getValuesList().stream()
+        .collect(Collectors.toCollection(HashMultiset::create));
+    listeners = snapshot.getListenersList().stream()
+        .map(SessionId::from)
+        .collect(Collectors.toCollection(LinkedHashSet::new));
+    iterators = snapshot.getIteratorsMap().entrySet().stream()
+        .map(e -> Maps.immutableEntry(e.getKey(), new DefaultDistributedCollectionService.IteratorContext(e.getValue())))
+        .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+    entryIterators = snapshot.getEntryIteratorsMap().entrySet().stream()
+        .map(e -> Maps.immutableEntry(e.getKey(), new IteratorContext(e.getValue())))
+        .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
   }
 
   @Override

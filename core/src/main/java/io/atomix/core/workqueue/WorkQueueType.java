@@ -20,7 +20,6 @@ import io.atomix.core.workqueue.impl.DefaultWorkQueueService;
 import io.atomix.primitive.PrimitiveManagementService;
 import io.atomix.primitive.PrimitiveType;
 import io.atomix.primitive.service.PrimitiveService;
-import io.atomix.primitive.service.ServiceConfig;
 import io.atomix.utils.serializer.Namespace;
 import io.atomix.utils.serializer.Namespaces;
 
@@ -60,7 +59,7 @@ public class WorkQueueType<E> implements PrimitiveType<WorkQueueBuilder<E>, Work
   }
 
   @Override
-  public PrimitiveService newService(ServiceConfig config) {
+  public PrimitiveService newService() {
     return new DefaultWorkQueueService();
   }
 

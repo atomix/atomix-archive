@@ -61,7 +61,7 @@
     <resteasy.version>3.1.4.Final</resteasy.version>
     <rest-assured.version>3.0.7</rest-assured.version>
     <argparse4j.version>0.7.0</argparse4j.version>
-    <protobuf.version>3.7.0</protobuf.version>
+    <protobuf.version>3.6.1</protobuf.version>
     <grpc.version>1.19.0</grpc.version>
 
     <!-- Maven plugins -->

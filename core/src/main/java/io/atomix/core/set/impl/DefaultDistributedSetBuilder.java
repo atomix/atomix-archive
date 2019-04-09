@@ -15,6 +15,8 @@
  */
 package io.atomix.core.set.impl;
 
+import java.util.concurrent.CompletableFuture;
+
 import com.google.common.io.BaseEncoding;
 import io.atomix.core.set.AsyncDistributedSet;
 import io.atomix.core.set.DistributedSet;
@@ -25,11 +27,8 @@ import io.atomix.primitive.protocol.GossipProtocol;
 import io.atomix.primitive.protocol.PrimitiveProtocol;
 import io.atomix.primitive.protocol.set.SetProtocol;
 import io.atomix.primitive.proxy.ProxyClient;
-import io.atomix.primitive.service.ServiceConfig;
 import io.atomix.utils.concurrent.Futures;
 import io.atomix.utils.serializer.Serializer;
-
-import java.util.concurrent.CompletableFuture;
 
 /**
  * Default distributed set builder.
@@ -55,7 +54,7 @@ public class DefaultDistributedSetBuilder<E> extends DistributedSetBuilder<E> {
         return Futures.exceptionalFuture(new UnsupportedOperationException("Sets are not supported by the provided gossip protocol"));
       }
     } else {
-      return newProxy(DistributedSetService.class, new ServiceConfig())
+      return newProxy(DistributedSetService.class)
           .thenCompose(proxy -> new DistributedSetProxy((ProxyClient) proxy, managementService.getPrimitiveRegistry()).connect())
           .thenApply(rawSet -> {
             Serializer serializer = serializer();

@@ -15,15 +15,14 @@
  */
 package io.atomix.core.map.impl;
 
+import java.util.concurrent.CompletableFuture;
+
 import io.atomix.core.map.AsyncAtomicSortedMap;
 import io.atomix.core.map.AtomicSortedMap;
 import io.atomix.core.map.AtomicSortedMapBuilder;
 import io.atomix.core.map.AtomicSortedMapConfig;
 import io.atomix.primitive.PrimitiveManagementService;
-import io.atomix.primitive.service.ServiceConfig;
 import io.atomix.utils.serializer.Serializer;
-
-import java.util.concurrent.CompletableFuture;
 
 /**
  * Default {@link AsyncAtomicSortedMap} builder.
@@ -38,7 +37,7 @@ public class DefaultAtomicSortedMapBuilder<K extends Comparable<K>, V> extends A
   @Override
   @SuppressWarnings("unchecked")
   public CompletableFuture<AtomicSortedMap<K, V>> buildAsync() {
-    return newProxy(AtomicTreeMapService.class, new ServiceConfig())
+    return newProxy(AtomicTreeMapService.class)
         .thenCompose(proxy -> new AtomicNavigableMapProxy(proxy, managementService.getPrimitiveRegistry()).connect())
         .thenApply(map -> {
           Serializer serializer = serializer();

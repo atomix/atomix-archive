@@ -15,21 +15,26 @@
  */
 package io.atomix.core.list.impl;
 
-import io.atomix.core.collection.impl.CollectionUpdateResult;
-import io.atomix.core.collection.impl.DefaultDistributedCollectionService;
-import io.atomix.core.iterator.impl.IteratorBatch;
-import io.atomix.core.list.DistributedListType;
-import io.atomix.primitive.service.BackupInput;
-import io.atomix.primitive.service.BackupOutput;
-import io.atomix.primitive.session.SessionId;
-import io.atomix.utils.serializer.Namespace;
-import io.atomix.utils.serializer.Serializer;
-
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Iterator;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+import com.google.common.collect.Maps;
+import io.atomix.core.collection.impl.CollectionUpdateResult;
+import io.atomix.core.collection.impl.DefaultDistributedCollectionService;
+import io.atomix.core.iterator.impl.IteratorBatch;
+import io.atomix.core.list.DistributedListType;
+import io.atomix.primitive.session.SessionId;
+import io.atomix.utils.serializer.Namespace;
+import io.atomix.utils.serializer.Serializer;
 
 import static io.atomix.core.collection.impl.CollectionUpdateResult.noop;
 import static io.atomix.core.collection.impl.CollectionUpdateResult.ok;
@@ -60,13 +65,30 @@ public class DefaultDistributedListService extends DefaultDistributedCollectionS
   }
 
   @Override
-  public void backup(BackupOutput output) {
-    output.writeObject(new ArrayList<>(list()));
+  public void backup(OutputStream output) throws IOException {
+    DistributedListSnapshot.newBuilder()
+        .addAllValues(list())
+        .addAllListeners(listeners.stream()
+            .map(SessionId::id)
+            .collect(Collectors.toList()))
+        .putAllIterators(iterators.entrySet().stream()
+            .map(e -> Maps.immutableEntry(e.getKey(), e.getValue().sessionId()))
+            .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue)))
+        .build()
+        .writeTo(output);
   }
 
   @Override
-  public void restore(BackupInput input) {
-    collection = Collections.synchronizedList(input.readObject());
+  public void restore(InputStream input) throws IOException {
+    DistributedListSnapshot snapshot = DistributedListSnapshot.parseFrom(input);
+    collection = snapshot.getValuesList().stream()
+        .collect(Collectors.toCollection(() -> Collections.synchronizedList(new ArrayList<>())));
+    listeners = snapshot.getListenersList().stream()
+        .map(SessionId::from)
+        .collect(Collectors.toCollection(LinkedHashSet::new));
+    iterators = snapshot.getIteratorsMap().entrySet().stream()
+        .map(e -> Maps.immutableEntry(e.getKey(), new IteratorContext(e.getValue())))
+        .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
   }
 
   @Override

@@ -17,6 +17,8 @@ package io.atomix.protocols.log;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -50,11 +52,8 @@ import io.atomix.primitive.partition.PartitionId;
 import io.atomix.primitive.partition.PrimaryElection;
 import io.atomix.primitive.partition.TestPrimaryElection;
 import io.atomix.primitive.service.AbstractPrimitiveService;
-import io.atomix.primitive.service.BackupInput;
-import io.atomix.primitive.service.BackupOutput;
 import io.atomix.primitive.service.Commit;
 import io.atomix.primitive.service.PrimitiveService;
-import io.atomix.primitive.service.ServiceConfig;
 import io.atomix.primitive.service.ServiceExecutor;
 import io.atomix.primitive.session.Session;
 import io.atomix.primitive.session.SessionId;
@@ -316,7 +315,7 @@ public class DistributedLogTest extends ConcurrentTestCase {
     }
 
     @Override
-    public PrimitiveService newService(ServiceConfig config) {
+    public PrimitiveService newService() {
       return new TestPrimitiveService();
     }
   }
@@ -361,13 +360,13 @@ public class DistributedLogTest extends ConcurrentTestCase {
     }
 
     @Override
-    public void backup(BackupOutput writer) {
-      writer.writeLong(10);
+    public void backup(OutputStream output) throws IOException {
+      output.write(new byte[]{1});
     }
 
     @Override
-    public void restore(BackupInput reader) {
-      assertEquals(10, reader.readLong());
+    public void restore(InputStream input) throws IOException {
+      assertEquals(1, input.read());
     }
 
     protected long write(Commit<Void> commit) {

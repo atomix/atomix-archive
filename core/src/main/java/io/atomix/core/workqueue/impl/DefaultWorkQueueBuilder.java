@@ -15,14 +15,13 @@
  */
 package io.atomix.core.workqueue.impl;
 
+import java.util.concurrent.CompletableFuture;
+
 import io.atomix.core.workqueue.WorkQueue;
 import io.atomix.core.workqueue.WorkQueueBuilder;
 import io.atomix.core.workqueue.WorkQueueConfig;
 import io.atomix.primitive.PrimitiveManagementService;
-import io.atomix.primitive.service.ServiceConfig;
 import io.atomix.utils.serializer.Serializer;
-
-import java.util.concurrent.CompletableFuture;
 
 /**
  * Default work queue builder implementation.
@@ -35,7 +34,7 @@ public class DefaultWorkQueueBuilder<E> extends WorkQueueBuilder<E> {
   @Override
   @SuppressWarnings("unchecked")
   public CompletableFuture<WorkQueue<E>> buildAsync() {
-    return newProxy(WorkQueueService.class, new ServiceConfig())
+    return newProxy(WorkQueueService.class)
         .thenCompose(proxy -> new WorkQueueProxy(proxy, managementService.getPrimitiveRegistry()).connect())
         .thenApply(queue -> {
           Serializer serializer = serializer();

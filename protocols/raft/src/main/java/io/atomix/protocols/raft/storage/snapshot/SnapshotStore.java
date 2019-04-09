@@ -15,21 +15,22 @@
  */
 package io.atomix.protocols.raft.storage.snapshot;
 
-import io.atomix.protocols.raft.storage.RaftStorage;
-import io.atomix.storage.StorageLevel;
-import io.atomix.storage.buffer.FileBuffer;
-import io.atomix.storage.buffer.HeapBuffer;
-import io.atomix.utils.time.WallClockTimestamp;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.NavigableMap;
 import java.util.concurrent.ConcurrentSkipListMap;
+
+import io.atomix.protocols.raft.storage.RaftStorage;
+import io.atomix.utils.time.WallClockTimestamp;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -125,40 +126,32 @@ public class SnapshotStore implements AutoCloseable {
       // If the file looks like a segment file, attempt to load the segment.
       if (SnapshotFile.isSnapshotFile(file)) {
         SnapshotFile snapshotFile = new SnapshotFile(file);
-        SnapshotDescriptor descriptor = new SnapshotDescriptor(FileBuffer.allocate(file, SnapshotDescriptor.BYTES));
-
-        // Valid segments will have been locked. Segments that resulting from failures during log cleaning will be
-        // unlocked and should ultimately be deleted from disk.
-        if (descriptor.isLocked()) {
-          log.debug("Loaded disk snapshot: {} ({})", descriptor.index(), snapshotFile.file().getName());
-          snapshots.add(new FileSnapshot(snapshotFile, descriptor, this));
-          descriptor.close();
+        SnapshotDescriptor descriptor = null;
+        try (InputStream is = new FileInputStream(file)) {
+          descriptor = SnapshotDescriptor.parseFrom(is);
+        } catch (IOException e) {
         }
-        // If the segment descriptor wasn't locked, close and delete the descriptor.
-        else {
-          log.debug("Deleting partial snapshot: {} ({})", descriptor.index(), snapshotFile.file().getName());
-          descriptor.close();
-          descriptor.delete();
+
+        if (descriptor != null) {
+          // Valid segments will have been locked. Segments that resulting from failures during log cleaning will be
+          // unlocked and should ultimately be deleted from disk.
+          if (descriptor.getLocked()) {
+            log.debug("Loaded disk snapshot: {} ({})", descriptor.getIndex(), snapshotFile.file().getName());
+            snapshots.add(new Snapshot(snapshotFile, descriptor, this));
+          }
+          // If the segment descriptor wasn't locked, close and delete the descriptor.
+          else {
+            log.debug("Deleting partial snapshot: {} ({})", descriptor.getIndex(), snapshotFile.file().getName());
+            try {
+              Files.delete(file.toPath());
+            } catch (IOException e) {
+            }
+          }
         }
       }
     }
 
     return snapshots;
-  }
-
-  /**
-   * Creates a temporary in-memory snapshot.
-   *
-   * @param index     The snapshot index.
-   * @param timestamp The snapshot timestamp.
-   * @return The snapshot.
-   */
-  public Snapshot newTemporarySnapshot(long index, WallClockTimestamp timestamp) {
-    SnapshotDescriptor descriptor = SnapshotDescriptor.builder()
-        .withIndex(index)
-        .withTimestamp(timestamp.unixTimestamp())
-        .build();
-    return newSnapshot(descriptor, StorageLevel.MEMORY);
   }
 
   /**
@@ -169,46 +162,15 @@ public class SnapshotStore implements AutoCloseable {
    * @return The snapshot.
    */
   public Snapshot newSnapshot(long index, WallClockTimestamp timestamp) {
-    SnapshotDescriptor descriptor = SnapshotDescriptor.builder()
-        .withIndex(index)
-        .withTimestamp(timestamp.unixTimestamp())
+    SnapshotDescriptor descriptor = SnapshotDescriptor.newBuilder()
+        .setIndex(index)
+        .setTimestamp(timestamp.unixTimestamp())
         .build();
-    return newSnapshot(descriptor, storage.storageLevel());
-  }
-
-  /**
-   * Creates a new snapshot buffer.
-   */
-  private Snapshot newSnapshot(SnapshotDescriptor descriptor, StorageLevel storageLevel) {
-    if (storageLevel == StorageLevel.MEMORY) {
-      return createMemorySnapshot(descriptor);
-    } else {
-      return createDiskSnapshot(descriptor);
-    }
-  }
-
-  /**
-   * Creates a memory snapshot.
-   */
-  private Snapshot createMemorySnapshot(SnapshotDescriptor descriptor) {
-    HeapBuffer buffer = HeapBuffer.allocate(SnapshotDescriptor.BYTES, Integer.MAX_VALUE);
-    Snapshot snapshot = new MemorySnapshot(buffer, descriptor.copyTo(buffer), this);
-    log.debug("Created memory snapshot: {}", snapshot);
-    return snapshot;
-  }
-
-  /**
-   * Creates a disk snapshot.
-   */
-  private Snapshot createDiskSnapshot(SnapshotDescriptor descriptor) {
     SnapshotFile file = new SnapshotFile(SnapshotFile.createSnapshotFile(
         storage.directory(),
         storage.prefix(),
-        descriptor.index()
-    ));
-    Snapshot snapshot = new FileSnapshot(file, descriptor, this);
-    log.debug("Created disk snapshot: {}", snapshot);
-    return snapshot;
+        descriptor.getIndex()));
+    return new Snapshot(file, descriptor, this);
   }
 
   /**

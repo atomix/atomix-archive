@@ -15,13 +15,11 @@
  */
 package io.atomix.core.semaphore;
 
-import io.atomix.core.semaphore.impl.AtomicSemaphoreServiceConfig;
 import io.atomix.core.semaphore.impl.DefaultAtomicSemaphoreBuilder;
 import io.atomix.core.semaphore.impl.DefaultAtomicSemaphoreService;
 import io.atomix.primitive.PrimitiveManagementService;
 import io.atomix.primitive.PrimitiveType;
 import io.atomix.primitive.service.PrimitiveService;
-import io.atomix.primitive.service.ServiceConfig;
 import io.atomix.utils.serializer.Namespace;
 import io.atomix.utils.serializer.Namespaces;
 import io.atomix.utils.time.Version;
@@ -53,15 +51,14 @@ public class AtomicSemaphoreType implements PrimitiveType<AtomicSemaphoreBuilder
   public Namespace namespace() {
     return Namespace.builder()
         .register(Namespaces.BASIC)
-        .register(AtomicSemaphoreServiceConfig.class)
         .register(Version.class)
         .register(QueueStatus.class)
         .build();
   }
 
   @Override
-  public PrimitiveService newService(ServiceConfig config) {
-    return new DefaultAtomicSemaphoreService((AtomicSemaphoreServiceConfig) config);
+  public PrimitiveService newService() {
+    return new DefaultAtomicSemaphoreService();
   }
 
   @Override

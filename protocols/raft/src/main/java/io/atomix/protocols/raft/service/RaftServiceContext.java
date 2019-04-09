@@ -16,6 +16,13 @@
 
 package io.atomix.protocols.raft.service;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.util.concurrent.CompletableFuture;
+import java.util.stream.Collectors;
+
+import com.google.protobuf.ByteString;
 import io.atomix.cluster.MemberId;
 import io.atomix.primitive.PrimitiveId;
 import io.atomix.primitive.PrimitiveType;
@@ -23,10 +30,7 @@ import io.atomix.primitive.operation.OperationType;
 import io.atomix.primitive.operation.PrimitiveOperation;
 import io.atomix.primitive.service.Commit;
 import io.atomix.primitive.service.PrimitiveService;
-import io.atomix.primitive.service.ServiceConfig;
 import io.atomix.primitive.service.ServiceContext;
-import io.atomix.primitive.service.impl.DefaultBackupInput;
-import io.atomix.primitive.service.impl.DefaultBackupOutput;
 import io.atomix.primitive.service.impl.DefaultCommit;
 import io.atomix.primitive.session.Session;
 import io.atomix.primitive.session.SessionId;
@@ -36,9 +40,8 @@ import io.atomix.protocols.raft.impl.OperationResult;
 import io.atomix.protocols.raft.impl.RaftContext;
 import io.atomix.protocols.raft.session.RaftSession;
 import io.atomix.protocols.raft.session.RaftSessionRegistry;
-import io.atomix.protocols.raft.storage.snapshot.SnapshotReader;
-import io.atomix.protocols.raft.storage.snapshot.SnapshotWriter;
-import io.atomix.storage.buffer.Bytes;
+import io.atomix.protocols.raft.storage.snapshot.ServiceSession;
+import io.atomix.protocols.raft.storage.snapshot.ServiceSnapshot;
 import io.atomix.utils.concurrent.ThreadContextFactory;
 import io.atomix.utils.config.ConfigurationException;
 import io.atomix.utils.logging.ContextualLoggerFactory;
@@ -49,8 +52,6 @@ import io.atomix.utils.time.LogicalTimestamp;
 import io.atomix.utils.time.WallClock;
 import io.atomix.utils.time.WallClockTimestamp;
 import org.slf4j.Logger;
-
-import java.util.concurrent.CompletableFuture;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -63,7 +64,6 @@ public class RaftServiceContext implements ServiceContext {
   private final PrimitiveId primitiveId;
   private final String serviceName;
   private final PrimitiveType primitiveType;
-  private final ServiceConfig config;
   private final PrimitiveService service;
   private final RaftContext raft;
   private final RaftSessionRegistry sessions;
@@ -91,14 +91,12 @@ public class RaftServiceContext implements ServiceContext {
       PrimitiveId primitiveId,
       String serviceName,
       PrimitiveType primitiveType,
-      ServiceConfig config,
       PrimitiveService service,
       RaftContext raft,
       ThreadContextFactory threadContextFactory) {
     this.primitiveId = checkNotNull(primitiveId);
     this.serviceName = checkNotNull(serviceName);
     this.primitiveType = checkNotNull(primitiveType);
-    this.config = checkNotNull(config);
     this.service = checkNotNull(service);
     this.raft = checkNotNull(raft);
     this.sessions = raft.getSessions();
@@ -138,12 +136,6 @@ public class RaftServiceContext implements ServiceContext {
   @Override
   public PrimitiveType serviceType() {
     return primitiveType;
-  }
-
-  @Override
-  @SuppressWarnings("unchecked")
-  public <C extends ServiceConfig> C serviceConfig() {
-    return (C) config;
   }
 
   public Serializer serializer() {
@@ -233,87 +225,84 @@ public class RaftServiceContext implements ServiceContext {
   /**
    * Installs a snapshot.
    */
-  public void installSnapshot(SnapshotReader reader) {
-    log.debug("Installing snapshot {}", reader.snapshot().index());
-    reader.skip(Bytes.LONG); // Skip the service ID
+  public void installSnapshot(ServiceSnapshot snapshot) {
+    log.debug("Installing snapshot {}", snapshot.getIndex());
     PrimitiveType primitiveType;
     try {
-      primitiveType = raft.getPrimitiveTypes().getPrimitiveType(reader.readString());
+      primitiveType = raft.getPrimitiveTypes().getPrimitiveType(snapshot.getType());
     } catch (ConfigurationException e) {
       log.error(e.getMessage(), e);
       return;
     }
 
-    String serviceName = reader.readString();
-    currentIndex = reader.readLong();
-    currentTimestamp = reader.readLong();
-    timestampDelta = reader.readLong();
-
-    int sessionCount = reader.readInt();
-    for (int i = 0; i < sessionCount; i++) {
-      SessionId sessionId = SessionId.from(reader.readLong());
-      MemberId node = MemberId.from(reader.readString());
-      ReadConsistency readConsistency = ReadConsistency.valueOf(reader.readString());
-      long minTimeout = reader.readLong();
-      long maxTimeout = reader.readLong();
-      long sessionTimestamp = reader.readLong();
-
-      // Only create a new session if one does not already exist. This is necessary to ensure only a single session
-      // is ever opened and exposed to the state machine.
+    for (ServiceSession serviceSession : snapshot.getSessionsList()) {
       RaftSession session = raft.getSessions().addSession(new RaftSession(
-          sessionId,
-          node,
-          serviceName,
+          SessionId.from(serviceSession.getSessionId()),
+          MemberId.from(serviceSession.getMemberId()),
+          snapshot.getName(),
           primitiveType,
-          readConsistency,
-          minTimeout,
-          maxTimeout,
-          sessionTimestamp,
+          ReadConsistency.valueOf(serviceSession.getReadConsistency()),
+          serviceSession.getMinTimeout(),
+          serviceSession.getMaxTimeout(),
+          serviceSession.getTimestamp(),
           service.serializer(),
           this,
           raft,
           threadContextFactory));
 
-      session.setRequestSequence(reader.readLong());
-      session.setCommandSequence(reader.readLong());
-      session.setEventIndex(reader.readLong());
-      session.setLastCompleted(reader.readLong());
-      session.setLastApplied(reader.snapshot().index());
-      session.setLastUpdated(sessionTimestamp);
+      session.setRequestSequence(serviceSession.getRequestSequence());
+      session.setCommandSequence(serviceSession.getCommandSequence());
+      session.setEventIndex(serviceSession.getEventIndex());
+      session.setLastCompleted(serviceSession.getLastCompleted());
+      session.setLastApplied(snapshot.getIndex());
+      session.setLastUpdated(serviceSession.getTimestamp());
       session.open();
       service.register(sessions.addSession(session));
     }
-    service.restore(new DefaultBackupInput(reader, service.serializer()));
+
+    try {
+      service.restore(new ByteArrayInputStream(snapshot.getSnapshot().toByteArray()));
+    } catch (IOException e) {
+      log.error("Failed to restore service {}", snapshot.getName(), e);
+    }
   }
 
   /**
    * Takes a snapshot of the service state.
    */
-  public void takeSnapshot(SnapshotWriter writer) {
-    log.debug("Taking snapshot {}", writer.snapshot().index());
+  public ServiceSnapshot takeSnapshot() {
+    log.debug("Taking snapshot {}", currentIndex);
 
-    // Serialize sessions to the in-memory snapshot and request a snapshot from the state machine.
-    writer.writeLong(primitiveId.id());
-    writer.writeString(primitiveType.name());
-    writer.writeString(serviceName);
-    writer.writeLong(currentIndex);
-    writer.writeLong(currentTimestamp);
-    writer.writeLong(timestampDelta);
-
-    writer.writeInt(sessions.getSessions().size());
-    for (RaftSession session : sessions.getSessions()) {
-      writer.writeLong(session.sessionId().id());
-      writer.writeString(session.memberId().id());
-      writer.writeString(session.readConsistency().name());
-      writer.writeLong(session.minTimeout());
-      writer.writeLong(session.maxTimeout());
-      writer.writeLong(session.getLastUpdated());
-      writer.writeLong(session.getRequestSequence());
-      writer.writeLong(session.getCommandSequence());
-      writer.writeLong(session.getEventIndex());
-      writer.writeLong(session.getLastCompleted());
+    ByteArrayOutputStream output = new ByteArrayOutputStream();
+    try {
+      service.backup(output);
+    } catch (IOException e) {
+      log.error("Failed to backup service {}", serviceName, e);
     }
-    service.backup(new DefaultBackupOutput(writer, service.serializer()));
+
+    return ServiceSnapshot.newBuilder()
+        .setId(primitiveId.id())
+        .setType(primitiveType.name())
+        .setName(serviceName)
+        .setIndex(currentIndex)
+        .setTimestamp(currentTimestamp)
+        .setDelta(timestampDelta)
+        .addAllSessions(sessions.getSessions().stream()
+            .map(session -> ServiceSession.newBuilder()
+                .setSessionId(session.sessionId().id())
+                .setMemberId(session.memberId().id())
+                .setReadConsistency(session.readConsistency().name())
+                .setMinTimeout(session.minTimeout())
+                .setMaxTimeout(session.maxTimeout())
+                .setTimestamp(session.getLastUpdated())
+                .setRequestSequence(session.getRequestSequence())
+                .setCommandSequence(session.getCommandSequence())
+                .setEventIndex(session.getEventIndex())
+                .setLastApplied(session.getLastApplied())
+                .build())
+            .collect(Collectors.toList()))
+        .setSnapshot(ByteString.copyFrom(output.toByteArray()))
+        .build();
   }
 
   /**

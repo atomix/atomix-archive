@@ -15,6 +15,8 @@
  */
 package io.atomix.core.map.impl;
 
+import java.util.concurrent.CompletableFuture;
+
 import com.google.common.io.BaseEncoding;
 import io.atomix.core.map.AsyncAtomicMap;
 import io.atomix.core.map.AtomicMap;
@@ -22,10 +24,7 @@ import io.atomix.core.map.AtomicMapBuilder;
 import io.atomix.core.map.AtomicMapConfig;
 import io.atomix.primitive.PrimitiveManagementService;
 import io.atomix.primitive.proxy.ProxyClient;
-import io.atomix.primitive.service.ServiceConfig;
 import io.atomix.utils.serializer.Serializer;
-
-import java.util.concurrent.CompletableFuture;
 
 /**
  * Default {@link AsyncAtomicMap} builder.
@@ -41,7 +40,7 @@ public class DefaultAtomicMapBuilder<K, V> extends AtomicMapBuilder<K, V> {
   @Override
   @SuppressWarnings("unchecked")
   public CompletableFuture<AtomicMap<K, V>> buildAsync() {
-    return newProxy(AtomicMapService.class, new ServiceConfig())
+    return newProxy(AtomicMapService.class)
         .thenCompose(proxy -> new AtomicMapProxy((ProxyClient) proxy, managementService.getPrimitiveRegistry()).connect())
         .thenApply(rawMap -> {
           Serializer serializer = serializer();

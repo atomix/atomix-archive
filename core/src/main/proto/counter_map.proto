@@ -1,0 +1,12 @@
+syntax = "proto3";
+
+package atomix.counter_map.service;
+
+option java_package = "io.atomix.core.map.impl";
+option java_outer_classname = "AtomicCounterMapProto";
+option java_multiple_files = true;
+
+// Atomic counter map snapshot
+message AtomicCounterMapSnapshot {
+    map<string, int64> entries = 1;
+}

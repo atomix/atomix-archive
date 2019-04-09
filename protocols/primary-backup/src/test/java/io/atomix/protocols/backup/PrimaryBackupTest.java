@@ -15,6 +15,20 @@
  */
 package io.atomix.protocols.backup;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Consumer;
+import java.util.stream.Collectors;
+
 import io.atomix.cluster.MemberId;
 import io.atomix.cluster.TestClusterMembershipService;
 import io.atomix.primitive.PrimitiveBuilder;
@@ -29,11 +43,8 @@ import io.atomix.primitive.partition.PartitionId;
 import io.atomix.primitive.partition.PrimaryElection;
 import io.atomix.primitive.partition.TestPrimaryElection;
 import io.atomix.primitive.service.AbstractPrimitiveService;
-import io.atomix.primitive.service.BackupInput;
-import io.atomix.primitive.service.BackupOutput;
 import io.atomix.primitive.service.Commit;
 import io.atomix.primitive.service.PrimitiveService;
-import io.atomix.primitive.service.ServiceConfig;
 import io.atomix.primitive.service.ServiceExecutor;
 import io.atomix.primitive.session.Session;
 import io.atomix.primitive.session.SessionClient;
@@ -48,17 +59,6 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Ignore;
 import org.junit.Test;
-
-import java.time.Duration;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.function.Consumer;
-import java.util.stream.Collectors;
 
 import static io.atomix.primitive.operation.PrimitiveOperation.operation;
 import static org.junit.Assert.assertEquals;
@@ -447,7 +447,7 @@ public class PrimaryBackupTest extends ConcurrentTestCase {
    */
   private SessionClient createProxy(PrimaryBackupClient client, int backups, Replication replication) {
     try {
-      return client.sessionBuilder("primary-backup-test", TestPrimitiveType.INSTANCE, new ServiceConfig())
+      return client.sessionBuilder("primary-backup-test", TestPrimitiveType.INSTANCE)
           .withNumBackups(backups)
           .withReplication(replication)
           .build()
@@ -508,7 +508,7 @@ public class PrimaryBackupTest extends ConcurrentTestCase {
     }
 
     @Override
-    public PrimitiveService newService(ServiceConfig config) {
+    public PrimitiveService newService() {
       return new TestPrimitiveService();
     }
   }
@@ -553,13 +553,13 @@ public class PrimaryBackupTest extends ConcurrentTestCase {
     }
 
     @Override
-    public void backup(BackupOutput writer) {
-      writer.writeLong(10);
+    public void backup(OutputStream output) throws IOException {
+      output.write(new byte[]{1});
     }
 
     @Override
-    public void restore(BackupInput reader) {
-      assertEquals(10, reader.readLong());
+    public void restore(InputStream input) throws IOException {
+      assertEquals(1, input.read());
     }
 
     protected long write(Commit<Void> commit) {

@@ -15,6 +15,8 @@
  */
 package io.atomix.core.multimap;
 
+import java.util.ArrayList;
+
 import com.google.common.collect.Maps;
 import io.atomix.core.iterator.impl.IteratorBatch;
 import io.atomix.core.multimap.impl.DefaultDistributedMultimapBuilder;
@@ -22,12 +24,9 @@ import io.atomix.core.multimap.impl.DefaultDistributedMultimapService;
 import io.atomix.primitive.PrimitiveManagementService;
 import io.atomix.primitive.PrimitiveType;
 import io.atomix.primitive.service.PrimitiveService;
-import io.atomix.primitive.service.ServiceConfig;
 import io.atomix.utils.serializer.Namespace;
 import io.atomix.utils.serializer.Namespaces;
 import io.atomix.utils.time.Versioned;
-
-import java.util.ArrayList;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
 
@@ -68,7 +67,7 @@ public class DistributedMultimapType<K, V> implements PrimitiveType<DistributedM
   }
 
   @Override
-  public PrimitiveService newService(ServiceConfig config) {
+  public PrimitiveService newService() {
     return new DefaultDistributedMultimapService();
   }
 

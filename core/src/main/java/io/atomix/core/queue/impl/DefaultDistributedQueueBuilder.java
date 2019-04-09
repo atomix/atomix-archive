@@ -15,16 +15,15 @@
  */
 package io.atomix.core.queue.impl;
 
+import java.util.concurrent.CompletableFuture;
+
 import com.google.common.io.BaseEncoding;
 import io.atomix.core.queue.AsyncDistributedQueue;
 import io.atomix.core.queue.DistributedQueue;
 import io.atomix.core.queue.DistributedQueueBuilder;
 import io.atomix.core.queue.DistributedQueueConfig;
 import io.atomix.primitive.PrimitiveManagementService;
-import io.atomix.primitive.service.ServiceConfig;
 import io.atomix.utils.serializer.Serializer;
-
-import java.util.concurrent.CompletableFuture;
 
 /**
  * Default distributed queue builder.
@@ -39,7 +38,7 @@ public class DefaultDistributedQueueBuilder<E> extends DistributedQueueBuilder<E
   @Override
   @SuppressWarnings("unchecked")
   public CompletableFuture<DistributedQueue<E>> buildAsync() {
-    return newProxy(DistributedQueueService.class, new ServiceConfig())
+    return newProxy(DistributedQueueService.class)
         .thenCompose(proxy -> new DistributedQueueProxy(proxy, managementService.getPrimitiveRegistry()).connect())
         .thenApply(rawQueue -> {
           Serializer serializer = serializer();

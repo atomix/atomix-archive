@@ -15,13 +15,13 @@
  */
 package io.atomix.core.semaphore.impl;
 
+import java.util.concurrent.CompletableFuture;
+
 import io.atomix.core.semaphore.AsyncAtomicSemaphore;
 import io.atomix.core.semaphore.AtomicSemaphore;
 import io.atomix.core.semaphore.AtomicSemaphoreBuilder;
 import io.atomix.core.semaphore.AtomicSemaphoreConfig;
 import io.atomix.primitive.PrimitiveManagementService;
-
-import java.util.concurrent.CompletableFuture;
 
 public class DefaultAtomicSemaphoreBuilder extends AtomicSemaphoreBuilder {
   public DefaultAtomicSemaphoreBuilder(String name, AtomicSemaphoreConfig config, PrimitiveManagementService managementService) {
@@ -31,12 +31,13 @@ public class DefaultAtomicSemaphoreBuilder extends AtomicSemaphoreBuilder {
   @SuppressWarnings("unchecked")
   @Override
   public CompletableFuture<AtomicSemaphore> buildAsync() {
-    return newProxy(AtomicSemaphoreService.class, new AtomicSemaphoreServiceConfig().setInitialCapacity(config.initialCapacity()))
+    return newProxy(AtomicSemaphoreService.class)
         .thenCompose(proxy -> new AtomicSemaphoreProxy(
             proxy,
             managementService.getPrimitiveRegistry(),
             managementService.getExecutorService())
             .connect())
+        .thenCompose(semaphore -> semaphore.increasePermits(config.initialCapacity()).thenApply(v -> semaphore))
         .thenApply(AsyncAtomicSemaphore::sync);
   }
 }

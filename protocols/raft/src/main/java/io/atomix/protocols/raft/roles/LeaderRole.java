@@ -845,7 +845,6 @@ public final class LeaderRole extends ActiveRole {
         request.node(),
         request.serviceName(),
         request.serviceType(),
-        request.serviceConfig(),
         request.readConsistency(),
         minTimeout,
         maxTimeout))

@@ -15,15 +15,18 @@
  */
 package io.atomix.protocols.raft.impl;
 
+import java.util.Collection;
+import java.util.concurrent.CompletableFuture;
+import java.util.function.Supplier;
+
 import io.atomix.cluster.MemberId;
 import io.atomix.primitive.PrimitiveType;
 import io.atomix.primitive.Recovery;
+import io.atomix.primitive.partition.PartitionId;
 import io.atomix.primitive.session.SessionClient;
 import io.atomix.primitive.session.impl.BlockingAwareSessionClient;
 import io.atomix.primitive.session.impl.RecoveringSessionClient;
 import io.atomix.primitive.session.impl.RetryingSessionClient;
-import io.atomix.primitive.partition.PartitionId;
-import io.atomix.primitive.service.ServiceConfig;
 import io.atomix.protocols.raft.RaftClient;
 import io.atomix.protocols.raft.RaftMetadataClient;
 import io.atomix.protocols.raft.protocol.RaftClientProtocol;
@@ -36,10 +39,6 @@ import io.atomix.utils.concurrent.ThreadContextFactory;
 import io.atomix.utils.logging.ContextualLoggerFactory;
 import io.atomix.utils.logging.LoggerContext;
 import org.slf4j.Logger;
-
-import java.util.Collection;
-import java.util.concurrent.CompletableFuture;
-import java.util.function.Supplier;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -127,7 +126,7 @@ public class DefaultRaftClient implements RaftClient {
   }
 
   @Override
-  public RaftSessionClient.Builder sessionBuilder(String primitiveName, PrimitiveType primitiveType, ServiceConfig serviceConfig) {
+  public RaftSessionClient.Builder sessionBuilder(String primitiveName, PrimitiveType primitiveType) {
     return new RaftSessionClient.Builder() {
       @Override
       public SessionClient build() {
@@ -136,7 +135,6 @@ public class DefaultRaftClient implements RaftClient {
             new DefaultRaftSessionClient(
                 primitiveName,
                 primitiveType,
-                serviceConfig,
                 partitionId,
                 DefaultRaftClient.this.protocol,
                 selectorManager,

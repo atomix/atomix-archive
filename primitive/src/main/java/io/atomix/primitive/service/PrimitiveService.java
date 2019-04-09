@@ -15,6 +15,10 @@
  */
 package io.atomix.primitive.service;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+
 import io.atomix.primitive.session.Session;
 import io.atomix.primitive.session.SessionId;
 import io.atomix.utils.serializer.Serializer;
@@ -52,18 +56,18 @@ public interface PrimitiveService {
   Serializer serializer();
 
   /**
-   * Backs up the service state to the given buffer.
+   * Backs up the service state to the given output stream.
    *
-   * @param output the buffer to which to back up the service state
+   * @param output the output stream
    */
-  void backup(BackupOutput output);
+  void backup(OutputStream output) throws IOException;
 
   /**
-   * Restores the service state from the given buffer.
+   * Restores the service state from the given input stream.
    *
-   * @param input the buffer from which to restore the service state
+   * @param input the input stream
    */
-  void restore(BackupInput input);
+  void restore(InputStream input) throws IOException;
 
   /**
    * Applies a commit to the state machine.

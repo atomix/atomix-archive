@@ -15,20 +15,18 @@
  */
 package io.atomix.core.multimap.impl;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.util.Collection;
+
 import io.atomix.core.multimap.AtomicMultimapType;
 import io.atomix.primitive.PrimitiveId;
 import io.atomix.primitive.service.ServiceContext;
-import io.atomix.primitive.service.impl.DefaultBackupInput;
-import io.atomix.primitive.service.impl.DefaultBackupOutput;
 import io.atomix.primitive.session.Session;
 import io.atomix.primitive.session.SessionId;
-import io.atomix.storage.buffer.Buffer;
-import io.atomix.storage.buffer.HeapBuffer;
 import io.atomix.utils.time.Versioned;
 import io.atomix.utils.time.WallClock;
 import org.junit.Test;
-
-import java.util.Collection;
 
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
@@ -56,12 +54,12 @@ public class DefaultAtomicMultimapServiceTest {
     service.init(context);
     service.put("foo", "Hello world!".getBytes());
 
-    Buffer buffer = HeapBuffer.allocate();
-    service.backup(new DefaultBackupOutput(buffer, service.serializer()));
+    ByteArrayOutputStream os = new ByteArrayOutputStream();
+    service.backup(os);
 
     service = new DefaultAtomicMultimapService();
     service.init(context);
-    service.restore(new DefaultBackupInput(buffer.flip(), service.serializer()));
+    service.restore(new ByteArrayInputStream(os.toByteArray()));
 
     Versioned<Collection<byte[]>> value = service.get("foo");
     assertNotNull(value);

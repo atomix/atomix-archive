@@ -15,15 +15,14 @@
  */
 package io.atomix.core.tree.impl;
 
+import java.util.concurrent.CompletableFuture;
+
 import io.atomix.core.tree.AsyncAtomicDocumentTree;
 import io.atomix.core.tree.AtomicDocumentTree;
 import io.atomix.core.tree.AtomicDocumentTreeBuilder;
 import io.atomix.core.tree.AtomicDocumentTreeConfig;
 import io.atomix.primitive.PrimitiveManagementService;
-import io.atomix.primitive.service.ServiceConfig;
 import io.atomix.utils.serializer.Serializer;
-
-import java.util.concurrent.CompletableFuture;
 
 /**
  * Default {@link AsyncAtomicDocumentTree} builder.
@@ -38,7 +37,7 @@ public class DefaultAtomicDocumentTreeBuilder<V> extends AtomicDocumentTreeBuild
   @Override
   @SuppressWarnings("unchecked")
   public CompletableFuture<AtomicDocumentTree<V>> buildAsync() {
-    return newProxy(DocumentTreeService.class, new ServiceConfig())
+    return newProxy(DocumentTreeService.class)
         .thenCompose(proxy -> new AtomicDocumentTreeProxy(proxy, managementService.getPrimitiveRegistry()).connect())
         .thenApply(treeProxy -> {
           Serializer serializer = serializer();

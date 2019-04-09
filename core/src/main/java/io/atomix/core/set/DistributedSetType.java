@@ -29,7 +29,6 @@ import io.atomix.core.transaction.impl.RollbackResult;
 import io.atomix.primitive.PrimitiveManagementService;
 import io.atomix.primitive.PrimitiveType;
 import io.atomix.primitive.service.PrimitiveService;
-import io.atomix.primitive.service.ServiceConfig;
 import io.atomix.utils.serializer.Namespace;
 import io.atomix.utils.serializer.Namespaces;
 
@@ -80,8 +79,8 @@ public class DistributedSetType<E> implements PrimitiveType<DistributedSetBuilde
   }
 
   @Override
-  public PrimitiveService newService(ServiceConfig config) {
-    return new DefaultDistributedSetService<>();
+  public PrimitiveService newService() {
+    return new DefaultDistributedSetService();
   }
 
   @Override

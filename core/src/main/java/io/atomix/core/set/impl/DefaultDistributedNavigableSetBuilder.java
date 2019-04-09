@@ -15,6 +15,8 @@
  */
 package io.atomix.core.set.impl;
 
+import java.util.concurrent.CompletableFuture;
+
 import io.atomix.core.set.AsyncDistributedNavigableSet;
 import io.atomix.core.set.DistributedNavigableSet;
 import io.atomix.core.set.DistributedNavigableSetBuilder;
@@ -24,10 +26,7 @@ import io.atomix.primitive.protocol.GossipProtocol;
 import io.atomix.primitive.protocol.PrimitiveProtocol;
 import io.atomix.primitive.protocol.set.NavigableSetProtocol;
 import io.atomix.primitive.proxy.ProxyClient;
-import io.atomix.primitive.service.ServiceConfig;
 import io.atomix.utils.concurrent.Futures;
-
-import java.util.concurrent.CompletableFuture;
 
 /**
  * Default distributed tree set builder.
@@ -53,7 +52,7 @@ public class DefaultDistributedNavigableSetBuilder<E extends Comparable<E>> exte
         return Futures.exceptionalFuture(new UnsupportedOperationException("Sets are not supported by the provided gossip protocol"));
       }
     } else {
-      return newProxy(DistributedTreeSetService.class, new ServiceConfig())
+      return newProxy(DistributedTreeSetService.class)
           .thenCompose(proxy -> new DistributedNavigableSetProxy<E>((ProxyClient) proxy, managementService.getPrimitiveRegistry()).connect())
           .thenApply(set -> {
             if (config.getCacheConfig().isEnabled()) {

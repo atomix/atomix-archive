@@ -15,6 +15,20 @@
  */
 package io.atomix.core;
 
+import java.io.File;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+
 import com.google.common.collect.Lists;
 import com.google.common.io.Resources;
 import io.atomix.cluster.AtomixCluster;
@@ -31,7 +45,6 @@ import io.atomix.core.barrier.DistributedCyclicBarrier;
 import io.atomix.core.counter.AtomicCounter;
 import io.atomix.core.counter.DistributedCounter;
 import io.atomix.core.election.LeaderElection;
-import io.atomix.core.election.LeaderElector;
 import io.atomix.core.idgenerator.AtomicIdGenerator;
 import io.atomix.core.impl.CorePrimitiveCache;
 import io.atomix.core.impl.CorePrimitivesService;
@@ -92,20 +105,6 @@ import io.atomix.utils.config.ConfigMapper;
 import io.atomix.utils.config.ConfigurationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.io.File;
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.List;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -738,12 +737,6 @@ public class Atomix extends AtomixCluster implements PrimitivesService {
   public <T> LeaderElection<T> getLeaderElection(String name) {
     checkRunning();
     return primitives.getLeaderElection(name);
-  }
-
-  @Override
-  public <T> LeaderElector<T> getLeaderElector(String name) {
-    checkRunning();
-    return primitives.getLeaderElector(name);
   }
 
   @Override

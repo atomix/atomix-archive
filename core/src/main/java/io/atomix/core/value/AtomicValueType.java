@@ -20,7 +20,6 @@ import io.atomix.core.value.impl.DefaultAtomicValueService;
 import io.atomix.primitive.PrimitiveManagementService;
 import io.atomix.primitive.PrimitiveType;
 import io.atomix.primitive.service.PrimitiveService;
-import io.atomix.primitive.service.ServiceConfig;
 import io.atomix.utils.serializer.Namespace;
 import io.atomix.utils.serializer.Namespaces;
 import io.atomix.utils.time.Versioned;
@@ -62,7 +61,7 @@ public class AtomicValueType<V> implements PrimitiveType<AtomicValueBuilder<V>, 
   }
 
   @Override
-  public PrimitiveService newService(ServiceConfig config) {
+  public PrimitiveService newService() {
     return new DefaultAtomicValueService();
   }
 

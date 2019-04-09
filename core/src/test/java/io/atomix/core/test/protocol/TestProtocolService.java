@@ -15,6 +15,11 @@
  */
 package io.atomix.core.test.protocol;
 
+import java.time.Duration;
+import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicLong;
+
 import com.google.common.collect.Maps;
 import io.atomix.cluster.MemberId;
 import io.atomix.primitive.PrimitiveException;
@@ -24,7 +29,6 @@ import io.atomix.primitive.operation.OperationType;
 import io.atomix.primitive.operation.PrimitiveOperation;
 import io.atomix.primitive.partition.PartitionId;
 import io.atomix.primitive.service.PrimitiveService;
-import io.atomix.primitive.service.ServiceConfig;
 import io.atomix.primitive.service.ServiceContext;
 import io.atomix.primitive.service.impl.DefaultCommit;
 import io.atomix.primitive.session.Session;
@@ -36,11 +40,6 @@ import io.atomix.utils.time.LogicalTimestamp;
 import io.atomix.utils.time.WallClock;
 import io.atomix.utils.time.WallClockTimestamp;
 
-import java.time.Duration;
-import java.util.Map;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.atomic.AtomicLong;
-
 /**
  * Test protocol service.
  */
@@ -48,7 +47,6 @@ public class TestProtocolService {
   private final PartitionId partition;
   private final String name;
   private final PrimitiveType primitiveType;
-  private final ServiceConfig config;
   private final PrimitiveService service;
   private final TestProtocolServiceRegistry registry;
   private final ThreadContext context;
@@ -64,14 +62,12 @@ public class TestProtocolService {
       PartitionId partition,
       String name,
       PrimitiveType primitiveType,
-      ServiceConfig config,
       PrimitiveService service,
       TestProtocolServiceRegistry registry,
       ThreadContext context) {
     this.partition = partition;
     this.name = name;
     this.primitiveType = primitiveType;
-    this.config = config;
     this.service = service;
     this.registry = registry;
     this.context = context;
@@ -252,12 +248,6 @@ public class TestProtocolService {
     @Override
     public MemberId localMemberId() {
       return MemberId.from("test");
-    }
-
-    @Override
-    @SuppressWarnings("unchecked")
-    public <C extends ServiceConfig> C serviceConfig() {
-      return (C) config;
     }
 
     @Override

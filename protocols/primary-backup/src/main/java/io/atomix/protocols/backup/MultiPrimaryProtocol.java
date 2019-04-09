@@ -15,6 +15,9 @@
  */
 package io.atomix.protocols.backup;
 
+import java.util.Collection;
+import java.util.stream.Collectors;
+
 import io.atomix.primitive.PrimitiveType;
 import io.atomix.primitive.partition.PartitionGroup;
 import io.atomix.primitive.partition.PartitionService;
@@ -22,13 +25,9 @@ import io.atomix.primitive.protocol.PrimitiveProtocol;
 import io.atomix.primitive.protocol.ProxyProtocol;
 import io.atomix.primitive.proxy.ProxyClient;
 import io.atomix.primitive.proxy.impl.DefaultProxyClient;
-import io.atomix.primitive.service.ServiceConfig;
 import io.atomix.primitive.session.SessionClient;
 import io.atomix.protocols.backup.partition.PrimaryBackupPartition;
 import io.atomix.utils.config.ConfigurationException;
-
-import java.util.Collection;
-import java.util.stream.Collectors;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
 
@@ -105,7 +104,7 @@ public class MultiPrimaryProtocol implements ProxyProtocol {
   }
 
   @Override
-  public <S> ProxyClient<S> newProxy(String primitiveName, PrimitiveType primitiveType, Class<S> serviceType, ServiceConfig serviceConfig, PartitionService partitionService) {
+  public <S> ProxyClient<S> newProxy(String primitiveName, PrimitiveType primitiveType, Class<S> serviceType, PartitionService partitionService) {
     PartitionGroup partitionGroup = partitionService.getPartitionGroup(this);
     if (partitionGroup == null) {
       throw new ConfigurationException("No Raft partition group matching the configured protocol exists");
@@ -113,7 +112,7 @@ public class MultiPrimaryProtocol implements ProxyProtocol {
 
     Collection<SessionClient> partitions = partitionGroup.getPartitions().stream()
         .map(partition -> ((PrimaryBackupPartition) partition).getClient()
-            .sessionBuilder(primitiveName, primitiveType, serviceConfig)
+            .sessionBuilder(primitiveName, primitiveType)
             .withConsistency(config.getConsistency())
             .withReplication(config.getReplication())
             .withRecovery(config.getRecovery())

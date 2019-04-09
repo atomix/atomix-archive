@@ -15,13 +15,14 @@
  */
 package io.atomix.core.map.impl;
 
-import io.atomix.core.map.AtomicCounterMapType;
-import io.atomix.primitive.service.AbstractPrimitiveService;
-import io.atomix.primitive.service.BackupInput;
-import io.atomix.primitive.service.BackupOutput;
-
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.util.HashMap;
 import java.util.Map;
+
+import io.atomix.core.map.AtomicCounterMapType;
+import io.atomix.primitive.service.AbstractPrimitiveService;
 
 /**
  * Atomic counter map state for Atomix.
@@ -39,13 +40,17 @@ public class DefaultAtomicCounterMapService extends AbstractPrimitiveService imp
   }
 
   @Override
-  public void backup(BackupOutput writer) {
-    writer.writeObject(map);
+  public void backup(OutputStream output) throws IOException {
+    AtomicCounterMapSnapshot.newBuilder()
+        .putAllEntries(map)
+        .build()
+        .writeTo(output);
   }
 
   @Override
-  public void restore(BackupInput reader) {
-    map = reader.readObject();
+  public void restore(InputStream input) throws IOException {
+    AtomicCounterMapSnapshot snapshot = AtomicCounterMapSnapshot.parseFrom(input);
+    map = new HashMap<>(snapshot.getEntriesMap());
   }
 
   /**

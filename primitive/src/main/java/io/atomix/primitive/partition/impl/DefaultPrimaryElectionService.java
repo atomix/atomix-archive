@@ -15,6 +15,12 @@
  */
 package io.atomix.primitive.partition.impl;
 
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Consumer;
+
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import io.atomix.primitive.event.PrimitiveEvent;
@@ -26,16 +32,9 @@ import io.atomix.primitive.partition.PrimaryElection;
 import io.atomix.primitive.partition.PrimaryElectionEvent;
 import io.atomix.primitive.partition.PrimaryElectionEventListener;
 import io.atomix.primitive.partition.PrimaryElectionService;
-import io.atomix.primitive.service.ServiceConfig;
 import io.atomix.primitive.session.SessionClient;
 import io.atomix.utils.serializer.Namespace;
 import io.atomix.utils.serializer.Serializer;
-
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.function.Consumer;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 import static io.atomix.primitive.partition.impl.PrimaryElectorEvents.CHANGE;
@@ -88,7 +87,7 @@ public class DefaultPrimaryElectionService implements ManagedPrimaryElectionServ
   @SuppressWarnings("unchecked")
   public CompletableFuture<PrimaryElectionService> start() {
     return partitions.getPartitions().iterator().next().getClient()
-        .sessionBuilder(PRIMITIVE_NAME, PrimaryElectorType.instance(), new ServiceConfig())
+        .sessionBuilder(PRIMITIVE_NAME, PrimaryElectorType.instance())
         .build()
         .connect()
         .thenAccept(proxy -> {

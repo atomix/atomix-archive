@@ -20,7 +20,6 @@ import io.atomix.core.election.impl.DefaultLeaderElectionService;
 import io.atomix.primitive.PrimitiveManagementService;
 import io.atomix.primitive.PrimitiveType;
 import io.atomix.primitive.service.PrimitiveService;
-import io.atomix.primitive.service.ServiceConfig;
 import io.atomix.utils.serializer.Namespace;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
@@ -58,7 +57,7 @@ public class LeaderElectionType<T> implements PrimitiveType<LeaderElectionBuilde
   }
 
   @Override
-  public PrimitiveService newService(ServiceConfig config) {
+  public PrimitiveService newService() {
     return new DefaultLeaderElectionService();
   }
 

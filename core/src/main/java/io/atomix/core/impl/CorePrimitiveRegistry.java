@@ -15,6 +15,14 @@
  */
 package io.atomix.core.impl;
 
+import java.util.Collection;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.stream.Collectors;
+
 import io.atomix.core.map.AsyncAtomicMap;
 import io.atomix.core.map.AtomicMapType;
 import io.atomix.core.map.impl.AtomicMapProxy;
@@ -30,17 +38,8 @@ import io.atomix.primitive.PrimitiveTypeRegistry;
 import io.atomix.primitive.partition.PartitionService;
 import io.atomix.primitive.protocol.ProxyProtocol;
 import io.atomix.primitive.proxy.ProxyClient;
-import io.atomix.primitive.service.ServiceConfig;
 import io.atomix.utils.serializer.Namespaces;
 import io.atomix.utils.serializer.Serializer;
-
-import java.util.Collection;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.stream.Collectors;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -120,7 +119,6 @@ public class CorePrimitiveRegistry implements ManagedPrimitiveRegistry {
         "primitives",
         AtomicMapType.instance(),
         AtomicMapService.class,
-        new ServiceConfig(),
         partitionService);
     return proxy.connect()
         .thenApply(v -> {

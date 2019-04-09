@@ -15,6 +15,9 @@
  */
 package io.atomix.primitive.proxy.impl;
 
+import java.util.Collection;
+import java.util.stream.Collectors;
+
 import com.google.common.io.BaseEncoding;
 import io.atomix.primitive.PrimitiveType;
 import io.atomix.primitive.log.LogClient;
@@ -22,11 +25,7 @@ import io.atomix.primitive.log.LogSession;
 import io.atomix.primitive.partition.PartitionId;
 import io.atomix.primitive.protocol.PrimitiveProtocol;
 import io.atomix.primitive.proxy.ProxySession;
-import io.atomix.primitive.service.ServiceConfig;
 import io.atomix.utils.serializer.Serializer;
-
-import java.util.Collection;
-import java.util.stream.Collectors;
 
 /**
  * Log proxy client.
@@ -40,9 +39,8 @@ public class LogProxyClient<S> extends AbstractProxyClient<S> {
       PrimitiveType type,
       PrimitiveProtocol protocol,
       Class<S> serviceType,
-      ServiceConfig serviceConfig,
       LogClient client) {
-    super(name, type, protocol, createSessions(name, type, serviceType, serviceConfig, client.getPartitions()));
+    super(name, type, protocol, createSessions(name, type, serviceType, client.getPartitions()));
     this.client = client;
     this.serializer = Serializer.using(type.namespace());
   }
@@ -51,11 +49,10 @@ public class LogProxyClient<S> extends AbstractProxyClient<S> {
       String name,
       PrimitiveType primitiveType,
       Class<S> serviceType,
-      ServiceConfig serviceConfig,
       Collection<LogSession> partitions) {
     Serializer serializer = Serializer.using(primitiveType.namespace());
     return partitions.stream()
-        .map(partition -> new LogProxySession<S>(name, primitiveType, serviceType, serviceConfig, serializer, partition))
+        .map(partition -> new LogProxySession<S>(name, primitiveType, serviceType, serializer, partition))
         .collect(Collectors.toList());
   }
 

@@ -15,14 +15,13 @@
  */
 package io.atomix.core.value.impl;
 
+import java.util.concurrent.CompletableFuture;
+
 import io.atomix.core.value.AtomicValue;
 import io.atomix.core.value.AtomicValueBuilder;
 import io.atomix.core.value.AtomicValueConfig;
 import io.atomix.primitive.PrimitiveManagementService;
-import io.atomix.primitive.service.ServiceConfig;
 import io.atomix.utils.serializer.Serializer;
-
-import java.util.concurrent.CompletableFuture;
 
 /**
  * Default implementation of AtomicValueBuilder.
@@ -37,7 +36,7 @@ public class DefaultAtomicValueBuilder<V> extends AtomicValueBuilder<V> {
   @Override
   @SuppressWarnings("unchecked")
   public CompletableFuture<AtomicValue<V>> buildAsync() {
-    return newProxy(AtomicValueService.class, new ServiceConfig())
+    return newProxy(AtomicValueService.class)
         .thenCompose(proxy -> new AtomicValueProxy(proxy, managementService.getPrimitiveRegistry()).connect())
         .thenApply(elector -> {
           Serializer serializer = serializer();

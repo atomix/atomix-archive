@@ -15,6 +15,35 @@
  */
 package io.atomix.protocols.raft.test;
 
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.nio.file.FileVisitResult;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.SimpleFileVisitor;
+import java.nio.file.attribute.BasicFileAttributes;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Random;
+import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executor;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.BiConsumer;
+import java.util.function.Consumer;
+import java.util.stream.Collectors;
+
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import io.atomix.cluster.BootstrapService;
@@ -42,11 +71,8 @@ import io.atomix.primitive.operation.PrimitiveOperation;
 import io.atomix.primitive.operation.impl.DefaultOperationId;
 import io.atomix.primitive.partition.PartitionId;
 import io.atomix.primitive.service.AbstractPrimitiveService;
-import io.atomix.primitive.service.BackupInput;
-import io.atomix.primitive.service.BackupOutput;
 import io.atomix.primitive.service.Commit;
 import io.atomix.primitive.service.PrimitiveService;
-import io.atomix.primitive.service.ServiceConfig;
 import io.atomix.primitive.service.ServiceExecutor;
 import io.atomix.primitive.session.SessionClient;
 import io.atomix.primitive.session.SessionId;
@@ -111,33 +137,6 @@ import io.atomix.utils.concurrent.ThreadModel;
 import io.atomix.utils.net.Address;
 import io.atomix.utils.serializer.Namespace;
 import io.atomix.utils.serializer.Serializer;
-
-import java.io.File;
-import java.io.IOException;
-import java.nio.file.FileVisitResult;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.SimpleFileVisitor;
-import java.nio.file.attribute.BasicFileAttributes;
-import java.time.Instant;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Random;
-import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.Executor;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.BiConsumer;
-import java.util.function.Consumer;
-import java.util.stream.Collectors;
 
 import static io.atomix.primitive.operation.PrimitiveOperation.operation;
 
@@ -560,7 +559,7 @@ public class RaftPerformanceTest implements Runnable {
    * Creates a test session.
    */
   private SessionClient createProxy(RaftClient client) {
-    return client.sessionBuilder("raft-performance-test", TestPrimitiveType.INSTANCE, new ServiceConfig())
+    return client.sessionBuilder("raft-performance-test", TestPrimitiveType.INSTANCE)
         .withReadConsistency(READ_CONSISTENCY)
         .withCommunicationStrategy(COMMUNICATION_STRATEGY)
         .build();
@@ -590,7 +589,7 @@ public class RaftPerformanceTest implements Runnable {
     }
 
     @Override
-    public PrimitiveService newService(ServiceConfig config) {
+    public PrimitiveService newService() {
       return new PerformanceService();
     }
   }
@@ -619,23 +618,13 @@ public class RaftPerformanceTest implements Runnable {
     }
 
     @Override
-    public void backup(BackupOutput writer) {
-      writer.writeInt(map.size());
-      for (Map.Entry<String, String> entry : map.entrySet()) {
-        writer.writeString(entry.getKey());
-        writer.writeString(entry.getValue());
-      }
+    public void backup(OutputStream output) throws IOException {
+
     }
 
     @Override
-    public void restore(BackupInput reader) {
-      map = new HashMap<>();
-      int size = reader.readInt();
-      for (int i = 0; i < size; i++) {
-        String key = reader.readString();
-        String value = reader.readString();
-        map.put(key, value);
-      }
+    public void restore(InputStream input) throws IOException {
+
     }
 
     protected long put(Commit<Map.Entry<String, String>> commit) {

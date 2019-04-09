@@ -25,14 +25,12 @@ import static com.google.common.base.MoreObjects.toStringHelper;
 public class PrimitiveDescriptor {
   private final String name;
   private final String type;
-  private final byte[] config;
   private final int backups;
   private final Replication replication;
 
-  public PrimitiveDescriptor(String name, String type, byte[] config, int backups, Replication replication) {
+  public PrimitiveDescriptor(String name, String type, int backups, Replication replication) {
     this.name = name;
     this.type = type;
-    this.config = config;
     this.backups = backups;
     this.replication = replication;
   }
@@ -53,15 +51,6 @@ public class PrimitiveDescriptor {
    */
   public String type() {
     return type;
-  }
-
-  /**
-   * Returns the primitive service configuration.
-   *
-   * @return the primitive service configuration
-   */
-  public byte[] config() {
-    return config;
   }
 
   /**

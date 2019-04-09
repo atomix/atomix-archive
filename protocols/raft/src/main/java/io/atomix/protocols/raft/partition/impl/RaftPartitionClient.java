@@ -15,10 +15,11 @@
  */
 package io.atomix.protocols.raft.partition.impl;
 
+import java.util.concurrent.CompletableFuture;
+
 import io.atomix.cluster.MemberId;
 import io.atomix.primitive.PrimitiveType;
 import io.atomix.primitive.partition.PartitionClient;
-import io.atomix.primitive.service.ServiceConfig;
 import io.atomix.protocols.raft.RaftClient;
 import io.atomix.protocols.raft.partition.RaftPartition;
 import io.atomix.protocols.raft.protocol.RaftClientProtocol;
@@ -26,8 +27,6 @@ import io.atomix.protocols.raft.session.RaftSessionClient;
 import io.atomix.utils.Managed;
 import io.atomix.utils.concurrent.ThreadContextFactory;
 import org.slf4j.Logger;
-
-import java.util.concurrent.CompletableFuture;
 
 import static org.slf4j.LoggerFactory.getLogger;
 
@@ -74,8 +73,8 @@ public class RaftPartitionClient implements PartitionClient, Managed<RaftPartiti
   }
 
   @Override
-  public RaftSessionClient.Builder sessionBuilder(String primitiveName, PrimitiveType primitiveType, ServiceConfig serviceConfig) {
-    return client.sessionBuilder(primitiveName, primitiveType, serviceConfig);
+  public RaftSessionClient.Builder sessionBuilder(String primitiveName, PrimitiveType primitiveType) {
+    return client.sessionBuilder(primitiveName, primitiveType);
   }
 
   @Override

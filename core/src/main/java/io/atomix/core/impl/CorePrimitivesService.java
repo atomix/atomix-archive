@@ -15,6 +15,11 @@
  */
 package io.atomix.core.impl;
 
+import java.util.Collection;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.atomic.AtomicBoolean;
+
 import io.atomix.cluster.ClusterMembershipService;
 import io.atomix.cluster.messaging.ClusterCommunicationService;
 import io.atomix.cluster.messaging.ClusterEventService;
@@ -29,8 +34,6 @@ import io.atomix.core.counter.DistributedCounter;
 import io.atomix.core.counter.DistributedCounterType;
 import io.atomix.core.election.LeaderElection;
 import io.atomix.core.election.LeaderElectionType;
-import io.atomix.core.election.LeaderElector;
-import io.atomix.core.election.LeaderElectorType;
 import io.atomix.core.idgenerator.AtomicIdGenerator;
 import io.atomix.core.idgenerator.AtomicIdGeneratorType;
 import io.atomix.core.list.DistributedList;
@@ -102,11 +105,6 @@ import io.atomix.primitive.protocol.impl.DefaultPrimitiveProtocolTypeRegistry;
 import io.atomix.primitive.serialization.SerializationService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.util.Collection;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -275,11 +273,6 @@ public class CorePrimitivesService implements ManagedPrimitivesService {
   @Override
   public <T> LeaderElection<T> getLeaderElection(String name) {
     return getPrimitive(name, LeaderElectionType.instance());
-  }
-
-  @Override
-  public <T> LeaderElector<T> getLeaderElector(String name) {
-    return getPrimitive(name, LeaderElectorType.instance());
   }
 
   @Override

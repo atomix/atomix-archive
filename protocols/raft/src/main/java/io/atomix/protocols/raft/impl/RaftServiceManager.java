@@ -15,13 +15,23 @@
  */
 package io.atomix.protocols.raft.impl;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+
 import com.google.common.collect.Maps;
 import com.google.common.primitives.Longs;
 import io.atomix.cluster.MemberId;
 import io.atomix.primitive.PrimitiveId;
 import io.atomix.primitive.PrimitiveType;
 import io.atomix.primitive.service.PrimitiveService;
-import io.atomix.primitive.service.ServiceConfig;
 import io.atomix.primitive.session.SessionId;
 import io.atomix.primitive.session.SessionMetadata;
 import io.atomix.protocols.raft.RaftException;
@@ -39,9 +49,8 @@ import io.atomix.protocols.raft.storage.log.entry.MetadataEntry;
 import io.atomix.protocols.raft.storage.log.entry.OpenSessionEntry;
 import io.atomix.protocols.raft.storage.log.entry.QueryEntry;
 import io.atomix.protocols.raft.storage.log.entry.RaftLogEntry;
+import io.atomix.protocols.raft.storage.snapshot.ServiceSnapshot;
 import io.atomix.protocols.raft.storage.snapshot.Snapshot;
-import io.atomix.protocols.raft.storage.snapshot.SnapshotReader;
-import io.atomix.protocols.raft.storage.snapshot.SnapshotWriter;
 import io.atomix.storage.StorageLevel;
 import io.atomix.storage.journal.Indexed;
 import io.atomix.utils.concurrent.ComposableFuture;
@@ -52,17 +61,8 @@ import io.atomix.utils.concurrent.ThreadContextFactory;
 import io.atomix.utils.config.ConfigurationException;
 import io.atomix.utils.logging.ContextualLoggerFactory;
 import io.atomix.utils.logging.LoggerContext;
-import io.atomix.utils.serializer.Serializer;
 import io.atomix.utils.time.WallClockTimestamp;
 import org.slf4j.Logger;
-
-import java.time.Duration;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.CompletableFuture;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -268,7 +268,7 @@ public class RaftServiceManager implements AutoCloseable {
    * Schedules a log compaction.
    *
    * @param lastApplied the last applied index at the start of snapshotting. This represents the highest index
-   *     before which segments can be safely removed from disk
+   *                    before which segments can be safely removed from disk
    */
   private void scheduleCompaction(long lastApplied) {
     // Schedule compaction after a randomized delay to discourage snapshots on multiple nodes at the same time.
@@ -450,19 +450,14 @@ public class RaftServiceManager implements AutoCloseable {
    * Takes snapshots for the given index.
    */
   Snapshot snapshot() {
-    Snapshot snapshot = raft.getSnapshotStore().newTemporarySnapshot(raft.getLastApplied(), new WallClockTimestamp());
-    try (SnapshotWriter writer = snapshot.openWriter()) {
+    Snapshot snapshot = raft.getSnapshotStore().newSnapshot(raft.getLastApplied(), new WallClockTimestamp());
+    try (OutputStream output = snapshot.openOutputStream()) {
       for (RaftServiceContext service : raft.getServices()) {
-        writer.buffer().mark();
-        SnapshotWriter serviceWriter = new SnapshotWriter(writer.buffer().writeInt(0).slice(), writer.snapshot());
-        snapshotService(serviceWriter, service);
-        int length = serviceWriter.buffer().position();
-        writer.buffer().reset().writeInt(length).skip(length);
+        snapshotService(output, service);
       }
-    } catch (Exception e) {
+    } catch (IOException e) {
       snapshot.close();
       logger.error("Failed to snapshot services", e);
-      throw e;
     }
     return snapshot;
   }
@@ -470,19 +465,14 @@ public class RaftServiceManager implements AutoCloseable {
   /**
    * Takes a snapshot of the given service.
    *
-   * @param writer the snapshot writer
+   * @param output  the snapshot output
    * @param service the service to snapshot
    */
-  private void snapshotService(SnapshotWriter writer, RaftServiceContext service) {
-    writer.writeLong(service.serviceId().id());
-    writer.writeString(service.serviceType().name());
-    writer.writeString(service.serviceName());
-    byte[] config = Serializer.using(service.serviceType().namespace()).encode(service.serviceConfig());
-    writer.writeInt(config.length).writeBytes(config);
+  private void snapshotService(OutputStream output, RaftServiceContext service) {
     try {
-      service.takeSnapshot(writer);
-    } catch (Exception e) {
-      logger.error("Failed to take snapshot of service {}", service.serviceId(), e);
+      service.takeSnapshot().writeTo(output);
+    } catch (IOException e) {
+      logger.error("Failed to snapshot service {}", service.serviceName(), e);
     }
   }
 
@@ -493,42 +483,32 @@ public class RaftServiceManager implements AutoCloseable {
    */
   void install(Snapshot snapshot) {
     logger.debug("Installing snapshot {}", snapshot);
-    try (SnapshotReader reader = snapshot.openReader()) {
-      while (reader.hasRemaining()) {
-        try {
-          int length = reader.readInt();
-          if (length > 0) {
-            SnapshotReader serviceReader = new SnapshotReader(reader.buffer().slice(length), reader.snapshot());
-            installService(serviceReader);
-            reader.skip(length);
-          }
-        } catch (Exception e) {
-          logger.error("Failed to read snapshot", e);
-        }
+    try (InputStream input = snapshot.openInputStream()) {
+      while (input.available() > 0) {
+        installService(input);
       }
+    } catch (IOException e) {
+      logger.error("Failed to read snapshot", e);
     }
   }
 
   /**
    * Restores the service associated with the given snapshot.
    *
-   * @param reader the snapshot reader
+   * @param input the snapshot input
    */
-  private void installService(SnapshotReader reader) {
-    PrimitiveId primitiveId = PrimitiveId.from(reader.readLong());
+  private void installService(InputStream input) throws IOException {
+    ServiceSnapshot snapshot = ServiceSnapshot.parseDelimitedFrom(input);
     try {
-      PrimitiveType primitiveType = raft.getPrimitiveTypes().getPrimitiveType(reader.readString());
-      String serviceName = reader.readString();
-      byte[] serviceConfig = reader.readBytes(reader.readInt());
-
-      // Get or create the service associated with the snapshot.
-      logger.debug("Installing service {} {}", primitiveId, serviceName);
-      RaftServiceContext service = initializeService(primitiveId, primitiveType, serviceName, serviceConfig);
+      RaftServiceContext service = initializeService(
+          PrimitiveId.from(snapshot.getId()),
+          raft.getPrimitiveTypes().getPrimitiveType(snapshot.getType()),
+          snapshot.getName());
       if (service != null) {
         try {
-          service.installSnapshot(reader);
+          service.installSnapshot(snapshot);
         } catch (Exception e) {
-          logger.error("Failed to install snapshot for service {}", serviceName, e);
+          logger.error("Failed to install snapshot for service {}", snapshot.getName(), e);
         }
       }
     } catch (ConfigurationException e) {
@@ -653,11 +633,11 @@ public class RaftServiceManager implements AutoCloseable {
   /**
    * Gets or initializes a service context.
    */
-  private RaftServiceContext getOrInitializeService(PrimitiveId primitiveId, PrimitiveType primitiveType, String serviceName, byte[] config) {
+  private RaftServiceContext getOrInitializeService(PrimitiveId primitiveId, PrimitiveType primitiveType, String serviceName) {
     // Get the state machine executor or create one if it doesn't already exist.
     RaftServiceContext service = raft.getServices().getService(serviceName);
     if (service == null) {
-      service = initializeService(primitiveId, primitiveType, serviceName, config);
+      service = initializeService(primitiveId, primitiveType, serviceName);
     }
     return service;
   }
@@ -666,15 +646,13 @@ public class RaftServiceManager implements AutoCloseable {
    * Initializes a new service.
    */
   @SuppressWarnings("unchecked")
-  private RaftServiceContext initializeService(PrimitiveId primitiveId, PrimitiveType primitiveType, String serviceName, byte[] config) {
+  private RaftServiceContext initializeService(PrimitiveId primitiveId, PrimitiveType primitiveType, String serviceName) {
     RaftServiceContext oldService = raft.getServices().getService(serviceName);
-    ServiceConfig serviceConfig = config == null ? new ServiceConfig() : Serializer.using(primitiveType.namespace()).decode(config);
     RaftServiceContext service = new RaftServiceContext(
         primitiveId,
         serviceName,
         primitiveType,
-        serviceConfig,
-        primitiveType.newService(serviceConfig),
+        primitiveType.newService(),
         raft,
         threadContextFactory);
     raft.getServices().registerService(service);
@@ -696,8 +674,7 @@ public class RaftServiceManager implements AutoCloseable {
     RaftServiceContext service = getOrInitializeService(
         PrimitiveId.from(entry.index()),
         primitiveType,
-        entry.entry().serviceName(),
-        entry.entry().serviceConfig());
+        entry.entry().serviceName());
 
     if (service == null) {
       throw new RaftException.UnknownService("Unknown service type " + entry.entry().serviceType());

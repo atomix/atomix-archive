@@ -15,21 +15,9 @@
  */
 package io.atomix.core.election.impl;
 
-import com.google.common.base.MoreObjects;
-import com.google.common.base.Objects;
-import com.google.common.collect.Lists;
-import io.atomix.core.election.Leader;
-import io.atomix.core.election.LeaderElectionType;
-import io.atomix.core.election.Leadership;
-import io.atomix.primitive.service.AbstractPrimitiveService;
-import io.atomix.primitive.service.BackupInput;
-import io.atomix.primitive.service.BackupOutput;
-import io.atomix.primitive.session.Session;
-import io.atomix.primitive.session.SessionId;
-import io.atomix.utils.misc.ArraySizeHashPrinter;
-import io.atomix.utils.serializer.Namespace;
-import io.atomix.utils.serializer.Serializer;
-
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -39,6 +27,20 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
+
+import com.google.common.base.MoreObjects;
+import com.google.common.base.Objects;
+import com.google.common.collect.Lists;
+import com.google.protobuf.ByteString;
+import io.atomix.core.election.Leader;
+import io.atomix.core.election.LeaderElectionType;
+import io.atomix.core.election.Leadership;
+import io.atomix.primitive.service.AbstractPrimitiveService;
+import io.atomix.primitive.session.Session;
+import io.atomix.primitive.session.SessionId;
+import io.atomix.utils.misc.ArraySizeHashPrinter;
+import io.atomix.utils.serializer.Namespace;
+import io.atomix.utils.serializer.Serializer;
 
 import static com.google.common.base.Throwables.throwIfUnchecked;
 
@@ -71,25 +73,51 @@ public class DefaultLeaderElectionService extends AbstractPrimitiveService<Leade
   }
 
   @Override
-  public void backup(BackupOutput writer) {
-    writer.writeLong(termCounter.get());
-    writer.writeObject(leader);
-    writer.writeLong(term);
-    writer.writeLong(termStartTime);
-    writer.writeObject(registrations);
-    writer.writeObject(listeners);
-    getLogger().debug("Took state machine snapshot");
+  public void backup(OutputStream output) throws IOException {
+    LeaderElectionSnapshot.Builder builder = LeaderElectionSnapshot.newBuilder()
+        .setTermCounter(termCounter.get())
+        .addAllListeners(listeners.stream()
+            .map(SessionId::id)
+            .collect(Collectors.toList()));
+
+    if (leader != null) {
+      builder.setLeader(LeaderElectionRegistration.newBuilder()
+          .setId(ByteString.copyFrom(leader.id))
+          .setSessionId(leader.sessionId)
+          .build())
+      .setTerm(term)
+      .setTimestamp(termStartTime);
+    }
+
+    builder.addAllCandidates(registrations.stream()
+        .map(registration -> LeaderElectionRegistration.newBuilder()
+            .setId(ByteString.copyFrom(registration.id))
+            .setSessionId(registration.sessionId)
+            .build())
+        .collect(Collectors.toList()));
+
+    builder.build().writeTo(output);
   }
 
   @Override
-  public void restore(BackupInput reader) {
-    termCounter.set(reader.readLong());
-    leader = reader.readObject();
-    term = reader.readLong();
-    termStartTime = reader.readLong();
-    registrations = reader.readObject();
-    listeners = reader.readObject();
-    getLogger().debug("Reinstated state machine from snapshot");
+  public void restore(InputStream input) throws IOException {
+    LeaderElectionSnapshot snapshot = LeaderElectionSnapshot.parseFrom(input);
+    termCounter.set(snapshot.getTermCounter());
+
+    if (snapshot.hasLeader()) {
+      leader = new Registration(snapshot.getLeader().getId().toByteArray(), snapshot.getLeader().getSessionId());
+      term = snapshot.getTerm();
+      termStartTime = snapshot.getTimestamp();
+    } else {
+      leader = null;
+    }
+
+    registrations = snapshot.getCandidatesList().stream()
+        .map(candidate -> new Registration(candidate.getId().toByteArray(), candidate.getSessionId()))
+        .collect(Collectors.toCollection(LinkedList::new));
+    listeners = snapshot.getListenersList().stream()
+        .map(SessionId::from)
+        .collect(Collectors.toCollection(LinkedHashSet::new));
   }
 
   @Override

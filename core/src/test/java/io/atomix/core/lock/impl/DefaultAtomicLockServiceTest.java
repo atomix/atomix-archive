@@ -15,16 +15,15 @@
  */
 package io.atomix.core.lock.impl;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+
 import io.atomix.core.election.LeaderElectionType;
 import io.atomix.primitive.PrimitiveId;
 import io.atomix.primitive.operation.OperationType;
 import io.atomix.primitive.service.ServiceContext;
-import io.atomix.primitive.service.impl.DefaultBackupInput;
-import io.atomix.primitive.service.impl.DefaultBackupOutput;
 import io.atomix.primitive.session.Session;
 import io.atomix.primitive.session.SessionId;
-import io.atomix.storage.buffer.Buffer;
-import io.atomix.storage.buffer.HeapBuffer;
 import io.atomix.utils.time.WallClock;
 import io.atomix.utils.time.WallClockTimestamp;
 import org.junit.Test;
@@ -55,26 +54,26 @@ public class DefaultAtomicLockServiceTest {
     service.register(session);
     service.tick(new WallClockTimestamp());
 
-    Buffer buffer = HeapBuffer.allocate();
-    service.backup(new DefaultBackupOutput(buffer, service.serializer()));
+    ByteArrayOutputStream os = new ByteArrayOutputStream();
+    service.backup(os);
 
     service = new DefaultAtomicLockService();
     service.init(context);
     service.register(session);
     service.tick(new WallClockTimestamp());
-    service.restore(new DefaultBackupInput(buffer.flip(), service.serializer()));
+    service.restore(new ByteArrayInputStream(os.toByteArray()));
 
     service.lock(1);
     service.lock(2, 1000);
 
-    buffer = HeapBuffer.allocate();
-    service.backup(new DefaultBackupOutput(buffer, service.serializer()));
+    os = new ByteArrayOutputStream();
+    service.backup(os);
 
     service = new DefaultAtomicLockService();
     service.init(context);
     service.register(session);
     service.tick(new WallClockTimestamp());
-    service.restore(new DefaultBackupInput(buffer.flip(), service.serializer()));
+    service.restore(new ByteArrayInputStream(os.toByteArray()));
 
     assertTrue(service.isLocked(service.lock.index));
     assertTrue(!service.queue.isEmpty());

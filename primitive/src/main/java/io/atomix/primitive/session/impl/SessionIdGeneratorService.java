@@ -15,10 +15,13 @@
  */
 package io.atomix.primitive.session.impl;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+
 import io.atomix.primitive.service.AbstractPrimitiveService;
-import io.atomix.primitive.service.BackupInput;
-import io.atomix.primitive.service.BackupOutput;
 import io.atomix.primitive.service.ServiceExecutor;
+import io.atomix.primitive.session.impl.proto.SessionIdGeneratorSnapshot;
 import io.atomix.utils.serializer.Namespace;
 import io.atomix.utils.serializer.Serializer;
 
@@ -43,13 +46,17 @@ public class SessionIdGeneratorService extends AbstractPrimitiveService {
   }
 
   @Override
-  public void backup(BackupOutput writer) {
-    writer.writeLong(id);
+  public void backup(OutputStream output) throws IOException {
+    SessionIdGeneratorSnapshot.newBuilder()
+        .setId(id)
+        .build()
+        .writeTo(output);
   }
 
   @Override
-  public void restore(BackupInput reader) {
-    id = reader.readLong();
+  public void restore(InputStream input) throws IOException {
+    SessionIdGeneratorSnapshot snapshot = SessionIdGeneratorSnapshot.parseFrom(input);
+    id = snapshot.getId();
   }
 
   @Override

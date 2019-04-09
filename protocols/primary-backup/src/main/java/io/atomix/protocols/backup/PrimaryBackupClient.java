@@ -15,12 +15,14 @@
  */
 package io.atomix.protocols.backup;
 
+import java.util.concurrent.CompletableFuture;
+import java.util.function.Supplier;
+
 import io.atomix.cluster.ClusterMembershipService;
 import io.atomix.primitive.PrimitiveType;
 import io.atomix.primitive.Recovery;
 import io.atomix.primitive.partition.PartitionId;
 import io.atomix.primitive.partition.PrimaryElection;
-import io.atomix.primitive.service.ServiceConfig;
 import io.atomix.primitive.session.SessionClient;
 import io.atomix.primitive.session.SessionIdService;
 import io.atomix.primitive.session.impl.BlockingAwareSessionClient;
@@ -35,11 +37,7 @@ import io.atomix.utils.concurrent.ThreadContextFactory;
 import io.atomix.utils.concurrent.ThreadModel;
 import io.atomix.utils.logging.ContextualLoggerFactory;
 import io.atomix.utils.logging.LoggerContext;
-import io.atomix.utils.serializer.Serializer;
 import org.slf4j.Logger;
-
-import java.util.concurrent.CompletableFuture;
-import java.util.function.Supplier;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -93,11 +91,9 @@ public class PrimaryBackupClient {
    *
    * @param primitiveName the primitive name
    * @param primitiveType the primitive type
-   * @param serviceConfig the service configuration
    * @return a new primary-backup proxy session builder
    */
-  public PrimaryBackupSessionClient.Builder sessionBuilder(String primitiveName, PrimitiveType primitiveType, ServiceConfig serviceConfig) {
-    byte[] configBytes = Serializer.using(primitiveType.namespace()).encode(serviceConfig);
+  public PrimaryBackupSessionClient.Builder sessionBuilder(String primitiveName, PrimitiveType primitiveType) {
     return new PrimaryBackupSessionClient.Builder() {
       @Override
       public SessionClient build() {
@@ -110,7 +106,6 @@ public class PrimaryBackupClient {
                 new PrimitiveDescriptor(
                     primitiveName,
                     primitiveType.name(),
-                    configBytes,
                     numBackups,
                     replication),
                 clusterMembershipService,

@@ -56,11 +56,12 @@ import io.atomix.protocols.raft.storage.log.RaftLogWriter;
 import io.atomix.protocols.raft.storage.log.entry.QueryEntry;
 import io.atomix.protocols.raft.storage.log.entry.RaftLogEntry;
 import io.atomix.protocols.raft.storage.snapshot.Snapshot;
-import io.atomix.protocols.raft.storage.snapshot.SnapshotWriter;
 import io.atomix.storage.StorageException;
 import io.atomix.storage.journal.Indexed;
 import io.atomix.utils.time.WallClockTimestamp;
 
+import java.io.IOException;
+import java.io.OutputStream;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 
@@ -552,7 +553,7 @@ public class PassiveRole extends InactiveRole {
             .build()));
       }
 
-      Snapshot snapshot = raft.getSnapshotStore().newTemporarySnapshot(
+      Snapshot snapshot = raft.getSnapshotStore().newSnapshot(
           request.snapshotIndex(),
           WallClockTimestamp.from(request.snapshotTimestamp()));
       pendingSnapshot = new PendingSnapshot(snapshot);
@@ -573,8 +574,10 @@ public class PassiveRole extends InactiveRole {
     }
 
     // Write the data to the snapshot.
-    try (SnapshotWriter writer = pendingSnapshot.snapshot().openWriter()) {
-      writer.write(request.data());
+    try (OutputStream output = pendingSnapshot.snapshot().openOutputStream()) {
+      output.write(request.data());
+    } catch (IOException e) {
+      log.warn("Failed to open snapshot", e);
     }
 
     // If the snapshot is complete, store the snapshot and reset state, otherwise update the next snapshot offset.

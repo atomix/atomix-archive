@@ -37,7 +37,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
 public class DefaultDocumentTreeNode<V> implements DocumentTreeNode<V> {
   private final DocumentPath key;
   private Versioned<V> value;
-  private final Map<String, DocumentTreeNode<V>> children;
+  final Map<String, DocumentTreeNode<V>> children;
   private final Ordering ordering;
   private final DocumentTreeNode<V> parent;
 

@@ -15,13 +15,13 @@
  */
 package io.atomix.core.semaphore.impl;
 
+import java.util.concurrent.CompletableFuture;
+
 import io.atomix.core.semaphore.AsyncDistributedSemaphore;
 import io.atomix.core.semaphore.DistributedSemaphore;
 import io.atomix.core.semaphore.DistributedSemaphoreBuilder;
 import io.atomix.core.semaphore.DistributedSemaphoreConfig;
 import io.atomix.primitive.PrimitiveManagementService;
-
-import java.util.concurrent.CompletableFuture;
 
 /**
  * Default distributed semaphore builder.
@@ -34,12 +34,13 @@ public class DefaultDistributedSemaphoreBuilder extends DistributedSemaphoreBuil
   @SuppressWarnings("unchecked")
   @Override
   public CompletableFuture<DistributedSemaphore> buildAsync() {
-    return newProxy(AtomicSemaphoreService.class, new AtomicSemaphoreServiceConfig().setInitialCapacity(config.initialCapacity()))
+    return newProxy(AtomicSemaphoreService.class)
         .thenCompose(proxy -> new AtomicSemaphoreProxy(
             proxy,
             managementService.getPrimitiveRegistry(),
             managementService.getExecutorService())
             .connect())
+        .thenCompose(semaphore -> semaphore.increasePermits(config.initialCapacity()).thenApply(v -> semaphore))
         .thenApply(DelegatingAsyncDistributedSemaphore::new)
         .thenApply(AsyncDistributedSemaphore::sync);
   }

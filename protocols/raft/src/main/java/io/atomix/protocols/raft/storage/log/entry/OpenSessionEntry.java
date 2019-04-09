@@ -16,7 +16,6 @@
 package io.atomix.protocols.raft.storage.log.entry;
 
 import io.atomix.protocols.raft.ReadConsistency;
-import io.atomix.utils.misc.ArraySizeHashPrinter;
 import io.atomix.utils.misc.TimestampPrinter;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
@@ -28,7 +27,6 @@ public class OpenSessionEntry extends TimestampedEntry {
   private final String memberId;
   private final String serviceName;
   private final String serviceType;
-  private final byte[] serviceConfig;
   private final ReadConsistency readConsistency;
   private final long minTimeout;
   private final long maxTimeout;
@@ -39,7 +37,6 @@ public class OpenSessionEntry extends TimestampedEntry {
       String memberId,
       String serviceName,
       String serviceType,
-      byte[] serviceConfig,
       ReadConsistency readConsistency,
       long minTimeout,
       long maxTimeout) {
@@ -47,7 +44,6 @@ public class OpenSessionEntry extends TimestampedEntry {
     this.memberId = memberId;
     this.serviceName = serviceName;
     this.serviceType = serviceType;
-    this.serviceConfig = serviceConfig;
     this.readConsistency = readConsistency;
     this.minTimeout = minTimeout;
     this.maxTimeout = maxTimeout;
@@ -78,15 +74,6 @@ public class OpenSessionEntry extends TimestampedEntry {
    */
   public String serviceType() {
     return serviceType;
-  }
-
-  /**
-   * Returns the service configuration.
-   *
-   * @return the service configuration
-   */
-  public byte[] serviceConfig() {
-    return serviceConfig;
   }
 
   /**
@@ -124,7 +111,6 @@ public class OpenSessionEntry extends TimestampedEntry {
         .add("node", memberId)
         .add("serviceName", serviceName)
         .add("serviceType", serviceType)
-        .add("serviceConfig", ArraySizeHashPrinter.of(serviceConfig))
         .add("readConsistency", readConsistency)
         .add("minTimeout", minTimeout)
         .add("maxTimeout", maxTimeout)

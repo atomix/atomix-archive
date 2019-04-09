@@ -15,15 +15,14 @@
  */
 package io.atomix.core.map.impl;
 
+import java.util.concurrent.CompletableFuture;
+
 import com.google.common.io.BaseEncoding;
 import io.atomix.core.map.AtomicCounterMap;
 import io.atomix.core.map.AtomicCounterMapBuilder;
 import io.atomix.core.map.AtomicCounterMapConfig;
 import io.atomix.primitive.PrimitiveManagementService;
-import io.atomix.primitive.service.ServiceConfig;
 import io.atomix.utils.serializer.Serializer;
-
-import java.util.concurrent.CompletableFuture;
 
 /**
  * Default {@code AtomicCounterMapBuilder}.
@@ -36,7 +35,7 @@ public class DefaultAtomicCounterMapBuilder<K> extends AtomicCounterMapBuilder<K
   @Override
   @SuppressWarnings("unchecked")
   public CompletableFuture<AtomicCounterMap<K>> buildAsync() {
-    return newProxy(AtomicCounterMapService.class, new ServiceConfig())
+    return newProxy(AtomicCounterMapService.class)
         .thenCompose(proxy -> new AtomicCounterMapProxy(proxy, managementService.getPrimitiveRegistry()).connect())
         .thenApply(map -> {
           Serializer serializer = serializer();

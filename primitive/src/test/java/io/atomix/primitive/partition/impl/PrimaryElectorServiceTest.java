@@ -32,7 +32,6 @@ import io.atomix.primitive.partition.PrimaryTerm;
 import io.atomix.primitive.partition.impl.PrimaryElectorOperations.Enter;
 import io.atomix.primitive.partition.impl.PrimaryElectorOperations.GetTerm;
 import io.atomix.primitive.service.Commit;
-import io.atomix.primitive.service.ServiceConfig;
 import io.atomix.primitive.service.ServiceContext;
 import io.atomix.primitive.service.impl.DefaultCommit;
 import io.atomix.primitive.session.Session;
@@ -299,11 +298,6 @@ public class PrimaryElectorServiceTest {
 
       @Override
       public MemberId localMemberId() {
-        return null;
-      }
-
-      @Override
-      public <C extends ServiceConfig> C serviceConfig() {
         return null;
       }
 

@@ -15,6 +15,11 @@
  */
 package io.atomix.primitive;
 
+import java.util.Collection;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.stream.Collectors;
+
 import com.google.common.base.Joiner;
 import io.atomix.primitive.config.PrimitiveConfig;
 import io.atomix.primitive.partition.PartitionGroup;
@@ -22,7 +27,6 @@ import io.atomix.primitive.protocol.PrimitiveProtocol;
 import io.atomix.primitive.protocol.PrimitiveProtocolConfig;
 import io.atomix.primitive.protocol.ProxyProtocol;
 import io.atomix.primitive.proxy.ProxyClient;
-import io.atomix.primitive.service.ServiceConfig;
 import io.atomix.utils.Builder;
 import io.atomix.utils.concurrent.Futures;
 import io.atomix.utils.config.ConfigurationException;
@@ -30,11 +34,6 @@ import io.atomix.utils.serializer.Namespace;
 import io.atomix.utils.serializer.NamespaceConfig;
 import io.atomix.utils.serializer.Namespaces;
 import io.atomix.utils.serializer.Serializer;
-
-import java.util.Collection;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionException;
-import java.util.stream.Collectors;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -160,12 +159,12 @@ public abstract class PrimitiveBuilder<B extends PrimitiveBuilder<B, C, P>, C ex
     return serializer;
   }
 
-  protected <S> CompletableFuture<ProxyClient<S>> newProxy(Class<S> serviceType, ServiceConfig config) {
+  protected <S> CompletableFuture<ProxyClient<S>> newProxy(Class<S> serviceType) {
     PrimitiveProtocol protocol = protocol();
     if (protocol instanceof ProxyProtocol) {
       try {
         return CompletableFuture.completedFuture(((ProxyProtocol) protocol)
-            .newProxy(name, type, serviceType, config, managementService.getPartitionService()));
+            .newProxy(name, type, serviceType, managementService.getPartitionService()));
       } catch (Exception e) {
         return Futures.exceptionalFuture(e);
       }

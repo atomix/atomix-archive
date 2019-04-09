@@ -20,7 +20,6 @@ import io.atomix.core.counter.impl.DefaultAtomicCounterService;
 import io.atomix.primitive.PrimitiveManagementService;
 import io.atomix.primitive.PrimitiveType;
 import io.atomix.primitive.service.PrimitiveService;
-import io.atomix.primitive.service.ServiceConfig;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
 
@@ -46,7 +45,7 @@ public class AtomicCounterType implements PrimitiveType<AtomicCounterBuilder, At
   }
 
   @Override
-  public PrimitiveService newService(ServiceConfig config) {
+  public PrimitiveService newService() {
     return new DefaultAtomicCounterService();
   }
 

@@ -15,15 +15,14 @@
  */
 package io.atomix.core.value.impl;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+
 import io.atomix.core.map.AtomicMapType;
 import io.atomix.primitive.PrimitiveId;
 import io.atomix.primitive.service.ServiceContext;
-import io.atomix.primitive.service.impl.DefaultBackupInput;
-import io.atomix.primitive.service.impl.DefaultBackupOutput;
 import io.atomix.primitive.session.Session;
 import io.atomix.primitive.session.SessionId;
-import io.atomix.storage.buffer.Buffer;
-import io.atomix.storage.buffer.HeapBuffer;
 import io.atomix.utils.time.WallClock;
 import org.junit.Test;
 
@@ -54,26 +53,26 @@ public class DefaultAtomicValueServiceTest {
 
     assertNull(service.get());
 
-    Buffer buffer = HeapBuffer.allocate();
-    service.backup(new DefaultBackupOutput(buffer, service.serializer()));
+    ByteArrayOutputStream os = new ByteArrayOutputStream();
+    service.backup(os);
 
     assertNull(service.get());
 
     service = new DefaultAtomicValueService();
-    service.restore(new DefaultBackupInput(buffer.flip(), service.serializer()));
+    service.restore(new ByteArrayInputStream(os.toByteArray()));
 
     assertNull(service.get());
 
     service.set("Hello world!".getBytes());
     assertArrayEquals("Hello world!".getBytes(), service.get().value());
 
-    buffer = HeapBuffer.allocate();
-    service.backup(new DefaultBackupOutput(buffer, service.serializer()));
+    os = new ByteArrayOutputStream();
+    service.backup(os);
 
     assertArrayEquals("Hello world!".getBytes(), service.get().value());
 
     service = new DefaultAtomicValueService();
-    service.restore(new DefaultBackupInput(buffer.flip(), service.serializer()));
+    service.restore(new ByteArrayInputStream(os.toByteArray()));
 
     assertArrayEquals("Hello world!".getBytes(), service.get().value());
 

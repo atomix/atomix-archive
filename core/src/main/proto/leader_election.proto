@@ -1,0 +1,23 @@
+syntax = "proto3";
+
+package atomix.leader_election.service;
+
+option java_package = "io.atomix.core.election.impl";
+option java_outer_classname = "LeaderElectionProto";
+option java_multiple_files = true;
+
+// Leader election snapshot
+message LeaderElectionSnapshot {
+    LeaderElectionRegistration leader = 1;
+    int64 term = 2;
+    int64 timestamp = 3;
+    repeated LeaderElectionRegistration candidates = 4;
+    int64 term_counter = 5;
+    repeated int64 listeners = 6;
+}
+
+// Leader election candidate
+message LeaderElectionRegistration {
+    bytes id = 1;
+    int64 session_id = 2;
+}

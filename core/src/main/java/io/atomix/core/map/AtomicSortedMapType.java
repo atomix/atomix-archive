@@ -20,7 +20,6 @@ import io.atomix.core.map.impl.DefaultAtomicSortedMapBuilder;
 import io.atomix.primitive.PrimitiveManagementService;
 import io.atomix.primitive.PrimitiveType;
 import io.atomix.primitive.service.PrimitiveService;
-import io.atomix.primitive.service.ServiceConfig;
 import io.atomix.utils.serializer.Namespace;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
@@ -56,8 +55,8 @@ public class AtomicSortedMapType<K extends Comparable<K>, V>
   }
 
   @Override
-  public PrimitiveService newService(ServiceConfig config) {
-    return new DefaultAtomicNavigableMapService<>();
+  public PrimitiveService newService() {
+    return new DefaultAtomicNavigableMapService();
   }
 
   @Override

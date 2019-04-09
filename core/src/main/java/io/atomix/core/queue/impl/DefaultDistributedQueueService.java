@@ -15,15 +15,21 @@
  */
 package io.atomix.core.queue.impl;
 
-import io.atomix.core.collection.impl.DefaultDistributedCollectionService;
-import io.atomix.core.queue.DistributedQueueType;
-import io.atomix.primitive.service.BackupInput;
-import io.atomix.primitive.service.BackupOutput;
-
-import java.util.ArrayDeque;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.stream.Collectors;
+
+import com.google.common.collect.Maps;
+import io.atomix.core.collection.impl.DefaultDistributedCollectionService;
+import io.atomix.core.queue.DistributedQueueType;
+import io.atomix.primitive.session.SessionId;
 
 /**
  * Default distributed queue service.
@@ -38,13 +44,29 @@ public class DefaultDistributedQueueService extends DefaultDistributedCollection
   }
 
   @Override
-  public void backup(BackupOutput output) {
-    output.writeObject(new ArrayDeque<>(queue()));
+  public void backup(OutputStream output) throws IOException {
+    DistributedQueueSnapshot.newBuilder()
+        .addAllValues(new ArrayList<>(queue()))
+        .addAllListeners(listeners.stream()
+            .map(SessionId::id)
+            .collect(Collectors.toList()))
+        .putAllIterators(iterators.entrySet().stream()
+            .map(e -> Maps.immutableEntry(e.getKey(), e.getValue().sessionId()))
+            .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue)))
+        .build()
+        .writeTo(output);
   }
 
   @Override
-  public void restore(BackupInput input) {
-    collection = new ConcurrentLinkedQueue<>(input.readObject());
+  public void restore(InputStream input) throws IOException {
+    DistributedQueueSnapshot snapshot = DistributedQueueSnapshot.parseFrom(input);
+    collection = new ConcurrentLinkedQueue<>(snapshot.getValuesList());
+    listeners = snapshot.getListenersList().stream()
+        .map(SessionId::from)
+        .collect(Collectors.toCollection(LinkedHashSet::new));
+    iterators = snapshot.getIteratorsMap().entrySet().stream()
+        .map(e -> Maps.immutableEntry(e.getKey(), new IteratorContext(e.getValue())))
+        .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
   }
 
   @Override

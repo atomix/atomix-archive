@@ -15,6 +15,8 @@
  */
 package io.atomix.core.tree;
 
+import java.util.LinkedHashMap;
+
 import io.atomix.core.transaction.TransactionId;
 import io.atomix.core.transaction.TransactionLog;
 import io.atomix.core.transaction.impl.CommitResult;
@@ -27,13 +29,10 @@ import io.atomix.core.tree.impl.NodeUpdate;
 import io.atomix.primitive.PrimitiveManagementService;
 import io.atomix.primitive.PrimitiveType;
 import io.atomix.primitive.service.PrimitiveService;
-import io.atomix.primitive.service.ServiceConfig;
 import io.atomix.utils.misc.Match;
 import io.atomix.utils.serializer.Namespace;
 import io.atomix.utils.serializer.Namespaces;
 import io.atomix.utils.time.Versioned;
-
-import java.util.LinkedHashMap;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
 
@@ -84,7 +83,7 @@ public class AtomicDocumentTreeType<V> implements PrimitiveType<AtomicDocumentTr
   }
 
   @Override
-  public PrimitiveService newService(ServiceConfig config) {
+  public PrimitiveService newService() {
     return new DefaultDocumentTreeService();
   }
 

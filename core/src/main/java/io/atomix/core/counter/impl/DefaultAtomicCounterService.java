@@ -15,12 +15,13 @@
  */
 package io.atomix.core.counter.impl;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.util.concurrent.atomic.AtomicLong;
+
 import io.atomix.core.counter.AtomicCounterType;
 import io.atomix.primitive.service.AbstractPrimitiveService;
-import io.atomix.primitive.service.BackupInput;
-import io.atomix.primitive.service.BackupOutput;
-
-import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Atomix long state.
@@ -33,13 +34,17 @@ public class DefaultAtomicCounterService extends AbstractPrimitiveService implem
   }
 
   @Override
-  public void backup(BackupOutput writer) {
-    writer.writeLong(counter.get());
+  public void backup(OutputStream output) throws IOException {
+    AtomicCounterSnapshot.newBuilder()
+        .setCounter(counter.get())
+        .build()
+        .writeTo(output);
   }
 
   @Override
-  public void restore(BackupInput reader) {
-    counter.set(reader.readLong());
+  public void restore(InputStream input) throws IOException {
+    AtomicCounterSnapshot snapshot = AtomicCounterSnapshot.parseFrom(input);
+    counter.set(snapshot.getCounter());
   }
 
   @Override

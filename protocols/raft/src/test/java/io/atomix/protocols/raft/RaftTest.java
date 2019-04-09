@@ -15,6 +15,32 @@
  */
 package io.atomix.protocols.raft;
 
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.nio.file.FileVisitResult;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.SimpleFileVisitor;
+import java.nio.file.attribute.BasicFileAttributes;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Consumer;
+import java.util.stream.Collectors;
+
 import com.google.common.collect.Sets;
 import io.atomix.cluster.ClusterMembershipService;
 import io.atomix.cluster.MemberId;
@@ -40,10 +66,7 @@ import io.atomix.primitive.protocol.PrimitiveProtocol;
 import io.atomix.primitive.proxy.ProxyClient;
 import io.atomix.primitive.proxy.impl.DefaultProxyClient;
 import io.atomix.primitive.service.AbstractPrimitiveService;
-import io.atomix.primitive.service.BackupInput;
-import io.atomix.primitive.service.BackupOutput;
 import io.atomix.primitive.service.PrimitiveService;
-import io.atomix.primitive.service.ServiceConfig;
 import io.atomix.primitive.session.Session;
 import io.atomix.primitive.session.SessionClient;
 import io.atomix.primitive.session.SessionId;
@@ -73,30 +96,6 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Ignore;
 import org.junit.Test;
-
-import java.io.File;
-import java.io.IOException;
-import java.nio.file.FileVisitResult;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.SimpleFileVisitor;
-import java.nio.file.attribute.BasicFileAttributes;
-import java.time.Duration;
-import java.time.Instant;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.function.Consumer;
-import java.util.stream.Collectors;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
@@ -1338,7 +1337,7 @@ public class RaftTest extends ConcurrentTestCase {
    * Creates a test session.
    */
   private SessionClient createSession(RaftClient client, ReadConsistency consistency) throws Exception {
-    return client.sessionBuilder("raft-test", TestPrimitiveType.INSTANCE, new ServiceConfig())
+    return client.sessionBuilder("raft-test", TestPrimitiveType.INSTANCE)
         .withReadConsistency(consistency)
         .withMinTimeout(Duration.ofMillis(250))
         .withMaxTimeout(Duration.ofSeconds(5))
@@ -1439,8 +1438,8 @@ public class RaftTest extends ConcurrentTestCase {
     }
 
     @Override
-    public PrimitiveService newService(ServiceConfig config) {
-      return new TestPrimitiveServiceImpl(config);
+    public PrimitiveService newService() {
+      return new TestPrimitiveServiceImpl();
     }
   }
 
@@ -1577,7 +1576,7 @@ public class RaftTest extends ConcurrentTestCase {
     private SessionId expire;
     private SessionId close;
 
-    public TestPrimitiveServiceImpl(ServiceConfig config) {
+    public TestPrimitiveServiceImpl() {
       super(TestPrimitiveType.INSTANCE, TestPrimitiveClient.class);
     }
 
@@ -1601,13 +1600,13 @@ public class RaftTest extends ConcurrentTestCase {
     }
 
     @Override
-    public void backup(BackupOutput writer) {
-      writer.writeLong(10);
+    public void backup(OutputStream output) throws IOException {
+
     }
 
     @Override
-    public void restore(BackupInput reader) {
-      assertEquals(10, reader.readLong());
+    public void restore(InputStream input) throws IOException {
+
     }
 
     @Override

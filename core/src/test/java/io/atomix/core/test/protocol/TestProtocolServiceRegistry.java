@@ -15,14 +15,13 @@
  */
 package io.atomix.core.test.protocol;
 
+import java.util.Map;
+import java.util.concurrent.ScheduledExecutorService;
+
 import com.google.common.collect.Maps;
 import io.atomix.primitive.PrimitiveType;
 import io.atomix.primitive.partition.PartitionId;
-import io.atomix.primitive.service.ServiceConfig;
 import io.atomix.utils.concurrent.ThreadPoolContext;
-
-import java.util.Map;
-import java.util.concurrent.ScheduledExecutorService;
 
 /**
  * Test protocol service registry.
@@ -41,13 +40,12 @@ public class TestProtocolServiceRegistry {
    * @param partitionId the partition identifier
    * @param name the service name
    * @param type the service type
-   * @param config the service configuration
    * @return the test service
    */
-  public TestProtocolService getOrCreateService(PartitionId partitionId, String name, PrimitiveType type, ServiceConfig config) {
+  public TestProtocolService getOrCreateService(PartitionId partitionId, String name, PrimitiveType type) {
     return partitions.computeIfAbsent(partitionId, id -> Maps.newConcurrentMap())
         .computeIfAbsent(name, n ->
-            new TestProtocolService(partitionId, n, type, config, type.newService(config), this, new ThreadPoolContext(threadPool)));
+            new TestProtocolService(partitionId, n, type, type.newService(), this, new ThreadPoolContext(threadPool)));
   }
 
   /**

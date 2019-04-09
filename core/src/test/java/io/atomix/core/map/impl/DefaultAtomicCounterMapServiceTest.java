@@ -15,10 +15,9 @@
  */
 package io.atomix.core.map.impl;
 
-import io.atomix.primitive.service.impl.DefaultBackupInput;
-import io.atomix.primitive.service.impl.DefaultBackupOutput;
-import io.atomix.storage.buffer.Buffer;
-import io.atomix.storage.buffer.HeapBuffer;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
@@ -32,11 +31,11 @@ public class DefaultAtomicCounterMapServiceTest {
     DefaultAtomicCounterMapService service = new DefaultAtomicCounterMapService();
     service.put("foo", 1);
 
-    Buffer buffer = HeapBuffer.allocate();
-    service.backup(new DefaultBackupOutput(buffer, service.serializer()));
+    ByteArrayOutputStream os = new ByteArrayOutputStream();
+    service.backup(os);
 
     service = new DefaultAtomicCounterMapService();
-    service.restore(new DefaultBackupInput(buffer.flip(), service.serializer()));
+    service.restore(new ByteArrayInputStream(os.toByteArray()));
 
     long value = service.get("foo");
     assertEquals(1, value);

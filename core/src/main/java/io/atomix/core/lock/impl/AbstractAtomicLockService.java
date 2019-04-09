@@ -15,23 +15,25 @@
  */
 package io.atomix.core.lock.impl;
 
-import io.atomix.core.lock.AtomicLockType;
-import io.atomix.primitive.PrimitiveType;
-import io.atomix.primitive.service.AbstractPrimitiveService;
-import io.atomix.primitive.service.BackupInput;
-import io.atomix.primitive.service.BackupOutput;
-import io.atomix.primitive.session.Session;
-import io.atomix.primitive.session.SessionId;
-import io.atomix.utils.concurrent.Scheduled;
-import io.atomix.utils.serializer.Namespace;
-import io.atomix.utils.serializer.Serializer;
-
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.time.Duration;
 import java.util.ArrayDeque;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Queue;
+import java.util.stream.Collectors;
+
+import io.atomix.core.lock.AtomicLockType;
+import io.atomix.primitive.PrimitiveType;
+import io.atomix.primitive.service.AbstractPrimitiveService;
+import io.atomix.primitive.session.Session;
+import io.atomix.primitive.session.SessionId;
+import io.atomix.utils.concurrent.Scheduled;
+import io.atomix.utils.serializer.Namespace;
+import io.atomix.utils.serializer.Serializer;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
 
@@ -59,22 +61,47 @@ public abstract class AbstractAtomicLockService extends AbstractPrimitiveService
   }
 
   @Override
-  public void backup(BackupOutput output) {
+  public void backup(OutputStream output) throws IOException {
+    AtomicLockSnapshot.Builder builder = AtomicLockSnapshot.newBuilder();
     if (lock != null) {
-      output.writeBoolean(true);
-      output.writeObject(lock);
-    } else {
-      output.writeBoolean(false);
+      builder.setLock(LockRequest.newBuilder()
+          .setId(lock.id)
+          .setIndex(lock.index)
+          .setSessionId(lock.session.id())
+          .setExpire(lock.expire)
+          .build());
     }
-    output.writeObject(queue);
+
+    builder.addAllQueue(queue.stream()
+        .map(lock -> LockRequest.newBuilder()
+            .setId(lock.id)
+            .setIndex(lock.index)
+            .setSessionId(lock.session.id())
+            .setExpire(lock.expire)
+            .build())
+        .collect(Collectors.toList()));
+
+    builder.build().writeTo(output);
   }
 
   @Override
-  public void restore(BackupInput input) {
-    if (input.readBoolean()) {
-      lock = input.readObject();
+  public void restore(InputStream input) throws IOException {
+    AtomicLockSnapshot snapshot = AtomicLockSnapshot.parseFrom(input);
+    if (snapshot.hasLock()) {
+      lock = new LockHolder(
+          snapshot.getLock().getId(),
+          snapshot.getLock().getIndex(),
+          SessionId.from(snapshot.getLock().getSessionId()),
+          snapshot.getLock().getExpire());
     }
-    queue = input.readObject();
+
+    queue = snapshot.getQueueList().stream()
+        .map(lock -> new LockHolder(
+            lock.getId(),
+            lock.getIndex(),
+            SessionId.from(lock.getSessionId()),
+            lock.getExpire()))
+        .collect(Collectors.toCollection(ArrayDeque::new));
 
     // After the snapshot is installed, we need to cancel any existing timers and schedule new ones based on the
     // state provided by the snapshot.

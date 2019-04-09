@@ -1,0 +1,34 @@
+syntax = "proto3";
+
+package atomix.primary_elector;
+
+option java_package = "io.atomix.primitive.partition.impl.proto";
+option java_multiple_files = true;
+
+// Primary elector snapshot format
+message PrimaryElectorSnapshot {
+    repeated int64 sessions = 1;
+    repeated ElectionState elections = 2;
+}
+
+// Primary election state
+message ElectionState {
+    int32 partition_id = 1;
+    string group = 2;
+    ElectionCandidate primary = 3;
+    int64 term = 4;
+    int64 timestamp = 5;
+    repeated ElectionCandidate candidates = 6;
+}
+
+// Primary election candidate
+message ElectionCandidate {
+    ElectionMember member = 1;
+    int64 session_id = 2;
+}
+
+// Primary election member
+message ElectionMember {
+    string member_id = 1;
+    string group_id = 2;
+}

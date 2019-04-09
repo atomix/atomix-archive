@@ -19,7 +19,6 @@ import io.atomix.core.log.impl.DefaultDistributedLogBuilder;
 import io.atomix.primitive.PrimitiveManagementService;
 import io.atomix.primitive.PrimitiveType;
 import io.atomix.primitive.service.PrimitiveService;
-import io.atomix.primitive.service.ServiceConfig;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
 
@@ -46,7 +45,7 @@ public class DistributedLogType<T> implements PrimitiveType<DistributedLogBuilde
   }
 
   @Override
-  public PrimitiveService newService(ServiceConfig config) {
+  public PrimitiveService newService() {
     throw new UnsupportedOperationException();
   }
 

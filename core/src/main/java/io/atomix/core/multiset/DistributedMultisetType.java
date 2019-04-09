@@ -23,7 +23,6 @@ import io.atomix.core.multiset.impl.DefaultDistributedMultisetService;
 import io.atomix.primitive.PrimitiveManagementService;
 import io.atomix.primitive.PrimitiveType;
 import io.atomix.primitive.service.PrimitiveService;
-import io.atomix.primitive.service.ServiceConfig;
 import io.atomix.utils.serializer.Namespace;
 import io.atomix.utils.serializer.Namespaces;
 
@@ -67,7 +66,7 @@ public class DistributedMultisetType<E> implements PrimitiveType<DistributedMult
   }
 
   @Override
-  public PrimitiveService newService(ServiceConfig config) {
+  public PrimitiveService newService() {
     return new DefaultDistributedMultisetService();
   }
 

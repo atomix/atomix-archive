@@ -16,6 +16,13 @@
 
 package io.atomix.protocols.backup.service.impl;
 
+import java.util.Collection;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
+import java.util.stream.Collectors;
+
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Maps;
 import io.atomix.cluster.ClusterMembershipEvent;
@@ -31,7 +38,6 @@ import io.atomix.primitive.partition.PrimaryElection;
 import io.atomix.primitive.partition.PrimaryElectionEventListener;
 import io.atomix.primitive.partition.PrimaryTerm;
 import io.atomix.primitive.service.PrimitiveService;
-import io.atomix.primitive.service.ServiceConfig;
 import io.atomix.primitive.service.ServiceContext;
 import io.atomix.primitive.session.Session;
 import io.atomix.primitive.session.SessionId;
@@ -55,19 +61,11 @@ import io.atomix.utils.concurrent.ComposableFuture;
 import io.atomix.utils.concurrent.ThreadContext;
 import io.atomix.utils.logging.ContextualLoggerFactory;
 import io.atomix.utils.logging.LoggerContext;
-import io.atomix.utils.serializer.Serializer;
 import io.atomix.utils.time.LogicalClock;
 import io.atomix.utils.time.LogicalTimestamp;
 import io.atomix.utils.time.WallClock;
 import io.atomix.utils.time.WallClockTimestamp;
 import org.slf4j.Logger;
-
-import java.util.Collection;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.concurrent.CompletableFuture;
-import java.util.stream.Collectors;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -80,7 +78,6 @@ public class PrimaryBackupServiceContext implements ServiceContext {
   private final String serverName;
   private final PrimitiveId primitiveId;
   private final PrimitiveType primitiveType;
-  private final ServiceConfig serviceConfig;
   private final PrimitiveDescriptor descriptor;
   private final PrimitiveService service;
   private final Map<Long, PrimaryBackupSession> sessions = Maps.newConcurrentMap();
@@ -129,9 +126,8 @@ public class PrimaryBackupServiceContext implements ServiceContext {
     this.serverName = checkNotNull(serverName);
     this.primitiveId = checkNotNull(primitiveId);
     this.primitiveType = checkNotNull(primitiveType);
-    this.serviceConfig = Serializer.using(primitiveType.namespace()).decode(descriptor.config());
     this.descriptor = checkNotNull(descriptor);
-    this.service = primitiveType.newService(serviceConfig);
+    this.service = primitiveType.newService();
     this.threadContext = checkNotNull(threadContext);
     this.clusterMembershipService = checkNotNull(clusterMembershipService);
     this.memberGroupService = checkNotNull(memberGroupService);
@@ -211,12 +207,6 @@ public class PrimaryBackupServiceContext implements ServiceContext {
   @Override
   public PrimitiveType serviceType() {
     return primitiveType;
-  }
-
-  @Override
-  @SuppressWarnings("unchecked")
-  public <C extends ServiceConfig> C serviceConfig() {
-    return (C) serviceConfig;
   }
 
   @Override

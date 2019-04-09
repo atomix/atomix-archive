@@ -1,0 +1,35 @@
+syntax = "proto3";
+
+package atomix.set.service;
+
+option java_package = "io.atomix.core.set.impl";
+option java_outer_classname = "AtomicSetProto";
+option java_multiple_files = true;
+
+// Distributed set snapshot
+message DistributedSetSnapshot {
+    repeated string values = 1;
+    repeated int64 listeners = 2;
+    map<int64, int64> iterators = 3;
+    repeated string locked_elements = 4;
+    map<string, DistributedSetTransaction> transactions = 5;
+}
+
+// Distributed set transaction
+message DistributedSetTransaction {
+    int64 version = 1;
+    repeated DistributedSetUpdate updates = 2;
+}
+
+// Transaction update
+message DistributedSetUpdate {
+    Type type = 1;
+    string value = 2;
+
+    enum Type {
+        ADD = 0;
+        REMOVE = 1;
+        CONTAINS = 2;
+        NOT_CONTAINS = 3;
+    }
+}

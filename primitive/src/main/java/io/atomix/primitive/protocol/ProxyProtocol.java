@@ -18,7 +18,6 @@ package io.atomix.primitive.protocol;
 import io.atomix.primitive.PrimitiveType;
 import io.atomix.primitive.partition.PartitionService;
 import io.atomix.primitive.proxy.ProxyClient;
-import io.atomix.primitive.service.ServiceConfig;
 
 /**
  * State machine replication-based primitive protocol.
@@ -38,7 +37,6 @@ public interface ProxyProtocol extends PrimitiveProtocol {
    * @param primitiveName    the primitive name
    * @param primitiveType    the primitive type
    * @param serviceType      the primitive service type
-   * @param serviceConfig    the service configuration
    * @param partitionService the partition service
    * @return the proxy for the given partition group
    */
@@ -46,6 +44,5 @@ public interface ProxyProtocol extends PrimitiveProtocol {
       String primitiveName,
       PrimitiveType primitiveType,
       Class<S> serviceType,
-      ServiceConfig serviceConfig,
       PartitionService partitionService);
 }

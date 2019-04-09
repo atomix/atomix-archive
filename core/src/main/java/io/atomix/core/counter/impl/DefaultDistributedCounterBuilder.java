@@ -15,6 +15,8 @@
  */
 package io.atomix.core.counter.impl;
 
+import java.util.concurrent.CompletableFuture;
+
 import io.atomix.core.counter.AsyncDistributedCounter;
 import io.atomix.core.counter.DistributedCounter;
 import io.atomix.core.counter.DistributedCounterBuilder;
@@ -24,11 +26,8 @@ import io.atomix.primitive.protocol.GossipProtocol;
 import io.atomix.primitive.protocol.PrimitiveProtocol;
 import io.atomix.primitive.protocol.ProxyProtocol;
 import io.atomix.primitive.protocol.counter.CounterProtocol;
-import io.atomix.primitive.service.ServiceConfig;
 import io.atomix.utils.concurrent.Futures;
 import io.atomix.utils.config.ConfigurationException;
-
-import java.util.concurrent.CompletableFuture;
 
 /**
  * Default distributed counter builder.
@@ -51,7 +50,7 @@ public class DefaultDistributedCounterBuilder extends DistributedCounterBuilder 
         return Futures.exceptionalFuture(new UnsupportedOperationException("Counter is not supported by the provided gossip protocol"));
       }
     } else if (protocol instanceof ProxyProtocol) {
-      return newProxy(AtomicCounterService.class, new ServiceConfig())
+      return newProxy(AtomicCounterService.class)
           .thenCompose(proxy -> new AtomicCounterProxy(proxy, managementService.getPrimitiveRegistry()).connect())
           .thenApply(DelegatingDistributedCounter::new)
           .thenApply(AsyncDistributedCounter::sync);

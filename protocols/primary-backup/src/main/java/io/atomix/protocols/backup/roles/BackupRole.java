@@ -15,8 +15,13 @@
  */
 package io.atomix.protocols.backup.roles;
 
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.util.LinkedList;
+import java.util.Queue;
+import java.util.concurrent.CompletableFuture;
+
 import io.atomix.cluster.MemberId;
-import io.atomix.primitive.service.impl.DefaultBackupInput;
 import io.atomix.primitive.service.impl.DefaultCommit;
 import io.atomix.primitive.session.Session;
 import io.atomix.protocols.backup.PrimaryBackupServer.Role;
@@ -31,12 +36,8 @@ import io.atomix.protocols.backup.protocol.HeartbeatOperation;
 import io.atomix.protocols.backup.protocol.PrimaryBackupResponse;
 import io.atomix.protocols.backup.protocol.RestoreRequest;
 import io.atomix.protocols.backup.service.impl.PrimaryBackupServiceContext;
-import io.atomix.storage.buffer.Buffer;
-import io.atomix.storage.buffer.HeapBuffer;
-
-import java.util.LinkedList;
-import java.util.Queue;
-import java.util.concurrent.CompletableFuture;
+import io.atomix.protocols.backup.snapshot.ServiceSession;
+import io.atomix.protocols.backup.snapshot.ServiceSnapshot;
 
 /**
  * Backup role.
@@ -163,14 +164,17 @@ public class BackupRole extends PrimaryBackupRole {
           if (error == null && response.status() == PrimaryBackupResponse.Status.OK) {
             context.resetIndex(response.index(), response.timestamp());
 
-            Buffer buffer = HeapBuffer.wrap(response.data());
-            int sessions = buffer.readInt();
-            for (int i = 0; i < sessions; i++) {
-              context.getOrCreateSession(buffer.readLong(), MemberId.from(buffer.readString()));
-            }
+            try {
+              ServiceSnapshot snapshot = ServiceSnapshot.parseFrom(response.data());
+              for (ServiceSession session : snapshot.getSessionsList()) {
+                context.getOrCreateSession(session.getSessionId(), MemberId.from(session.getMemberId()));
+              }
 
-            context.service().restore(new DefaultBackupInput(buffer, context.service().serializer()));
-            operations.clear();
+              context.service().restore(new ByteArrayInputStream(snapshot.getSnapshot().toByteArray()));
+              operations.clear();
+            } catch (IOException e) {
+              log.error("Failed to deserialize snapshot");
+            }
           }
         }, context.threadContext());
   }

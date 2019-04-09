@@ -20,7 +20,6 @@ import io.atomix.core.map.impl.DefaultDistributedNavigableMapService;
 import io.atomix.primitive.PrimitiveManagementService;
 import io.atomix.primitive.PrimitiveType;
 import io.atomix.primitive.service.PrimitiveService;
-import io.atomix.primitive.service.ServiceConfig;
 import io.atomix.utils.serializer.Namespace;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
@@ -56,7 +55,7 @@ public class DistributedNavigableMapType<K extends Comparable<K>, V> implements 
   }
 
   @Override
-  public PrimitiveService newService(ServiceConfig config) {
+  public PrimitiveService newService() {
     return new DefaultDistributedNavigableMapService();
   }
 

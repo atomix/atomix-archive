@@ -15,16 +15,15 @@
  */
 package io.atomix.core.multiset.impl;
 
+import java.util.concurrent.CompletableFuture;
+
 import com.google.common.io.BaseEncoding;
 import io.atomix.core.multiset.AsyncDistributedMultiset;
 import io.atomix.core.multiset.DistributedMultiset;
 import io.atomix.core.multiset.DistributedMultisetBuilder;
 import io.atomix.core.multiset.DistributedMultisetConfig;
 import io.atomix.primitive.PrimitiveManagementService;
-import io.atomix.primitive.service.ServiceConfig;
 import io.atomix.utils.serializer.Serializer;
-
-import java.util.concurrent.CompletableFuture;
 
 /**
  * Default distributed multiset builder.
@@ -39,7 +38,7 @@ public class DefaultDistributedMultisetBuilder<E> extends DistributedMultisetBui
   @Override
   @SuppressWarnings("unchecked")
   public CompletableFuture<DistributedMultiset<E>> buildAsync() {
-    return newProxy(DistributedMultisetService.class, new ServiceConfig())
+    return newProxy(DistributedMultisetService.class)
         .thenCompose(proxy -> new DistributedMultisetProxy(proxy, managementService.getPrimitiveRegistry()).connect())
         .thenApply(rawList -> {
           Serializer serializer = serializer();

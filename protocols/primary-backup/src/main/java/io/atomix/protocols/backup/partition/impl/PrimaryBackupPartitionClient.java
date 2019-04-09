@@ -15,10 +15,11 @@
  */
 package io.atomix.protocols.backup.partition.impl;
 
+import java.util.concurrent.CompletableFuture;
+
 import io.atomix.primitive.PrimitiveType;
 import io.atomix.primitive.partition.PartitionClient;
 import io.atomix.primitive.partition.PartitionManagementService;
-import io.atomix.primitive.service.ServiceConfig;
 import io.atomix.protocols.backup.PrimaryBackupClient;
 import io.atomix.protocols.backup.partition.PrimaryBackupPartition;
 import io.atomix.protocols.backup.serializer.impl.PrimaryBackupNamespaces;
@@ -28,8 +29,6 @@ import io.atomix.utils.concurrent.ThreadContextFactory;
 import io.atomix.utils.serializer.Serializer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.util.concurrent.CompletableFuture;
 
 /**
  * Primary-backup partition client.
@@ -51,8 +50,8 @@ public class PrimaryBackupPartitionClient implements PartitionClient, Managed<Pr
   }
 
   @Override
-  public PrimaryBackupSessionClient.Builder sessionBuilder(String primitiveName, PrimitiveType primitiveType, ServiceConfig serviceConfig) {
-    return client.sessionBuilder(primitiveName, primitiveType, serviceConfig);
+  public PrimaryBackupSessionClient.Builder sessionBuilder(String primitiveName, PrimitiveType primitiveType) {
+    return client.sessionBuilder(primitiveName, primitiveType);
   }
 
   @Override

@@ -15,6 +15,22 @@
  */
 package io.atomix.core;
 
+import java.io.File;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Properties;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
+
 import io.atomix.cluster.ClusterMembershipEvent;
 import io.atomix.cluster.ClusterMembershipEventListener;
 import io.atomix.cluster.Member;
@@ -23,7 +39,6 @@ import io.atomix.core.counter.AtomicCounter;
 import io.atomix.core.counter.AtomicCounterType;
 import io.atomix.core.counter.DistributedCounterType;
 import io.atomix.core.election.LeaderElectionType;
-import io.atomix.core.election.LeaderElectorType;
 import io.atomix.core.idgenerator.AtomicIdGeneratorType;
 import io.atomix.core.list.DistributedListType;
 import io.atomix.core.lock.AtomicLockType;
@@ -65,23 +80,11 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
-import java.io.File;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Properties;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
-import java.util.function.Function;
-import java.util.stream.Collectors;
-import java.util.stream.IntStream;
-
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertSame;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 /**
  * Atomix test.
@@ -577,11 +580,6 @@ public class AtomixTest extends AbstractAtomixTest {
     assertSame(atomix.getLeaderElection("n"), atomix.getLeaderElection("n"));
     assertEquals(1, atomix.getPrimitives(LeaderElectionType.instance()).size());
 
-    assertEquals("o", atomix.getLeaderElector("o").name());
-    assertEquals(LeaderElectorType.instance(), atomix.getLeaderElector("o").type());
-    assertSame(atomix.getLeaderElector("o"), atomix.getLeaderElector("o"));
-    assertEquals(1, atomix.getPrimitives(LeaderElectorType.instance()).size());
-
     assertEquals("p", atomix.getList("p").name());
     assertEquals(DistributedListType.instance(), atomix.getList("p").type());
     assertSame(atomix.getList("p"), atomix.getList("p"));
@@ -757,10 +755,6 @@ public class AtomixTest extends AbstractAtomixTest {
     assertEquals("leader-election", atomix.getLeaderElection("leader-election").name());
     assertEquals("two", ((ProxyProtocol) atomix.getLeaderElection("leader-election").protocol()).group());
 
-    assertEquals(LeaderElectorType.instance(), atomix.getPrimitive("leader-elector", LeaderElectorType.instance()).type());
-    assertEquals("leader-elector", atomix.getLeaderElector("leader-elector").name());
-    assertEquals("two", ((ProxyProtocol) atomix.getLeaderElector("leader-elector").protocol()).group());
-
     assertEquals(DistributedListType.instance(), atomix.getPrimitive("list", DistributedListType.instance()).type());
     assertEquals("list", atomix.getList("list").name());
     assertEquals("two", ((ProxyProtocol) atomix.getList("list").protocol()).group());
@@ -878,9 +872,6 @@ public class AtomixTest extends AbstractAtomixTest {
 
     assertEquals("n", atomix.leaderElectionBuilder("n").build().name());
     assertEquals(LeaderElectionType.instance(), atomix.leaderElectionBuilder("n").build().type());
-
-    assertEquals("o", atomix.leaderElectorBuilder("o").build().name());
-    assertEquals(LeaderElectorType.instance(), atomix.leaderElectorBuilder("o").build().type());
 
     assertEquals("p", atomix.listBuilder("p").build().name());
     assertEquals(DistributedListType.instance(), atomix.listBuilder("p").build().type());

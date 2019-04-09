@@ -15,9 +15,14 @@
  */
 package io.atomix.protocols.raft.storage.snapshot;
 
-import io.atomix.utils.time.WallClockTimestamp;
-
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.util.Objects;
+
+import io.atomix.utils.time.WallClockTimestamp;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -25,41 +30,15 @@ import static com.google.common.base.Preconditions.checkState;
 
 /**
  * Manages reading and writing a single snapshot file.
- * <p>
- * User-provided state machines which implement the {@link Snapshottable} interface
- * transparently write snapshots to and read snapshots from files on disk. Each time a snapshot is taken of
- * the state machine state, the snapshot will be written to a single file represented by this interface.
- * Snapshots are backed by a {@link io.atomix.storage.buffer.Buffer} dictated by the parent
- * {@link io.atomix.storage.StorageLevel} configuration. Snapshots for file-based storage
- * levels like {@link io.atomix.storage.StorageLevel#DISK DISK} will be stored in a disk
- * backed buffer, and {@link io.atomix.storage.StorageLevel#MEMORY MEMORY} snapshots will
- * be stored in an on-heap buffer.
- * <p>
- * Snapshots are read and written by a {@link SnapshotReader} and {@link SnapshotWriter} respectively.
- * To create a reader or writer, use the {@link #openReader()} and {@link #openWriter()} methods.
- * <p>
- * <pre>
- *   {@code
- *   Snapshot snapshot = snapshotStore.snapshot(1);
- *   try (SnapshotWriter writer = snapshot.writer()) {
- *     writer.writeString("Hello world!");
- *   }
- *   snapshot.complete();
- *   }
- * </pre>
- * A {@link SnapshotReader} is not allowed to be created until a {@link SnapshotWriter} has
- * completed writing the snapshot file and the snapshot has been marked {@link #complete() complete}.
- * This allows snapshots to effectively be written and closed but not completed until other conditions
- * are met. Prior to the completion of a snapshot, a failure and recovery of the parent {@link SnapshotStore}
- * will <em>not</em> recover an incomplete snapshot. Once a snapshot is complete, the snapshot becomes immutable,
- * can be recovered after a failure, and can be read by multiple readers concurrently.
  */
-public abstract class Snapshot implements AutoCloseable {
-  protected final SnapshotDescriptor descriptor;
-  protected final SnapshotStore store;
-  private SnapshotWriter writer;
+public class Snapshot implements AutoCloseable {
+  private final SnapshotFile file;
+  private final SnapshotDescriptor descriptor;
+  private final SnapshotStore store;
+  private OutputStream output;
 
-  protected Snapshot(SnapshotDescriptor descriptor, SnapshotStore store) {
+  protected Snapshot(SnapshotFile file, SnapshotDescriptor descriptor, SnapshotStore store) {
+    this.file = checkNotNull(file, "file cannot be null");
     this.descriptor = checkNotNull(descriptor, "descriptor cannot be null");
     this.store = checkNotNull(store, "store cannot be null");
   }
@@ -72,7 +51,7 @@ public abstract class Snapshot implements AutoCloseable {
    * @return The snapshot index.
    */
   public long index() {
-    return descriptor.index();
+    return descriptor.getIndex();
   }
 
   /**
@@ -83,88 +62,69 @@ public abstract class Snapshot implements AutoCloseable {
    * @return The snapshot timestamp.
    */
   public WallClockTimestamp timestamp() {
-    return WallClockTimestamp.from(descriptor.timestamp());
+    return WallClockTimestamp.from(descriptor.getTimestamp());
   }
 
   /**
-   * Returns the snapshot format version.
+   * Opens a new snapshot output stream.
    *
-   * @return the snapshot format version
-   */
-  public int version() {
-    return descriptor.version();
-  }
-
-  /**
-   * Opens a new snapshot writer.
-   * <p>
-   * Only a single {@link SnapshotWriter} per {@link Snapshot} can be created. The single writer
-   * must write the snapshot in full and {@link #complete()} the snapshot to persist it to disk
-   * and make it available for {@link #openReader() reads}.
-   *
-   * @return A new snapshot writer.
+   * @return A new snapshot output stream.
    * @throws IllegalStateException if a writer was already created or the snapshot is {@link #complete() complete}
    */
-  public abstract SnapshotWriter openWriter();
+  public OutputStream openOutputStream() throws IOException {
+    checkOutput();
+    OutputStream outputStream = new FileOutputStream(file.file());
+    descriptor.writeTo(outputStream);
+    return openOutputStream(outputStream, descriptor);
+  }
 
   /**
    * Checks that the snapshot can be written.
    */
-  protected void checkWriter() {
-    checkState(writer == null, "cannot create multiple writers for the same snapshot");
+  protected void checkOutput() {
+    checkState(output == null, "cannot create multiple output streams for the same snapshot");
   }
 
   /**
-   * Opens the given snapshot writer.
+   * Opens the given snapshot output stream.
    */
-  protected SnapshotWriter openWriter(SnapshotWriter writer, SnapshotDescriptor descriptor) {
-    checkWriter();
-    checkState(!descriptor.isLocked(), "cannot write to locked snapshot descriptor");
-    this.writer = checkNotNull(writer, "writer cannot be null");
-    return writer;
+  protected OutputStream openOutputStream(OutputStream output, SnapshotDescriptor descriptor) {
+    checkOutput();
+    checkState(!descriptor.getLocked(), "cannot write to locked snapshot descriptor");
+    this.output = checkNotNull(output, "output cannot be null");
+    return output;
   }
 
   /**
-   * Closes the current snapshot writer.
+   * Closes the current snapshot output.
    */
-  protected void closeWriter(SnapshotWriter writer) {
-    this.writer = null;
+  protected void closeOutputStream(OutputStream output) {
+    this.output = null;
   }
 
   /**
-   * Opens a new snapshot reader.
-   * <p>
-   * A {@link SnapshotReader} can only be created for a snapshot that has been fully written and
-   * {@link #complete() completed}. Multiple concurrent readers can be created for the same snapshot
-   * since completed snapshots are immutable.
+   * Opens a new snapshot input stream.
    *
    * @return A new snapshot reader.
    * @throws IllegalStateException if the snapshot is not {@link #complete() complete}
    */
-  public abstract SnapshotReader openReader();
-
-  /**
-   * Opens the given snapshot reader.
-   */
-  protected SnapshotReader openReader(SnapshotReader reader, SnapshotDescriptor descriptor) {
-    checkState(descriptor.isLocked(), "cannot read from unlocked snapshot descriptor");
-    return reader;
+  public InputStream openInputStream() throws IOException {
+    checkState(file.file().exists(), "missing snapshot file: %s", file.file());
+    InputStream inputStream = new FileInputStream(file.file());
+    SnapshotDescriptor descriptor = SnapshotDescriptor.parseDelimitedFrom(inputStream);
+    return openInputStream(inputStream, descriptor);
   }
 
   /**
-   * Closes the current snapshot reader.
+   * Opens the given snapshot input stream.
    */
-  protected void closeReader(SnapshotReader reader) {
-
+  protected InputStream openInputStream(InputStream input, SnapshotDescriptor descriptor) {
+    checkState(descriptor.getLocked(), "cannot read from unlocked snapshot descriptor");
+    return input;
   }
 
   /**
    * Completes writing the snapshot to persist it and make it available for reads.
-   * <p>
-   * Snapshot writers must call this method to persist a snapshot to disk. Prior to completing a
-   * snapshot, failure and recovery of the parent {@link SnapshotStore} will not result in recovery
-   * of this snapshot. Additionally, no {@link #openReader() readers} can be created until the snapshot
-   * has been completed.
    *
    * @return The completed snapshot.
    */
@@ -181,6 +141,13 @@ public abstract class Snapshot implements AutoCloseable {
    * @return The persisted snapshot.
    */
   public Snapshot persist() {
+    OutputStream output = this.output;
+    if (output != null) {
+      try {
+        output.flush();
+      } catch (IOException e) {
+      }
+    }
     return this;
   }
 
@@ -189,7 +156,9 @@ public abstract class Snapshot implements AutoCloseable {
    *
    * @return Whether the snapshot is persisted.
    */
-  public abstract boolean isPersisted();
+  public boolean isPersisted() {
+    return true;
+  }
 
   /**
    * Closes the snapshot.

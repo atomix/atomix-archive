@@ -15,6 +15,8 @@
  */
 package io.atomix.core.map.impl;
 
+import java.util.concurrent.CompletableFuture;
+
 import io.atomix.core.map.AsyncDistributedNavigableMap;
 import io.atomix.core.map.DistributedNavigableMap;
 import io.atomix.core.map.DistributedNavigableMapBuilder;
@@ -24,11 +26,8 @@ import io.atomix.primitive.protocol.GossipProtocol;
 import io.atomix.primitive.protocol.PrimitiveProtocol;
 import io.atomix.primitive.protocol.map.NavigableMapProtocol;
 import io.atomix.primitive.proxy.ProxyClient;
-import io.atomix.primitive.service.ServiceConfig;
 import io.atomix.utils.concurrent.Futures;
 import io.atomix.utils.serializer.Serializer;
-
-import java.util.concurrent.CompletableFuture;
 
 /**
  * Default distributed tree map builder.
@@ -52,7 +51,7 @@ public class DefaultDistributedNavigableMapBuilder<K extends Comparable<K>, V> e
         return Futures.exceptionalFuture(new UnsupportedOperationException("Sets are not supported by the provided gossip protocol"));
       }
     } else {
-      return newProxy(AtomicTreeMapService.class, new ServiceConfig())
+      return newProxy(AtomicTreeMapService.class)
           .thenCompose(proxy -> new AtomicNavigableMapProxy<K>((ProxyClient) proxy, managementService.getPrimitiveRegistry()).connect())
           .thenApply(map -> {
             Serializer serializer = serializer();

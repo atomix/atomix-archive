@@ -16,29 +16,13 @@
 
 package io.atomix.core.tree.impl;
 
-import com.esotericsoftware.kryo.Kryo;
-import com.esotericsoftware.kryo.io.Input;
-import com.esotericsoftware.kryo.io.Output;
-import com.google.common.collect.Queues;
-import com.google.common.collect.Sets;
-import io.atomix.core.tree.AtomicDocumentTree;
-import io.atomix.core.tree.AtomicDocumentTreeType;
-import io.atomix.core.tree.DocumentPath;
-import io.atomix.core.tree.DocumentTreeEvent;
-import io.atomix.core.tree.IllegalDocumentModificationException;
-import io.atomix.core.tree.NoSuchDocumentPathException;
-import io.atomix.primitive.Ordering;
-import io.atomix.primitive.service.AbstractPrimitiveService;
-import io.atomix.primitive.service.BackupInput;
-import io.atomix.primitive.service.BackupOutput;
-import io.atomix.primitive.session.Session;
-import io.atomix.primitive.session.SessionId;
-import io.atomix.utils.serializer.Namespace;
-import io.atomix.utils.serializer.Serializer;
-import io.atomix.utils.time.Versioned;
-
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -47,6 +31,28 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
+
+import com.esotericsoftware.kryo.Kryo;
+import com.esotericsoftware.kryo.io.Input;
+import com.esotericsoftware.kryo.io.Output;
+import com.google.common.collect.Maps;
+import com.google.common.collect.Queues;
+import com.google.common.collect.Sets;
+import com.google.protobuf.ByteString;
+import io.atomix.core.tree.AtomicDocumentTree;
+import io.atomix.core.tree.AtomicDocumentTreeType;
+import io.atomix.core.tree.DocumentPath;
+import io.atomix.core.tree.DocumentTreeEvent;
+import io.atomix.core.tree.DocumentTreeNode;
+import io.atomix.core.tree.IllegalDocumentModificationException;
+import io.atomix.core.tree.NoSuchDocumentPathException;
+import io.atomix.primitive.Ordering;
+import io.atomix.primitive.service.AbstractPrimitiveService;
+import io.atomix.primitive.session.Session;
+import io.atomix.primitive.session.SessionId;
+import io.atomix.utils.serializer.Namespace;
+import io.atomix.utils.serializer.Serializer;
+import io.atomix.utils.time.Versioned;
 
 /**
  * State Machine for {@link AtomicDocumentTreeProxy} resource.
@@ -93,19 +99,69 @@ public class DefaultDocumentTreeService extends AbstractPrimitiveService<Documen
   }
 
   @Override
-  public void backup(BackupOutput writer) {
-    writer.writeLong(versionCounter.get());
-    writer.writeObject(listeners);
-    writer.writeObject(docTree);
-    writer.writeObject(preparedKeys);
+  public void backup(OutputStream output) throws IOException {
+    AtomicDocumentTreeSnapshot.newBuilder()
+        .setVersion(versionCounter.get())
+        .putAllListeners(listeners.entrySet().stream()
+            .map(e -> Maps.immutableEntry(e.getKey().id(), AtomicDocumentTreeListeners.newBuilder()
+                .addAllPaths(e.getValue().paths.stream()
+                    .map(DocumentPath::toString)
+                    .collect(Collectors.toList()))
+                .build()))
+            .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue)))
+        .setNode(buildNode(((DefaultAtomicDocumentTree<byte[]>) docTree).root))
+        .addAllPreparedKeys(preparedKeys.stream()
+            .map(DocumentPath::toString)
+            .collect(Collectors.toList()))
+        .build()
+        .writeTo(output);
+  }
+
+  private AtomicDocumentTreeNode buildNode(DocumentTreeNode<byte[]> node) {
+    AtomicDocumentTreeNode.Builder builder = AtomicDocumentTreeNode.newBuilder()
+        .setPath(node.path().toString());
+    if (node.value() != null) {
+      builder.setVersion(node.value().version());
+      builder.setValue(ByteString.copyFrom(node.value().value()));
+    }
+    Iterator<DocumentTreeNode<byte[]>> iterator = node.children();
+    while (iterator.hasNext()) {
+      builder.addChildren(buildNode(iterator.next()));
+    }
+    return builder.build();
   }
 
   @Override
-  public void restore(BackupInput reader) {
-    versionCounter = new AtomicLong(reader.readLong());
-    listeners = reader.readObject();
-    docTree = reader.readObject();
-    preparedKeys = reader.readObject();
+  public void restore(InputStream input) throws IOException {
+    AtomicDocumentTreeSnapshot snapshot = AtomicDocumentTreeSnapshot.parseFrom(input);
+    versionCounter.set(snapshot.getVersion());
+    preparedKeys = snapshot.getPreparedKeysList().stream()
+        .map(DocumentPath::from)
+        .collect(Collectors.toCollection(HashSet::new));
+    listeners = snapshot.getListenersMap().entrySet().stream()
+        .map(entry -> Maps.immutableEntry(SessionId.from(entry.getKey()),
+            new SessionListenCommits(entry.getValue().getPathsList().stream()
+                .map(DocumentPath::from)
+                .collect(Collectors.toCollection(HashSet::new)))))
+        .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+    docTree = buildTree(snapshot.getNode());
+  }
+
+  private AtomicDocumentTree<byte[]> buildTree(AtomicDocumentTreeNode node) {
+    return new DefaultAtomicDocumentTree<>(versionCounter::incrementAndGet, buildNode(node, null));
+  }
+
+  private DefaultDocumentTreeNode<byte[]> buildNode(AtomicDocumentTreeNode node, DocumentTreeNode<byte[]> parent) {
+    DefaultDocumentTreeNode<byte[]> n = new DefaultDocumentTreeNode<>(
+        DocumentPath.from(node.getPath()),
+        node.getValue().toByteArray(),
+        node.getVersion(),
+        Ordering.NATURAL,
+        parent);
+    n.children.putAll(node.getChildrenList().stream()
+        .map(child -> Maps.immutableEntry(child.getPath(), buildNode(child, n)))
+        .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue)));
+    return n;
   }
 
   /**
@@ -284,8 +340,16 @@ public class DefaultDocumentTreeService extends AbstractPrimitiveService<Documen
   }
 
   private class SessionListenCommits {
-    private final Set<DocumentPath> paths = Sets.newHashSet();
+    private final Set<DocumentPath> paths;
     private DocumentPath leastCommonAncestorPath;
+
+    private SessionListenCommits() {
+      this.paths = Sets.newHashSet();
+    }
+
+    private SessionListenCommits(Set<DocumentPath> paths) {
+      this.paths = paths;
+    }
 
     public void add(DocumentPath path) {
       paths.add(path);

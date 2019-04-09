@@ -16,12 +16,11 @@
 package io.atomix.core.barrier;
 
 import io.atomix.core.barrier.impl.CyclicBarrierResult;
-import io.atomix.core.barrier.impl.DefaultDistributedCyclicBarrierService;
 import io.atomix.core.barrier.impl.DefaultDistributedCyclicBarrierBuilder;
+import io.atomix.core.barrier.impl.DefaultDistributedCyclicBarrierService;
 import io.atomix.primitive.PrimitiveManagementService;
 import io.atomix.primitive.PrimitiveType;
 import io.atomix.primitive.service.PrimitiveService;
-import io.atomix.primitive.service.ServiceConfig;
 import io.atomix.utils.serializer.Namespace;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
@@ -57,7 +56,7 @@ public class DistributedCyclicBarrierType implements PrimitiveType<DistributedCy
   }
 
   @Override
-  public PrimitiveService newService(ServiceConfig config) {
+  public PrimitiveService newService() {
     return new DefaultDistributedCyclicBarrierService();
   }
 

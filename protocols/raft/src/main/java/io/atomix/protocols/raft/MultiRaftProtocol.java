@@ -105,7 +105,7 @@ public class MultiRaftProtocol implements ProxyProtocol {
   }
 
   @Override
-  public <S> ProxyClient<S> newProxy(String primitiveName, PrimitiveType primitiveType, Class<S> serviceType, ServiceConfig serviceConfig, PartitionService partitionService) {
+  public <S> ProxyClient<S> newProxy(String primitiveName, PrimitiveType primitiveType, Class<S> serviceType, PartitionService partitionService) {
     PartitionGroup partitionGroup = partitionService.getPartitionGroup(this);
     if (partitionGroup == null) {
       throw new ConfigurationException("No Raft partition group matching the configured protocol exists");
@@ -113,7 +113,7 @@ public class MultiRaftProtocol implements ProxyProtocol {
 
     Collection<SessionClient> partitions = partitionGroup.getPartitions().stream()
         .map(partition -> ((RaftPartition) partition).getClient()
-            .sessionBuilder(primitiveName, primitiveType, serviceConfig)
+            .sessionBuilder(primitiveName, primitiveType)
             .withMinTimeout(config.getMinTimeout())
             .withMaxTimeout(config.getMaxTimeout())
             .withReadConsistency(config.getReadConsistency())

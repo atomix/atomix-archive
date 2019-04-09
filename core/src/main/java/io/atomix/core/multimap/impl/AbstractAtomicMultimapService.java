@@ -16,27 +16,9 @@
 
 package io.atomix.core.multimap.impl;
 
-import com.esotericsoftware.kryo.Kryo;
-import com.esotericsoftware.kryo.io.Input;
-import com.esotericsoftware.kryo.io.Output;
-import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Maps;
-import com.google.common.collect.Multiset;
-import com.google.common.collect.Multisets;
-import com.google.common.collect.Sets;
-import io.atomix.core.iterator.impl.IteratorBatch;
-import io.atomix.core.multimap.AtomicMultimapType;
-import io.atomix.primitive.PrimitiveType;
-import io.atomix.primitive.service.AbstractPrimitiveService;
-import io.atomix.primitive.service.BackupInput;
-import io.atomix.primitive.service.BackupOutput;
-import io.atomix.primitive.session.Session;
-import io.atomix.primitive.session.SessionId;
-import io.atomix.utils.misc.Match;
-import io.atomix.utils.serializer.Namespace;
-import io.atomix.utils.serializer.Serializer;
-import io.atomix.utils.time.Versioned;
-
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -52,6 +34,26 @@ import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
+
+import com.esotericsoftware.kryo.Kryo;
+import com.esotericsoftware.kryo.io.Input;
+import com.esotericsoftware.kryo.io.Output;
+import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Maps;
+import com.google.common.collect.Multiset;
+import com.google.common.collect.Multisets;
+import com.google.common.collect.Sets;
+import com.google.protobuf.ByteString;
+import io.atomix.core.iterator.impl.IteratorBatch;
+import io.atomix.core.multimap.AtomicMultimapType;
+import io.atomix.primitive.PrimitiveType;
+import io.atomix.primitive.service.AbstractPrimitiveService;
+import io.atomix.primitive.session.Session;
+import io.atomix.primitive.session.SessionId;
+import io.atomix.utils.misc.Match;
+import io.atomix.utils.serializer.Namespace;
+import io.atomix.utils.serializer.Serializer;
+import io.atomix.utils.time.Versioned;
 
 /**
  * Base class for atomic multimap primitives.
@@ -97,17 +99,36 @@ public abstract class AbstractAtomicMultimapService extends AbstractPrimitiveSer
   }
 
   @Override
-  public void backup(BackupOutput writer) {
-    writer.writeLong(globalVersion.get());
-    writer.writeObject(listeners);
-    writer.writeObject(backingMap);
+  public void backup(OutputStream output) throws IOException {
+    AtomicMultimapSnapshot.newBuilder()
+        .setVersion(globalVersion.get())
+        .addAllListeners(listeners.stream().map(SessionId::id).collect(Collectors.toList()))
+        .putAllValues(backingMap.entrySet().stream()
+            .map(entry -> Maps.immutableEntry(entry.getKey(), AtomicMultimapValues.newBuilder()
+                .setVersion(entry.getValue().version())
+                .addAllValues(entry.getValue().values().stream()
+                    .map(ByteString::copyFrom)
+                    .collect(Collectors.toList()))
+                .build()))
+            .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue)))
+        .build()
+        .writeTo(output);
   }
 
   @Override
-  public void restore(BackupInput reader) {
-    globalVersion = new AtomicLong(reader.readLong());
-    listeners = reader.readObject();
-    backingMap = reader.readObject();
+  public void restore(InputStream input) throws IOException {
+    AtomicMultimapSnapshot snapshot = AtomicMultimapSnapshot.parseFrom(input);
+    globalVersion = new AtomicLong(snapshot.getVersion());
+    listeners = snapshot.getListenersList().stream()
+        .map(SessionId::from)
+        .collect(Collectors.toSet());
+    backingMap = snapshot.getValuesMap().entrySet().stream()
+        .map(entry -> Maps.immutableEntry(entry.getKey(), new NonTransactionalValues(
+            entry.getValue().getVersion(),
+            entry.getValue().getValuesList().stream()
+                .map(ByteString::toByteArray)
+                .collect(Collectors.toList()))))
+        .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
   }
 
   @Override
@@ -533,6 +554,11 @@ public abstract class AbstractAtomicMultimapService extends AbstractPrimitiveSer
       //Set the version to current it will only be updated once this is
       // populated
       this.version = globalVersion.get();
+    }
+
+    NonTransactionalValues(long version, Collection<byte[]> values) {
+      this.version = version;
+      valueSet.addAll(values);
     }
 
     @Override

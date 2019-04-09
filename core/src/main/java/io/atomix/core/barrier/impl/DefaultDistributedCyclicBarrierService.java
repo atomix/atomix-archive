@@ -15,24 +15,27 @@
  */
 package io.atomix.core.barrier.impl;
 
-import com.google.common.collect.Maps;
-import com.google.common.collect.Sets;
-import io.atomix.core.barrier.DistributedCyclicBarrierType;
-import io.atomix.primitive.service.AbstractPrimitiveService;
-import io.atomix.primitive.service.BackupInput;
-import io.atomix.primitive.service.BackupOutput;
-import io.atomix.primitive.session.Session;
-import io.atomix.primitive.session.SessionId;
-import io.atomix.utils.concurrent.Scheduled;
-import io.atomix.utils.serializer.Namespace;
-import io.atomix.utils.serializer.Serializer;
-
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.time.Duration;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
+
+import com.google.common.collect.Maps;
+import com.google.common.collect.Sets;
+import io.atomix.core.barrier.DistributedCyclicBarrierType;
+import io.atomix.primitive.service.AbstractPrimitiveService;
+import io.atomix.primitive.session.Session;
+import io.atomix.primitive.session.SessionId;
+import io.atomix.utils.concurrent.Scheduled;
+import io.atomix.utils.serializer.Namespace;
+import io.atomix.utils.serializer.Serializer;
 
 /**
  * Default cyclic barrier service.
@@ -58,26 +61,32 @@ public class DefaultDistributedCyclicBarrierService extends AbstractPrimitiveSer
   }
 
   @Override
-  public void backup(BackupOutput output) {
-    output.writeObject(parties);
-    output.writeLong(barrierId);
-    output.writeBoolean(broken);
-    output.writeObject(waiters.entrySet().stream()
-        .map(entry -> Maps.immutableEntry(entry.getKey(), entry.getValue().timeout))
-        .collect(Collectors.toMap(e -> e.getKey(), e -> e.getValue())));
+  public void backup(OutputStream output) throws IOException {
+    DistributedCyclicBarrierSnapshot.newBuilder()
+        .addAllParties(parties.stream()
+            .map(SessionId::id)
+            .collect(Collectors.toList()))
+        .setBarrierId(barrierId)
+        .setBroken(broken)
+        .putAllWaiters(waiters.entrySet().stream()
+            .map(e -> Maps.immutableEntry(e.getKey().id(), e.getValue().timeout))
+            .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue)))
+        .build()
+        .writeTo(output);
   }
 
   @Override
-  public void restore(BackupInput input) {
-    parties = input.readObject();
-    barrierId = input.readLong();
-    broken = input.readBoolean();
-    this.waiters = Maps.newLinkedHashMap();
-    Map<SessionId, Long> waiters = input.readObject();
-    waiters.forEach((sessionId, timeout) -> {
-      this.waiters.put(sessionId, new Waiter(timeout, timeout == 0 ? null
-          : getScheduler().schedule(Duration.ofMillis(timeout - getWallClock().getTime().unixTimestamp()), () -> timeout(barrierId))));
-    });
+  public void restore(InputStream input) throws IOException {
+    DistributedCyclicBarrierSnapshot snapshot = DistributedCyclicBarrierSnapshot.parseFrom(input);
+    parties = snapshot.getPartiesList().stream()
+        .map(SessionId::from)
+        .collect(Collectors.toCollection(HashSet::new));
+    barrierId = snapshot.getBarrierId();
+    broken = snapshot.getBroken();
+    waiters = snapshot.getWaitersMap().entrySet().stream()
+        .map(e -> Maps.immutableEntry(SessionId.from(e.getKey()), new Waiter(
+            e.getValue(), getScheduler().schedule(Duration.ofMillis(e.getValue() - getWallClock().getTime().unixTimestamp()), () -> timeout(barrierId)))))
+        .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue, (a, b) -> a, LinkedHashMap::new));
   }
 
   @Override

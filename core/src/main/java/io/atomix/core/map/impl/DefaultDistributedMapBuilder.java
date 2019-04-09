@@ -15,6 +15,8 @@
  */
 package io.atomix.core.map.impl;
 
+import java.util.concurrent.CompletableFuture;
+
 import com.google.common.io.BaseEncoding;
 import io.atomix.core.map.AsyncAtomicMap;
 import io.atomix.core.map.AsyncDistributedMap;
@@ -26,11 +28,8 @@ import io.atomix.primitive.protocol.GossipProtocol;
 import io.atomix.primitive.protocol.PrimitiveProtocol;
 import io.atomix.primitive.protocol.map.MapProtocol;
 import io.atomix.primitive.proxy.ProxyClient;
-import io.atomix.primitive.service.ServiceConfig;
 import io.atomix.utils.concurrent.Futures;
 import io.atomix.utils.serializer.Serializer;
-
-import java.util.concurrent.CompletableFuture;
 
 /**
  * Default distributed map builder.
@@ -54,7 +53,7 @@ public class DefaultDistributedMapBuilder<K, V> extends DistributedMapBuilder<K,
         return Futures.exceptionalFuture(new UnsupportedOperationException("Maps are not supported by the provided gossip protocol"));
       }
     } else {
-      return newProxy(AtomicMapService.class, new ServiceConfig())
+      return newProxy(AtomicMapService.class)
           .thenCompose(proxy -> new AtomicMapProxy((ProxyClient) proxy, managementService.getPrimitiveRegistry()).connect())
           .thenApply(rawMap -> {
             Serializer serializer = serializer();

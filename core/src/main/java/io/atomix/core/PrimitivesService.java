@@ -27,9 +27,6 @@ import io.atomix.core.counter.DistributedCounterType;
 import io.atomix.core.election.LeaderElection;
 import io.atomix.core.election.LeaderElectionBuilder;
 import io.atomix.core.election.LeaderElectionType;
-import io.atomix.core.election.LeaderElector;
-import io.atomix.core.election.LeaderElectorBuilder;
-import io.atomix.core.election.LeaderElectorType;
 import io.atomix.core.idgenerator.AtomicIdGenerator;
 import io.atomix.core.idgenerator.AtomicIdGeneratorBuilder;
 import io.atomix.core.idgenerator.AtomicIdGeneratorType;
@@ -659,28 +656,6 @@ public interface PrimitivesService extends PrimitiveFactory {
    */
   default <T> LeaderElectionBuilder<T> leaderElectionBuilder(String name) {
     return primitiveBuilder(name, LeaderElectionType.instance());
-  }
-
-  /**
-   * Creates a new named {@link LeaderElector} builder.
-   * <p>
-   * The elector name must be provided when constructing the builder. The name is used to reference a distinct instance of
-   * the primitive within the cluster. Multiple instances of the primitive with the same name will share the same state.
-   * However, the instance of the primitive constructed by the returned builder will be distinct and will not share
-   * local memory (e.g. cache) with any other instance on this node.
-   * <p>
-   * To get an asynchronous instance of the elector, use the {@link SyncPrimitive#async()} method:
-   * <pre>
-   *   {@code
-   *   AsyncLeaderElector<String> elector = atomix.<String>leaderElectorBuilder("my-elector").build().async();
-   *   }
-   * </pre>
-   *
-   * @param name the primitive name
-   * @return leader elector builder
-   */
-  default <T> LeaderElectorBuilder<T> leaderElectorBuilder(String name) {
-    return primitiveBuilder(name, LeaderElectorType.instance());
   }
 
   /**
@@ -1400,30 +1375,6 @@ public interface PrimitivesService extends PrimitiveFactory {
    */
   @Deprecated
   <T> LeaderElection<T> getLeaderElection(String name);
-
-  /**
-   * Gets or creates a {@link LeaderElector}.
-   * <p>
-   * A new primitive will be created if no primitive instance with the given {@code name} exists on this node, otherwise
-   * the existing instance will be returned. The name is used to reference a distinct instance of the primitive within
-   * the cluster. The returned primitive will share the same state with primitives of the same name on other nodes.
-   * <p>
-   * When the instance is initially constructed, it will be configured with any pre-existing primitive configuration
-   * defined in {@code atomix.conf}.
-   * <p>
-   * To get an asynchronous instance of the elector, use the {@link SyncPrimitive#async()} method:
-   * <pre>
-   *   {@code
-   *   AsyncLeaderElector<String> elector = atomix.getLeaderElector("my-elector").async();
-   *   }
-   * </pre>
-   *
-   * @param name the primitive name
-   * @return leader elector builder
-   * @deprecated since 3.1; use {@link PrimitiveBuilder#get()}
-   */
-  @Deprecated
-  <T> LeaderElector<T> getLeaderElector(String name);
 
   /**
    * Gets or creates a {@link DistributedLock}.

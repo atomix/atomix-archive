@@ -15,27 +15,15 @@
  */
 package io.atomix.core.workqueue.impl;
 
-import com.google.common.base.MoreObjects;
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.Maps;
-import com.google.common.collect.Queues;
-import com.google.common.collect.Sets;
-import io.atomix.core.workqueue.Task;
-import io.atomix.core.workqueue.WorkQueueStats;
-import io.atomix.core.workqueue.WorkQueueType;
-import io.atomix.primitive.service.AbstractPrimitiveService;
-import io.atomix.primitive.service.BackupInput;
-import io.atomix.primitive.service.BackupOutput;
-import io.atomix.primitive.session.Session;
-import io.atomix.primitive.session.SessionId;
-import io.atomix.utils.serializer.Namespace;
-import io.atomix.utils.serializer.Serializer;
-
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
@@ -43,6 +31,21 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
+
+import com.google.common.base.MoreObjects;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Maps;
+import com.google.common.collect.Queues;
+import com.google.common.collect.Sets;
+import com.google.protobuf.ByteString;
+import io.atomix.core.workqueue.Task;
+import io.atomix.core.workqueue.WorkQueueStats;
+import io.atomix.core.workqueue.WorkQueueType;
+import io.atomix.primitive.service.AbstractPrimitiveService;
+import io.atomix.primitive.session.Session;
+import io.atomix.primitive.session.SessionId;
+import io.atomix.utils.serializer.Namespace;
+import io.atomix.utils.serializer.Serializer;
 
 import static com.google.common.base.Throwables.throwIfUnchecked;
 
@@ -75,19 +78,45 @@ public class DefaultWorkQueueService extends AbstractPrimitiveService<WorkQueueC
   }
 
   @Override
-  public void backup(BackupOutput writer) {
-    writer.writeObject(registeredWorkers);
-    writer.writeObject(assignments);
-    writer.writeObject(unassignedTasks);
-    writer.writeLong(totalCompleted.get());
+  public void backup(OutputStream output) throws IOException {
+    WorkQueueSnapshot.newBuilder()
+        .addAllRegisteredWorkers(registeredWorkers.stream()
+            .map(SessionId::id)
+            .collect(Collectors.toList()))
+        .putAllAssignments(assignments.entrySet().stream()
+            .map(e -> Maps.immutableEntry(e.getKey(), WorkQueueTaskAssignment.newBuilder()
+                .setSessionId(e.getValue().sessionId)
+                .setTask(WorkQueueTask.newBuilder()
+                    .setTaskId(e.getValue().task.taskId())
+                    .setPayload(ByteString.copyFrom(e.getValue().task.payload()))
+                    .build())
+                .build()))
+            .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue)))
+        .addAllUnassignedTasks(unassignedTasks.stream()
+            .map(task -> WorkQueueTask.newBuilder()
+                .setTaskId(task.taskId())
+                .setPayload(ByteString.copyFrom(task.payload()))
+                .build())
+            .collect(Collectors.toList()))
+        .setTotalCompleted(totalCompleted.get())
+        .build()
+        .writeTo(output);
   }
 
   @Override
-  public void restore(BackupInput reader) {
-    registeredWorkers = reader.readObject();
-    assignments = reader.readObject();
-    unassignedTasks = reader.readObject();
-    totalCompleted.set(reader.readLong());
+  public void restore(InputStream input) throws IOException {
+    WorkQueueSnapshot snapshot = WorkQueueSnapshot.parseFrom(input);
+    registeredWorkers = snapshot.getRegisteredWorkersList().stream()
+        .map(SessionId::from)
+        .collect(Collectors.toCollection(LinkedHashSet::new));
+    assignments = snapshot.getAssignmentsMap().entrySet().stream()
+        .map(e -> Maps.immutableEntry(e.getKey(), new TaskAssignment(e.getValue().getSessionId(),
+            new Task<>(e.getValue().getTask().getTaskId(), e.getValue().getTask().getPayload().toByteArray()))))
+        .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+    unassignedTasks = snapshot.getUnassignedTasksList().stream()
+        .map(task -> new Task<>(task.getTaskId(), task.getPayload().toByteArray()))
+        .collect(Collectors.toCollection(ArrayDeque::new));
+    totalCompleted.set(snapshot.getTotalCompleted());
   }
 
   @Override
