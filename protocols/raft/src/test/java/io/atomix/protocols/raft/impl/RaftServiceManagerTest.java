@@ -108,7 +108,7 @@ public class RaftServiceManagerTest {
             .setMemberId("test-1")
             .setServiceType("test")
             .setServiceName("test")
-            .setReadConsistency(OpenSessionEntry.ReadConsistency.LINEARIZABLE)
+            .setReadConsistency(io.atomix.protocols.raft.protocol.ReadConsistency.LINEARIZABLE)
             .setTimeout(1000)
             .build())
         .build());
@@ -145,7 +145,7 @@ public class RaftServiceManagerTest {
             .setMemberId("test-1")
             .setServiceType("test")
             .setServiceName("test")
-            .setReadConsistency(OpenSessionEntry.ReadConsistency.LINEARIZABLE)
+            .setReadConsistency(io.atomix.protocols.raft.protocol.ReadConsistency.LINEARIZABLE)
             .setTimeout(1000)
             .build())
         .build());

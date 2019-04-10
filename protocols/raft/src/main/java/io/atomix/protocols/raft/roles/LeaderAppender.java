@@ -15,6 +15,14 @@
  */
 package io.atomix.protocols.raft.roles;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+
+import com.google.protobuf.Message;
 import io.atomix.protocols.raft.RaftException;
 import io.atomix.protocols.raft.RaftServer;
 import io.atomix.protocols.raft.cluster.RaftMember;
@@ -25,15 +33,7 @@ import io.atomix.protocols.raft.protocol.ConfigureRequest;
 import io.atomix.protocols.raft.protocol.ConfigureResponse;
 import io.atomix.protocols.raft.protocol.InstallRequest;
 import io.atomix.protocols.raft.protocol.InstallResponse;
-import io.atomix.protocols.raft.protocol.RaftRequest;
 import io.atomix.protocols.raft.storage.snapshot.Snapshot;
-
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.CompletableFuture;
 
 /**
  * The leader appender is responsible for sending {@link AppendRequest}s on behalf of a leader to followers.
@@ -182,7 +182,7 @@ final class LeaderAppender extends AbstractAppender {
     // member state in a set of configuring members.
     // Once the configuration is complete sendAppendRequest will be called recursively.
     else if (member.getConfigTerm() < raft.getTerm()
-        || member.getConfigIndex() < raft.getCluster().getConfiguration().index()) {
+        || member.getConfigIndex() < raft.getCluster().getConfiguration().getIndex()) {
       if (member.canConfigure()) {
         sendConfigureRequest(member, buildConfigureRequest(member));
       } else if (member.canHeartbeat()) {
@@ -378,12 +378,12 @@ final class LeaderAppender extends AbstractAppender {
     succeedAttempt(member);
 
     // If replication succeeded then trigger commit futures.
-    if (response.succeeded()) {
+    if (response.getSucceeded()) {
       member.appendSucceeded();
       updateMatchIndex(member, response);
 
       // If entries were committed to the replica then check commit indexes.
-      if (!request.entries().isEmpty()) {
+      if (!request.getEntriesList().isEmpty()) {
         commitEntries();
       }
 
@@ -393,8 +393,8 @@ final class LeaderAppender extends AbstractAppender {
       }
     }
     // If we've received a greater term, update the term and transition back to follower.
-    else if (response.term() > raft.getTerm()) {
-      raft.setTerm(response.term());
+    else if (response.getTerm() > raft.getTerm()) {
+      raft.setTerm(response.getTerm());
       raft.setLeader(null);
       raft.transition(RaftServer.Role.FOLLOWER);
     }
@@ -413,13 +413,13 @@ final class LeaderAppender extends AbstractAppender {
   }
 
   /**
-   * Handles a {@link io.atomix.protocols.raft.protocol.RaftResponse.Status#ERROR} response.
+   * Handles a {@link io.atomix.protocols.raft.protocol.ResponseStatus#ERROR} response.
    */
   protected void handleAppendResponseError(RaftMemberContext member, AppendRequest request, AppendResponse response) {
     // If we've received a greater term, update the term and transition back to follower.
-    if (response.term() > raft.getTerm()) {
+    if (response.getTerm() > raft.getTerm()) {
       log.debug("Received higher term from {}", member.getMember().memberId());
-      raft.setTerm(response.term());
+      raft.setTerm(response.getTerm());
       raft.setLeader(null);
       raft.transition(RaftServer.Role.FOLLOWER);
     } else {
@@ -428,7 +428,7 @@ final class LeaderAppender extends AbstractAppender {
   }
 
   @Override
-  protected void failAttempt(RaftMemberContext member, RaftRequest request, Throwable error) {
+  protected void failAttempt(RaftMemberContext member, Message request, Throwable error) {
     super.failAttempt(member, request, error);
 
     // Fail heartbeat futures.

@@ -15,25 +15,24 @@
  */
 package io.atomix.protocols.raft.session.impl;
 
+import java.time.Duration;
+import java.util.Arrays;
+import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+
+import com.google.protobuf.ByteString;
 import io.atomix.primitive.operation.OperationId;
 import io.atomix.primitive.session.SessionId;
 import io.atomix.protocols.raft.RaftException;
 import io.atomix.protocols.raft.TestPrimitiveType;
-import io.atomix.protocols.raft.protocol.CommandRequest;
-import io.atomix.protocols.raft.protocol.CommandResponse;
-import io.atomix.protocols.raft.protocol.QueryRequest;
-import io.atomix.protocols.raft.protocol.QueryResponse;
-import io.atomix.protocols.raft.protocol.RaftResponse;
+import io.atomix.protocols.raft.protocol.OperationRequest;
+import io.atomix.protocols.raft.protocol.OperationResponse;
+import io.atomix.protocols.raft.protocol.ResponseStatus;
 import io.atomix.storage.buffer.HeapBytes;
 import io.atomix.utils.concurrent.Scheduled;
 import io.atomix.utils.concurrent.ThreadContext;
 import org.junit.Test;
 import org.mockito.Mockito;
-
-import java.time.Duration;
-import java.util.Arrays;
-import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
 
 import static io.atomix.primitive.operation.PrimitiveOperation.operation;
 import static org.junit.Assert.assertArrayEquals;
@@ -59,11 +58,11 @@ public class RaftSessionInvokerTest {
   @Test
   public void testSubmitCommand() throws Throwable {
     RaftSessionConnection connection = mock(RaftSessionConnection.class);
-    when(connection.command(any(CommandRequest.class)))
-        .thenReturn(CompletableFuture.completedFuture(CommandResponse.builder()
-            .withStatus(RaftResponse.Status.OK)
-            .withIndex(10)
-            .withResult("Hello world!".getBytes())
+    when(connection.command(any(OperationRequest.class)))
+        .thenReturn(CompletableFuture.completedFuture(OperationResponse.newBuilder()
+            .setStatus(ResponseStatus.OK)
+            .setIndex(10)
+            .setOutput(ByteString.copyFrom("Hello world!".getBytes()))
             .build()));
 
     RaftSessionState state = new RaftSessionState("test", SessionId.from(1), UUID.randomUUID().toString(), TestPrimitiveType.instance(), 1000);
@@ -82,11 +81,11 @@ public class RaftSessionInvokerTest {
    */
   @Test
   public void testResequenceCommand() throws Throwable {
-    CompletableFuture<CommandResponse> future1 = new CompletableFuture<>();
-    CompletableFuture<CommandResponse> future2 = new CompletableFuture<>();
+    CompletableFuture<OperationResponse> future1 = new CompletableFuture<>();
+    CompletableFuture<OperationResponse> future2 = new CompletableFuture<>();
 
     RaftSessionConnection connection = mock(RaftSessionConnection.class);
-    Mockito.when(connection.command(any(CommandRequest.class)))
+    Mockito.when(connection.command(any(OperationRequest.class)))
         .thenReturn(future1)
         .thenReturn(future2);
 
@@ -99,10 +98,10 @@ public class RaftSessionInvokerTest {
     CompletableFuture<byte[]> result1 = submitter.invoke(operation(COMMAND));
     CompletableFuture<byte[]> result2 = submitter.invoke(operation(COMMAND));
 
-    future2.complete(CommandResponse.builder()
-        .withStatus(RaftResponse.Status.OK)
-        .withIndex(10)
-        .withResult("Hello world again!".getBytes())
+    future2.complete(OperationResponse.newBuilder()
+        .setStatus(ResponseStatus.OK)
+        .setIndex(10)
+        .setOutput(ByteString.copyFrom("Hello world again!".getBytes()))
         .build());
 
     assertEquals(2, state.getCommandRequest());
@@ -112,10 +111,10 @@ public class RaftSessionInvokerTest {
     assertFalse(result1.isDone());
     assertFalse(result2.isDone());
 
-    future1.complete(CommandResponse.builder()
-        .withStatus(RaftResponse.Status.OK)
-        .withIndex(9)
-        .withResult("Hello world!".getBytes())
+    future1.complete(OperationResponse.newBuilder()
+        .setStatus(ResponseStatus.OK)
+        .setIndex(9)
+        .setOutput(ByteString.copyFrom("Hello world!".getBytes()))
         .build());
 
     assertTrue(result1.isDone());
@@ -134,11 +133,11 @@ public class RaftSessionInvokerTest {
   @Test
   public void testSubmitQuery() throws Throwable {
     RaftSessionConnection connection = mock(RaftSessionConnection.class);
-    when(connection.query(any(QueryRequest.class)))
-        .thenReturn(CompletableFuture.completedFuture(QueryResponse.builder()
-            .withStatus(RaftResponse.Status.OK)
-            .withIndex(10)
-            .withResult("Hello world!".getBytes())
+    when(connection.query(any(OperationRequest.class)))
+        .thenReturn(CompletableFuture.completedFuture(OperationResponse.newBuilder()
+            .setStatus(ResponseStatus.OK)
+            .setIndex(10)
+            .setOutput(ByteString.copyFrom("Hello world!".getBytes()))
             .build()));
 
     RaftSessionState state = new RaftSessionState("test", SessionId.from(1), UUID.randomUUID().toString(), TestPrimitiveType.instance(), 1000);
@@ -155,11 +154,11 @@ public class RaftSessionInvokerTest {
    */
   @Test
   public void testResequenceQuery() throws Throwable {
-    CompletableFuture<QueryResponse> future1 = new CompletableFuture<>();
-    CompletableFuture<QueryResponse> future2 = new CompletableFuture<>();
+    CompletableFuture<OperationResponse> future1 = new CompletableFuture<>();
+    CompletableFuture<OperationResponse> future2 = new CompletableFuture<>();
 
     RaftSessionConnection connection = mock(RaftSessionConnection.class);
-    Mockito.when(connection.query(any(QueryRequest.class)))
+    Mockito.when(connection.query(any(OperationRequest.class)))
         .thenReturn(future1)
         .thenReturn(future2);
 
@@ -172,10 +171,10 @@ public class RaftSessionInvokerTest {
     CompletableFuture<byte[]> result1 = submitter.invoke(operation(QUERY));
     CompletableFuture<byte[]> result2 = submitter.invoke(operation(QUERY));
 
-    future2.complete(QueryResponse.builder()
-        .withStatus(RaftResponse.Status.OK)
-        .withIndex(10)
-        .withResult("Hello world again!".getBytes())
+    future2.complete(OperationResponse.newBuilder()
+        .setStatus(ResponseStatus.OK)
+        .setIndex(10)
+        .setOutput(ByteString.copyFrom("Hello world again!".getBytes()))
         .build());
 
     assertEquals(1, state.getResponseIndex());
@@ -183,10 +182,10 @@ public class RaftSessionInvokerTest {
     assertFalse(result1.isDone());
     assertFalse(result2.isDone());
 
-    future1.complete(QueryResponse.builder()
-        .withStatus(RaftResponse.Status.OK)
-        .withIndex(9)
-        .withResult("Hello world!".getBytes())
+    future1.complete(OperationResponse.newBuilder()
+        .setStatus(ResponseStatus.OK)
+        .setIndex(9)
+        .setOutput(ByteString.copyFrom("Hello world!".getBytes()))
         .build());
 
     assertTrue(result1.isDone());
@@ -202,11 +201,11 @@ public class RaftSessionInvokerTest {
    */
   @Test
   public void testSkippingOverFailedQuery() throws Throwable {
-    CompletableFuture<QueryResponse> future1 = new CompletableFuture<>();
-    CompletableFuture<QueryResponse> future2 = new CompletableFuture<>();
+    CompletableFuture<OperationResponse> future1 = new CompletableFuture<>();
+    CompletableFuture<OperationResponse> future2 = new CompletableFuture<>();
 
     RaftSessionConnection connection = mock(RaftSessionConnection.class);
-    Mockito.when(connection.query(any(QueryRequest.class)))
+    Mockito.when(connection.query(any(OperationRequest.class)))
         .thenReturn(future1)
         .thenReturn(future2);
 
@@ -225,10 +224,10 @@ public class RaftSessionInvokerTest {
     assertFalse(result2.isDone());
 
     future1.completeExceptionally(new RaftException.QueryFailure("failure"));
-    future2.complete(QueryResponse.builder()
-        .withStatus(RaftResponse.Status.OK)
-        .withIndex(10)
-        .withResult("Hello world!".getBytes())
+    future2.complete(OperationResponse.newBuilder()
+        .setStatus(ResponseStatus.OK)
+        .setIndex(10)
+        .setOutput(ByteString.copyFrom("Hello world!".getBytes()))
         .build());
 
     assertTrue(result1.isCompletedExceptionally());
@@ -243,10 +242,10 @@ public class RaftSessionInvokerTest {
    */
   @Test
   public void testExpireSessionOnCommandFailure() throws Throwable {
-    CompletableFuture<CommandResponse> future = new CompletableFuture<>();
+    CompletableFuture<OperationResponse> future = new CompletableFuture<>();
 
     RaftSessionConnection connection = mock(RaftSessionConnection.class);
-    Mockito.when(connection.command(any(CommandRequest.class))).thenReturn(future);
+    Mockito.when(connection.command(any(OperationRequest.class))).thenReturn(future);
 
     RaftSessionState state = new RaftSessionState("test", SessionId.from(1), UUID.randomUUID().toString(), TestPrimitiveType.instance(), 1000);
     RaftSessionManager manager = mock(RaftSessionManager.class);
@@ -270,10 +269,10 @@ public class RaftSessionInvokerTest {
    */
   @Test
   public void testExpireSessionOnQueryFailure() throws Throwable {
-    CompletableFuture<QueryResponse> future = new CompletableFuture<>();
+    CompletableFuture<OperationResponse> future = new CompletableFuture<>();
 
     RaftSessionConnection connection = mock(RaftSessionConnection.class);
-    Mockito.when(connection.query(any(QueryRequest.class)))
+    Mockito.when(connection.query(any(OperationRequest.class)))
         .thenReturn(future);
 
     RaftSessionState state = new RaftSessionState("test", SessionId.from(1), UUID.randomUUID().toString(), TestPrimitiveType.instance(), 1000);

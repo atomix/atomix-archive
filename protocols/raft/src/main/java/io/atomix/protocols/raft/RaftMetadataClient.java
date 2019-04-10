@@ -17,7 +17,7 @@ package io.atomix.protocols.raft;
 
 import io.atomix.cluster.MemberId;
 import io.atomix.primitive.PrimitiveType;
-import io.atomix.primitive.session.SessionMetadata;
+import io.atomix.protocols.raft.protocol.SessionMetadata;
 
 import java.util.Collection;
 import java.util.Set;

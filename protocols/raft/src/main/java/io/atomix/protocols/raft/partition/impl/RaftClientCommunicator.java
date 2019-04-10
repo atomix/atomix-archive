@@ -15,34 +15,29 @@
  */
 package io.atomix.protocols.raft.partition.impl;
 
+import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
+import java.util.function.Consumer;
+
 import com.google.common.base.Preconditions;
 import io.atomix.cluster.MemberId;
 import io.atomix.cluster.messaging.ClusterCommunicationService;
 import io.atomix.primitive.session.SessionId;
 import io.atomix.protocols.raft.protocol.CloseSessionRequest;
 import io.atomix.protocols.raft.protocol.CloseSessionResponse;
-import io.atomix.protocols.raft.protocol.CommandRequest;
-import io.atomix.protocols.raft.protocol.CommandResponse;
-import io.atomix.protocols.raft.protocol.HeartbeatRequest;
-import io.atomix.protocols.raft.protocol.HeartbeatResponse;
 import io.atomix.protocols.raft.protocol.KeepAliveRequest;
 import io.atomix.protocols.raft.protocol.KeepAliveResponse;
 import io.atomix.protocols.raft.protocol.MetadataRequest;
 import io.atomix.protocols.raft.protocol.MetadataResponse;
 import io.atomix.protocols.raft.protocol.OpenSessionRequest;
 import io.atomix.protocols.raft.protocol.OpenSessionResponse;
+import io.atomix.protocols.raft.protocol.OperationRequest;
+import io.atomix.protocols.raft.protocol.OperationResponse;
 import io.atomix.protocols.raft.protocol.PublishRequest;
-import io.atomix.protocols.raft.protocol.QueryRequest;
-import io.atomix.protocols.raft.protocol.QueryResponse;
 import io.atomix.protocols.raft.protocol.RaftClientProtocol;
 import io.atomix.protocols.raft.protocol.ResetRequest;
 import io.atomix.utils.serializer.Serializer;
-
-import java.util.Set;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Executor;
-import java.util.function.Consumer;
-import java.util.function.Function;
 
 /**
  * Raft client protocol that uses a cluster communicator.
@@ -82,12 +77,12 @@ public class RaftClientCommunicator implements RaftClientProtocol {
   }
 
   @Override
-  public CompletableFuture<QueryResponse> query(MemberId memberId, QueryRequest request) {
+  public CompletableFuture<OperationResponse> query(MemberId memberId, OperationRequest request) {
     return sendAndReceive(context.querySubject, request, memberId);
   }
 
   @Override
-  public CompletableFuture<CommandResponse> command(MemberId memberId, CommandRequest request) {
+  public CompletableFuture<OperationResponse> command(MemberId memberId, OperationRequest request) {
     return sendAndReceive(context.commandSubject, request, memberId);
   }
 
@@ -97,18 +92,8 @@ public class RaftClientCommunicator implements RaftClientProtocol {
   }
 
   @Override
-  public void registerHeartbeatHandler(Function<HeartbeatRequest, CompletableFuture<HeartbeatResponse>> handler) {
-    clusterCommunicator.subscribe(context.heartbeatSubject, serializer::decode, handler, serializer::encode);
-  }
-
-  @Override
-  public void unregisterHeartbeatHandler() {
-    clusterCommunicator.unsubscribe(context.heartbeatSubject);
-  }
-
-  @Override
   public void reset(Set<MemberId> members, ResetRequest request) {
-    clusterCommunicator.multicast(context.resetSubject(request.session()), request, serializer::encode, members);
+    clusterCommunicator.multicast(context.resetSubject(request.getSessionId()), request, serializer::encode, members);
   }
 
   @Override

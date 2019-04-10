@@ -15,23 +15,33 @@
  */
 package io.atomix.protocols.raft.impl;
 
+import java.io.IOException;
+import java.time.Duration;
+import java.util.Objects;
+import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CopyOnWriteArraySet;
+import java.util.concurrent.ExecutionException;
+import java.util.function.Consumer;
+import java.util.function.Supplier;
+
+import com.google.protobuf.Message;
 import io.atomix.cluster.ClusterMembershipService;
 import io.atomix.cluster.MemberId;
 import io.atomix.primitive.PrimitiveTypeRegistry;
-import io.atomix.protocols.raft.RaftError;
 import io.atomix.protocols.raft.RaftException;
 import io.atomix.protocols.raft.RaftServer;
 import io.atomix.protocols.raft.cluster.RaftMember;
 import io.atomix.protocols.raft.cluster.impl.DefaultRaftMember;
 import io.atomix.protocols.raft.cluster.impl.RaftClusterContext;
 import io.atomix.protocols.raft.protocol.CloseSessionResponse;
-import io.atomix.protocols.raft.protocol.CommandResponse;
 import io.atomix.protocols.raft.protocol.KeepAliveResponse;
 import io.atomix.protocols.raft.protocol.MetadataResponse;
 import io.atomix.protocols.raft.protocol.OpenSessionResponse;
-import io.atomix.protocols.raft.protocol.QueryResponse;
-import io.atomix.protocols.raft.protocol.RaftResponse;
+import io.atomix.protocols.raft.protocol.OperationResponse;
+import io.atomix.protocols.raft.protocol.RaftError;
 import io.atomix.protocols.raft.protocol.RaftServerProtocol;
+import io.atomix.protocols.raft.protocol.ResponseStatus;
 import io.atomix.protocols.raft.protocol.TransferRequest;
 import io.atomix.protocols.raft.roles.ActiveRole;
 import io.atomix.protocols.raft.roles.CandidateRole;
@@ -57,15 +67,6 @@ import io.atomix.utils.concurrent.ThreadContextFactory;
 import io.atomix.utils.logging.ContextualLoggerFactory;
 import io.atomix.utils.logging.LoggerContext;
 import org.slf4j.Logger;
-
-import java.time.Duration;
-import java.util.Objects;
-import java.util.Set;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CopyOnWriteArraySet;
-import java.util.concurrent.ExecutionException;
-import java.util.function.Consumer;
-import java.util.function.Supplier;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -385,7 +386,11 @@ public class RaftContext implements AutoCloseable {
       }
 
       this.lastVotedFor = null;
-      meta.storeVote(null);
+      try {
+        meta.storeVote(null);
+      } catch (IOException e) {
+        log.error("Failed to store Raft vote");
+      }
     }
   }
 
@@ -429,8 +434,16 @@ public class RaftContext implements AutoCloseable {
       this.term = term;
       this.leader = null;
       this.lastVotedFor = null;
-      meta.storeTerm(this.term);
-      meta.storeVote(this.lastVotedFor);
+      try {
+        meta.storeTerm(this.term);
+      } catch (IOException e) {
+        log.error("Failed to store Raft term");
+      }
+      try {
+        meta.storeVote(this.lastVotedFor);
+      } catch (IOException e) {
+        log.error("Failed to store Raft vote");
+      }
       log.debug("Set term {}", term);
     }
   }
@@ -455,7 +468,11 @@ public class RaftContext implements AutoCloseable {
     DefaultRaftMember member = cluster.getMember(candidate);
     checkState(member != null, "Unknown candidate: %d", candidate);
     this.lastVotedFor = candidate;
-    meta.storeVote(this.lastVotedFor);
+    try {
+      meta.storeVote(this.lastVotedFor);
+    } catch (IOException e) {
+      log.error("Failed to store Raft vote");
+    }
 
     if (candidate != null) {
       log.debug("Voted for {}", member.memberId());
@@ -485,7 +502,7 @@ public class RaftContext implements AutoCloseable {
     if (commitIndex > previousCommitIndex) {
       this.commitIndex = commitIndex;
       logWriter.commit(Math.min(commitIndex, logWriter.getLastIndex()));
-      long configurationIndex = cluster.getConfiguration().index();
+      long configurationIndex = cluster.getConfiguration().getIndex();
       if (configurationIndex > previousCommitIndex && configurationIndex <= commitIndex) {
         cluster.commit();
       }
@@ -679,10 +696,10 @@ public class RaftContext implements AutoCloseable {
    * Registers server handlers on the configured protocol.
    */
   private void registerHandlers(RaftServerProtocol protocol) {
-    protocol.registerOpenSessionHandler(request -> runOnContextIfReady(() -> role.onOpenSession(request), OpenSessionResponse::builder));
-    protocol.registerCloseSessionHandler(request -> runOnContextIfReady(() -> role.onCloseSession(request), CloseSessionResponse::builder));
-    protocol.registerKeepAliveHandler(request -> runOnContextIfReady(() -> role.onKeepAlive(request), KeepAliveResponse::builder));
-    protocol.registerMetadataHandler(request -> runOnContextIfReady(() -> role.onMetadata(request), MetadataResponse::builder));
+    protocol.registerOpenSessionHandler(request -> runOnContextIfReady(() -> role.onOpenSession(request), OpenSessionResponse::newBuilder));
+    protocol.registerCloseSessionHandler(request -> runOnContextIfReady(() -> role.onCloseSession(request), CloseSessionResponse::newBuilder));
+    protocol.registerKeepAliveHandler(request -> runOnContextIfReady(() -> role.onKeepAlive(request), KeepAliveResponse::newBuilder));
+    protocol.registerMetadataHandler(request -> runOnContextIfReady(() -> role.onMetadata(request), MetadataResponse::newBuilder));
     protocol.registerConfigureHandler(request -> runOnContext(() -> role.onConfigure(request)));
     protocol.registerInstallHandler(request -> runOnContext(() -> role.onInstall(request)));
     protocol.registerJoinHandler(request -> runOnContext(() -> role.onJoin(request)));
@@ -692,23 +709,24 @@ public class RaftContext implements AutoCloseable {
     protocol.registerAppendHandler(request -> runOnContext(() -> role.onAppend(request)));
     protocol.registerPollHandler(request -> runOnContext(() -> role.onPoll(request)));
     protocol.registerVoteHandler(request -> runOnContext(() -> role.onVote(request)));
-    protocol.registerCommandHandler(request -> runOnContextIfReady(() -> role.onCommand(request), CommandResponse::builder));
-    protocol.registerQueryHandler(request -> runOnContextIfReady(() -> role.onQuery(request), QueryResponse::builder));
+    protocol.registerCommandHandler(request -> runOnContextIfReady(() -> role.onCommand(request), OperationResponse::newBuilder));
+    protocol.registerQueryHandler(request -> runOnContextIfReady(() -> role.onQuery(request), OperationResponse::newBuilder));
   }
 
-  private <R extends RaftResponse> CompletableFuture<R> runOnContextIfReady(
-      Supplier<CompletableFuture<R>> function, Supplier<RaftResponse.Builder<?, R>> builderSupplier) {
+  @SuppressWarnings("unchecked")
+  private <R extends Message> CompletableFuture<R> runOnContextIfReady(
+      Supplier<CompletableFuture<R>> function, Supplier<Message.Builder> builderSupplier) {
     if (state == State.READY) {
       return runOnContext(function);
     } else {
-      return CompletableFuture.completedFuture(builderSupplier.get()
-          .withStatus(RaftResponse.Status.ERROR)
-          .withError(RaftError.Type.ILLEGAL_MEMBER_STATE)
-          .build());
+      Message.Builder builder = builderSupplier.get();
+      builder.setField(builder.getDescriptorForType().findFieldByName("status"), ResponseStatus.ERROR);
+      builder.setField(builder.getDescriptorForType().findFieldByName("error"), RaftError.ILLEGAL_MEMBER_STATE);
+      return CompletableFuture.completedFuture((R) builder.build());
     }
   }
 
-  private <R extends RaftResponse> CompletableFuture<R> runOnContext(Supplier<CompletableFuture<R>> function) {
+  private <R extends Message> CompletableFuture<R> runOnContext(Supplier<CompletableFuture<R>> function) {
     CompletableFuture<R> future = new CompletableFuture<>();
     threadContext.execute(() -> {
       function.get().whenComplete((response, error) -> {
@@ -773,13 +791,13 @@ public class RaftContext implements AutoCloseable {
       RaftMember member = getCluster().getMember();
       RaftMember leader = getLeader();
       if (leader != null) {
-        protocol.transfer(leader.memberId(), TransferRequest.builder()
-            .withMember(member.memberId())
+        protocol.transfer(leader.memberId(), TransferRequest.newBuilder()
+            .setMemberId(member.memberId().id())
             .build()).whenCompleteAsync((response, error) -> {
               if (error != null) {
                 future.completeExceptionally(error);
-              } else if (response.status() == RaftResponse.Status.ERROR) {
-                future.completeExceptionally(response.error().createException());
+              } else if (response.getStatus() == ResponseStatus.ERROR) {
+                future.completeExceptionally(new RaftException.ProtocolException("Failed to transfer leadership"));
               } else {
                 transition(RaftServer.Role.CANDIDATE);
               }

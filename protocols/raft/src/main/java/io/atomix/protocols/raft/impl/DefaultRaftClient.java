@@ -142,8 +142,7 @@ public class DefaultRaftClient implements RaftClient {
                 readConsistency,
                 communicationStrategy,
                 threadContextFactory.createContext(),
-                minTimeout,
-                maxTimeout));
+                timeout));
 
         SessionClient proxy;
 

@@ -24,8 +24,10 @@ import java.util.Objects;
 import java.util.Queue;
 
 import com.google.common.collect.Lists;
+import com.google.protobuf.ByteString;
 import io.atomix.cluster.MemberId;
 import io.atomix.primitive.PrimitiveType;
+import io.atomix.primitive.event.EventType;
 import io.atomix.primitive.event.PrimitiveEvent;
 import io.atomix.primitive.operation.OperationType;
 import io.atomix.primitive.session.Session;
@@ -36,6 +38,7 @@ import io.atomix.protocols.raft.impl.OperationResult;
 import io.atomix.protocols.raft.impl.PendingCommand;
 import io.atomix.protocols.raft.impl.RaftContext;
 import io.atomix.protocols.raft.protocol.PublishRequest;
+import io.atomix.protocols.raft.protocol.RaftEvent;
 import io.atomix.protocols.raft.protocol.RaftServerProtocol;
 import io.atomix.protocols.raft.service.RaftServiceContext;
 import io.atomix.utils.concurrent.ThreadContext;
@@ -420,7 +423,34 @@ public class RaftSession extends AbstractSession {
   }
 
   @Override
+  public void publish(EventType eventType, Object event) {
+    publish(RaftEvent.newBuilder()
+        .setType(eventType.id())
+        .setValue(ByteString.copyFrom(encode(event)))
+        .build());
+  }
+
+  @Override
+  public void publish(EventType eventType) {
+    publish(RaftEvent.newBuilder()
+        .setType(eventType.id())
+        .build());
+  }
+
+  @Override
   public void publish(PrimitiveEvent event) {
+    publish(RaftEvent.newBuilder()
+        .setType(event.type().id())
+        .setValue(ByteString.copyFrom(event.value()))
+        .build());
+  }
+
+  /**
+   * Publishes a Raft event to the session.
+   *
+   * @param event the event to publish
+   */
+  private void publish(RaftEvent event) {
     // Store volatile state in a local variable.
     State state = this.state;
 
@@ -521,11 +551,11 @@ public class RaftSession extends AbstractSession {
     // Only send events to the client if this server is the leader.
     if (server.isLeader()) {
       eventExecutor.execute(() -> {
-        PublishRequest request = PublishRequest.builder()
-            .withSession(sessionId().id())
-            .withEventIndex(event.eventIndex)
-            .withPreviousIndex(event.previousIndex)
-            .withEvents(event.events)
+        PublishRequest request = PublishRequest.newBuilder()
+            .setSessionId(sessionId().id())
+            .setEventIndex(event.eventIndex)
+            .setPreviousIndex(event.previousIndex)
+            .addAllEvents(event.events)
             .build();
 
         log.trace("Sending {}", request);
@@ -539,7 +569,7 @@ public class RaftSession extends AbstractSession {
    */
   public void open() {
     setState(State.OPEN);
-    protocol.registerResetListener(sessionId(), request -> resendEvents(request.index()), server.getServiceManager().executor());
+    protocol.registerResetListener(sessionId(), request -> resendEvents(request.getIndex()), server.getServiceManager().executor());
   }
 
   /**
@@ -583,7 +613,7 @@ public class RaftSession extends AbstractSession {
   private static class EventHolder {
     private final long eventIndex;
     private final long previousIndex;
-    private final List<PrimitiveEvent> events = new LinkedList<>();
+    private final List<RaftEvent> events = new LinkedList<>();
 
     private EventHolder(long eventIndex, long previousIndex) {
       this.eventIndex = eventIndex;

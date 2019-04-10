@@ -15,24 +15,7 @@
  */
 package io.atomix.protocols.raft.cluster.impl;
 
-import io.atomix.cluster.MemberId;
-import io.atomix.protocols.raft.RaftError;
-import io.atomix.protocols.raft.RaftServer;
-import io.atomix.protocols.raft.cluster.RaftCluster;
-import io.atomix.protocols.raft.cluster.RaftClusterEvent;
-import io.atomix.protocols.raft.cluster.RaftClusterEventListener;
-import io.atomix.protocols.raft.cluster.RaftMember;
-import io.atomix.protocols.raft.impl.RaftContext;
-import io.atomix.protocols.raft.protocol.JoinRequest;
-import io.atomix.protocols.raft.protocol.LeaveRequest;
-import io.atomix.protocols.raft.protocol.RaftResponse;
-import io.atomix.protocols.raft.storage.system.Configuration;
-import io.atomix.utils.concurrent.Futures;
-import io.atomix.utils.concurrent.Scheduled;
-import io.atomix.utils.logging.ContextualLoggerFactory;
-import io.atomix.utils.logging.LoggerContext;
-import org.slf4j.Logger;
-
+import java.io.IOException;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -50,6 +33,24 @@ import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
+import io.atomix.cluster.MemberId;
+import io.atomix.protocols.raft.RaftServer;
+import io.atomix.protocols.raft.cluster.RaftCluster;
+import io.atomix.protocols.raft.cluster.RaftClusterEvent;
+import io.atomix.protocols.raft.cluster.RaftClusterEventListener;
+import io.atomix.protocols.raft.cluster.RaftMember;
+import io.atomix.protocols.raft.impl.RaftContext;
+import io.atomix.protocols.raft.protocol.JoinRequest;
+import io.atomix.protocols.raft.protocol.LeaveRequest;
+import io.atomix.protocols.raft.protocol.RaftError;
+import io.atomix.protocols.raft.protocol.ResponseStatus;
+import io.atomix.protocols.raft.storage.system.RaftConfiguration;
+import io.atomix.utils.concurrent.Futures;
+import io.atomix.utils.concurrent.Scheduled;
+import io.atomix.utils.logging.ContextualLoggerFactory;
+import io.atomix.utils.logging.LoggerContext;
+import org.slf4j.Logger;
+
 import static com.google.common.base.MoreObjects.toStringHelper;
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -60,7 +61,7 @@ public final class RaftClusterContext implements RaftCluster, AutoCloseable {
   private final Logger log;
   private final RaftContext raft;
   private final DefaultRaftMember member;
-  private volatile Configuration configuration;
+  private volatile RaftConfiguration configuration;
   private final Map<MemberId, RaftMemberContext> membersMap = new ConcurrentHashMap<>();
   private final Set<RaftMember> members = new CopyOnWriteArraySet<>();
   private final List<RaftMemberContext> remoteMembers = new CopyOnWriteArrayList<>();
@@ -84,8 +85,12 @@ public final class RaftClusterContext implements RaftCluster, AutoCloseable {
 
     // Iterate through members in the new configuration and add remote members.
     if (configuration != null) {
-      Instant updateTime = Instant.ofEpochMilli(configuration.time());
-      for (RaftMember member : configuration.members()) {
+      Instant updateTime = Instant.ofEpochMilli(configuration.getTimestamp());
+      for (io.atomix.protocols.raft.protocol.RaftMember raftMember : configuration.getMembersList()) {
+        RaftMember member = new DefaultRaftMember(
+            MemberId.from(raftMember.getMemberId()),
+            RaftMember.Type.valueOf(raftMember.getType().name()),
+            Instant.ofEpochMilli(raftMember.getUpdated()));
         if (member.equals(this.member)) {
           this.member.setType(member.getType());
           this.members.add(this.member);
@@ -123,7 +128,7 @@ public final class RaftClusterContext implements RaftCluster, AutoCloseable {
    *
    * @return The cluster configuration.
    */
-  public Configuration getConfiguration() {
+  public RaftConfiguration getConfiguration() {
     return configuration;
   }
 
@@ -287,7 +292,18 @@ public final class RaftClusterContext implements RaftCluster, AutoCloseable {
       activeMembers.add(member);
 
       // Create a new configuration and store it on disk to ensure the cluster can fall back to the configuration.
-      configure(new Configuration(0, 0, member.getLastUpdated().toEpochMilli(), activeMembers));
+      configure(RaftConfiguration.newBuilder()
+          .setTerm(0)
+          .setIndex(0)
+          .setTimestamp(member.getLastUpdated().toEpochMilli())
+          .addAllMembers(activeMembers.stream()
+              .map(member -> io.atomix.protocols.raft.protocol.RaftMember.newBuilder()
+                  .setMemberId(member.memberId().id())
+                  .setType(io.atomix.protocols.raft.protocol.RaftMember.Type.valueOf(member.getType().name()))
+                  .setUpdated(member.getLastUpdated().toEpochMilli())
+                  .build())
+              .collect(Collectors.toList()))
+          .build());
     }
     return join();
   }
@@ -316,7 +332,18 @@ public final class RaftClusterContext implements RaftCluster, AutoCloseable {
 
       // Create a new configuration and configure the cluster. Once the cluster is configured, the configuration
       // will be stored on disk to ensure the cluster can fall back to the provided configuration if necessary.
-      configure(new Configuration(0, 0, member.getLastUpdated().toEpochMilli(), activeMembers));
+      configure(RaftConfiguration.newBuilder()
+          .setTerm(0)
+          .setIndex(0)
+          .setTimestamp(member.getLastUpdated().toEpochMilli())
+          .addAllMembers(activeMembers.stream()
+              .map(member -> io.atomix.protocols.raft.protocol.RaftMember.newBuilder()
+                  .setMemberId(member.memberId().id())
+                  .setType(io.atomix.protocols.raft.protocol.RaftMember.Type.valueOf(member.getType().name()))
+                  .setUpdated(member.getLastUpdated().toEpochMilli())
+                  .build())
+              .collect(Collectors.toList()))
+          .build());
     }
     return join();
   }
@@ -345,7 +372,18 @@ public final class RaftClusterContext implements RaftCluster, AutoCloseable {
 
       // Create a new configuration and configure the cluster. Once the cluster is configured, the configuration
       // will be stored on disk to ensure the cluster can fall back to the provided configuration if necessary.
-      configure(new Configuration(0, 0, member.getLastUpdated().toEpochMilli(), activeMembers));
+      configure(RaftConfiguration.newBuilder()
+          .setTerm(0)
+          .setIndex(0)
+          .setTimestamp(member.getLastUpdated().toEpochMilli())
+          .addAllMembers(activeMembers.stream()
+              .map(member -> io.atomix.protocols.raft.protocol.RaftMember.newBuilder()
+                  .setMemberId(member.memberId().id())
+                  .setType(io.atomix.protocols.raft.protocol.RaftMember.Type.valueOf(member.getType().name()))
+                  .setUpdated(member.getLastUpdated().toEpochMilli())
+                  .build())
+              .collect(Collectors.toList()))
+          .build());
     }
 
     return join().thenCompose(v -> {
@@ -394,18 +432,27 @@ public final class RaftClusterContext implements RaftCluster, AutoCloseable {
 
       log.debug("Attempting to join via {}", member.getMember().memberId());
 
-      JoinRequest request = JoinRequest.builder()
-          .withMember(new DefaultRaftMember(getMember().memberId(), getMember().getType(), getMember().getLastUpdated()))
+      JoinRequest request = JoinRequest.newBuilder()
+          .setMember(io.atomix.protocols.raft.protocol.RaftMember.newBuilder()
+              .setMemberId(getMember().memberId().id())
+              .setType(io.atomix.protocols.raft.protocol.RaftMember.Type.valueOf(getMember().getType().name()))
+              .setUpdated(getMember().getLastUpdated().toEpochMilli())
+              .build())
           .build();
       raft.getProtocol().join(member.getMember().memberId(), request).whenCompleteAsync((response, error) -> {
         // Cancel the join timer.
         cancelJoinTimer();
 
         if (error == null) {
-          if (response.status() == RaftResponse.Status.OK) {
+          if (response.getStatus() == ResponseStatus.OK) {
             log.debug("Successfully joined via {}", member.getMember().memberId());
 
-            Configuration configuration = new Configuration(response.index(), response.term(), response.timestamp(), response.members());
+            RaftConfiguration configuration = RaftConfiguration.newBuilder()
+                .setIndex(response.getIndex())
+                .setTerm(response.getTerm())
+                .setTimestamp(response.getTimestamp())
+                .addAllMembers(response.getMembersList())
+                .build();
 
             // Configure the cluster with the join response.
             // Commit the configuration as we know it was committed via the successful join response.
@@ -417,7 +464,7 @@ public final class RaftClusterContext implements RaftCluster, AutoCloseable {
             } else if (joinFuture != null) {
               joinFuture.complete(null);
             }
-          } else if (response.error() == null || response.error().type() == RaftError.Type.CONFIGURATION_ERROR) {
+          } else if (response.getError() == null || response.getError() == RaftError.CONFIGURATION_ERROR) {
             // If the response error is null, that indicates that no error occurred but the leader was
             // in a state that was incapable of handling the join request. Attempt to join the leader
             // again after an election timeout.
@@ -483,7 +530,7 @@ public final class RaftClusterContext implements RaftCluster, AutoCloseable {
       }
 
       // If there are no remote members to leave, simply transition the server to INACTIVE.
-      if (getActiveMemberStates().isEmpty() && configuration.index() <= raft.getCommitIndex()) {
+      if (getActiveMemberStates().isEmpty() && configuration.getIndex() <= raft.getCommitIndex()) {
         log.trace("Single member cluster. Transitioning directly to inactive.");
         raft.transition(RaftServer.Role.INACTIVE);
         leaveFuture.complete(null);
@@ -507,26 +554,35 @@ public final class RaftClusterContext implements RaftCluster, AutoCloseable {
     // Attempt to leave the cluster by submitting a LeaveRequest directly to the server state.
     // Non-leader states should forward the request to the leader if there is one. Leader states
     // will log, replicate, and commit the reconfiguration.
-    raft.getRaftRole().onLeave(LeaveRequest.builder()
-        .withMember(getMember())
+    raft.getRaftRole().onLeave(LeaveRequest.newBuilder()
+        .setMember(io.atomix.protocols.raft.protocol.RaftMember.newBuilder()
+            .setMemberId(member.memberId().id())
+            .setType(io.atomix.protocols.raft.protocol.RaftMember.Type.valueOf(member.getType().name()))
+            .setUpdated(member.getLastUpdated().toEpochMilli())
+            .build())
         .build()).whenComplete((response, error) -> {
-          // Cancel the leave timer.
-          cancelLeaveTimer();
+      // Cancel the leave timer.
+      cancelLeaveTimer();
 
-          if (error == null && response.status() == RaftResponse.Status.OK) {
-            Configuration configuration = new Configuration(response.index(), response.term(), response.timestamp(), response.members());
+      if (error == null && response.getStatus() == ResponseStatus.OK) {
+        RaftConfiguration configuration = RaftConfiguration.newBuilder()
+            .setIndex(response.getIndex())
+            .setTerm(response.getTerm())
+            .setTimestamp(response.getTimestamp())
+            .addAllMembers(response.getMembersList())
+            .build();
 
-            // Configure the cluster and commit the configuration as we know the successful response
-            // indicates commitment.
-            configure(configuration).commit();
-            future.complete(null);
-          } else {
-            // Reset the leave timer.
-            leaveTimeout = raft.getThreadContext().schedule(raft.getElectionTimeout(), () -> {
-              leave(future);
-            });
-          }
+        // Configure the cluster and commit the configuration as we know the successful response
+        // indicates commitment.
+        configure(configuration).commit();
+        future.complete(null);
+      } else {
+        // Reset the leave timer.
+        leaveTimeout = raft.getThreadContext().schedule(raft.getElectionTimeout(), () -> {
+          leave(future);
         });
+      }
+    });
   }
 
   /**
@@ -558,13 +614,19 @@ public final class RaftClusterContext implements RaftCluster, AutoCloseable {
   public RaftClusterContext commit() {
     // Apply the configuration to the local server state.
     raft.transition(member.getType());
-    if (!configuration.members().contains(member) && leaveFuture != null) {
+    boolean isMember = configuration.getMembersList().stream()
+        .anyMatch(m -> m.getMemberId().equals(member.memberId().id()));
+    if (!isMember && leaveFuture != null) {
       leaveFuture.complete(null);
     }
 
     // If the local stored configuration is older than the committed configuration, overwrite it.
-    if (raft.getMetaStore().loadConfiguration().index() < configuration.index()) {
-      raft.getMetaStore().storeConfiguration(configuration);
+    if (raft.getMetaStore().loadConfiguration().getIndex() < configuration.getIndex()) {
+      try {
+        raft.getMetaStore().storeConfiguration(configuration);
+      } catch (IOException e) {
+        log.error("Failed to store Raft cluster configuration");
+      }
     }
     return this;
   }
@@ -575,20 +637,24 @@ public final class RaftClusterContext implements RaftCluster, AutoCloseable {
    * @param configuration The cluster configuration.
    * @return The cluster state.
    */
-  public RaftClusterContext configure(Configuration configuration) {
+  public RaftClusterContext configure(RaftConfiguration configuration) {
     checkNotNull(configuration, "configuration cannot be null");
 
     // If the configuration index is less than the currently configured index, ignore it.
     // Configurations can be persisted and applying old configurations can revert newer configurations.
-    if (this.configuration != null && configuration.index() <= this.configuration.index()) {
+    if (this.configuration != null && configuration.getIndex() <= this.configuration.getIndex()) {
       return this;
     }
 
-    Instant time = Instant.ofEpochMilli(configuration.time());
+    Instant time = Instant.ofEpochMilli(configuration.getTimestamp());
 
     // Iterate through members in the new configuration, add any missing members, and update existing members.
     boolean transition = false;
-    for (RaftMember member : configuration.members()) {
+    for (io.atomix.protocols.raft.protocol.RaftMember raftMember : configuration.getMembersList()) {
+      RaftMember member = new DefaultRaftMember(
+          MemberId.from(raftMember.getMemberId()),
+          RaftMember.Type.valueOf(raftMember.getType().name()),
+          Instant.ofEpochMilli(raftMember.getUpdated()));
       if (member.equals(this.member)) {
         transition = this.member.getType().ordinal() < member.getType().ordinal();
         this.member.update(member.getType(), time);
@@ -638,7 +704,9 @@ public final class RaftClusterContext implements RaftCluster, AutoCloseable {
     int i = 0;
     while (i < this.remoteMembers.size()) {
       RaftMemberContext member = this.remoteMembers.get(i);
-      if (!configuration.members().contains(member.getMember())) {
+      boolean isMember = configuration.getMembersList().stream()
+          .anyMatch(m -> m.getMemberId().equals(member.getMember().memberId().id()));
+      if (!isMember) {
         this.members.remove(member.getMember());
         this.remoteMembers.remove(i);
         for (List<RaftMemberContext> memberType : memberTypes.values()) {
@@ -652,15 +720,21 @@ public final class RaftClusterContext implements RaftCluster, AutoCloseable {
     }
 
     // If the local member was removed from the cluster, remove it from the members list.
-    if (!configuration.members().contains(member)) {
+    boolean isMember = configuration.getMembersList().stream()
+        .anyMatch(m -> m.getMemberId().equals(member.memberId().id()));
+    if (!isMember) {
       members.remove(member);
     }
 
     this.configuration = configuration;
 
     // Store the configuration if it's already committed.
-    if (raft.getCommitIndex() >= configuration.index()) {
-      raft.getMetaStore().storeConfiguration(configuration);
+    if (raft.getCommitIndex() >= configuration.getIndex()) {
+      try {
+        raft.getMetaStore().storeConfiguration(configuration);
+      } catch (IOException e) {
+        log.error("Failed to store Raft cluster configuration", e);
+      }
     }
 
     return this;

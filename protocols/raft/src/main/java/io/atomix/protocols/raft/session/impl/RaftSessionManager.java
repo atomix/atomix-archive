@@ -16,10 +16,10 @@
 package io.atomix.protocols.raft.session.impl;
 
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -28,7 +28,6 @@ import java.util.stream.Collectors;
 
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
-import com.google.common.primitives.Longs;
 import io.atomix.cluster.MemberId;
 import io.atomix.primitive.PrimitiveState;
 import io.atomix.primitive.PrimitiveType;
@@ -37,12 +36,10 @@ import io.atomix.protocols.raft.RaftClient;
 import io.atomix.protocols.raft.RaftException;
 import io.atomix.protocols.raft.ReadConsistency;
 import io.atomix.protocols.raft.protocol.CloseSessionRequest;
-import io.atomix.protocols.raft.protocol.HeartbeatRequest;
-import io.atomix.protocols.raft.protocol.HeartbeatResponse;
 import io.atomix.protocols.raft.protocol.KeepAliveRequest;
 import io.atomix.protocols.raft.protocol.OpenSessionRequest;
 import io.atomix.protocols.raft.protocol.RaftClientProtocol;
-import io.atomix.protocols.raft.protocol.RaftResponse;
+import io.atomix.protocols.raft.protocol.ResponseStatus;
 import io.atomix.protocols.raft.session.CommunicationStrategy;
 import io.atomix.utils.concurrent.Futures;
 import io.atomix.utils.concurrent.Scheduled;
@@ -91,7 +88,6 @@ public class RaftSessionManager {
         LoggerContext.builder(RaftClient.class)
             .addValue(clientId)
             .build());
-    protocol.registerHeartbeatHandler(this::handleHeartbeat);
     this.threadContextFactory = checkNotNull(threadContextFactory, "threadContextFactory cannot be null");
   }
 
@@ -146,8 +142,7 @@ public class RaftSessionManager {
    * @param serviceName           The session name.
    * @param primitiveType         The session type.
    * @param communicationStrategy The strategy with which to communicate with servers.
-   * @param minTimeout            The minimum session timeout.
-   * @param maxTimeout            The maximum session timeout.
+   * @param timeout            The session timeout.
    * @return A completable future to be completed once the session has been opened.
    */
   public CompletableFuture<RaftSessionState> openSession(
@@ -155,35 +150,33 @@ public class RaftSessionManager {
       PrimitiveType primitiveType,
       ReadConsistency readConsistency,
       CommunicationStrategy communicationStrategy,
-      Duration minTimeout,
-      Duration maxTimeout) {
+      Duration timeout) {
     checkNotNull(serviceName, "serviceName cannot be null");
     checkNotNull(primitiveType, "serviceType cannot be null");
     checkNotNull(communicationStrategy, "communicationStrategy cannot be null");
-    checkNotNull(maxTimeout, "timeout cannot be null");
+    checkNotNull(timeout, "timeout cannot be null");
 
     log.debug("Opening session; name: {}, type: {}", serviceName, primitiveType);
-    OpenSessionRequest request = OpenSessionRequest.builder()
-        .withMemberId(memberId)
-        .withServiceName(serviceName)
-        .withServiceType(primitiveType)
-        .withReadConsistency(readConsistency)
-        .withMinTimeout(minTimeout.toMillis())
-        .withMaxTimeout(maxTimeout.toMillis())
+    OpenSessionRequest request = OpenSessionRequest.newBuilder()
+        .setMemberId(memberId.id())
+        .setServiceName(serviceName)
+        .setServiceType(primitiveType.name())
+        .setReadConsistency(io.atomix.protocols.raft.protocol.ReadConsistency.valueOf(readConsistency.name()))
+        .setTimeout(timeout.toMillis())
         .build();
 
     CompletableFuture<RaftSessionState> future = new CompletableFuture<>();
     ThreadContext proxyContext = threadContextFactory.createContext();
     connection.openSession(request).whenCompleteAsync((response, error) -> {
       if (error == null) {
-        if (response.status() == RaftResponse.Status.OK) {
+        if (response.getStatus() == ResponseStatus.OK) {
           // Create and store the proxy state.
           RaftSessionState state = new RaftSessionState(
               clientId,
-              SessionId.from(response.session()),
+              SessionId.from(response.getSessionId()),
               serviceName,
               primitiveType,
-              response.timeout());
+              response.getTimeout());
           sessions.put(state.getSessionId().id(), state);
 
           state.addStateChangeListener(s -> {
@@ -197,7 +190,7 @@ public class RaftSessionManager {
 
           future.complete(state);
         } else {
-          future.completeExceptionally(new RaftException.Unavailable(response.error().message()));
+          future.completeExceptionally(new RaftException.Unavailable("Failed to open session"));
         }
       } else {
         future.completeExceptionally(new RaftException.Unavailable(error.getMessage()));
@@ -220,19 +213,19 @@ public class RaftSessionManager {
     }
 
     log.debug("Closing session {}", sessionId);
-    CloseSessionRequest request = CloseSessionRequest.builder()
-        .withSession(sessionId.id())
-        .withDelete(delete)
+    CloseSessionRequest request = CloseSessionRequest.newBuilder()
+        .setSessionId(sessionId.id())
+        .setDelete(delete)
         .build();
 
     CompletableFuture<Void> future = new CompletableFuture<>();
     connection.closeSession(request).whenComplete((response, error) -> {
       sessions.remove(sessionId.id());
       if (error == null) {
-        if (response.status() == RaftResponse.Status.OK) {
+        if (response.getStatus() == ResponseStatus.OK) {
           future.complete(null);
         } else {
-          future.completeExceptionally(response.error().createException());
+          future.completeExceptionally(new RaftException.Unavailable("Failed to close session"));
         }
       } else {
         future.completeExceptionally(error);
@@ -253,25 +246,23 @@ public class RaftSessionManager {
     }
 
     // Allocate session IDs, command response sequence numbers, and event index arrays.
-    long[] sessionIds = new long[sessions.size()];
-    long[] commandResponses = new long[sessions.size()];
-    long[] eventIndexes = new long[sessions.size()];
+    List<Long> sessionIds = new ArrayList<>(sessions.size());
+    List<Long> commandResponses = new ArrayList<>(sessions.size());
+    List<Long> eventIndexes = new ArrayList<>(sessions.size());
 
     // For each session that needs to be kept alive, populate batch request arrays.
-    int i = 0;
     for (RaftSessionState sessionState : sessions) {
-      sessionIds[i] = sessionState.getSessionId().id();
-      commandResponses[i] = sessionState.getCommandResponse();
-      eventIndexes[i] = sessionState.getEventIndex();
-      i++;
+      sessionIds.add(sessionState.getSessionId().id());
+      commandResponses.add(sessionState.getCommandResponse());
+      eventIndexes.add(sessionState.getEventIndex());
     }
 
-    log.trace("Resetting {} sessions", sessionIds.length);
+    log.trace("Resetting {} sessions", sessionIds.size());
 
-    KeepAliveRequest request = KeepAliveRequest.builder()
-        .withSessionIds(sessionIds)
-        .withCommandSequences(commandResponses)
-        .withEventIndexes(eventIndexes)
+    KeepAliveRequest request = KeepAliveRequest.newBuilder()
+        .addAllSessionIds(sessionIds)
+        .addAllCommandSequences(commandResponses)
+        .addAllEventIndexes(eventIndexes)
         .build();
     connection.keepAlive(request);
   }
@@ -290,18 +281,18 @@ public class RaftSessionManager {
 
     CompletableFuture<Void> future = new CompletableFuture<>();
 
-    KeepAliveRequest request = KeepAliveRequest.builder()
-        .withSessionIds(new long[]{sessionId.id()})
-        .withCommandSequences(new long[]{sessionState.getCommandResponse()})
-        .withEventIndexes(new long[]{sessionState.getEventIndex()})
+    KeepAliveRequest request = KeepAliveRequest.newBuilder()
+        .addSessionIds(sessionId.id())
+        .addCommandSequences(sessionState.getCommandResponse())
+        .addEventIndexes(sessionState.getEventIndex())
         .build();
 
     connection.keepAlive(request).whenComplete((response, error) -> {
       if (error == null) {
-        if (response.status() == RaftResponse.Status.OK) {
+        if (response.getStatus() == ResponseStatus.OK) {
           future.complete(null);
         } else {
-          future.completeExceptionally(response.error().createException());
+          future.completeExceptionally(new RaftException.Unavailable("Failed to reset event indexes"));
         }
       } else {
         future.completeExceptionally(error);
@@ -326,25 +317,23 @@ public class RaftSessionManager {
     }
 
     // Allocate session IDs, command response sequence numbers, and event index arrays.
-    long[] sessionIds = new long[needKeepAlive.size()];
-    long[] commandResponses = new long[needKeepAlive.size()];
-    long[] eventIndexes = new long[needKeepAlive.size()];
+    List<Long> sessionIds = new ArrayList<>(needKeepAlive.size());
+    List<Long> commandResponses = new ArrayList<>(needKeepAlive.size());
+    List<Long> eventIndexes = new ArrayList<>(needKeepAlive.size());
 
     // For each session that needs to be kept alive, populate batch request arrays.
-    int i = 0;
     for (RaftSessionState sessionState : needKeepAlive) {
-      sessionIds[i] = sessionState.getSessionId().id();
-      commandResponses[i] = sessionState.getCommandResponse();
-      eventIndexes[i] = sessionState.getEventIndex();
-      i++;
+      sessionIds.add(sessionState.getSessionId().id());
+      commandResponses.add(sessionState.getCommandResponse());
+      eventIndexes.add(sessionState.getEventIndex());
     }
 
-    log.trace("Keeping {} sessions alive", sessionIds.length);
+    log.trace("Keeping {} sessions alive", sessionIds.size());
 
-    KeepAliveRequest request = KeepAliveRequest.builder()
-        .withSessionIds(sessionIds)
-        .withCommandSequences(commandResponses)
-        .withEventIndexes(eventIndexes)
+    KeepAliveRequest request = KeepAliveRequest.newBuilder()
+        .addAllSessionIds(sessionIds)
+        .addAllCommandSequences(commandResponses)
+        .addAllEventIndexes(eventIndexes)
         .build();
 
     long keepAliveTime = System.currentTimeMillis();
@@ -353,11 +342,13 @@ public class RaftSessionManager {
         long delta = System.currentTimeMillis() - keepAliveTime;
         if (error == null) {
           // If the request was successful, update the address selector and schedule the next keep-alive.
-          if (response.status() == RaftResponse.Status.OK) {
-            selectorManager.resetAll(response.leader(), response.members());
+          if (response.getStatus() == ResponseStatus.OK) {
+            selectorManager.resetAll(
+                MemberId.from(response.getLeader()),
+                response.getMembersList().stream().map(MemberId::from).collect(Collectors.toList()));
 
             // Iterate through sessions and close sessions that weren't kept alive by the request (have already been closed).
-            Set<Long> keptAliveSessions = Sets.newHashSet(Longs.asList(response.sessionIds()));
+            Set<Long> keptAliveSessions = Sets.newHashSet(response.getSessionsList());
             for (RaftSessionState session : needKeepAlive) {
               if (keptAliveSessions.contains(session.getSessionId().id())) {
                 session.setState(PrimitiveState.CONNECTED);
@@ -414,23 +405,6 @@ public class RaftSessionManager {
   }
 
   /**
-   * Handles a heartbeat request.
-   */
-  private CompletableFuture<HeartbeatResponse> handleHeartbeat(HeartbeatRequest request) {
-    log.trace("Received {}", request);
-    boolean newLeader = !Objects.equals(selectorManager.leader(), request.leader());
-    selectorManager.resetAll(request.leader(), request.members());
-    HeartbeatResponse response = HeartbeatResponse.builder()
-        .withStatus(RaftResponse.Status.OK)
-        .build();
-    if (newLeader) {
-      resetAllIndexes();
-    }
-    log.trace("Sending {}", response);
-    return CompletableFuture.completedFuture(response);
-  }
-
-  /**
    * Closes the session manager.
    *
    * @return A completable future to be completed once the session manager is closed.
@@ -443,7 +417,6 @@ public class RaftSessionManager {
           for (Scheduled keepAliveFuture : keepAliveTimers.values()) {
             keepAliveFuture.cancel();
           }
-          protocol.unregisterHeartbeatHandler();
         }
         future.complete(null);
       });

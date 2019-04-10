@@ -15,12 +15,12 @@
  */
 package io.atomix.protocols.raft.session;
 
+import java.time.Duration;
+import java.util.concurrent.TimeUnit;
+
 import io.atomix.primitive.Recovery;
 import io.atomix.primitive.session.SessionClient;
 import io.atomix.protocols.raft.ReadConsistency;
-
-import java.time.Duration;
-import java.util.concurrent.TimeUnit;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -34,8 +34,7 @@ public interface RaftSessionClient extends SessionClient {
    * Raft proxy builder.
    */
   abstract class Builder extends SessionClient.Builder {
-    protected Duration minTimeout = Duration.ofMillis(250);
-    protected Duration maxTimeout = Duration.ofSeconds(30);
+    protected Duration timeout = Duration.ZERO;
     protected ReadConsistency readConsistency = ReadConsistency.SEQUENTIAL;
     protected CommunicationStrategy communicationStrategy = CommunicationStrategy.LEADER;
     protected Recovery recoveryStrategy = Recovery.RECOVER;
@@ -43,24 +42,13 @@ public interface RaftSessionClient extends SessionClient {
     protected Duration retryDelay = Duration.ofMillis(100);
 
     /**
-     * Sets the minimum session timeout.
+     * Sets the session timeout.
      *
-     * @param minTimeout the minimum session timeout
+     * @param timeout the session timeout
      * @return the Raft protocol builder
      */
-    public Builder withMinTimeout(Duration minTimeout) {
-      this.minTimeout = checkNotNull(minTimeout, "minTimeout cannot be null");
-      return this;
-    }
-
-    /**
-     * Sets the maximum session timeout.
-     *
-     * @param maxTimeout the maximum session timeout
-     * @return the Raft protocol builder
-     */
-    public Builder withMaxTimeout(Duration maxTimeout) {
-      this.maxTimeout = checkNotNull(maxTimeout, "maxTimeout cannot be null");
+    public Builder withTimeout(Duration timeout) {
+      this.timeout = checkNotNull(timeout, "timeout cannot be null");
       return this;
     }
 

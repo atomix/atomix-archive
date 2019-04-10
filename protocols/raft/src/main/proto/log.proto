@@ -1,6 +1,8 @@
 syntax = "proto3";
 
-package atomix.raft.storage;
+import "raft.proto";
+
+package atomix.raft.storage.log;
 
 option java_package = "io.atomix.protocols.raft.storage.log";
 option java_outer_classname = "RaftLogProto";
@@ -40,12 +42,6 @@ message OpenSessionEntry {
     string service_type = 3;
     ReadConsistency read_consistency = 4;
     int64 timeout = 5;
-
-    enum ReadConsistency {
-        SEQUENTIAL = 0;
-        LINEARIZABLE_LEASE = 1;
-        LINEARIZABLE = 2;
-    }
 }
 
 message KeepAliveEntry {
@@ -72,17 +68,4 @@ message QueryEntry {
     int64 sequence_number = 2;
     string operation = 3;
     bytes value = 4;
-}
-
-message RaftMember {
-    string member_id = 1;
-    Type type = 2;
-    int64 updated = 3;
-
-    enum Type {
-        INACTIVE = 0;
-        PASSIVE = 1;
-        PROMOTABLE = 2;
-        ACTIVE = 3;
-    }
 }

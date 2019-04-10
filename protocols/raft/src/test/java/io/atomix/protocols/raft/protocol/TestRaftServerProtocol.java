@@ -15,18 +15,18 @@
  */
 package io.atomix.protocols.raft.protocol;
 
-import com.google.common.collect.Maps;
-import io.atomix.cluster.MemberId;
-import io.atomix.primitive.session.SessionId;
-import io.atomix.utils.concurrent.Futures;
-import io.atomix.utils.concurrent.ThreadContext;
-
 import java.net.ConnectException;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.function.Consumer;
 import java.util.function.Function;
+
+import com.google.common.collect.Maps;
+import io.atomix.cluster.MemberId;
+import io.atomix.primitive.session.SessionId;
+import io.atomix.utils.concurrent.Futures;
+import io.atomix.utils.concurrent.ThreadContext;
 
 /**
  * Test server protocol.
@@ -35,8 +35,8 @@ public class TestRaftServerProtocol extends TestRaftProtocol implements RaftServ
   private Function<OpenSessionRequest, CompletableFuture<OpenSessionResponse>> openSessionHandler;
   private Function<CloseSessionRequest, CompletableFuture<CloseSessionResponse>> closeSessionHandler;
   private Function<KeepAliveRequest, CompletableFuture<KeepAliveResponse>> keepAliveHandler;
-  private Function<QueryRequest, CompletableFuture<QueryResponse>> queryHandler;
-  private Function<CommandRequest, CompletableFuture<CommandResponse>> commandHandler;
+  private Function<OperationRequest, CompletableFuture<OperationResponse>> queryHandler;
+  private Function<OperationRequest, CompletableFuture<OperationResponse>> commandHandler;
   private Function<MetadataRequest, CompletableFuture<MetadataResponse>> metadataHandler;
   private Function<JoinRequest, CompletableFuture<JoinResponse>> joinHandler;
   private Function<LeaveRequest, CompletableFuture<LeaveResponse>> leaveHandler;
@@ -92,12 +92,12 @@ public class TestRaftServerProtocol extends TestRaftProtocol implements RaftServ
   }
 
   @Override
-  public CompletableFuture<QueryResponse> query(MemberId memberId, QueryRequest request) {
+  public CompletableFuture<OperationResponse> query(MemberId memberId, OperationRequest request) {
     return scheduleTimeout(getServer(memberId).thenCompose(listener -> listener.query(request)));
   }
 
   @Override
-  public CompletableFuture<CommandResponse> command(MemberId memberId, CommandRequest request) {
+  public CompletableFuture<OperationResponse> command(MemberId memberId, OperationRequest request) {
     return scheduleTimeout(getServer(memberId).thenCompose(listener -> listener.command(request)));
   }
 
@@ -156,11 +156,6 @@ public class TestRaftServerProtocol extends TestRaftProtocol implements RaftServ
     getClient(memberId).thenAccept(protocol -> protocol.publish(request));
   }
 
-  @Override
-  public CompletableFuture<HeartbeatResponse> heartbeat(MemberId memberId, HeartbeatRequest request) {
-    return scheduleTimeout(getClient(memberId).thenCompose(protocol -> protocol.heartbeat(request)));
-  }
-
   CompletableFuture<OpenSessionResponse> openSession(OpenSessionRequest request) {
     if (openSessionHandler != null) {
       return openSessionHandler.apply(request);
@@ -215,7 +210,7 @@ public class TestRaftServerProtocol extends TestRaftProtocol implements RaftServ
     this.keepAliveHandler = null;
   }
 
-  CompletableFuture<QueryResponse> query(QueryRequest request) {
+  CompletableFuture<OperationResponse> query(OperationRequest request) {
     if (queryHandler != null) {
       return queryHandler.apply(request);
     } else {
@@ -224,7 +219,7 @@ public class TestRaftServerProtocol extends TestRaftProtocol implements RaftServ
   }
 
   @Override
-  public void registerQueryHandler(Function<QueryRequest, CompletableFuture<QueryResponse>> handler) {
+  public void registerQueryHandler(Function<OperationRequest, CompletableFuture<OperationResponse>> handler) {
     this.queryHandler = handler;
   }
 
@@ -233,7 +228,7 @@ public class TestRaftServerProtocol extends TestRaftProtocol implements RaftServ
     this.queryHandler = null;
   }
 
-  CompletableFuture<CommandResponse> command(CommandRequest request) {
+  CompletableFuture<OperationResponse> command(OperationRequest request) {
     if (commandHandler != null) {
       return commandHandler.apply(request);
     } else {
@@ -242,7 +237,7 @@ public class TestRaftServerProtocol extends TestRaftProtocol implements RaftServ
   }
 
   @Override
-  public void registerCommandHandler(Function<CommandRequest, CompletableFuture<CommandResponse>> handler) {
+  public void registerCommandHandler(Function<OperationRequest, CompletableFuture<OperationResponse>> handler) {
     this.commandHandler = handler;
   }
 
@@ -432,7 +427,7 @@ public class TestRaftServerProtocol extends TestRaftProtocol implements RaftServ
   }
 
   void reset(ResetRequest request) {
-    Consumer<ResetRequest> listener = resetListeners.get(request.session());
+    Consumer<ResetRequest> listener = resetListeners.get(request.getSessionId());
     if (listener != null) {
       listener.accept(request);
     }

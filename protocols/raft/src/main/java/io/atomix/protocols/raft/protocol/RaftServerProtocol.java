@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-present Open Networking Foundation
+ * Copyright 2019-present Open Networking Foundation
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,13 +15,13 @@
  */
 package io.atomix.protocols.raft.protocol;
 
-import io.atomix.cluster.MemberId;
-import io.atomix.primitive.session.SessionId;
-
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.function.Consumer;
 import java.util.function.Function;
+
+import io.atomix.cluster.MemberId;
+import io.atomix.primitive.session.SessionId;
 
 /**
  * Raft server protocol.
@@ -62,7 +62,7 @@ public interface RaftServerProtocol {
    * @param request the request to send
    * @return a future to be completed with the response
    */
-  CompletableFuture<QueryResponse> query(MemberId memberId, QueryRequest request);
+  CompletableFuture<OperationResponse> query(MemberId memberId, OperationRequest request);
 
   /**
    * Sends a command request to the given node.
@@ -71,7 +71,7 @@ public interface RaftServerProtocol {
    * @param request the request to send
    * @return a future to be completed with the response
    */
-  CompletableFuture<CommandResponse> command(MemberId memberId, CommandRequest request);
+  CompletableFuture<OperationResponse> command(MemberId memberId, OperationRequest request);
 
   /**
    * Sends a metadata request to the given node.
@@ -164,15 +164,6 @@ public interface RaftServerProtocol {
   CompletableFuture<AppendResponse> append(MemberId memberId, AppendRequest request);
 
   /**
-   * Sends a heartbeat request to the given node.
-   *
-   * @param memberId the node to which to send the request
-   * @param request the request to send
-   * @return a future to be completed with the response
-   */
-  CompletableFuture<HeartbeatResponse> heartbeat(MemberId memberId, HeartbeatRequest request);
-
-  /**
    * Unicasts a publish request to the given node.
    *
    * @param memberId  the node to which to send the request
@@ -221,7 +212,7 @@ public interface RaftServerProtocol {
    *
    * @param handler the open session request handler to register
    */
-  void registerQueryHandler(Function<QueryRequest, CompletableFuture<QueryResponse>> handler);
+  void registerQueryHandler(Function<OperationRequest, CompletableFuture<OperationResponse>> handler);
 
   /**
    * Unregisters the query request handler.
@@ -233,7 +224,7 @@ public interface RaftServerProtocol {
    *
    * @param handler the open session request handler to register
    */
-  void registerCommandHandler(Function<CommandRequest, CompletableFuture<CommandResponse>> handler);
+  void registerCommandHandler(Function<OperationRequest, CompletableFuture<OperationResponse>> handler);
 
   /**
    * Unregisters the command request handler.

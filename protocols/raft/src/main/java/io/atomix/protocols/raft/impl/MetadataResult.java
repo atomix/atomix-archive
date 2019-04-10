@@ -15,9 +15,9 @@
  */
 package io.atomix.protocols.raft.impl;
 
-import io.atomix.primitive.session.SessionMetadata;
-
 import java.util.Set;
+
+import io.atomix.protocols.raft.protocol.SessionMetadata;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
 

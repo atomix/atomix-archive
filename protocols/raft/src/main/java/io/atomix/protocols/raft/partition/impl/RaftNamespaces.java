@@ -28,8 +28,6 @@ import io.atomix.primitive.operation.OperationType;
 import io.atomix.primitive.operation.PrimitiveOperation;
 import io.atomix.primitive.operation.impl.DefaultOperationId;
 import io.atomix.primitive.session.SessionId;
-import io.atomix.primitive.session.SessionMetadata;
-import io.atomix.protocols.raft.RaftError;
 import io.atomix.protocols.raft.ReadConsistency;
 import io.atomix.protocols.raft.cluster.RaftMember;
 import io.atomix.protocols.raft.cluster.impl.DefaultRaftMember;
@@ -37,12 +35,8 @@ import io.atomix.protocols.raft.protocol.AppendRequest;
 import io.atomix.protocols.raft.protocol.AppendResponse;
 import io.atomix.protocols.raft.protocol.CloseSessionRequest;
 import io.atomix.protocols.raft.protocol.CloseSessionResponse;
-import io.atomix.protocols.raft.protocol.CommandRequest;
-import io.atomix.protocols.raft.protocol.CommandResponse;
 import io.atomix.protocols.raft.protocol.ConfigureRequest;
 import io.atomix.protocols.raft.protocol.ConfigureResponse;
-import io.atomix.protocols.raft.protocol.HeartbeatRequest;
-import io.atomix.protocols.raft.protocol.HeartbeatResponse;
 import io.atomix.protocols.raft.protocol.InstallRequest;
 import io.atomix.protocols.raft.protocol.InstallResponse;
 import io.atomix.protocols.raft.protocol.JoinRequest;
@@ -58,15 +52,11 @@ import io.atomix.protocols.raft.protocol.OpenSessionResponse;
 import io.atomix.protocols.raft.protocol.PollRequest;
 import io.atomix.protocols.raft.protocol.PollResponse;
 import io.atomix.protocols.raft.protocol.PublishRequest;
-import io.atomix.protocols.raft.protocol.QueryRequest;
-import io.atomix.protocols.raft.protocol.QueryResponse;
-import io.atomix.protocols.raft.protocol.RaftResponse;
 import io.atomix.protocols.raft.protocol.ReconfigureRequest;
 import io.atomix.protocols.raft.protocol.ReconfigureResponse;
 import io.atomix.protocols.raft.protocol.ResetRequest;
 import io.atomix.protocols.raft.protocol.VoteRequest;
 import io.atomix.protocols.raft.protocol.VoteResponse;
-import io.atomix.protocols.raft.storage.system.Configuration;
 import io.atomix.utils.serializer.Namespace;
 import io.atomix.utils.serializer.Namespaces;
 
@@ -87,12 +77,6 @@ public final class RaftNamespaces {
       .register(CloseSessionResponse.class)
       .register(KeepAliveRequest.class)
       .register(KeepAliveResponse.class)
-      .register(HeartbeatRequest.class)
-      .register(HeartbeatResponse.class)
-      .register(QueryRequest.class)
-      .register(QueryResponse.class)
-      .register(CommandRequest.class)
-      .register(CommandResponse.class)
       .register(MetadataRequest.class)
       .register(MetadataResponse.class)
       .register(JoinRequest.class)
@@ -113,11 +97,7 @@ public final class RaftNamespaces {
       .register(AppendResponse.class)
       .register(PublishRequest.class)
       .register(ResetRequest.class)
-      .register(RaftResponse.Status.class)
-      .register(RaftError.class)
-      .register(RaftError.Type.class)
       .register(ReadConsistency.class)
-      .register(SessionMetadata.class)
       .register(PrimitiveOperation.class)
       .register(PrimitiveEvent.class)
       .register(DefaultEventType.class)
@@ -133,7 +113,6 @@ public final class RaftNamespaces {
       .register(SessionId.class)
       .register(RaftMember.Type.class)
       .register(Instant.class)
-      .register(Configuration.class)
       .build("RaftProtocol");
 
   /**
@@ -152,7 +131,6 @@ public final class RaftNamespaces {
       .register(MemberId.class)
       .register(RaftMember.Type.class)
       .register(Instant.class)
-      .register(Configuration.class)
       .build("RaftStorage");
 
   private RaftNamespaces() {

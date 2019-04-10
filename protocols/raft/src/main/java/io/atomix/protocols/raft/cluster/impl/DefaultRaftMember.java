@@ -15,21 +15,22 @@
  */
 package io.atomix.protocols.raft.cluster.impl;
 
-import com.google.common.hash.Hashing;
-import io.atomix.cluster.MemberId;
-import io.atomix.protocols.raft.RaftError;
-import io.atomix.protocols.raft.cluster.RaftMember;
-import io.atomix.protocols.raft.protocol.RaftResponse;
-import io.atomix.protocols.raft.protocol.ReconfigureRequest;
-import io.atomix.protocols.raft.storage.system.Configuration;
-import io.atomix.utils.concurrent.Scheduled;
-
 import java.time.Instant;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.function.Consumer;
+
+import com.google.common.hash.Hashing;
+import io.atomix.cluster.MemberId;
+import io.atomix.protocols.raft.RaftException;
+import io.atomix.protocols.raft.cluster.RaftMember;
+import io.atomix.protocols.raft.protocol.RaftError;
+import io.atomix.protocols.raft.protocol.ReconfigureRequest;
+import io.atomix.protocols.raft.protocol.ResponseStatus;
+import io.atomix.protocols.raft.storage.system.RaftConfiguration;
+import io.atomix.utils.concurrent.Scheduled;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -176,25 +177,34 @@ public final class DefaultRaftMember implements RaftMember, AutoCloseable {
     // Attempt to leave the cluster by submitting a LeaveRequest directly to the server state.
     // Non-leader states should forward the request to the leader if there is one. Leader states
     // will log, replicate, and commit the reconfiguration.
-    cluster.getContext().getRaftRole().onReconfigure(ReconfigureRequest.builder()
-        .withIndex(cluster.getConfiguration().index())
-        .withTerm(cluster.getConfiguration().term())
-        .withMember(new DefaultRaftMember(id, type, updated))
+    cluster.getContext().getRaftRole().onReconfigure(ReconfigureRequest.newBuilder()
+        .setIndex(cluster.getConfiguration().getIndex())
+        .setTerm(cluster.getConfiguration().getTerm())
+        .setMember(io.atomix.protocols.raft.protocol.RaftMember.newBuilder()
+            .setMemberId(id.id())
+            .setType(io.atomix.protocols.raft.protocol.RaftMember.Type.valueOf(type.name()))
+            .setUpdated(updated.toEpochMilli())
+            .build())
         .build()).whenComplete((response, error) -> {
           if (error == null) {
-            if (response.status() == RaftResponse.Status.OK) {
+            if (response.getStatus() == ResponseStatus.OK) {
               cancelConfigureTimer();
-              cluster.configure(new Configuration(response.index(), response.term(), response.timestamp(), response.members()));
+              cluster.configure(RaftConfiguration.newBuilder()
+                  .setIndex(response.getIndex())
+                  .setTerm(response.getTerm())
+                  .setTimestamp(response.getTimestamp())
+                  .addAllMembers(response.getMembersList())
+                  .build());
               future.complete(null);
-            } else if (response.error() == null
-                || response.error().type() == RaftError.Type.UNAVAILABLE
-                || response.error().type() == RaftError.Type.PROTOCOL_ERROR
-                || response.error().type() == RaftError.Type.NO_LEADER) {
+            } else if (response.getError() == null
+                || response.getError() == RaftError.UNAVAILABLE
+                || response.getError() == RaftError.PROTOCOL_ERROR
+                || response.getError() == RaftError.NO_LEADER) {
               cancelConfigureTimer();
               configureTimeout = cluster.getContext().getThreadContext().schedule(cluster.getContext().getElectionTimeout().multipliedBy(2), () -> configure(type, future));
             } else {
               cancelConfigureTimer();
-              future.completeExceptionally(response.error().createException());
+              future.completeExceptionally(new RaftException.Unavailable("Cluster is unavailable"));
             }
           } else {
             future.completeExceptionally(error);

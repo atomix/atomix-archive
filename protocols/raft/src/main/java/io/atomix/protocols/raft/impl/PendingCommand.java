@@ -15,10 +15,10 @@
  */
 package io.atomix.protocols.raft.impl;
 
-import io.atomix.protocols.raft.protocol.CommandRequest;
-import io.atomix.protocols.raft.protocol.CommandResponse;
-
 import java.util.concurrent.CompletableFuture;
+
+import io.atomix.protocols.raft.protocol.OperationRequest;
+import io.atomix.protocols.raft.protocol.OperationResponse;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
 
@@ -26,10 +26,10 @@ import static com.google.common.base.MoreObjects.toStringHelper;
  * Pending command.
  */
 public final class PendingCommand {
-  private final CommandRequest request;
-  private final CompletableFuture<CommandResponse> future;
+  private final OperationRequest request;
+  private final CompletableFuture<OperationResponse> future;
 
-  public PendingCommand(CommandRequest request, CompletableFuture<CommandResponse> future) {
+  public PendingCommand(OperationRequest request, CompletableFuture<OperationResponse> future) {
     this.request = request;
     this.future = future;
   }
@@ -39,7 +39,7 @@ public final class PendingCommand {
    *
    * @return the pending command request
    */
-  public CommandRequest request() {
+  public OperationRequest request() {
     return request;
   }
 
@@ -48,7 +48,7 @@ public final class PendingCommand {
    *
    * @return the pending command future
    */
-  public CompletableFuture<CommandResponse> future() {
+  public CompletableFuture<OperationResponse> future() {
     return future;
   }
 

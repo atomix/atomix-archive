@@ -70,13 +70,12 @@ import io.atomix.primitive.service.PrimitiveService;
 import io.atomix.primitive.session.Session;
 import io.atomix.primitive.session.SessionClient;
 import io.atomix.primitive.session.SessionId;
-import io.atomix.primitive.session.SessionMetadata;
 import io.atomix.protocols.raft.cluster.RaftClusterEvent;
 import io.atomix.protocols.raft.cluster.RaftMember;
 import io.atomix.protocols.raft.cluster.impl.DefaultRaftMember;
+import io.atomix.protocols.raft.protocol.SessionMetadata;
 import io.atomix.protocols.raft.protocol.TestRaftProtocolFactory;
 import io.atomix.protocols.raft.storage.RaftStorage;
-import io.atomix.protocols.raft.storage.system.Configuration;
 import io.atomix.storage.StorageLevel;
 import io.atomix.utils.concurrent.SingleThreadContext;
 import io.atomix.utils.concurrent.ThreadContext;
@@ -111,7 +110,6 @@ public class RaftTest extends ConcurrentTestCase {
       .register(MemberId.class)
       .register(RaftMember.Type.class)
       .register(Instant.class)
-      .register(Configuration.class)
       .register(byte[].class)
       .register(long[].class)
       .build();
@@ -1323,8 +1321,7 @@ public class RaftTest extends ConcurrentTestCase {
   private SessionClient createSession(RaftClient client, ReadConsistency consistency) throws Exception {
     return client.sessionBuilder("raft-test", TestPrimitiveType.INSTANCE)
         .withReadConsistency(consistency)
-        .withMinTimeout(Duration.ofMillis(250))
-        .withMaxTimeout(Duration.ofSeconds(5))
+        .withTimeout(Duration.ofSeconds(5))
         .build()
         .connect()
         .get(10, TimeUnit.SECONDS);

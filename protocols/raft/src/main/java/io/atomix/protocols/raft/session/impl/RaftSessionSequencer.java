@@ -15,18 +15,18 @@
  */
 package io.atomix.protocols.raft.session.impl;
 
-import com.google.common.annotations.VisibleForTesting;
-import io.atomix.protocols.raft.protocol.OperationResponse;
-import io.atomix.protocols.raft.protocol.PublishRequest;
-import io.atomix.primitive.session.SessionClient;
-import io.atomix.utils.logging.ContextualLoggerFactory;
-import io.atomix.utils.logging.LoggerContext;
-import org.slf4j.Logger;
-
 import java.util.ArrayDeque;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Queue;
+
+import com.google.common.annotations.VisibleForTesting;
+import io.atomix.primitive.session.SessionClient;
+import io.atomix.protocols.raft.protocol.OperationResponse;
+import io.atomix.protocols.raft.protocol.PublishRequest;
+import io.atomix.utils.logging.ContextualLoggerFactory;
+import io.atomix.utils.logging.LoggerContext;
+import org.slf4j.Logger;
 
 /**
  * Client response sequencer.
@@ -103,7 +103,7 @@ final class RaftSessionSequencer {
     if (requestSequence == responseSequence) {
       log.trace("Completing {}", request);
       callback.run();
-      eventIndex = request.eventIndex();
+      eventIndex = request.getEventIndex();
     } else {
       eventCallbacks.add(new EventCallback(request, callback));
       completeResponses();
@@ -165,7 +165,7 @@ final class RaftSessionSequencer {
       while (eventCallback != null) {
         log.trace("Completing {}", eventCallback.request);
         eventCallback.run();
-        eventIndex = eventCallback.request.eventIndex();
+        eventIndex = eventCallback.request.getEventIndex();
         eventCallback = eventCallbacks.poll();
       }
     }
@@ -185,22 +185,22 @@ final class RaftSessionSequencer {
 
     // If the response's event index is greater than the current event index, that indicates that events that were
     // published prior to the response have not yet been completed. Attempt to complete pending events.
-    if (response.eventIndex() > eventIndex) {
+    if (response.getEventIndex() > eventIndex) {
       // For each pending event with an eventIndex less than or equal to the response eventIndex, complete the event.
       // This is safe since we know that sequenced responses should see sequential order of events.
       EventCallback eventCallback = eventCallbacks.peek();
-      while (eventCallback != null && eventCallback.request.eventIndex() <= response.eventIndex()) {
+      while (eventCallback != null && eventCallback.request.getEventIndex() <= response.getEventIndex()) {
         eventCallbacks.remove();
         log.trace("Completing event {}", eventCallback.request);
         eventCallback.run();
-        eventIndex = eventCallback.request.eventIndex();
+        eventIndex = eventCallback.request.getEventIndex();
         eventCallback = eventCallbacks.peek();
       }
     }
 
     // If after completing pending events the eventIndex is greater than or equal to the response's eventIndex, complete the response.
     // Note that the event protocol initializes the eventIndex to the session ID.
-    if (response.eventIndex() <= eventIndex || (eventIndex == 0 && response.eventIndex() == state.getSessionId().id())) {
+    if (response.getEventIndex() <= eventIndex || (eventIndex == 0 && response.getEventIndex() == state.getSessionId().id())) {
       log.trace("Completing response {}", response);
       callback.run();
       return true;

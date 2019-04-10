@@ -15,13 +15,13 @@
  */
 package io.atomix.protocols.raft;
 
+import java.time.Duration;
+
 import io.atomix.primitive.Recovery;
 import io.atomix.primitive.partition.Partitioner;
 import io.atomix.primitive.protocol.PrimitiveProtocol;
 import io.atomix.primitive.protocol.PrimitiveProtocolConfig;
 import io.atomix.protocols.raft.session.CommunicationStrategy;
-
-import java.time.Duration;
 
 /**
  * Raft protocol configuration.
@@ -29,8 +29,7 @@ import java.time.Duration;
 public class MultiRaftProtocolConfig extends PrimitiveProtocolConfig<MultiRaftProtocolConfig> {
   private String group;
   private Partitioner<String> partitioner = Partitioner.MURMUR3;
-  private Duration minTimeout = Duration.ofMillis(250);
-  private Duration maxTimeout = Duration.ofSeconds(30);
+  private Duration timeout = Duration.ZERO;
   private ReadConsistency readConsistency = ReadConsistency.SEQUENTIAL;
   private CommunicationStrategy communicationStrategy = CommunicationStrategy.LEADER;
   private Recovery recoveryStrategy = Recovery.RECOVER;
@@ -83,42 +82,22 @@ public class MultiRaftProtocolConfig extends PrimitiveProtocolConfig<MultiRaftPr
   }
 
   /**
-   * Returns the minimum session timeout.
+   * Returns the session timeout.
    *
-   * @return the minimum session timeout
+   * @return the session timeout
    */
-  public Duration getMinTimeout() {
-    return minTimeout;
+  public Duration getTimeout() {
+    return timeout;
   }
 
   /**
-   * Sets the minimum session timeout.
+   * Sets the session timeout.
    *
-   * @param minTimeout the minimum session timeout
+   * @param timeout the session timeout
    * @return the Raft protocol configuration
    */
-  public MultiRaftProtocolConfig setMinTimeout(Duration minTimeout) {
-    this.minTimeout = minTimeout;
-    return this;
-  }
-
-  /**
-   * Returns the maximum session timeout.
-   *
-   * @return the maximum session timeout
-   */
-  public Duration getMaxTimeout() {
-    return maxTimeout;
-  }
-
-  /**
-   * Sets the maximum session timeout.
-   *
-   * @param maxTimeout the maximum session timeout
-   * @return the Raft protocol configuration
-   */
-  public MultiRaftProtocolConfig setMaxTimeout(Duration maxTimeout) {
-    this.maxTimeout = maxTimeout;
+  public MultiRaftProtocolConfig setTimeout(Duration timeout) {
+    this.timeout = timeout;
     return this;
   }
 

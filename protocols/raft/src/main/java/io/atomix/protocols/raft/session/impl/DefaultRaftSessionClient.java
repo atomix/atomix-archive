@@ -61,8 +61,7 @@ public class DefaultRaftSessionClient implements RaftSessionClient {
   private final String serviceName;
   private final PrimitiveType primitiveType;
   private final PartitionId partitionId;
-  private final Duration minTimeout;
-  private final Duration maxTimeout;
+  private final Duration timeout;
   private final RaftClientProtocol protocol;
   private final MemberSelectorManager selectorManager;
   private final RaftSessionManager sessionManager;
@@ -84,8 +83,7 @@ public class DefaultRaftSessionClient implements RaftSessionClient {
       ReadConsistency readConsistency,
       CommunicationStrategy communicationStrategy,
       ThreadContext context,
-      Duration minTimeout,
-      Duration maxTimeout) {
+      Duration timeout) {
     this.serviceName = checkNotNull(serviceName, "serviceName cannot be null");
     this.primitiveType = checkNotNull(primitiveType, "serviceType cannot be null");
     this.partitionId = checkNotNull(partitionId, "partitionId cannot be null");
@@ -94,8 +92,7 @@ public class DefaultRaftSessionClient implements RaftSessionClient {
     this.readConsistency = checkNotNull(readConsistency, "readConsistency cannot be null");
     this.communicationStrategy = checkNotNull(communicationStrategy, "communicationStrategy cannot be null");
     this.context = checkNotNull(context, "context cannot be null");
-    this.minTimeout = checkNotNull(minTimeout, "minTimeout cannot be null");
-    this.maxTimeout = checkNotNull(maxTimeout, "maxTimeout cannot be null");
+    this.timeout = checkNotNull(timeout, "timeout cannot be null");
     this.sessionManager = checkNotNull(sessionManager, "sessionManager cannot be null");
   }
 
@@ -173,8 +170,7 @@ public class DefaultRaftSessionClient implements RaftSessionClient {
         primitiveType,
         readConsistency,
         communicationStrategy,
-        minTimeout,
-        maxTimeout)
+        timeout)
         .thenApply(state -> {
           this.state = state;
 

@@ -15,25 +15,23 @@
  */
 package io.atomix.protocols.raft.protocol;
 
-import com.google.common.collect.Maps;
-import io.atomix.cluster.MemberId;
-import io.atomix.primitive.session.SessionId;
-import io.atomix.utils.concurrent.Futures;
-import io.atomix.utils.concurrent.ThreadContext;
-
 import java.net.ConnectException;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.function.Consumer;
-import java.util.function.Function;
+
+import com.google.common.collect.Maps;
+import io.atomix.cluster.MemberId;
+import io.atomix.primitive.session.SessionId;
+import io.atomix.utils.concurrent.Futures;
+import io.atomix.utils.concurrent.ThreadContext;
 
 /**
  * Test Raft client protocol.
  */
 public class TestRaftClientProtocol extends TestRaftProtocol implements RaftClientProtocol {
-  private Function<HeartbeatRequest, CompletableFuture<HeartbeatResponse>> heartbeatHandler;
   private final Map<Long, Consumer<PublishRequest>> publishListeners = Maps.newConcurrentMap();
 
   public TestRaftClientProtocol(
@@ -54,24 +52,6 @@ public class TestRaftClientProtocol extends TestRaftProtocol implements RaftClie
     }
   }
 
-  CompletableFuture<HeartbeatResponse> heartbeat(HeartbeatRequest request) {
-    if (heartbeatHandler != null) {
-      return heartbeatHandler.apply(request);
-    } else {
-      return Futures.exceptionalFuture(new ConnectException());
-    }
-  }
-
-  @Override
-  public void registerHeartbeatHandler(Function<HeartbeatRequest, CompletableFuture<HeartbeatResponse>> handler) {
-    this.heartbeatHandler = handler;
-  }
-
-  @Override
-  public void unregisterHeartbeatHandler() {
-    this.heartbeatHandler = null;
-  }
-
   @Override
   public CompletableFuture<OpenSessionResponse> openSession(MemberId memberId, OpenSessionRequest request) {
     return scheduleTimeout(getServer(memberId).thenCompose(protocol -> protocol.openSession(request)));
@@ -88,12 +68,12 @@ public class TestRaftClientProtocol extends TestRaftProtocol implements RaftClie
   }
 
   @Override
-  public CompletableFuture<QueryResponse> query(MemberId memberId, QueryRequest request) {
+  public CompletableFuture<OperationResponse> query(MemberId memberId, OperationRequest request) {
     return scheduleTimeout(getServer(memberId).thenCompose(protocol -> protocol.query(request)));
   }
 
   @Override
-  public CompletableFuture<CommandResponse> command(MemberId memberId, CommandRequest request) {
+  public CompletableFuture<OperationResponse> command(MemberId memberId, OperationRequest request) {
     return scheduleTimeout(getServer(memberId).thenCompose(protocol -> protocol.command(request)));
   }
 
@@ -113,7 +93,7 @@ public class TestRaftClientProtocol extends TestRaftProtocol implements RaftClie
   }
 
   void publish(PublishRequest request) {
-    Consumer<PublishRequest> listener = publishListeners.get(request.session());
+    Consumer<PublishRequest> listener = publishListeners.get(request.getSessionId());
     if (listener != null) {
       listener.accept(request);
     }

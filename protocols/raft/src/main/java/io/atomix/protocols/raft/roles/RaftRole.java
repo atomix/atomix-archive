@@ -15,13 +15,13 @@
  */
 package io.atomix.protocols.raft.roles;
 
+import java.util.concurrent.CompletableFuture;
+
 import io.atomix.protocols.raft.RaftServer;
 import io.atomix.protocols.raft.protocol.AppendRequest;
 import io.atomix.protocols.raft.protocol.AppendResponse;
 import io.atomix.protocols.raft.protocol.CloseSessionRequest;
 import io.atomix.protocols.raft.protocol.CloseSessionResponse;
-import io.atomix.protocols.raft.protocol.CommandRequest;
-import io.atomix.protocols.raft.protocol.CommandResponse;
 import io.atomix.protocols.raft.protocol.ConfigureRequest;
 import io.atomix.protocols.raft.protocol.ConfigureResponse;
 import io.atomix.protocols.raft.protocol.InstallRequest;
@@ -36,10 +36,10 @@ import io.atomix.protocols.raft.protocol.MetadataRequest;
 import io.atomix.protocols.raft.protocol.MetadataResponse;
 import io.atomix.protocols.raft.protocol.OpenSessionRequest;
 import io.atomix.protocols.raft.protocol.OpenSessionResponse;
+import io.atomix.protocols.raft.protocol.OperationRequest;
+import io.atomix.protocols.raft.protocol.OperationResponse;
 import io.atomix.protocols.raft.protocol.PollRequest;
 import io.atomix.protocols.raft.protocol.PollResponse;
-import io.atomix.protocols.raft.protocol.QueryRequest;
-import io.atomix.protocols.raft.protocol.QueryResponse;
 import io.atomix.protocols.raft.protocol.ReconfigureRequest;
 import io.atomix.protocols.raft.protocol.ReconfigureResponse;
 import io.atomix.protocols.raft.protocol.TransferRequest;
@@ -47,8 +47,6 @@ import io.atomix.protocols.raft.protocol.TransferResponse;
 import io.atomix.protocols.raft.protocol.VoteRequest;
 import io.atomix.protocols.raft.protocol.VoteResponse;
 import io.atomix.utils.Managed;
-
-import java.util.concurrent.CompletableFuture;
 
 /**
  * Raft role interface.
@@ -172,7 +170,7 @@ public interface RaftRole extends Managed<RaftRole> {
    * @param request The request to handle.
    * @return A completable future to be completed with the request response.
    */
-  CompletableFuture<CommandResponse> onCommand(CommandRequest request);
+  CompletableFuture<OperationResponse> onCommand(OperationRequest request);
 
   /**
    * Handles a query request.
@@ -180,6 +178,6 @@ public interface RaftRole extends Managed<RaftRole> {
    * @param request The request to handle.
    * @return A completable future to be completed with the request response.
    */
-  CompletableFuture<QueryResponse> onQuery(QueryRequest request);
+  CompletableFuture<OperationResponse> onQuery(OperationRequest request);
 
 }

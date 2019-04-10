@@ -15,6 +15,11 @@
  */
 package io.atomix.protocols.raft.storage;
 
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.util.function.Predicate;
+
 import io.atomix.protocols.raft.storage.log.RaftLog;
 import io.atomix.protocols.raft.storage.snapshot.SnapshotFile;
 import io.atomix.protocols.raft.storage.snapshot.SnapshotStore;
@@ -26,12 +31,6 @@ import io.atomix.storage.journal.JournalSegmentDescriptor;
 import io.atomix.storage.journal.JournalSegmentFile;
 import io.atomix.storage.statistics.StorageStatistics;
 import io.atomix.utils.serializer.Namespace;
-import io.atomix.utils.serializer.Serializer;
-
-import java.io.File;
-import java.io.IOException;
-import java.nio.file.Files;
-import java.util.function.Predicate;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
 import static com.google.common.base.Preconditions.checkArgument;
@@ -68,7 +67,6 @@ public class RaftStorage {
   private final String prefix;
   private final StorageLevel storageLevel;
   private final File directory;
-  private final Namespace namespace;
   private final int maxSegmentSize;
   private final int maxEntrySize;
   private final int maxEntriesPerSegment;
@@ -95,7 +93,6 @@ public class RaftStorage {
     this.prefix = prefix;
     this.storageLevel = storageLevel;
     this.directory = directory;
-    this.namespace = namespace;
     this.maxSegmentSize = maxSegmentSize;
     this.maxEntrySize = maxEntrySize;
     this.maxEntriesPerSegment = maxEntriesPerSegment;
@@ -115,15 +112,6 @@ public class RaftStorage {
    */
   public String prefix() {
     return prefix;
-  }
-
-  /**
-   * Returns the storage serializer.
-   *
-   * @return The storage serializer.
-   */
-  public Namespace namespace() {
-    return namespace;
   }
 
   /**
@@ -275,7 +263,7 @@ public class RaftStorage {
    * @return The metastore.
    */
   public MetaStore openMetaStore() {
-    return new MetaStore(this, Serializer.using(namespace));
+    return new MetaStore(this);
   }
 
   /**

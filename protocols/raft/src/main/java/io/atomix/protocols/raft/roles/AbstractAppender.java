@@ -15,6 +15,14 @@
  */
 package io.atomix.protocols.raft.roles;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
+import com.google.protobuf.ByteString;
+import com.google.protobuf.Message;
 import io.atomix.protocols.raft.RaftServer;
 import io.atomix.protocols.raft.cluster.impl.DefaultRaftMember;
 import io.atomix.protocols.raft.cluster.impl.RaftMemberContext;
@@ -25,8 +33,7 @@ import io.atomix.protocols.raft.protocol.ConfigureRequest;
 import io.atomix.protocols.raft.protocol.ConfigureResponse;
 import io.atomix.protocols.raft.protocol.InstallRequest;
 import io.atomix.protocols.raft.protocol.InstallResponse;
-import io.atomix.protocols.raft.protocol.RaftRequest;
-import io.atomix.protocols.raft.protocol.RaftResponse;
+import io.atomix.protocols.raft.protocol.ResponseStatus;
 import io.atomix.protocols.raft.storage.log.RaftLogEntry;
 import io.atomix.protocols.raft.storage.log.RaftLogReader;
 import io.atomix.protocols.raft.storage.snapshot.Snapshot;
@@ -34,12 +41,6 @@ import io.atomix.storage.journal.Indexed;
 import io.atomix.utils.logging.ContextualLoggerFactory;
 import io.atomix.utils.logging.LoggerContext;
 import org.slf4j.Logger;
-
-import java.io.IOException;
-import java.io.InputStream;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -102,13 +103,13 @@ abstract class AbstractAppender implements AutoCloseable {
     Indexed<RaftLogEntry> prevEntry = reader != null ? reader.getCurrentEntry() : null;
 
     DefaultRaftMember leader = raft.getLeader();
-    return AppendRequest.builder()
-        .withTerm(raft.getTerm())
-        .withLeader(leader != null ? leader.memberId() : null)
-        .withPrevLogIndex(prevEntry != null ? prevEntry.index() : reader != null ? reader.getFirstIndex() - 1 : 0)
-        .withPrevLogTerm(prevEntry != null ? prevEntry.entry().getTerm() : 0)
-        .withEntries(Collections.emptyList())
-        .withCommitIndex(raft.getCommitIndex())
+    return AppendRequest.newBuilder()
+        .setTerm(raft.getTerm())
+        .setLeader(leader != null ? leader.memberId().id() : "")
+        .setPrevLogIndex(prevEntry != null ? prevEntry.index() : reader != null ? reader.getFirstIndex() - 1 : 0)
+        .setPrevLogTerm(prevEntry != null ? prevEntry.entry().getTerm() : 0)
+        .addAllEntries(Collections.emptyList())
+        .setCommitIndex(raft.getCommitIndex())
         .build();
   }
 
@@ -122,12 +123,12 @@ abstract class AbstractAppender implements AutoCloseable {
     final Indexed<RaftLogEntry> prevEntry = reader.getCurrentEntry();
 
     final DefaultRaftMember leader = raft.getLeader();
-    AppendRequest.Builder builder = AppendRequest.builder()
-        .withTerm(raft.getTerm())
-        .withLeader(leader != null ? leader.memberId() : null)
-        .withPrevLogIndex(prevEntry != null ? prevEntry.index() : reader.getFirstIndex() - 1)
-        .withPrevLogTerm(prevEntry != null ? prevEntry.entry().getTerm() : 0)
-        .withCommitIndex(raft.getCommitIndex());
+    AppendRequest.Builder builder = AppendRequest.newBuilder()
+        .setTerm(raft.getTerm())
+        .setLeader(leader != null ? leader.memberId().id() : "")
+        .setPrevLogIndex(prevEntry != null ? prevEntry.index() : reader.getFirstIndex() - 1)
+        .setPrevLogTerm(prevEntry != null ? prevEntry.entry().getTerm() : 0)
+        .setCommitIndex(raft.getCommitIndex());
 
     // Build a list of entries to send to the member.
     final List<RaftLogEntry> entries = new ArrayList<>();
@@ -152,7 +153,7 @@ abstract class AbstractAppender implements AutoCloseable {
     }
 
     // Add the entries to the request builder and build the request.
-    return builder.withEntries(entries).build();
+    return builder.addAllEntries(entries).build();
   }
 
   /**
@@ -160,7 +161,7 @@ abstract class AbstractAppender implements AutoCloseable {
    */
   protected void sendAppendRequest(RaftMemberContext member, AppendRequest request) {
     // If this is a heartbeat message and a heartbeat is already in progress, skip the request.
-    if (request.entries().isEmpty() && !member.canHeartbeat()) {
+    if (request.getEntriesList().isEmpty() && !member.canHeartbeat()) {
       return;
     }
 
@@ -172,7 +173,7 @@ abstract class AbstractAppender implements AutoCloseable {
     log.trace("Sending {} to {}", request, member.getMember().memberId());
     raft.getProtocol().append(member.getMember().memberId(), request).whenCompleteAsync((response, error) -> {
       // Complete the append to the member.
-      if (!request.entries().isEmpty()) {
+      if (!request.getEntriesList().isEmpty()) {
         member.completeAppend(System.currentTimeMillis() - timestamp);
       } else {
         member.completeAppend();
@@ -188,7 +189,7 @@ abstract class AbstractAppender implements AutoCloseable {
       }
     }, raft.getThreadContext());
 
-    if (!request.entries().isEmpty() && hasMoreEntries(member)) {
+    if (!request.getEntriesList().isEmpty() && hasMoreEntries(member)) {
       appendEntries(member);
     }
   }
@@ -205,7 +206,7 @@ abstract class AbstractAppender implements AutoCloseable {
    * Handles an append response.
    */
   protected void handleAppendResponse(RaftMemberContext member, AppendRequest request, AppendResponse response, long timestamp) {
-    if (response.status() == RaftResponse.Status.OK) {
+    if (response.getStatus() == ResponseStatus.OK) {
       handleAppendResponseOk(member, request, response);
     } else {
       handleAppendResponseError(member, request, response);
@@ -213,24 +214,24 @@ abstract class AbstractAppender implements AutoCloseable {
   }
 
   /**
-   * Handles a {@link RaftResponse.Status#OK} response.
+   * Handles a {@link ResponseStatus#OK} response.
    */
   protected void handleAppendResponseOk(RaftMemberContext member, AppendRequest request, AppendResponse response) {
     // Reset the member failure count and update the member's availability status if necessary.
     succeedAttempt(member);
 
     // If replication succeeded then trigger commit futures.
-    if (response.succeeded()) {
+    if (response.getSucceeded()) {
       updateMatchIndex(member, response);
 
       // If there are more entries to send then attempt to send another commit.
-      if (request.prevLogIndex() != response.lastLogIndex() && hasMoreEntries(member)) {
+      if (request.getPrevLogIndex() != response.getLastLogIndex() && hasMoreEntries(member)) {
         appendEntries(member);
       }
     }
     // If we've received a greater term, update the term and transition back to follower.
-    else if (response.term() > raft.getTerm()) {
-      raft.setTerm(response.term());
+    else if (response.getTerm() > raft.getTerm()) {
+      raft.setTerm(response.getTerm());
       raft.setLeader(null);
       raft.transition(RaftServer.Role.FOLLOWER);
     }
@@ -241,14 +242,14 @@ abstract class AbstractAppender implements AutoCloseable {
       resetNextIndex(member, response);
 
       // If there are more entries to send then attempt to send another commit.
-      if (response.lastLogIndex() != request.prevLogIndex() && hasMoreEntries(member)) {
+      if (response.getLastLogIndex() != request.getPrevLogIndex() && hasMoreEntries(member)) {
         appendEntries(member);
       }
     }
   }
 
   /**
-   * Handles a {@link RaftResponse.Status#ERROR} response.
+   * Handles a {@link ResponseStatus#ERROR} response.
    */
   protected void handleAppendResponseError(RaftMemberContext member, AppendRequest request, AppendResponse response) {
     // If any other error occurred, increment the failure count for the member. Log the first three failures,
@@ -256,7 +257,7 @@ abstract class AbstractAppender implements AutoCloseable {
     // when attempting to send entries to down followers.
     int failures = member.incrementFailureCount();
     if (failures <= 3 || failures % 100 == 0) {
-      log.debug("{} to {} failed: {}", request, member.getMember().memberId(), response.error() != null ? response.error() : "");
+      log.debug("{} to {} failed: {}", request, member.getMember().memberId(), response.getError() != null ? response.getError() : "");
     }
   }
 
@@ -271,7 +272,7 @@ abstract class AbstractAppender implements AutoCloseable {
   /**
    * Fails an attempt to contact a member.
    */
-  protected void failAttempt(RaftMemberContext member, RaftRequest request, Throwable error) {
+  protected void failAttempt(RaftMemberContext member, Message request, Throwable error) {
     // If any append error occurred, increment the failure count for the member. Log the first three failures,
     // and thereafter log 1% of the failures. This keeps the log from filling up with annoying error messages
     // when attempting to send entries to down followers.
@@ -291,15 +292,15 @@ abstract class AbstractAppender implements AutoCloseable {
    */
   protected void updateMatchIndex(RaftMemberContext member, AppendResponse response) {
     // If the replica returned a valid match index then update the existing match index.
-    member.setMatchIndex(response.lastLogIndex());
+    member.setMatchIndex(response.getLastLogIndex());
   }
 
   /**
    * Resets the match index when a response fails.
    */
   protected void resetMatchIndex(RaftMemberContext member, AppendResponse response) {
-    if (response.lastLogIndex() < member.getMatchIndex()) {
-      member.setMatchIndex(response.lastLogIndex());
+    if (response.getLastLogIndex() < member.getMatchIndex()) {
+      member.setMatchIndex(response.getLastLogIndex());
       log.trace("Reset match index for {} to {}", member, member.getMatchIndex());
     }
   }
@@ -308,7 +309,7 @@ abstract class AbstractAppender implements AutoCloseable {
    * Resets the next index when a response fails.
    */
   protected void resetNextIndex(RaftMemberContext member, AppendResponse response) {
-    long nextIndex = response.lastLogIndex() + 1;
+    long nextIndex = response.getLastLogIndex() + 1;
     if (member.getLogReader().getNextIndex() != nextIndex) {
       member.getLogReader().reset(nextIndex);
       log.trace("Reset next index for {} to {}", member, nextIndex);
@@ -320,12 +321,12 @@ abstract class AbstractAppender implements AutoCloseable {
    */
   protected ConfigureRequest buildConfigureRequest(RaftMemberContext member) {
     DefaultRaftMember leader = raft.getLeader();
-    return ConfigureRequest.builder()
-        .withTerm(raft.getTerm())
-        .withLeader(leader != null ? leader.memberId() : null)
-        .withIndex(raft.getCluster().getConfiguration().index())
-        .withTime(raft.getCluster().getConfiguration().time())
-        .withMembers(raft.getCluster().getConfiguration().members())
+    return ConfigureRequest.newBuilder()
+        .setTerm(raft.getTerm())
+        .setLeader(leader != null ? leader.memberId().id() : "")
+        .setIndex(raft.getCluster().getConfiguration().getIndex())
+        .setTimestamp(raft.getCluster().getConfiguration().getTimestamp())
+        .addAllMembers(raft.getCluster().getConfiguration().getMembersList())
         .build();
   }
 
@@ -373,7 +374,7 @@ abstract class AbstractAppender implements AutoCloseable {
    * Handles a configuration response.
    */
   protected void handleConfigureResponse(RaftMemberContext member, ConfigureRequest request, ConfigureResponse response, long timestamp) {
-    if (response.status() == RaftResponse.Status.OK) {
+    if (response.getStatus() == ResponseStatus.OK) {
       handleConfigureResponseOk(member, request, response);
     } else {
       handleConfigureResponseError(member, request, response);
@@ -389,8 +390,8 @@ abstract class AbstractAppender implements AutoCloseable {
     succeedAttempt(member);
 
     // Update the member's current configuration term and index according to the installed configuration.
-    member.setConfigTerm(request.term());
-    member.setConfigIndex(request.index());
+    member.setConfigTerm(request.getTerm());
+    member.setConfigIndex(request.getIndex());
 
     // Recursively append entries to the member.
     appendEntries(member);
@@ -426,14 +427,13 @@ abstract class AbstractAppender implements AutoCloseable {
         // Create the install request, indicating whether this is the last chunk of data based on the number
         // of bytes remaining in the buffer.
         DefaultRaftMember leader = raft.getLeader();
-        request = InstallRequest.builder()
-            .withTerm(raft.getTerm())
-            .withLeader(leader != null ? leader.memberId() : null)
-            .withIndex(snapshot.index())
-            .withTimestamp(snapshot.timestamp().unixTimestamp())
-            .withOffset(member.getNextSnapshotOffset())
-            .withData(data)
-            .withComplete(input.available() == 0)
+        request = InstallRequest.newBuilder()
+            .setTerm(raft.getTerm())
+            .setLeader(leader != null ? leader.memberId().id() : "")
+            .setIndex(snapshot.index())
+            .setTimestamp(snapshot.timestamp().unixTimestamp())
+            .setData(ByteString.copyFrom(data))
+            .setComplete(input.available() == 0)
             .build();
       } catch (IOException e) {
         log.error("Failed to read snapshot chunk");
@@ -488,7 +488,7 @@ abstract class AbstractAppender implements AutoCloseable {
    * Handles an install response.
    */
   protected void handleInstallResponse(RaftMemberContext member, InstallRequest request, InstallResponse response, long timestamp) {
-    if (response.status() == RaftResponse.Status.OK) {
+    if (response.getStatus() == ResponseStatus.OK) {
       handleInstallResponseOk(member, request, response);
     } else {
       handleInstallResponseError(member, request, response);
@@ -505,14 +505,14 @@ abstract class AbstractAppender implements AutoCloseable {
 
     // If the install request was completed successfully, set the member's snapshotIndex and reset
     // the next snapshot index/offset.
-    if (request.complete()) {
+    if (request.getComplete()) {
       member.setNextSnapshotIndex(0);
       member.setNextSnapshotOffset(0);
-      member.setSnapshotIndex(request.snapshotIndex());
+      member.setSnapshotIndex(request.getIndex());
     }
     // If more install requests remain, increment the member's snapshot offset.
     else {
-      member.setNextSnapshotOffset(request.chunkOffset() + 1);
+      member.setNextSnapshotOffset(member.getNextSnapshotOffset() + 1);
     }
 
     // Recursively append entries to the member.

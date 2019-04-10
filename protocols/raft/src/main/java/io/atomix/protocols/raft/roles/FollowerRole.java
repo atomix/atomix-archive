@@ -15,6 +15,13 @@
  */
 package io.atomix.protocols.raft.roles;
 
+import java.time.Duration;
+import java.util.Random;
+import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.stream.Collectors;
+
 import io.atomix.cluster.ClusterMembershipEvent;
 import io.atomix.cluster.ClusterMembershipEventListener;
 import io.atomix.protocols.raft.RaftServer;
@@ -35,13 +42,6 @@ import io.atomix.protocols.raft.storage.log.RaftLogEntry;
 import io.atomix.protocols.raft.utils.Quorum;
 import io.atomix.storage.journal.Indexed;
 import io.atomix.utils.concurrent.Scheduled;
-
-import java.time.Duration;
-import java.util.Random;
-import java.util.Set;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.stream.Collectors;
 
 /**
  * Follower state.
@@ -156,11 +156,11 @@ public final class FollowerRole extends ActiveRole {
     // of the cluster and vote each member for a vote.
     for (DefaultRaftMember member : votingMembers) {
       log.debug("Polling {} for next term {}", member, raft.getTerm() + 1);
-      PollRequest request = PollRequest.builder()
-          .withTerm(raft.getTerm())
-          .withCandidate(raft.getCluster().getMember().memberId())
-          .withLastLogIndex(lastEntry != null ? lastEntry.index() : 0)
-          .withLastLogTerm(lastTerm)
+      PollRequest request = PollRequest.newBuilder()
+          .setTerm(raft.getTerm())
+          .setCandidate(raft.getCluster().getMember().memberId().id())
+          .setLastLogIndex(lastEntry != null ? lastEntry.index() : 0)
+          .setLastLogTerm(lastTerm)
           .build();
       raft.getProtocol().poll(member.memberId(), request).whenCompleteAsync((response, error) -> {
         raft.checkThread();
@@ -169,14 +169,14 @@ public final class FollowerRole extends ActiveRole {
             log.warn("{}", error.getMessage());
             quorum.fail();
           } else {
-            if (response.term() > raft.getTerm()) {
-              raft.setTerm(response.term());
+            if (response.getTerm() > raft.getTerm()) {
+              raft.setTerm(response.getTerm());
             }
 
-            if (!response.accepted()) {
+            if (!response.getAccepted()) {
               log.debug("Received rejected poll from {}", member);
               quorum.fail();
-            } else if (response.term() != raft.getTerm()) {
+            } else if (response.getTerm() != raft.getTerm()) {
               log.debug("Received accepted poll for a different term from {}", member);
               quorum.fail();
             } else {
@@ -216,7 +216,7 @@ public final class FollowerRole extends ActiveRole {
   protected VoteResponse handleVote(VoteRequest request) {
     // Reset the heartbeat timeout if we voted for another candidate.
     VoteResponse response = super.handleVote(request);
-    if (response.voted()) {
+    if (response.getVoted()) {
       resetHeartbeatTimeout();
     }
     return response;

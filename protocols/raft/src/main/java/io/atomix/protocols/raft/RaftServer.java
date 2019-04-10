@@ -557,7 +557,7 @@ public interface RaftServer {
   abstract class Builder implements io.atomix.utils.Builder<RaftServer> {
     private static final Duration DEFAULT_ELECTION_TIMEOUT = Duration.ofMillis(750);
     private static final Duration DEFAULT_HEARTBEAT_INTERVAL = Duration.ofMillis(250);
-    private static final Duration DEFAULT_SESSION_TIMEOUT = Duration.ofMillis(5000);
+    private static final Duration DEFAULT_SESSION_TIMEOUT = Duration.ofSeconds(30);
     private static final ThreadModel DEFAULT_THREAD_MODEL = ThreadModel.SHARED_THREAD_POOL;
     private static final int DEFAULT_THREAD_POOL_SIZE = Math.max(Math.min(Runtime.getRuntime().availableProcessors() * 2, 8), 4);
 

@@ -15,18 +15,17 @@
  */
 package io.atomix.protocols.raft.session.impl;
 
-import io.atomix.primitive.session.SessionId;
-import io.atomix.protocols.raft.TestPrimitiveType;
-import io.atomix.protocols.raft.protocol.CommandResponse;
-import io.atomix.protocols.raft.protocol.PublishRequest;
-import io.atomix.protocols.raft.protocol.QueryResponse;
-import io.atomix.protocols.raft.protocol.RaftResponse;
-import org.junit.Test;
-
 import java.util.Collections;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+
+import io.atomix.primitive.session.SessionId;
+import io.atomix.protocols.raft.TestPrimitiveType;
+import io.atomix.protocols.raft.protocol.OperationResponse;
+import io.atomix.protocols.raft.protocol.PublishRequest;
+import io.atomix.protocols.raft.protocol.ResponseStatus;
+import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -47,17 +46,17 @@ public class RaftSessionSequencerTest {
     RaftSessionSequencer sequencer = new RaftSessionSequencer(new RaftSessionState("test", SessionId.from(1), UUID.randomUUID().toString(), TestPrimitiveType.instance(), 1000));
     long sequence = sequencer.nextRequest();
 
-    PublishRequest request = PublishRequest.builder()
-        .withSession(1)
-        .withEventIndex(1)
-        .withPreviousIndex(0)
-        .withEvents(Collections.emptyList())
+    PublishRequest request = PublishRequest.newBuilder()
+        .setSessionId(1)
+        .setEventIndex(1)
+        .setPreviousIndex(0)
+        .addAllEvents(Collections.emptyList())
         .build();
 
-    CommandResponse response = CommandResponse.builder()
-        .withStatus(RaftResponse.Status.OK)
-        .withIndex(2)
-        .withEventIndex(1)
+    OperationResponse response = OperationResponse.newBuilder()
+        .setStatus(ResponseStatus.OK)
+        .setIndex(2)
+        .setEventIndex(1)
         .build();
 
     AtomicInteger run = new AtomicInteger();
@@ -74,17 +73,17 @@ public class RaftSessionSequencerTest {
     RaftSessionSequencer sequencer = new RaftSessionSequencer(new RaftSessionState("test", SessionId.from(1), UUID.randomUUID().toString(), TestPrimitiveType.instance(), 1000));
     long sequence = sequencer.nextRequest();
 
-    PublishRequest request = PublishRequest.builder()
-        .withSession(1)
-        .withEventIndex(1)
-        .withPreviousIndex(0)
-        .withEvents(Collections.emptyList())
+    PublishRequest request = PublishRequest.newBuilder()
+        .setSessionId(1)
+        .setEventIndex(1)
+        .setPreviousIndex(0)
+        .addAllEvents(Collections.emptyList())
         .build();
 
-    CommandResponse response = CommandResponse.builder()
-        .withStatus(RaftResponse.Status.OK)
-        .withIndex(2)
-        .withEventIndex(1)
+    OperationResponse response = OperationResponse.newBuilder()
+        .setStatus(ResponseStatus.OK)
+        .setIndex(2)
+        .setEventIndex(1)
         .build();
 
     AtomicInteger run = new AtomicInteger();
@@ -101,17 +100,17 @@ public class RaftSessionSequencerTest {
     RaftSessionSequencer sequencer = new RaftSessionSequencer(new RaftSessionState("test", SessionId.from(1), UUID.randomUUID().toString(), TestPrimitiveType.instance(), 1000));
     long sequence = sequencer.nextRequest();
 
-    PublishRequest request = PublishRequest.builder()
-        .withSession(1)
-        .withEventIndex(2)
-        .withPreviousIndex(0)
-        .withEvents(Collections.emptyList())
+    PublishRequest request = PublishRequest.newBuilder()
+        .setSessionId(1)
+        .setEventIndex(2)
+        .setPreviousIndex(0)
+        .addAllEvents(Collections.emptyList())
         .build();
 
-    CommandResponse response = CommandResponse.builder()
-        .withStatus(RaftResponse.Status.OK)
-        .withIndex(2)
-        .withEventIndex(2)
+    OperationResponse response = OperationResponse.newBuilder()
+        .setStatus(ResponseStatus.OK)
+        .setIndex(2)
+        .setEventIndex(2)
         .build();
 
     AtomicInteger run = new AtomicInteger();
@@ -128,24 +127,24 @@ public class RaftSessionSequencerTest {
     RaftSessionSequencer sequencer = new RaftSessionSequencer(new RaftSessionState("test", SessionId.from(1), UUID.randomUUID().toString(), TestPrimitiveType.instance(), 1000));
     long sequence = sequencer.nextRequest();
 
-    PublishRequest request1 = PublishRequest.builder()
-        .withSession(1)
-        .withEventIndex(2)
-        .withPreviousIndex(0)
-        .withEvents(Collections.emptyList())
+    PublishRequest request1 = PublishRequest.newBuilder()
+        .setSessionId(1)
+        .setEventIndex(2)
+        .setPreviousIndex(0)
+        .addAllEvents(Collections.emptyList())
         .build();
 
-    PublishRequest request2 = PublishRequest.builder()
-        .withSession(1)
-        .withEventIndex(3)
-        .withPreviousIndex(2)
-        .withEvents(Collections.emptyList())
+    PublishRequest request2 = PublishRequest.newBuilder()
+        .setSessionId(1)
+        .setEventIndex(3)
+        .setPreviousIndex(2)
+        .addAllEvents(Collections.emptyList())
         .build();
 
-    CommandResponse response = CommandResponse.builder()
-        .withStatus(RaftResponse.Status.OK)
-        .withIndex(2)
-        .withEventIndex(2)
+    OperationResponse response = OperationResponse.newBuilder()
+        .setStatus(ResponseStatus.OK)
+        .setIndex(2)
+        .setEventIndex(2)
         .build();
 
     AtomicInteger run = new AtomicInteger();
@@ -162,18 +161,18 @@ public class RaftSessionSequencerTest {
   public void testSequenceEventAbsentCommand() throws Throwable {
     RaftSessionSequencer sequencer = new RaftSessionSequencer(new RaftSessionState("test", SessionId.from(1), UUID.randomUUID().toString(), TestPrimitiveType.instance(), 1000));
 
-    PublishRequest request1 = PublishRequest.builder()
-        .withSession(1)
-        .withEventIndex(2)
-        .withPreviousIndex(0)
-        .withEvents(Collections.emptyList())
+    PublishRequest request1 = PublishRequest.newBuilder()
+        .setSessionId(1)
+        .setEventIndex(2)
+        .setPreviousIndex(0)
+        .addAllEvents(Collections.emptyList())
         .build();
 
-    PublishRequest request2 = PublishRequest.builder()
-        .withSession(1)
-        .withEventIndex(3)
-        .withPreviousIndex(2)
-        .withEvents(Collections.emptyList())
+    PublishRequest request2 = PublishRequest.newBuilder()
+        .setSessionId(1)
+        .setEventIndex(3)
+        .setPreviousIndex(2)
+        .addAllEvents(Collections.emptyList())
         .build();
 
     AtomicInteger run = new AtomicInteger();
@@ -192,16 +191,16 @@ public class RaftSessionSequencerTest {
     long sequence2 = sequencer.nextRequest();
     assertTrue(sequence2 == sequence1 + 1);
 
-    CommandResponse commandResponse = CommandResponse.builder()
-        .withStatus(RaftResponse.Status.OK)
-        .withIndex(2)
-        .withEventIndex(0)
+    OperationResponse commandResponse = OperationResponse.newBuilder()
+        .setStatus(ResponseStatus.OK)
+        .setIndex(2)
+        .setEventIndex(0)
         .build();
 
-    QueryResponse queryResponse = QueryResponse.builder()
-        .withStatus(RaftResponse.Status.OK)
-        .withIndex(2)
-        .withEventIndex(0)
+    OperationResponse queryResponse = OperationResponse.newBuilder()
+        .setStatus(ResponseStatus.OK)
+        .setIndex(2)
+        .setEventIndex(0)
         .build();
 
     AtomicBoolean run = new AtomicBoolean();

@@ -15,15 +15,15 @@
  */
 package io.atomix.protocols.raft.roles;
 
-import io.atomix.protocols.raft.RaftError;
+import java.util.concurrent.CompletableFuture;
+
+import io.atomix.cluster.MemberId;
 import io.atomix.protocols.raft.RaftServer;
 import io.atomix.protocols.raft.impl.RaftContext;
 import io.atomix.protocols.raft.protocol.AppendRequest;
 import io.atomix.protocols.raft.protocol.AppendResponse;
 import io.atomix.protocols.raft.protocol.CloseSessionRequest;
 import io.atomix.protocols.raft.protocol.CloseSessionResponse;
-import io.atomix.protocols.raft.protocol.CommandRequest;
-import io.atomix.protocols.raft.protocol.CommandResponse;
 import io.atomix.protocols.raft.protocol.ConfigureRequest;
 import io.atomix.protocols.raft.protocol.ConfigureResponse;
 import io.atomix.protocols.raft.protocol.InstallRequest;
@@ -38,22 +38,20 @@ import io.atomix.protocols.raft.protocol.MetadataRequest;
 import io.atomix.protocols.raft.protocol.MetadataResponse;
 import io.atomix.protocols.raft.protocol.OpenSessionRequest;
 import io.atomix.protocols.raft.protocol.OpenSessionResponse;
+import io.atomix.protocols.raft.protocol.OperationRequest;
+import io.atomix.protocols.raft.protocol.OperationResponse;
 import io.atomix.protocols.raft.protocol.PollRequest;
 import io.atomix.protocols.raft.protocol.PollResponse;
-import io.atomix.protocols.raft.protocol.QueryRequest;
-import io.atomix.protocols.raft.protocol.QueryResponse;
-import io.atomix.protocols.raft.protocol.RaftResponse;
-import io.atomix.protocols.raft.protocol.RaftResponse.Status;
+import io.atomix.protocols.raft.protocol.RaftError;
 import io.atomix.protocols.raft.protocol.ReconfigureRequest;
 import io.atomix.protocols.raft.protocol.ReconfigureResponse;
+import io.atomix.protocols.raft.protocol.ResponseStatus;
 import io.atomix.protocols.raft.protocol.TransferRequest;
 import io.atomix.protocols.raft.protocol.TransferResponse;
 import io.atomix.protocols.raft.protocol.VoteRequest;
 import io.atomix.protocols.raft.protocol.VoteResponse;
-import io.atomix.protocols.raft.storage.system.Configuration;
+import io.atomix.protocols.raft.storage.system.RaftConfiguration;
 import io.atomix.utils.concurrent.Futures;
-
-import java.util.concurrent.CompletableFuture;
 
 /**
  * Inactive state.
@@ -73,9 +71,14 @@ public class InactiveRole extends AbstractRole {
   public CompletableFuture<ConfigureResponse> onConfigure(ConfigureRequest request) {
     raft.checkThread();
     logRequest(request);
-    updateTermAndLeader(request.term(), request.leader());
+    updateTermAndLeader(request.getTerm(), MemberId.from(request.getLeader()));
 
-    Configuration configuration = new Configuration(request.index(), request.term(), request.timestamp(), request.members());
+    RaftConfiguration configuration = RaftConfiguration.newBuilder()
+        .setIndex(request.getIndex())
+        .setTerm(request.getTerm())
+        .setTimestamp(request.getTimestamp())
+        .addAllMembers(request.getMembersList())
+        .build();
 
     // Configure the cluster membership. This will cause this server to transition to the
     // appropriate state if its type has changed.
@@ -84,138 +87,138 @@ public class InactiveRole extends AbstractRole {
     // If the configuration is already committed, commit it to disk.
     // Check against the actual cluster Configuration rather than the received configuration in
     // case the received configuration was an older configuration that was not applied.
-    if (raft.getCommitIndex() >= raft.getCluster().getConfiguration().index()) {
+    if (raft.getCommitIndex() >= raft.getCluster().getConfiguration().getIndex()) {
       raft.getCluster().commit();
     }
 
-    return CompletableFuture.completedFuture(logResponse(ConfigureResponse.builder()
-        .withStatus(RaftResponse.Status.OK)
+    return CompletableFuture.completedFuture(logResponse(ConfigureResponse.newBuilder()
+        .setStatus(ResponseStatus.OK)
         .build()));
   }
 
   @Override
   public CompletableFuture<MetadataResponse> onMetadata(MetadataRequest request) {
     logRequest(request);
-    return Futures.completedFuture(logResponse(MetadataResponse.builder()
-        .withStatus(Status.ERROR)
-        .withError(RaftError.Type.UNAVAILABLE)
+    return Futures.completedFuture(logResponse(MetadataResponse.newBuilder()
+        .setStatus(ResponseStatus.ERROR)
+        .setError(RaftError.UNAVAILABLE)
         .build()));
   }
 
   @Override
   public CompletableFuture<KeepAliveResponse> onKeepAlive(KeepAliveRequest request) {
     logRequest(request);
-    return Futures.completedFuture(logResponse(KeepAliveResponse.builder()
-        .withStatus(Status.ERROR)
-        .withError(RaftError.Type.UNAVAILABLE)
+    return Futures.completedFuture(logResponse(KeepAliveResponse.newBuilder()
+        .setStatus(ResponseStatus.ERROR)
+        .setError(RaftError.UNAVAILABLE)
         .build()));
   }
 
   @Override
   public CompletableFuture<OpenSessionResponse> onOpenSession(OpenSessionRequest request) {
     logRequest(request);
-    return Futures.completedFuture(logResponse(OpenSessionResponse.builder()
-        .withStatus(Status.ERROR)
-        .withError(RaftError.Type.UNAVAILABLE)
+    return Futures.completedFuture(logResponse(OpenSessionResponse.newBuilder()
+        .setStatus(ResponseStatus.ERROR)
+        .setError(RaftError.UNAVAILABLE)
         .build()));
   }
 
   @Override
   public CompletableFuture<CloseSessionResponse> onCloseSession(CloseSessionRequest request) {
     logRequest(request);
-    return Futures.completedFuture(logResponse(CloseSessionResponse.builder()
-        .withStatus(Status.ERROR)
-        .withError(RaftError.Type.UNAVAILABLE)
+    return Futures.completedFuture(logResponse(CloseSessionResponse.newBuilder()
+        .setStatus(ResponseStatus.ERROR)
+        .setError(RaftError.UNAVAILABLE)
         .build()));
   }
 
   @Override
   public CompletableFuture<InstallResponse> onInstall(InstallRequest request) {
     logRequest(request);
-    return Futures.completedFuture(logResponse(InstallResponse.builder()
-        .withStatus(Status.ERROR)
-        .withError(RaftError.Type.UNAVAILABLE)
+    return Futures.completedFuture(logResponse(InstallResponse.newBuilder()
+        .setStatus(ResponseStatus.ERROR)
+        .setError(RaftError.UNAVAILABLE)
         .build()));
   }
 
   @Override
   public CompletableFuture<JoinResponse> onJoin(JoinRequest request) {
     logRequest(request);
-    return Futures.completedFuture(logResponse(JoinResponse.builder()
-        .withStatus(Status.ERROR)
-        .withError(RaftError.Type.UNAVAILABLE)
+    return Futures.completedFuture(logResponse(JoinResponse.newBuilder()
+        .setStatus(ResponseStatus.ERROR)
+        .setError(RaftError.UNAVAILABLE)
         .build()));
   }
 
   @Override
   public CompletableFuture<ReconfigureResponse> onReconfigure(ReconfigureRequest request) {
     logRequest(request);
-    return Futures.completedFuture(logResponse(ReconfigureResponse.builder()
-        .withStatus(Status.ERROR)
-        .withError(RaftError.Type.UNAVAILABLE)
+    return Futures.completedFuture(logResponse(ReconfigureResponse.newBuilder()
+        .setStatus(ResponseStatus.ERROR)
+        .setError(RaftError.UNAVAILABLE)
         .build()));
   }
 
   @Override
   public CompletableFuture<LeaveResponse> onLeave(LeaveRequest request) {
     logRequest(request);
-    return Futures.completedFuture(logResponse(LeaveResponse.builder()
-        .withStatus(Status.ERROR)
-        .withError(RaftError.Type.UNAVAILABLE)
+    return Futures.completedFuture(logResponse(LeaveResponse.newBuilder()
+        .setStatus(ResponseStatus.ERROR)
+        .setError(RaftError.UNAVAILABLE)
         .build()));
   }
 
   @Override
   public CompletableFuture<TransferResponse> onTransfer(TransferRequest request) {
     logRequest(request);
-    return Futures.completedFuture(logResponse(TransferResponse.builder()
-        .withStatus(Status.ERROR)
-        .withError(RaftError.Type.UNAVAILABLE)
+    return Futures.completedFuture(logResponse(TransferResponse.newBuilder()
+        .setStatus(ResponseStatus.ERROR)
+        .setError(RaftError.UNAVAILABLE)
         .build()));
   }
 
   @Override
   public CompletableFuture<AppendResponse> onAppend(AppendRequest request) {
     logRequest(request);
-    return Futures.completedFuture(logResponse(AppendResponse.builder()
-        .withStatus(Status.ERROR)
-        .withError(RaftError.Type.UNAVAILABLE)
+    return Futures.completedFuture(logResponse(AppendResponse.newBuilder()
+        .setStatus(ResponseStatus.ERROR)
+        .setError(RaftError.UNAVAILABLE)
         .build()));
   }
 
   @Override
   public CompletableFuture<PollResponse> onPoll(PollRequest request) {
     logRequest(request);
-    return Futures.completedFuture(logResponse(PollResponse.builder()
-        .withStatus(Status.ERROR)
-        .withError(RaftError.Type.UNAVAILABLE)
+    return Futures.completedFuture(logResponse(PollResponse.newBuilder()
+        .setStatus(ResponseStatus.ERROR)
+        .setError(RaftError.UNAVAILABLE)
         .build()));
   }
 
   @Override
   public CompletableFuture<VoteResponse> onVote(VoteRequest request) {
     logRequest(request);
-    return Futures.completedFuture(logResponse(VoteResponse.builder()
-        .withStatus(Status.ERROR)
-        .withError(RaftError.Type.UNAVAILABLE)
+    return Futures.completedFuture(logResponse(VoteResponse.newBuilder()
+        .setStatus(ResponseStatus.ERROR)
+        .setError(RaftError.UNAVAILABLE)
         .build()));
   }
 
   @Override
-  public CompletableFuture<CommandResponse> onCommand(CommandRequest request) {
+  public CompletableFuture<OperationResponse> onCommand(OperationRequest request) {
     logRequest(request);
-    return Futures.completedFuture(logResponse(CommandResponse.builder()
-        .withStatus(Status.ERROR)
-        .withError(RaftError.Type.UNAVAILABLE)
+    return Futures.completedFuture(logResponse(OperationResponse.newBuilder()
+        .setStatus(ResponseStatus.ERROR)
+        .setError(RaftError.UNAVAILABLE)
         .build()));
   }
 
   @Override
-  public CompletableFuture<QueryResponse> onQuery(QueryRequest request) {
+  public CompletableFuture<OperationResponse> onQuery(OperationRequest request) {
     logRequest(request);
-    return Futures.completedFuture(logResponse(QueryResponse.builder()
-        .withStatus(Status.ERROR)
-        .withError(RaftError.Type.UNAVAILABLE)
+    return Futures.completedFuture(logResponse(OperationResponse.newBuilder()
+        .setStatus(ResponseStatus.ERROR)
+        .setError(RaftError.UNAVAILABLE)
         .build()));
   }
 

@@ -35,10 +35,10 @@ import io.atomix.primitive.operation.OperationId;
 import io.atomix.primitive.operation.PrimitiveOperation;
 import io.atomix.primitive.service.PrimitiveService;
 import io.atomix.primitive.session.SessionId;
-import io.atomix.primitive.session.SessionMetadata;
 import io.atomix.protocols.raft.RaftException;
 import io.atomix.protocols.raft.RaftServer;
 import io.atomix.protocols.raft.ReadConsistency;
+import io.atomix.protocols.raft.protocol.SessionMetadata;
 import io.atomix.protocols.raft.service.RaftServiceContext;
 import io.atomix.protocols.raft.session.RaftSession;
 import io.atomix.protocols.raft.storage.log.RaftLog;
@@ -733,14 +733,22 @@ public class RaftServiceManager implements AutoCloseable {
       Set<SessionMetadata> sessions = new HashSet<>();
       for (RaftSession s : raft.getSessions().getSessions()) {
         if (s.primitiveName().equals(session.primitiveName())) {
-          sessions.add(new SessionMetadata(s.sessionId().id(), s.primitiveName(), s.primitiveType().name()));
+          sessions.add(SessionMetadata.newBuilder()
+              .setSessionId(s.sessionId().id())
+              .setServiceName(s.primitiveName())
+              .setServiceType(s.primitiveType().name())
+              .build());
         }
       }
       return new MetadataResult(sessions);
     } else {
       Set<SessionMetadata> sessions = new HashSet<>();
       for (RaftSession session : raft.getSessions().getSessions()) {
-        sessions.add(new SessionMetadata(session.sessionId().id(), session.primitiveName(), session.primitiveType().name()));
+        sessions.add(SessionMetadata.newBuilder()
+            .setSessionId(session.sessionId().id())
+            .setServiceName(session.primitiveName())
+            .setServiceType(session.primitiveType().name())
+            .build());
       }
       return new MetadataResult(sessions);
     }

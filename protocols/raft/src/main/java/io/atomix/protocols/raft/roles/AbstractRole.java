@@ -15,20 +15,19 @@
  */
 package io.atomix.protocols.raft.roles;
 
+import java.util.concurrent.CompletableFuture;
+import java.util.function.BiFunction;
+
+import com.google.protobuf.Message;
 import io.atomix.cluster.MemberId;
 import io.atomix.protocols.raft.RaftException;
 import io.atomix.protocols.raft.RaftServer;
 import io.atomix.protocols.raft.cluster.impl.DefaultRaftMember;
 import io.atomix.protocols.raft.impl.RaftContext;
-import io.atomix.protocols.raft.protocol.RaftRequest;
-import io.atomix.protocols.raft.protocol.RaftResponse;
 import io.atomix.utils.concurrent.Futures;
 import io.atomix.utils.logging.ContextualLoggerFactory;
 import io.atomix.utils.logging.LoggerContext;
 import org.slf4j.Logger;
-
-import java.util.concurrent.CompletableFuture;
-import java.util.function.BiFunction;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
 
@@ -58,7 +57,7 @@ public abstract class AbstractRole implements RaftRole {
   /**
    * Logs a request.
    */
-  protected final <R extends RaftRequest> R logRequest(R request) {
+  protected final <R extends Message> R logRequest(R request) {
     log.trace("Received {}", request);
     return request;
   }
@@ -66,7 +65,7 @@ public abstract class AbstractRole implements RaftRole {
   /**
    * Logs a response.
    */
-  protected final <R extends RaftResponse> R logResponse(R response) {
+  protected final <R extends Message> R logResponse(R response) {
     log.trace("Sending {}", response);
     return response;
   }
@@ -86,7 +85,7 @@ public abstract class AbstractRole implements RaftRole {
   /**
    * Forwards the given request to the leader if possible.
    */
-  protected <T extends RaftRequest, U extends RaftResponse> CompletableFuture<U> forward(T request, BiFunction<MemberId, T, CompletableFuture<U>> function) {
+  protected <T extends Message, U extends Message> CompletableFuture<U> forward(T request, BiFunction<MemberId, T, CompletableFuture<U>> function) {
     CompletableFuture<U> future = new CompletableFuture<>();
     DefaultRaftMember leader = raft.getLeader();
     if (leader == null) {

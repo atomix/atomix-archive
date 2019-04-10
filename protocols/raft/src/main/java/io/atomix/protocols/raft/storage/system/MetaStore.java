@@ -15,20 +15,19 @@
  */
 package io.atomix.protocols.raft.storage.system;
 
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+
 import io.atomix.cluster.MemberId;
 import io.atomix.protocols.raft.storage.RaftStorage;
-import io.atomix.utils.serializer.Serializer;
-import io.atomix.storage.StorageLevel;
-import io.atomix.storage.buffer.Buffer;
-import io.atomix.storage.buffer.FileBuffer;
-import io.atomix.storage.buffer.HeapBuffer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.File;
-
 import static com.google.common.base.MoreObjects.toStringHelper;
-import static com.google.common.base.Preconditions.checkNotNull;
 
 /**
  * Manages persistence of server configurations.
@@ -36,32 +35,20 @@ import static com.google.common.base.Preconditions.checkNotNull;
  * The server metastore is responsible for persisting server configurations according to the configured
  * {@link RaftStorage#storageLevel() storage level}. Each server persists their current {@link #loadTerm() term}
  * and last {@link #loadVote() vote} as is dictated by the Raft consensus algorithm. Additionally, the
- * metastore is responsible for storing the last know server {@link Configuration}, including cluster
+ * metastore is responsible for storing the last know server {@link RaftConfiguration}, including cluster
  * membership.
  */
 public class MetaStore implements AutoCloseable {
   private final Logger log = LoggerFactory.getLogger(getClass());
-  private final Serializer serializer;
-  private final FileBuffer metadataBuffer;
-  private final Buffer configurationBuffer;
+  private final File metaFile;
+  private final File configFile;
 
-  public MetaStore(RaftStorage storage, Serializer serializer) {
-    this.serializer = checkNotNull(serializer, "serializer cannot be null");
-
+  public MetaStore(RaftStorage storage) {
     if (!(storage.directory().isDirectory() || storage.directory().mkdirs())) {
       throw new IllegalArgumentException(String.format("Can't create storage directory [%s].", storage.directory()));
     }
-
-    // Note that for raft safety, irrespective of the storage level, <term, vote> metadata is always persisted on disk.
-    File metaFile = new File(storage.directory(), String.format("%s.meta", storage.prefix()));
-    metadataBuffer = FileBuffer.allocate(metaFile, 12);
-
-    if (storage.storageLevel() == StorageLevel.MEMORY) {
-      configurationBuffer = HeapBuffer.allocate(32);
-    } else {
-      File confFile = new File(storage.directory(), String.format("%s.conf", storage.prefix()));
-      configurationBuffer = FileBuffer.allocate(confFile, 32);
-    }
+    metaFile = new File(storage.directory(), String.format("%s.meta", storage.prefix()));
+    configFile = new File(storage.directory(), String.format("%s.conf", storage.prefix()));
   }
 
   /**
@@ -69,9 +56,22 @@ public class MetaStore implements AutoCloseable {
    *
    * @param term The current server term.
    */
-  public synchronized void storeTerm(long term) {
+  public synchronized void storeTerm(long term) throws IOException {
     log.trace("Store term {}", term);
-    metadataBuffer.writeLong(0, term).flush();
+    RaftMetadata metadata;
+    try (InputStream input = new FileInputStream(metaFile)) {
+      metadata = RaftMetadata.parseFrom(input);
+    } catch (IOException e) {
+      metadata = RaftMetadata.newBuilder().build();
+    }
+
+    metadata = RaftMetadata.newBuilder(metadata)
+        .setTerm(term)
+        .build();
+
+    try (OutputStream output = new FileOutputStream(metaFile)) {
+      metadata.writeTo(output);
+    }
   }
 
   /**
@@ -80,7 +80,11 @@ public class MetaStore implements AutoCloseable {
    * @return The stored server term.
    */
   public synchronized long loadTerm() {
-    return metadataBuffer.readLong(0);
+    try (InputStream input = new FileInputStream(metaFile)) {
+      return RaftMetadata.parseFrom(input).getTerm();
+    } catch (IOException e) {
+      return 0;
+    }
   }
 
   /**
@@ -88,9 +92,22 @@ public class MetaStore implements AutoCloseable {
    *
    * @param vote The server vote.
    */
-  public synchronized void storeVote(MemberId vote) {
+  public synchronized void storeVote(MemberId vote) throws IOException {
     log.trace("Store vote {}", vote);
-    metadataBuffer.writeString(8, vote != null ? vote.id() : null).flush();
+    RaftMetadata metadata;
+    try (InputStream input = new FileInputStream(metaFile)) {
+      metadata = RaftMetadata.parseFrom(input);
+    } catch (IOException e) {
+      metadata = RaftMetadata.newBuilder().build();
+    }
+
+    metadata = RaftMetadata.newBuilder(metadata)
+        .setVote(vote != null ? vote.id() : "")
+        .build();
+
+    try (OutputStream output = new FileOutputStream(metaFile)) {
+      metadata.writeTo(output);
+    }
   }
 
   /**
@@ -99,8 +116,12 @@ public class MetaStore implements AutoCloseable {
    * @return The last vote for the server.
    */
   public synchronized MemberId loadVote() {
-    String id = metadataBuffer.readString(8);
-    return id != null ? MemberId.from(id) : null;
+    try (InputStream input = new FileInputStream(metaFile)) {
+      String vote = RaftMetadata.parseFrom(input).getVote();
+      return vote != null && !vote.equals("") ? MemberId.from(vote) : null;
+    } catch (IOException e) {
+      return null;
+    }
   }
 
   /**
@@ -108,14 +129,11 @@ public class MetaStore implements AutoCloseable {
    *
    * @param configuration The current cluster configuration.
    */
-  public synchronized void storeConfiguration(Configuration configuration) {
+  public synchronized void storeConfiguration(RaftConfiguration configuration) throws IOException {
     log.trace("Store configuration {}", configuration);
-    byte[] bytes = serializer.encode(configuration);
-    configurationBuffer.position(0)
-        .writeByte(1)
-        .writeInt(bytes.length)
-        .write(bytes);
-    configurationBuffer.flush();
+    try (OutputStream output = new FileOutputStream(configFile)) {
+      configuration.writeTo(output);
+    }
   }
 
   /**
@@ -123,21 +141,16 @@ public class MetaStore implements AutoCloseable {
    *
    * @return The current cluster configuration.
    */
-  public synchronized Configuration loadConfiguration() {
-    if (configurationBuffer.position(0).readByte() == 1) {
-      int bytesLength = configurationBuffer.readInt();
-      if (bytesLength == 0) {
-        return null;
-      }
-      return serializer.decode(configurationBuffer.readBytes(bytesLength));
+  public synchronized RaftConfiguration loadConfiguration() {
+    try (InputStream input = new FileInputStream(configFile)) {
+      return RaftConfiguration.parseFrom(input);
+    } catch (IOException e) {
+      return null;
     }
-    return null;
   }
 
   @Override
-  public synchronized void close() {
-    metadataBuffer.close();
-    configurationBuffer.close();
+  public void close() {
   }
 
   @Override
