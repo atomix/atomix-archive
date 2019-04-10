@@ -104,10 +104,8 @@ public class Snapshot implements AutoCloseable {
    * @return The completed snapshot.
    */
   public synchronized Snapshot complete() throws IOException {
-    checkState(!descriptor.getLocked(), "Snapshot is already complete");
-    if (file.temporaryFile().exists()) {
-      Files.move(file.temporaryFile().toPath(), file.file().toPath(), ATOMIC_MOVE);
-    }
+    checkState(file.temporaryFile().exists(), "Snapshot is already complete");
+    Files.move(file.temporaryFile().toPath(), file.file().toPath(), ATOMIC_MOVE);
     store.completeSnapshot(this);
     return this;
   }

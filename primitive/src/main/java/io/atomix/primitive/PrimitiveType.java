@@ -17,7 +17,6 @@ package io.atomix.primitive;
 
 import io.atomix.primitive.config.PrimitiveConfig;
 import io.atomix.primitive.service.PrimitiveService;
-import io.atomix.primitive.service.ServiceConfig;
 import io.atomix.utils.ConfiguredType;
 import io.atomix.utils.serializer.Namespace;
 import io.atomix.utils.serializer.Namespaces;
@@ -35,7 +34,6 @@ public interface PrimitiveType<B extends PrimitiveBuilder, C extends PrimitiveCo
   default Namespace namespace() {
     return Namespace.builder()
         .register(Namespaces.BASIC)
-        .register(ServiceConfig.class)
         .build();
   }
 

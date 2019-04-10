@@ -44,6 +44,7 @@ public class DefaultAtomicValueServiceTest {
     when(context.serviceName()).thenReturn("test");
     when(context.serviceId()).thenReturn(PrimitiveId.from(1));
     when(context.wallClock()).thenReturn(new WallClock());
+    when(context.currentIndex()).thenReturn(1L);
 
     Session session = mock(Session.class);
     when(session.sessionId()).thenReturn(SessionId.from(1));
@@ -51,17 +52,18 @@ public class DefaultAtomicValueServiceTest {
     DefaultAtomicValueService service = new DefaultAtomicValueService();
     service.init(context);
 
-    assertNull(service.get());
+    assertNull(service.get().value());
 
     ByteArrayOutputStream os = new ByteArrayOutputStream();
     service.backup(os);
 
-    assertNull(service.get());
+    assertNull(service.get().value());
 
     service = new DefaultAtomicValueService();
+    service.init(context);
     service.restore(new ByteArrayInputStream(os.toByteArray()));
 
-    assertNull(service.get());
+    assertNull(service.get().value());
 
     service.set("Hello world!".getBytes());
     assertArrayEquals("Hello world!".getBytes(), service.get().value());
@@ -72,11 +74,12 @@ public class DefaultAtomicValueServiceTest {
     assertArrayEquals("Hello world!".getBytes(), service.get().value());
 
     service = new DefaultAtomicValueService();
+    service.init(context);
     service.restore(new ByteArrayInputStream(os.toByteArray()));
 
     assertArrayEquals("Hello world!".getBytes(), service.get().value());
 
     service.set(null);
-    assertNull(service.get());
+    assertNull(service.get().value());
   }
 }

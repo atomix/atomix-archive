@@ -109,6 +109,15 @@ public interface AsyncAtomicSemaphore extends AsyncPrimitive {
   CompletableFuture<Integer> drainPermits();
 
   /**
+   * Sets the number of available permits to the indicated
+   * amount.
+   *
+   * @param permits the number of permits to set
+   * @return a future to be completed once the permits have been set
+   */
+  CompletableFuture<Void> setPermits(int permits);
+
+  /**
    * Increases the number of available permits by the indicated
    * amount. This method differs from {@code release} in that it does not
    * effect the amount of permits this caller has acquired.

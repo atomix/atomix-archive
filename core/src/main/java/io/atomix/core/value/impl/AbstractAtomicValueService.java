@@ -63,6 +63,7 @@ public abstract class AbstractAtomicValueService extends AbstractPrimitiveServic
       builder.setVersion(value.version());
     }
     builder.addAllListeners(listeners.stream().map(SessionId::id).collect(Collectors.toList()));
+    builder.build().writeTo(output);
   }
 
   @Override

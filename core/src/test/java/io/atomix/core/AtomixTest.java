@@ -650,7 +650,7 @@ public class AtomixTest extends AbstractAtomixTest {
     assertSame(atomix.getWorkQueue("cc"), atomix.getWorkQueue("cc"));
     assertEquals(1, atomix.getPrimitives(WorkQueueType.instance()).size());
 
-    assertEquals(30, atomix.getPrimitives().size());
+    assertEquals(29, atomix.getPrimitives().size());
   }
 
   @Test

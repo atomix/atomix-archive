@@ -44,6 +44,7 @@ public abstract class AbstractAtomicSemaphoreService extends AbstractPrimitiveSe
       .register(Waiter.class)
       .build());
 
+  private int permits;
   private int available;
   private Map<Long, Integer> holders = new HashMap<>();
   private LinkedList<Waiter> waiterQueue = new LinkedList<>();
@@ -56,6 +57,7 @@ public abstract class AbstractAtomicSemaphoreService extends AbstractPrimitiveSe
   @Override
   public void backup(OutputStream output) throws IOException {
     AtomicSemaphoreSnapshot.newBuilder()
+        .setPermits(permits)
         .setAvailable(available)
         .putAllHolders(holders)
         .addAllWaiters(waiterQueue.stream()
@@ -74,6 +76,7 @@ public abstract class AbstractAtomicSemaphoreService extends AbstractPrimitiveSe
   @Override
   public void restore(InputStream input) throws IOException {
     AtomicSemaphoreSnapshot snapshot = AtomicSemaphoreSnapshot.parseFrom(input);
+    permits = snapshot.getPermits();
     available = snapshot.getAvailable();
     holders = new HashMap<>(snapshot.getHoldersMap());
     waiterQueue = snapshot.getWaitersList().stream()
@@ -167,6 +170,17 @@ public abstract class AbstractAtomicSemaphoreService extends AbstractPrimitiveSe
       });
     }
     return acquirePermits;
+  }
+
+  @Override
+  public void set(int permits) {
+    if (permits > this.permits) {
+      increase(permits - this.permits);
+      this.permits = permits;
+    } else if (permits < this.permits) {
+      reduce(this.permits - permits);
+      this.permits = permits;
+    }
   }
 
   @Override

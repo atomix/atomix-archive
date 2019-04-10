@@ -40,7 +40,9 @@ public class DefaultDistributedSemaphoreBuilder extends DistributedSemaphoreBuil
             managementService.getPrimitiveRegistry(),
             managementService.getExecutorService())
             .connect())
-        .thenCompose(semaphore -> semaphore.increasePermits(config.initialCapacity()).thenApply(v -> semaphore))
+        .thenCompose(semaphore -> config.initialCapacity() != 0
+            ? semaphore.setPermits(config.initialCapacity()).thenApply(v -> semaphore)
+            : CompletableFuture.completedFuture(semaphore))
         .thenApply(DelegatingAsyncDistributedSemaphore::new)
         .thenApply(AsyncDistributedSemaphore::sync);
   }

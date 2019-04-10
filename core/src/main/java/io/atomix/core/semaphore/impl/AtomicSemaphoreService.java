@@ -35,6 +35,9 @@ public interface AtomicSemaphoreService {
   @Operation(value = "drain", type = OperationType.COMMAND)
   int drain();
 
+  @Operation(value = "set", type = OperationType.COMMAND)
+  void set(int permits);
+
   @Operation(value = "increase", type = OperationType.COMMAND)
   int increase(int permits);
 

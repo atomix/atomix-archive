@@ -15,14 +15,6 @@
  */
 package io.atomix.core.semaphore.impl;
 
-import io.atomix.core.semaphore.AsyncAtomicSemaphore;
-import io.atomix.core.semaphore.AtomicSemaphore;
-import io.atomix.core.semaphore.QueueStatus;
-import io.atomix.primitive.AbstractAsyncPrimitive;
-import io.atomix.primitive.PrimitiveRegistry;
-import io.atomix.primitive.proxy.ProxyClient;
-import io.atomix.utils.time.Version;
-
 import java.time.Duration;
 import java.util.Map;
 import java.util.Optional;
@@ -33,6 +25,14 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
+
+import io.atomix.core.semaphore.AsyncAtomicSemaphore;
+import io.atomix.core.semaphore.AtomicSemaphore;
+import io.atomix.core.semaphore.QueueStatus;
+import io.atomix.primitive.AbstractAsyncPrimitive;
+import io.atomix.primitive.PrimitiveRegistry;
+import io.atomix.primitive.proxy.ProxyClient;
+import io.atomix.utils.time.Version;
 
 public class AtomicSemaphoreProxy
     extends AbstractAsyncPrimitive<AsyncAtomicSemaphore, AtomicSemaphoreService>
@@ -138,6 +138,11 @@ public class AtomicSemaphoreProxy
   @Override
   public CompletableFuture<Integer> drainPermits() {
     return getProxyClient().applyBy(name(), service -> service.drain());
+  }
+
+  @Override
+  public CompletableFuture<Void> setPermits(int permits) {
+    return getProxyClient().acceptBy(name(), service -> service.set(permits));
   }
 
   @Override

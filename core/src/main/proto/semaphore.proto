@@ -8,9 +8,10 @@ option java_multiple_files = true;
 
 // Semaphore snapshot
 message AtomicSemaphoreSnapshot {
-    int32 available = 1;
-    map<int64, int32> holders = 2;
-    repeated AtomicSemaphoreWaiter waiters = 3;
+    int32 permits = 1;
+    int32 available = 2;
+    map<int64, int32> holders = 3;
+    repeated AtomicSemaphoreWaiter waiters = 4;
 }
 
 // Atomic semaphore waiter

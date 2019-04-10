@@ -22,7 +22,6 @@ import java.io.OutputStream;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -117,16 +116,18 @@ public class DefaultDocumentTreeService extends AbstractPrimitiveService<Documen
         .writeTo(output);
   }
 
-  private AtomicDocumentTreeNode buildNode(DocumentTreeNode<byte[]> node) {
+  private AtomicDocumentTreeNode buildNode(DefaultDocumentTreeNode<byte[]> node) {
     AtomicDocumentTreeNode.Builder builder = AtomicDocumentTreeNode.newBuilder()
-        .setPath(node.path().toString());
+        .setPath(node.path().pathElements().get(0));
     if (node.value() != null) {
       builder.setVersion(node.value().version());
-      builder.setValue(ByteString.copyFrom(node.value().value()));
+      if (node.value().value() != null) {
+        builder.setValue(ByteString.copyFrom(node.value().value()));
+      }
     }
-    Iterator<DocumentTreeNode<byte[]>> iterator = node.children();
-    while (iterator.hasNext()) {
-      builder.addChildren(buildNode(iterator.next()));
+
+    for (Map.Entry<String, DocumentTreeNode<byte[]>> entry : node.children.entrySet()) {
+      builder.putChildren(entry.getKey(), buildNode((DefaultDocumentTreeNode<byte[]>) entry.getValue()));
     }
     return builder.build();
   }
@@ -158,8 +159,8 @@ public class DefaultDocumentTreeService extends AbstractPrimitiveService<Documen
         node.getVersion(),
         Ordering.NATURAL,
         parent);
-    n.children.putAll(node.getChildrenList().stream()
-        .map(child -> Maps.immutableEntry(child.getPath(), buildNode(child, n)))
+    n.children.putAll(node.getChildrenMap().entrySet().stream()
+        .map(e -> Maps.immutableEntry(e.getKey(), buildNode(e.getValue(), n)))
         .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue)));
     return n;
   }
