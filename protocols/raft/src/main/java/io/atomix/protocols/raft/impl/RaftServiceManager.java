@@ -474,7 +474,7 @@ public class RaftServiceManager implements AutoCloseable {
    */
   private void snapshotService(OutputStream output, RaftServiceContext service) {
     try {
-      service.takeSnapshot().writeTo(output);
+      service.takeSnapshot().writeDelimitedTo(output);
     } catch (IOException e) {
       logger.error("Failed to snapshot service {}", service.serviceName(), e);
     }
