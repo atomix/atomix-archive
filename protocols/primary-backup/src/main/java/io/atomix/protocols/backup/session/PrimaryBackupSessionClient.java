@@ -15,9 +15,20 @@
  */
 package io.atomix.protocols.backup.session;
 
+import java.net.ConnectException;
+import java.net.SocketException;
+import java.time.Duration;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.function.Consumer;
+
 import com.google.common.base.Throwables;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
+import com.google.protobuf.ByteString;
 import io.atomix.cluster.ClusterMembershipEvent;
 import io.atomix.cluster.ClusterMembershipEventListener;
 import io.atomix.cluster.ClusterMembershipService;
@@ -39,24 +50,14 @@ import io.atomix.primitive.session.SessionId;
 import io.atomix.protocols.backup.protocol.CloseRequest;
 import io.atomix.protocols.backup.protocol.ExecuteRequest;
 import io.atomix.protocols.backup.protocol.PrimaryBackupClientProtocol;
-import io.atomix.protocols.backup.protocol.PrimaryBackupResponse.Status;
 import io.atomix.protocols.backup.protocol.PrimitiveDescriptor;
+import io.atomix.protocols.backup.protocol.ResponseStatus;
 import io.atomix.utils.concurrent.ComposableFuture;
 import io.atomix.utils.concurrent.Futures;
 import io.atomix.utils.concurrent.ThreadContext;
 import io.atomix.utils.logging.ContextualLoggerFactory;
 import io.atomix.utils.logging.LoggerContext;
 import org.slf4j.Logger;
-
-import java.net.ConnectException;
-import java.net.SocketException;
-import java.time.Duration;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
-import java.util.function.Consumer;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -106,13 +107,13 @@ public class PrimaryBackupSessionClient implements SessionClient {
     this.log = ContextualLoggerFactory.getLogger(getClass(), LoggerContext.builder(SessionClient.class)
         .addValue(clientName)
         .add("type", primitiveType.name())
-        .add("name", descriptor.name())
+        .add("name", descriptor.getName())
         .build());
   }
 
   @Override
   public String name() {
-    return descriptor.name();
+    return descriptor.getName();
   }
 
   @Override
@@ -180,15 +181,21 @@ public class PrimaryBackupSessionClient implements SessionClient {
       return;
     }
 
-    ExecuteRequest request = ExecuteRequest.request(descriptor, sessionId.id(), clusterMembershipService.getLocalMember().id(), operation);
+    ExecuteRequest request = ExecuteRequest.newBuilder()
+        .setPrimitive(descriptor)
+        .setSessionId(sessionId.id())
+        .setMemberId(clusterMembershipService.getLocalMember().id().id())
+        .setOperation(operation.id().id())
+        .setValue(ByteString.copyFrom(operation.value()))
+        .build();
     log.trace("Sending {} to {}", request, term.primary());
     PrimaryTerm term = this.term;
     if (term.primary() != null) {
       protocol.execute(term.primary().memberId(), request).whenCompleteAsync((response, error) -> {
         if (error == null) {
           log.trace("Received {}", response);
-          if (response.status() == Status.OK) {
-            future.complete(response.result());
+          if (response.getStatus() == ResponseStatus.OK) {
+            future.complete(response.getResult().toByteArray());
           } else if (this.term.term() > term.term()) {
             execute(operation).whenComplete(future);
           } else {
@@ -313,7 +320,10 @@ public class PrimaryBackupSessionClient implements SessionClient {
     CompletableFuture<Void> future = new CompletableFuture<>();
     PrimaryTerm term = this.term;
     if (term.primary() != null) {
-      protocol.close(term.primary().memberId(), new CloseRequest(descriptor, sessionId.id()))
+      protocol.close(term.primary().memberId(), CloseRequest.newBuilder()
+          .setPrimitive(descriptor)
+          .setSessionId(sessionId.id())
+          .build())
           .whenCompleteAsync((response, error) -> {
             try {
               protocol.unregisterEventListener(sessionId);

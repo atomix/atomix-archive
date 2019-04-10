@@ -22,17 +22,20 @@ import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
 import com.google.protobuf.ByteString;
-import io.atomix.primitive.operation.OperationType;
+import io.atomix.cluster.MemberId;
+import io.atomix.primitive.operation.OperationId;
 import io.atomix.primitive.service.impl.DefaultCommit;
 import io.atomix.primitive.session.Session;
 import io.atomix.protocols.backup.PrimaryBackupServer.Role;
 import io.atomix.protocols.backup.impl.PrimaryBackupSession;
-import io.atomix.protocols.backup.protocol.CloseOperation;
-import io.atomix.protocols.backup.protocol.ExecuteOperation;
+import io.atomix.protocols.backup.protocol.BackupOperation;
+import io.atomix.protocols.backup.protocol.Close;
+import io.atomix.protocols.backup.protocol.Execute;
 import io.atomix.protocols.backup.protocol.ExecuteRequest;
 import io.atomix.protocols.backup.protocol.ExecuteResponse;
-import io.atomix.protocols.backup.protocol.ExpireOperation;
-import io.atomix.protocols.backup.protocol.HeartbeatOperation;
+import io.atomix.protocols.backup.protocol.Expire;
+import io.atomix.protocols.backup.protocol.Heartbeat;
+import io.atomix.protocols.backup.protocol.ResponseStatus;
 import io.atomix.protocols.backup.protocol.RestoreRequest;
 import io.atomix.protocols.backup.protocol.RestoreResponse;
 import io.atomix.protocols.backup.service.impl.PrimaryBackupServiceContext;
@@ -56,7 +59,7 @@ public class PrimaryRole extends PrimaryBackupRole {
         Duration.ofMillis(HEARTBEAT_FREQUENCY),
         Duration.ofMillis(HEARTBEAT_FREQUENCY),
         this::heartbeat);
-    switch (context.descriptor().replication()) {
+    switch (context.descriptor().getReplication()) {
       case SYNCHRONOUS:
         replicator = new SynchronousReplicator(context, log);
         break;
@@ -74,42 +77,55 @@ public class PrimaryRole extends PrimaryBackupRole {
   private void heartbeat() {
     long index = context.nextIndex();
     long timestamp = System.currentTimeMillis();
-    replicator.replicate(new HeartbeatOperation(index, timestamp))
+    replicator.replicate(BackupOperation.newBuilder()
+        .setIndex(index)
+        .setTimestamp(timestamp)
+        .setHeartbeat(Heartbeat.newBuilder().build())
+        .build())
         .thenRun(() -> context.setTimestamp(timestamp));
   }
 
   @Override
   public CompletableFuture<ExecuteResponse> execute(ExecuteRequest request) {
     logRequest(request);
-    if (request.operation().id().type() == OperationType.COMMAND) {
+    if (request.getType() == ExecuteRequest.Type.COMMAND) {
       return executeCommand(request).thenApply(this::logResponse);
-    } else if (request.operation().id().type() == OperationType.QUERY) {
+    } else if (request.getType() == ExecuteRequest.Type.QUERY) {
       return executeQuery(request).thenApply(this::logResponse);
     }
     return Futures.exceptionalFuture(new IllegalArgumentException("Unknown operation type"));
   }
 
   private CompletableFuture<ExecuteResponse> executeCommand(ExecuteRequest request) {
-    PrimaryBackupSession session = context.getOrCreateSession(request.session(), request.node());
+    PrimaryBackupSession session = context.getOrCreateSession(request.getSessionId(), MemberId.from(request.getMemberId()));
     long index = context.nextIndex();
     long timestamp = System.currentTimeMillis();
-    return replicator.replicate(new ExecuteOperation(
-        index,
-        timestamp,
-        session.sessionId().id(),
-        session.memberId(),
-        request.operation()))
+    return replicator.replicate(BackupOperation.newBuilder()
+        .setIndex(index)
+        .setTimestamp(timestamp)
+        .setExecute(Execute.newBuilder()
+            .setSessionId(session.sessionId().id())
+            .setMemberId(session.memberId().id())
+            .setOperation(request.getOperation())
+            .setValue(request.getValue())
+            .build())
+        .build())
         .thenApply(v -> {
           try {
             byte[] result = context.service().apply(new DefaultCommit<>(
                 context.setIndex(index),
-                request.operation().id(),
-                request.operation().value(),
+                OperationId.command(request.getOperation()),
+                request.getValue().toByteArray(),
                 context.setSession(session),
                 context.setTimestamp(timestamp)));
-            return ExecuteResponse.ok(result);
+            return ExecuteResponse.newBuilder()
+                .setStatus(ResponseStatus.OK)
+                .setResult(ByteString.copyFrom(result))
+                .build();
           } catch (Exception e) {
-            return ExecuteResponse.error();
+            return ExecuteResponse.newBuilder()
+                .setStatus(ResponseStatus.ERROR)
+                .build();
           } finally {
             context.setSession(null);
           }
@@ -118,17 +134,19 @@ public class PrimaryRole extends PrimaryBackupRole {
 
   private CompletableFuture<ExecuteResponse> executeQuery(ExecuteRequest request) {
     // If the session doesn't exist, create and replicate a new session before applying the query.
-    Session session = context.getSession(request.session());
+    Session session = context.getSession(request.getSessionId());
     if (session == null) {
-      Session newSession = context.createSession(request.session(), request.node());
+      Session newSession = context.createSession(request.getSessionId(), MemberId.from(request.getMemberId()));
       long index = context.nextIndex();
       long timestamp = System.currentTimeMillis();
-      return replicator.replicate(new ExecuteOperation(
-          index,
-          timestamp,
-          newSession.sessionId().id(),
-          newSession.memberId(),
-          null))
+      return replicator.replicate(BackupOperation.newBuilder()
+          .setIndex(index)
+          .setTimestamp(timestamp)
+          .setExecute(Execute.newBuilder()
+              .setSessionId(newSession.sessionId().id())
+              .setMemberId(newSession.memberId().id())
+              .build())
+          .build())
           .thenApply(v -> {
             context.setIndex(index);
             context.setTimestamp(timestamp);
@@ -143,13 +161,18 @@ public class PrimaryRole extends PrimaryBackupRole {
     try {
       byte[] result = context.service().apply(new DefaultCommit<>(
           context.getIndex(),
-          request.operation().id(),
-          request.operation().value(),
+          OperationId.query(request.getOperation()),
+          request.getValue().toByteArray(),
           context.setSession(session),
           context.currentTimestamp()));
-      return ExecuteResponse.ok(result);
+      return ExecuteResponse.newBuilder()
+          .setStatus(ResponseStatus.OK)
+          .setResult(ByteString.copyFrom(result))
+          .build();
     } catch (Exception e) {
-      return ExecuteResponse.error();
+      return ExecuteResponse.newBuilder()
+          .setStatus(ResponseStatus.ERROR)
+          .build();
     } finally {
       context.setSession(null);
     }
@@ -158,8 +181,10 @@ public class PrimaryRole extends PrimaryBackupRole {
   @Override
   public CompletableFuture<RestoreResponse> restore(RestoreRequest request) {
     logRequest(request);
-    if (request.term() != context.currentTerm()) {
-      return CompletableFuture.completedFuture(logResponse(RestoreResponse.error()));
+    if (request.getTerm() != context.currentTerm()) {
+      return CompletableFuture.completedFuture(logResponse(RestoreResponse.newBuilder()
+          .setStatus(ResponseStatus.ERROR)
+          .build()));
     }
 
     ByteArrayOutputStream output = new ByteArrayOutputStream();
@@ -186,8 +211,12 @@ public class PrimaryRole extends PrimaryBackupRole {
       log.error("Failed to serialize snapshot", e);
     }
 
-    return CompletableFuture.completedFuture(
-        RestoreResponse.ok(context.currentIndex(), context.currentTimestamp(), output.toByteArray()))
+    return CompletableFuture.completedFuture(RestoreResponse.newBuilder()
+        .setStatus(ResponseStatus.OK)
+        .setIndex(context.currentIndex())
+        .setTimestamp(context.currentTimestamp())
+        .setData(ByteString.copyFrom(output.toByteArray()))
+        .build())
         .thenApply(this::logResponse);
   }
 
@@ -195,7 +224,13 @@ public class PrimaryRole extends PrimaryBackupRole {
   public CompletableFuture<Void> expire(PrimaryBackupSession session) {
     long index = context.nextIndex();
     long timestamp = System.currentTimeMillis();
-    return replicator.replicate(new ExpireOperation(index, timestamp, session.sessionId().id()))
+    return replicator.replicate(BackupOperation.newBuilder()
+        .setIndex(index)
+        .setTimestamp(timestamp)
+        .setExpire(Expire.newBuilder()
+            .setSessionId(session.sessionId().id())
+            .build())
+        .build())
         .thenRun(() -> {
           context.setTimestamp(timestamp);
           context.expireSession(session.sessionId().id());
@@ -206,7 +241,13 @@ public class PrimaryRole extends PrimaryBackupRole {
   public CompletableFuture<Void> close(PrimaryBackupSession session) {
     long index = context.nextIndex();
     long timestamp = System.currentTimeMillis();
-    return replicator.replicate(new CloseOperation(index, timestamp, session.sessionId().id()))
+    return replicator.replicate(BackupOperation.newBuilder()
+        .setIndex(index)
+        .setTimestamp(timestamp)
+        .setClose(Close.newBuilder()
+            .setSessionId(session.sessionId().id())
+            .build())
+        .build())
         .thenRun(() -> {
           context.setTimestamp(timestamp);
           context.closeSession(session.sessionId().id());

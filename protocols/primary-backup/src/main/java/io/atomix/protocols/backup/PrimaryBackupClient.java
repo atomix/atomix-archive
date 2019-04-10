@@ -30,6 +30,7 @@ import io.atomix.primitive.session.impl.RecoveringSessionClient;
 import io.atomix.primitive.session.impl.RetryingSessionClient;
 import io.atomix.protocols.backup.protocol.PrimaryBackupClientProtocol;
 import io.atomix.protocols.backup.protocol.PrimitiveDescriptor;
+import io.atomix.protocols.backup.protocol.Replication;
 import io.atomix.protocols.backup.session.PrimaryBackupSessionClient;
 import io.atomix.utils.concurrent.Futures;
 import io.atomix.utils.concurrent.ThreadContext;
@@ -103,11 +104,12 @@ public class PrimaryBackupClient {
                 partitionId,
                 sessionId,
                 primitiveType,
-                new PrimitiveDescriptor(
-                    primitiveName,
-                    primitiveType.name(),
-                    numBackups,
-                    replication),
+                PrimitiveDescriptor.newBuilder()
+                    .setName(primitiveName)
+                    .setType(primitiveType.name())
+                    .setBackups(numBackups)
+                    .setReplication(Replication.valueOf(replication.name()))
+                    .build(),
                 clusterMembershipService,
                 PrimaryBackupClient.this.protocol,
                 primaryElection,

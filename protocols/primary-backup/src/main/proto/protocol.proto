@@ -1,0 +1,121 @@
+syntax = "proto3";
+
+package atomix.backup.protocol;
+
+option java_package = "io.atomix.protocols.backup.protocol";
+option java_outer_classname = "PrimaryBackupProto";
+option java_multiple_files = true;
+
+message PrimitiveDescriptor {
+    string name = 1;
+    string type = 2;
+    int32 backups = 3;
+    Replication replication = 4;
+}
+
+enum Replication {
+    SYNCHRONOUS = 0;
+    ASYNCHRONOUS = 1;
+}
+
+message ExecuteRequest {
+    PrimitiveDescriptor primitive = 1;
+    int64 session_id = 2;
+    string member_id = 3;
+    Type type = 4;
+    string operation = 5;
+    bytes value = 6;
+
+    enum Type {
+        COMMAND = 0;
+        QUERY = 1;
+    }
+}
+
+message ExecuteResponse {
+    ResponseStatus status = 1;
+    bytes result = 2;
+}
+
+message BackupRequest {
+    PrimitiveDescriptor primitive = 1;
+    string primary = 2;
+    int64 term = 3;
+    int64 index = 4;
+    repeated BackupOperation operations = 5;
+}
+
+message BackupResponse {
+    ResponseStatus status = 1;
+}
+
+message RestoreRequest {
+    PrimitiveDescriptor primitive = 1;
+    int64 term = 2;
+}
+
+message RestoreResponse {
+    ResponseStatus status = 1;
+    int64 index = 2;
+    int64 timestamp = 3;
+    bytes data = 4;
+}
+
+message MetadataRequest {
+    string primitive_type = 1;
+}
+
+message MetadataResponse {
+    ResponseStatus status = 1;
+    repeated string primitives = 2;
+}
+
+message CloseRequest {
+    PrimitiveDescriptor primitive = 1;
+    int64 session_id = 2;
+}
+
+message CloseResponse {
+    ResponseStatus status = 1;
+}
+
+message BackupOperation {
+    int64 index = 1;
+    int64 timestamp = 2;
+
+    oneof operation {
+        Execute execute = 3;
+        Heartbeat heartbeat = 4;
+        Expire expire = 5;
+        Close close = 6;
+    }
+}
+
+message Execute {
+    int64 session_id = 1;
+    string member_id = 2;
+    string operation = 3;
+    bytes value = 4;
+}
+
+message Heartbeat {
+
+}
+
+message Expire {
+    int64 session_id = 1;
+}
+
+message Close {
+    int64 session_id = 1;
+}
+
+message BackupEvent {
+    string type = 1;
+    bytes value = 2;
+}
+
+enum ResponseStatus {
+    OK = 0;
+    ERROR = 1;
+}

@@ -15,22 +15,22 @@
  */
 package io.atomix.protocols.backup.roles;
 
+import java.util.concurrent.CompletableFuture;
+
+import com.google.protobuf.Message;
 import io.atomix.protocols.backup.PrimaryBackupServer.Role;
 import io.atomix.protocols.backup.impl.PrimaryBackupSession;
 import io.atomix.protocols.backup.protocol.BackupRequest;
 import io.atomix.protocols.backup.protocol.BackupResponse;
 import io.atomix.protocols.backup.protocol.ExecuteRequest;
 import io.atomix.protocols.backup.protocol.ExecuteResponse;
-import io.atomix.protocols.backup.protocol.PrimaryBackupRequest;
-import io.atomix.protocols.backup.protocol.PrimaryBackupResponse;
+import io.atomix.protocols.backup.protocol.ResponseStatus;
 import io.atomix.protocols.backup.protocol.RestoreRequest;
 import io.atomix.protocols.backup.protocol.RestoreResponse;
 import io.atomix.protocols.backup.service.impl.PrimaryBackupServiceContext;
 import io.atomix.utils.logging.ContextualLoggerFactory;
 import io.atomix.utils.logging.LoggerContext;
 import org.slf4j.Logger;
-
-import java.util.concurrent.CompletableFuture;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
 
@@ -63,7 +63,7 @@ public abstract class PrimaryBackupRole {
   /**
    * Logs a request.
    */
-  protected final <R extends PrimaryBackupRequest> R logRequest(R request) {
+  protected final <R extends Message> R logRequest(R request) {
     log.trace("Received {}", request);
     return request;
   }
@@ -71,7 +71,7 @@ public abstract class PrimaryBackupRole {
   /**
    * Logs a response.
    */
-  protected final <R extends PrimaryBackupResponse> R logResponse(R response) {
+  protected final <R extends Message> R logResponse(R response) {
     log.trace("Sending {}", response);
     return response;
   }
@@ -84,7 +84,7 @@ public abstract class PrimaryBackupRole {
    */
   public CompletableFuture<ExecuteResponse> execute(ExecuteRequest request) {
     logRequest(request);
-    return CompletableFuture.completedFuture(logResponse(ExecuteResponse.error()));
+    return CompletableFuture.completedFuture(logResponse(ExecuteResponse.newBuilder().setStatus(ResponseStatus.ERROR).build()));
   }
 
   /**
@@ -95,7 +95,7 @@ public abstract class PrimaryBackupRole {
    */
   public CompletableFuture<BackupResponse> backup(BackupRequest request) {
     logRequest(request);
-    return CompletableFuture.completedFuture(logResponse(BackupResponse.error()));
+    return CompletableFuture.completedFuture(logResponse(BackupResponse.newBuilder().setStatus(ResponseStatus.ERROR).build()));
   }
 
   /**
@@ -106,7 +106,7 @@ public abstract class PrimaryBackupRole {
    */
   public CompletableFuture<RestoreResponse> restore(RestoreRequest request) {
     logRequest(request);
-    return CompletableFuture.completedFuture(logResponse(RestoreResponse.error()));
+    return CompletableFuture.completedFuture(logResponse(RestoreResponse.newBuilder().setStatus(ResponseStatus.ERROR).build()));
   }
 
   /**

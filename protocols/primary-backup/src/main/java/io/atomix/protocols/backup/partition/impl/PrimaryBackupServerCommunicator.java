@@ -15,11 +15,18 @@
  */
 package io.atomix.protocols.backup.partition.impl;
 
+import java.util.concurrent.CompletableFuture;
+import java.util.function.Function;
+
 import com.google.common.base.Preconditions;
+import com.google.protobuf.ByteString;
+import com.google.protobuf.InvalidProtocolBufferException;
+import com.google.protobuf.Message;
 import io.atomix.cluster.MemberId;
 import io.atomix.cluster.messaging.ClusterCommunicationService;
 import io.atomix.primitive.event.PrimitiveEvent;
 import io.atomix.primitive.session.SessionId;
+import io.atomix.protocols.backup.protocol.BackupEvent;
 import io.atomix.protocols.backup.protocol.BackupRequest;
 import io.atomix.protocols.backup.protocol.BackupResponse;
 import io.atomix.protocols.backup.protocol.CloseRequest;
@@ -31,47 +38,58 @@ import io.atomix.protocols.backup.protocol.MetadataResponse;
 import io.atomix.protocols.backup.protocol.PrimaryBackupServerProtocol;
 import io.atomix.protocols.backup.protocol.RestoreRequest;
 import io.atomix.protocols.backup.protocol.RestoreResponse;
-import io.atomix.utils.serializer.Serializer;
-
-import java.util.concurrent.CompletableFuture;
-import java.util.function.Function;
 
 /**
  * Raft server protocol that uses a {@link ClusterCommunicationService}.
  */
 public class PrimaryBackupServerCommunicator implements PrimaryBackupServerProtocol {
   private final PrimaryBackupMessageContext context;
-  private final Serializer serializer;
   private final ClusterCommunicationService clusterCommunicator;
 
-  public PrimaryBackupServerCommunicator(String prefix, Serializer serializer, ClusterCommunicationService clusterCommunicator) {
+  public PrimaryBackupServerCommunicator(String prefix, ClusterCommunicationService clusterCommunicator) {
     this.context = new PrimaryBackupMessageContext(prefix);
-    this.serializer = Preconditions.checkNotNull(serializer, "serializer cannot be null");
     this.clusterCommunicator = Preconditions.checkNotNull(clusterCommunicator, "clusterCommunicator cannot be null");
-  }
-
-  private <T, U> CompletableFuture<U> sendAndReceive(String subject, T request, MemberId memberId) {
-    return clusterCommunicator.send(subject, request, serializer::encode, serializer::decode, MemberId.from(memberId.id()));
   }
 
   @Override
   public CompletableFuture<BackupResponse> backup(MemberId memberId, BackupRequest request) {
-    return sendAndReceive(context.backupSubject, request, memberId);
+    return clusterCommunicator.send(
+        context.backupSubject,
+        request,
+        this::encode,
+        bytes -> decode(bytes, BackupResponse::parseFrom),
+        memberId);
   }
 
   @Override
   public CompletableFuture<RestoreResponse> restore(MemberId memberId, RestoreRequest request) {
-    return sendAndReceive(context.restoreSubject, request, memberId);
+    return clusterCommunicator.send(
+        context.restoreSubject,
+        request,
+        this::encode,
+        bytes -> decode(bytes, RestoreResponse::parseFrom),
+        memberId);
   }
 
   @Override
   public void event(MemberId memberId, SessionId session, PrimitiveEvent event) {
-    clusterCommunicator.unicast(context.eventSubject(session.id()), event, serializer::encode, memberId);
+    clusterCommunicator.unicast(
+        context.eventSubject(session.id()),
+        BackupEvent.newBuilder()
+            .setType(event.type().id())
+            .setValue(ByteString.copyFrom(event.value()))
+            .build(),
+        this::encode,
+        memberId);
   }
 
   @Override
   public void registerExecuteHandler(Function<ExecuteRequest, CompletableFuture<ExecuteResponse>> handler) {
-    clusterCommunicator.subscribe(context.executeSubject, serializer::decode, handler, serializer::encode);
+    clusterCommunicator.subscribe(
+        context.executeSubject,
+        bytes -> decode(bytes, ExecuteRequest::parseFrom),
+        handler,
+        this::encode);
   }
 
   @Override
@@ -81,7 +99,11 @@ public class PrimaryBackupServerCommunicator implements PrimaryBackupServerProto
 
   @Override
   public void registerBackupHandler(Function<BackupRequest, CompletableFuture<BackupResponse>> handler) {
-    clusterCommunicator.subscribe(context.backupSubject, serializer::decode, handler, serializer::encode);
+    clusterCommunicator.subscribe(
+        context.backupSubject,
+        bytes -> decode(bytes, BackupRequest::parseFrom),
+        handler,
+        this::encode);
   }
 
   @Override
@@ -91,7 +113,11 @@ public class PrimaryBackupServerCommunicator implements PrimaryBackupServerProto
 
   @Override
   public void registerRestoreHandler(Function<RestoreRequest, CompletableFuture<RestoreResponse>> handler) {
-    clusterCommunicator.subscribe(context.restoreSubject, serializer::decode, handler, serializer::encode);
+    clusterCommunicator.subscribe(
+        context.restoreSubject,
+        bytes -> decode(bytes, RestoreRequest::parseFrom),
+        handler,
+        this::encode);
   }
 
   @Override
@@ -101,7 +127,11 @@ public class PrimaryBackupServerCommunicator implements PrimaryBackupServerProto
 
   @Override
   public void registerCloseHandler(Function<CloseRequest, CompletableFuture<CloseResponse>> handler) {
-    clusterCommunicator.subscribe(context.closeSubject, serializer::decode, handler, serializer::encode);
+    clusterCommunicator.subscribe(
+        context.closeSubject,
+        bytes -> decode(bytes, CloseRequest::parseFrom),
+        handler,
+        this::encode);
   }
 
   @Override
@@ -111,11 +141,31 @@ public class PrimaryBackupServerCommunicator implements PrimaryBackupServerProto
 
   @Override
   public void registerMetadataHandler(Function<MetadataRequest, CompletableFuture<MetadataResponse>> handler) {
-    clusterCommunicator.subscribe(context.metadataSubject, serializer::decode, handler, serializer::encode);
+    clusterCommunicator.subscribe(
+        context.metadataSubject,
+        bytes -> decode(bytes, MetadataRequest::parseFrom),
+        handler,
+        this::encode);
   }
 
   @Override
   public void unregisterMetadataHandler() {
     clusterCommunicator.unsubscribe(context.metadataSubject);
+  }
+
+  private interface Parser<T> {
+    T parse(byte[] bytes) throws InvalidProtocolBufferException;
+  }
+
+  private byte[] encode(Message message) {
+    return message.toByteArray();
+  }
+
+  private <T extends Message> T decode(byte[] bytes, Parser<T> parser) {
+    try {
+      return parser.parse(bytes);
+    } catch (InvalidProtocolBufferException e) {
+      throw new RuntimeException(e);
+    }
   }
 }

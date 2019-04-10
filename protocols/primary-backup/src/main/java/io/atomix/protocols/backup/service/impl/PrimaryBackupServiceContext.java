@@ -51,6 +51,7 @@ import io.atomix.protocols.backup.protocol.ExecuteRequest;
 import io.atomix.protocols.backup.protocol.ExecuteResponse;
 import io.atomix.protocols.backup.protocol.PrimaryBackupServerProtocol;
 import io.atomix.protocols.backup.protocol.PrimitiveDescriptor;
+import io.atomix.protocols.backup.protocol.ResponseStatus;
 import io.atomix.protocols.backup.protocol.RestoreRequest;
 import io.atomix.protocols.backup.protocol.RestoreResponse;
 import io.atomix.protocols.backup.roles.BackupRole;
@@ -135,8 +136,8 @@ public class PrimaryBackupServiceContext implements ServiceContext {
     this.primaryElection = checkNotNull(primaryElection);
     this.log = ContextualLoggerFactory.getLogger(getClass(), LoggerContext.builder(PrimitiveService.class)
         .addValue(serverName)
-        .add("type", descriptor.type())
-        .add("name", descriptor.name())
+        .add("type", descriptor.getType())
+        .add("name", descriptor.getName())
         .build());
     clusterMembershipService.addListener(membershipEventListener);
     primaryElection.addListener(primaryElectionListener);
@@ -201,7 +202,7 @@ public class PrimaryBackupServiceContext implements ServiceContext {
 
   @Override
   public String serviceName() {
-    return descriptor.name();
+    return descriptor.getName();
   }
 
   @Override
@@ -464,17 +465,17 @@ public class PrimaryBackupServiceContext implements ServiceContext {
   public CompletableFuture<CloseResponse> close(CloseRequest request) {
     ComposableFuture<CloseResponse> future = new ComposableFuture<>();
     threadContext.execute(() -> {
-      PrimaryBackupSession session = sessions.get(request.session());
+      PrimaryBackupSession session = sessions.get(request.getSessionId());
       if (session != null) {
         role.close(session).whenComplete((result, error) -> {
           if (error == null) {
-            future.complete(CloseResponse.ok());
+            future.complete(CloseResponse.newBuilder().setStatus(ResponseStatus.OK).build());
           } else {
-            future.complete(CloseResponse.error());
+            future.complete(CloseResponse.newBuilder().setStatus(ResponseStatus.ERROR).build());
           }
         });
       } else {
-        future.complete(CloseResponse.error());
+        future.complete(CloseResponse.newBuilder().setStatus(ResponseStatus.ERROR).build());
       }
     });
     return future;
@@ -581,7 +582,7 @@ public class PrimaryBackupServiceContext implements ServiceContext {
         log.debug("Term changed: {}", term);
         currentTerm = term.term();
         primary = term.primary() != null ? term.primary().memberId() : null;
-        backups = term.backups(descriptor.backups())
+        backups = term.backups(descriptor.getBackups())
             .stream()
             .map(GroupMember::memberId)
             .collect(Collectors.toList());

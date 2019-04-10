@@ -22,6 +22,7 @@ import java.util.Queue;
 import java.util.concurrent.CompletableFuture;
 
 import io.atomix.cluster.MemberId;
+import io.atomix.primitive.operation.OperationId;
 import io.atomix.primitive.service.impl.DefaultCommit;
 import io.atomix.primitive.session.Session;
 import io.atomix.protocols.backup.PrimaryBackupServer.Role;
@@ -29,11 +30,7 @@ import io.atomix.protocols.backup.impl.PrimaryBackupSession;
 import io.atomix.protocols.backup.protocol.BackupOperation;
 import io.atomix.protocols.backup.protocol.BackupRequest;
 import io.atomix.protocols.backup.protocol.BackupResponse;
-import io.atomix.protocols.backup.protocol.CloseOperation;
-import io.atomix.protocols.backup.protocol.ExecuteOperation;
-import io.atomix.protocols.backup.protocol.ExpireOperation;
-import io.atomix.protocols.backup.protocol.HeartbeatOperation;
-import io.atomix.protocols.backup.protocol.PrimaryBackupResponse;
+import io.atomix.protocols.backup.protocol.ResponseStatus;
 import io.atomix.protocols.backup.protocol.RestoreRequest;
 import io.atomix.protocols.backup.service.impl.PrimaryBackupServiceContext;
 import io.atomix.protocols.backup.snapshot.ServiceSession;
@@ -54,19 +51,23 @@ public class BackupRole extends PrimaryBackupRole {
     logRequest(request);
 
     // If the term is greater than the node's current term, update the term.
-    if (request.term() > context.currentTerm()) {
-      context.resetTerm(request.term(), request.primary());
+    if (request.getTerm() > context.currentTerm()) {
+      context.resetTerm(request.getTerm(), MemberId.from(request.getPrimary()));
     }
     // If the term is less than the node's current term, ignore the backup message.
-    else if (request.term() < context.currentTerm()) {
-      return CompletableFuture.completedFuture(BackupResponse.error());
+    else if (request.getTerm() < context.currentTerm()) {
+      return CompletableFuture.completedFuture(BackupResponse.newBuilder()
+          .setStatus(ResponseStatus.ERROR)
+          .build());
     }
 
-    operations.addAll(request.operations());
+    operations.addAll(request.getOperationsList());
     long currentCommitIndex = context.getCommitIndex();
-    long nextCommitIndex = context.setCommitIndex(request.index());
+    long nextCommitIndex = context.setCommitIndex(request.getIndex());
     context.threadContext().execute(() -> applyOperations(currentCommitIndex, nextCommitIndex));
-    return CompletableFuture.completedFuture(logResponse(BackupResponse.ok()));
+    return CompletableFuture.completedFuture(logResponse(BackupResponse.newBuilder()
+        .setStatus(ResponseStatus.OK)
+        .build()));
   }
 
   /**
@@ -80,23 +81,17 @@ public class BackupRole extends PrimaryBackupRole {
         break;
       }
 
-      if (context.nextIndex(operation.index())) {
-        switch (operation.type()) {
-          case EXECUTE:
-            applyExecute((ExecuteOperation) operation);
-            break;
-          case HEARTBEAT:
-            applyHeartbeat((HeartbeatOperation) operation);
-            break;
-          case EXPIRE:
-            applyExpire((ExpireOperation) operation);
-            break;
-          case CLOSE:
-            applyClose((CloseOperation) operation);
-            break;
+      if (context.nextIndex(operation.getIndex())) {
+        if (operation.hasExecute()) {
+          applyExecute(operation);
+        } else if (operation.hasHeartbeat()) {
+          applyHeartbeat(operation);
+        } else if (operation.hasExpire()) {
+          applyExpire(operation);
+        } else if (operation.hasClose()) {
+          applyClose(operation);
         }
-
-      } else if (operation.index() < i) {
+      } else if (operation.getIndex() < i) {
         continue;
       } else {
         requestRestore(context.primary());
@@ -108,16 +103,16 @@ public class BackupRole extends PrimaryBackupRole {
   /**
    * Applies an execute operation to the service.
    */
-  private void applyExecute(ExecuteOperation operation) {
-    Session session = context.getOrCreateSession(operation.session(), operation.node());
-    if (operation.operation() != null) {
+  private void applyExecute(BackupOperation operation) {
+    Session session = context.getOrCreateSession(operation.getExecute().getSessionId(), MemberId.from(operation.getExecute().getMemberId()));
+    if (!operation.getExecute().getOperation().equals("")) {
       try {
         context.service().apply(new DefaultCommit<>(
-            context.setIndex(operation.index()),
-            operation.operation().id(),
-            operation.operation().value(),
+            context.setIndex(operation.getIndex()),
+            OperationId.command(operation.getExecute().getOperation()),
+            operation.getExecute().getValue().toByteArray(),
             context.setSession(session),
-            context.setTimestamp(operation.timestamp())));
+            context.setTimestamp(operation.getTimestamp())));
       } catch (Exception e) {
         log.warn("Failed to apply operation: {}", e);
       } finally {
@@ -129,16 +124,16 @@ public class BackupRole extends PrimaryBackupRole {
   /**
    * Applies a heartbeat operation to the service.
    */
-  private void applyHeartbeat(HeartbeatOperation operation) {
-    context.setTimestamp(operation.timestamp());
+  private void applyHeartbeat(BackupOperation operation) {
+    context.setTimestamp(operation.getTimestamp());
   }
 
   /**
    * Applies an expire operation.
    */
-  private void applyExpire(ExpireOperation operation) {
-    context.setTimestamp(operation.timestamp());
-    PrimaryBackupSession session = context.getSession(operation.session());
+  private void applyExpire(BackupOperation operation) {
+    context.setTimestamp(operation.getTimestamp());
+    PrimaryBackupSession session = context.getSession(operation.getExpire().getSessionId());
     if (session != null) {
       context.expireSession(session.sessionId().id());
     }
@@ -147,9 +142,9 @@ public class BackupRole extends PrimaryBackupRole {
   /**
    * Applies a close operation.
    */
-  private void applyClose(CloseOperation operation) {
-    context.setTimestamp(operation.timestamp());
-    PrimaryBackupSession session = context.getSession(operation.session());
+  private void applyClose(BackupOperation operation) {
+    context.setTimestamp(operation.getTimestamp());
+    PrimaryBackupSession session = context.getSession(operation.getClose().getSessionId());
     if (session != null) {
       context.closeSession(session.sessionId().id());
     }
@@ -159,13 +154,16 @@ public class BackupRole extends PrimaryBackupRole {
    * Requests a restore from the primary.
    */
   private void requestRestore(MemberId primary) {
-    context.protocol().restore(primary, RestoreRequest.request(context.descriptor(), context.currentTerm()))
+    context.protocol().restore(primary, RestoreRequest.newBuilder()
+        .setPrimitive(context.descriptor())
+        .setTerm(context.currentTerm())
+        .build())
         .whenCompleteAsync((response, error) -> {
-          if (error == null && response.status() == PrimaryBackupResponse.Status.OK) {
-            context.resetIndex(response.index(), response.timestamp());
+          if (error == null && response.getStatus() == ResponseStatus.OK) {
+            context.resetIndex(response.getIndex(), response.getTimestamp());
 
             try {
-              ServiceSnapshot snapshot = ServiceSnapshot.parseFrom(response.data());
+              ServiceSnapshot snapshot = ServiceSnapshot.parseFrom(response.getData());
               for (ServiceSession session : snapshot.getSessionsList()) {
                 context.getOrCreateSession(session.getSessionId(), MemberId.from(session.getMemberId()));
               }

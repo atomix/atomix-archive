@@ -15,14 +15,6 @@
  */
 package io.atomix.protocols.backup.roles;
 
-import com.google.common.collect.ImmutableList;
-import io.atomix.cluster.MemberId;
-import io.atomix.protocols.backup.protocol.BackupOperation;
-import io.atomix.protocols.backup.protocol.BackupRequest;
-import io.atomix.protocols.backup.service.impl.PrimaryBackupServiceContext;
-import io.atomix.utils.concurrent.Scheduled;
-import org.slf4j.Logger;
-
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.LinkedList;
@@ -30,6 +22,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.Queue;
 import java.util.concurrent.CompletableFuture;
+
+import com.google.common.collect.ImmutableList;
+import io.atomix.cluster.MemberId;
+import io.atomix.protocols.backup.protocol.BackupOperation;
+import io.atomix.protocols.backup.protocol.BackupRequest;
+import io.atomix.protocols.backup.service.impl.PrimaryBackupServiceContext;
+import io.atomix.utils.concurrent.Scheduled;
+import org.slf4j.Logger;
 
 /**
  * Asynchronous replicator.
@@ -52,7 +52,7 @@ class AsynchronousReplicator implements Replicator {
     for (MemberId backup : context.backups()) {
       queues.computeIfAbsent(backup, BackupQueue::new).add(operation);
     }
-    context.setCommitIndex(operation.index());
+    context.setCommitIndex(operation.getIndex());
     return CompletableFuture.completedFuture(null);
   }
 
@@ -103,12 +103,13 @@ class AsynchronousReplicator implements Replicator {
     private void backup() {
       List<BackupOperation> batch = ImmutableList.copyOf(operations);
       operations.clear();
-      BackupRequest request = BackupRequest.request(
-          context.descriptor(),
-          context.memberId(),
-          context.currentTerm(),
-          context.currentIndex(),
-          batch);
+      BackupRequest request = BackupRequest.newBuilder()
+          .setPrimitive(context.descriptor())
+          .setPrimary(context.memberId().id())
+          .setTerm(context.currentTerm())
+          .setIndex(context.currentIndex())
+          .addAllOperations(batch)
+          .build();
       log.trace("Sending {} to {}", request, memberId);
       context.protocol().backup(memberId, request);
       lastSent = System.currentTimeMillis();

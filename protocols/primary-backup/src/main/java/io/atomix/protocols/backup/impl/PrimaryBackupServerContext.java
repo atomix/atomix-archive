@@ -15,6 +15,13 @@
  */
 package io.atomix.protocols.backup.impl;
 
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.stream.Collectors;
+
 import com.google.common.collect.Maps;
 import io.atomix.cluster.ClusterMembershipService;
 import io.atomix.primitive.PrimitiveId;
@@ -34,7 +41,7 @@ import io.atomix.protocols.backup.protocol.ExecuteResponse;
 import io.atomix.protocols.backup.protocol.MetadataRequest;
 import io.atomix.protocols.backup.protocol.MetadataResponse;
 import io.atomix.protocols.backup.protocol.PrimaryBackupServerProtocol;
-import io.atomix.protocols.backup.protocol.PrimitiveRequest;
+import io.atomix.protocols.backup.protocol.PrimitiveDescriptor;
 import io.atomix.protocols.backup.protocol.RestoreRequest;
 import io.atomix.protocols.backup.protocol.RestoreResponse;
 import io.atomix.protocols.backup.service.impl.PrimaryBackupServiceContext;
@@ -44,13 +51,6 @@ import io.atomix.utils.concurrent.OrderedFuture;
 import io.atomix.utils.concurrent.ThreadContextFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.stream.Collectors;
 
 /**
  * Primary-backup server context.
@@ -117,41 +117,41 @@ public class PrimaryBackupServerContext implements Managed<Void> {
    * Handles an execute request.
    */
   private CompletableFuture<ExecuteResponse> execute(ExecuteRequest request) {
-    return getService(request).thenCompose(service -> service.execute(request));
+    return getService(request.getPrimitive()).thenCompose(service -> service.execute(request));
   }
 
   /**
    * Handles a backup request.
    */
   private CompletableFuture<BackupResponse> backup(BackupRequest request) {
-    return getService(request).thenCompose(service -> service.backup(request));
+    return getService(request.getPrimitive()).thenCompose(service -> service.backup(request));
   }
 
   /**
    * Handles a restore request.
    */
   private CompletableFuture<RestoreResponse> restore(RestoreRequest request) {
-    return getService(request).thenCompose(service -> service.restore(request));
+    return getService(request.getPrimitive()).thenCompose(service -> service.restore(request));
   }
 
   /**
    * Handles a close request.
    */
   private CompletableFuture<CloseResponse> close(CloseRequest request) {
-    return getService(request).thenCompose(service -> service.close(request));
+    return getService(request.getPrimitive()).thenCompose(service -> service.close(request));
   }
 
   /**
    * Returns the service context for the given request.
    */
-  private CompletableFuture<PrimaryBackupServiceContext> getService(PrimitiveRequest request) {
-    return services.computeIfAbsent(request.primitive().name(), n -> {
-      PrimitiveType primitiveType = primitiveTypes.getPrimitiveType(request.primitive().type());
+  private CompletableFuture<PrimaryBackupServiceContext> getService(PrimitiveDescriptor descriptor) {
+    return services.computeIfAbsent(descriptor.getName(), n -> {
+      PrimitiveType primitiveType = primitiveTypes.getPrimitiveType(descriptor.getType());
       PrimaryBackupServiceContext service = new PrimaryBackupServiceContext(
           serverName,
-          PrimitiveId.from(request.primitive().name()),
+          PrimitiveId.from(descriptor.getName()),
           primitiveType,
-          request.primitive(),
+          descriptor,
           threadContextFactory.createContext(),
           clusterMembershipService,
           memberGroupService,
@@ -174,10 +174,12 @@ public class PrimaryBackupServerContext implements Managed<Void> {
    * Handles a metadata request.
    */
   private CompletableFuture<MetadataResponse> metadata(MetadataRequest request) {
-    return CompletableFuture.completedFuture(MetadataResponse.ok(services.entrySet().stream()
-        .filter(entry -> Futures.get(entry.getValue()).serviceType().name().equals(request.primitiveType()))
-        .map(entry -> entry.getKey())
-        .collect(Collectors.toSet())));
+    return CompletableFuture.completedFuture(MetadataResponse.newBuilder()
+        .addAllPrimitives(services.entrySet().stream()
+            .filter(entry -> Futures.get(entry.getValue()).serviceType().name().equals(request.getPrimitiveType()))
+            .map(entry -> entry.getKey())
+            .collect(Collectors.toSet()))
+        .build());
   }
 
   /**
