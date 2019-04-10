@@ -26,6 +26,8 @@ import io.atomix.primitive.AsyncPrimitive;
 import io.atomix.primitive.PrimitiveBuilder;
 import io.atomix.primitive.PrimitiveType;
 import io.atomix.primitive.SyncPrimitive;
+import io.atomix.primitive.protocol.LogCompatibleBuilder;
+import io.atomix.primitive.protocol.LogProtocol;
 import io.atomix.primitive.protocol.PrimitiveProtocol;
 import io.atomix.primitive.protocol.ProxyCompatibleBuilder;
 import io.atomix.primitive.protocol.ProxyProtocol;
@@ -155,7 +157,8 @@ public class PrimitiveExecutor<S extends SyncPrimitive, A extends AsyncPrimitive
    * @return indicates whether the ID has a valid name
    */
   private boolean hasName(Message id) {
-    return !getName(id).equals("");
+    String name = getName(id);
+    return name == null || !name.equals("");
   }
 
   /**
@@ -181,9 +184,23 @@ public class PrimitiveExecutor<S extends SyncPrimitive, A extends AsyncPrimitive
    */
   @SuppressWarnings("unchecked")
   public CompletableFuture<A> getPrimitive(Message id) {
-    PrimitiveBuilder builder = atomix.primitiveBuilder(getName(id), type);
+    String name = getName(id);
     PrimitiveProtocol protocol = toProtocol(id);
-    if (protocol instanceof ProxyProtocol) {
+
+    // If the primitive name is null, set the name to the partition group name if a log protocol is configured.
+    // Distributed log primitives are unnamed, but a name is required to create the primitive.
+    if (protocol instanceof LogProtocol && name == null) {
+      name = ((LogProtocol) protocol).group();
+    }
+
+    PrimitiveBuilder builder = atomix.primitiveBuilder(name, type);
+    if (protocol instanceof LogProtocol) {
+      if (builder instanceof LogCompatibleBuilder) {
+        ((LogCompatibleBuilder) builder).withProtocol((LogProtocol) protocol);
+      } else {
+        throw new AssertionError();
+      }
+    } else if (protocol instanceof ProxyProtocol) {
       if (builder instanceof ProxyCompatibleBuilder) {
         ((ProxyCompatibleBuilder) builder).withProtocol((ProxyProtocol) protocol);
       } else {
@@ -236,7 +253,7 @@ public class PrimitiveExecutor<S extends SyncPrimitive, A extends AsyncPrimitive
    */
   private static String getName(Message id) {
     Descriptors.FieldDescriptor nameField = id.getDescriptorForType().findFieldByName(NAME_FIELD);
-    return (String) id.getField(nameField);
+    return nameField != null ? (String) id.getField(nameField) : null;
   }
 
   /**
@@ -247,33 +264,33 @@ public class PrimitiveExecutor<S extends SyncPrimitive, A extends AsyncPrimitive
    */
   private static PrimitiveProtocol toProtocol(Message id) {
     Descriptors.FieldDescriptor raftField = id.getDescriptorForType().findFieldByName(RAFT_PROTOCOL);
-    if (id.hasField(raftField)) {
+    if (raftField != null && id.hasField(raftField)) {
       String group = ((io.atomix.grpc.protocol.MultiRaftProtocol) id.getField(raftField)).getGroup();
       return MultiRaftProtocol.builder(group)
           .build();
     }
 
     Descriptors.FieldDescriptor multiPrimaryField = id.getDescriptorForType().findFieldByName(MULTI_PRIMARY_PROTOCOL);
-    if (id.hasField(multiPrimaryField)) {
+    if (multiPrimaryField != null && id.hasField(multiPrimaryField)) {
       String group = ((io.atomix.grpc.protocol.MultiPrimaryProtocol) id.getField(multiPrimaryField)).getGroup();
       return MultiPrimaryProtocol.builder(group)
           .build();
     }
 
     Descriptors.FieldDescriptor logField = id.getDescriptorForType().findFieldByName(LOG_PROTOCOL);
-    if (id.hasField(logField)) {
+    if (logField != null && id.hasField(logField)) {
       String group = ((io.atomix.grpc.protocol.DistributedLogProtocol) id.getField(logField)).getGroup();
       return DistributedLogProtocol.builder(group)
           .build();
     }
 
     Descriptors.FieldDescriptor gossipField = id.getDescriptorForType().findFieldByName(GOSSIP_PROTOCOL);
-    if (id.hasField(gossipField)) {
+    if (gossipField != null && id.hasField(gossipField)) {
       return AntiEntropyProtocol.builder().build();
     }
 
     Descriptors.FieldDescriptor crdtField = id.getDescriptorForType().findFieldByName(CRDT_PROTOCOL);
-    if (id.hasField(crdtField)) {
+    if (crdtField != null && id.hasField(crdtField)) {
       return CrdtProtocol.builder().build();
     }
     return null;

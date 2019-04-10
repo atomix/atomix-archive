@@ -30,7 +30,7 @@ import static org.junit.Assert.assertTrue;
 /**
  * Distributed multiset configuration test.
  */
-public class DistributedMultisetConfigTest {
+public class  DistributedMultisetConfigTest {
   @Test
   public void testLoadConfig() throws Exception {
     DistributedMultisetConfig config = Atomix.config(getClass().getClassLoader().getResource("primitives.conf").getPath())
