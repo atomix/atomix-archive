@@ -15,6 +15,10 @@
  */
 package io.atomix.core.log.impl;
 
+import java.time.Duration;
+import java.util.concurrent.CompletableFuture;
+import java.util.function.Consumer;
+
 import io.atomix.core.log.AsyncDistributedLog;
 import io.atomix.core.log.AsyncDistributedLogPartition;
 import io.atomix.core.log.DistributedLogPartition;
@@ -24,10 +28,6 @@ import io.atomix.primitive.log.LogSession;
 import io.atomix.primitive.protocol.PrimitiveProtocol;
 import io.atomix.utils.concurrent.Futures;
 import io.atomix.utils.serializer.Serializer;
-
-import java.time.Duration;
-import java.util.concurrent.CompletableFuture;
-import java.util.function.Consumer;
 
 /**
  * Default asynchronous distributed log partition implementation.
@@ -103,7 +103,7 @@ public class DefaultAsyncDistributedLogPartition<E> implements AsyncDistributedL
   @Override
   public CompletableFuture<Void> consume(long offset, Consumer<Record<E>> consumer) {
     return session.consumer().consume(offset, record ->
-        consumer.accept(new Record<E>(record.index(), record.timestamp(), decode(record.value()))));
+        consumer.accept(new Record<E>(record.getIndex(), record.getTimestamp(), decode(record.getValue().toByteArray()))));
   }
 
   @Override

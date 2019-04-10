@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package atomix.log.protocol;
+package atomix.protocols.log;
 
 option java_package = "io.atomix.protocols.log.protocol";
 option java_outer_classname = "DistributedLogProto";

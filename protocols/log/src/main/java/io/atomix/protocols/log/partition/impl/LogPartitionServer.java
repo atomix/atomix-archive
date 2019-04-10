@@ -15,19 +15,17 @@
  */
 package io.atomix.protocols.log.partition.impl;
 
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicBoolean;
+
 import io.atomix.primitive.partition.PartitionManagementService;
 import io.atomix.protocols.log.DistributedLogServer;
 import io.atomix.protocols.log.partition.LogPartition;
 import io.atomix.protocols.log.partition.LogPartitionGroupConfig;
-import io.atomix.protocols.log.serializer.impl.LogNamespaces;
 import io.atomix.utils.Managed;
 import io.atomix.utils.concurrent.ThreadContextFactory;
-import io.atomix.utils.serializer.Serializer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Primary-backup partition server.
@@ -76,7 +74,6 @@ public class LogPartitionServer implements Managed<LogPartitionServer> {
         .withMemberGroupProvider(config.getMemberGroupProvider())
         .withProtocol(new LogServerCommunicator(
             partition.name(),
-            Serializer.using(LogNamespaces.PROTOCOL),
             managementService.getMessagingService()))
         .withPrimaryElection(managementService.getElectionService().getElectionFor(partition.id()))
         .withStorageLevel(config.getStorageConfig().getLevel())

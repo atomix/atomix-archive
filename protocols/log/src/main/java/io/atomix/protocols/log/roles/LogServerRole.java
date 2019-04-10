@@ -17,6 +17,7 @@ package io.atomix.protocols.log.roles;
 
 import java.util.concurrent.CompletableFuture;
 
+import com.google.protobuf.Message;
 import io.atomix.protocols.log.impl.DistributedLogServerContext;
 import io.atomix.protocols.log.protocol.AppendRequest;
 import io.atomix.protocols.log.protocol.AppendResponse;
@@ -24,9 +25,8 @@ import io.atomix.protocols.log.protocol.BackupRequest;
 import io.atomix.protocols.log.protocol.BackupResponse;
 import io.atomix.protocols.log.protocol.ConsumeRequest;
 import io.atomix.protocols.log.protocol.ConsumeResponse;
-import io.atomix.protocols.log.protocol.LogRequest;
-import io.atomix.protocols.log.protocol.LogResponse;
 import io.atomix.protocols.log.protocol.ResetRequest;
+import io.atomix.protocols.log.protocol.ResponseStatus;
 import io.atomix.utils.logging.ContextualLoggerFactory;
 import io.atomix.utils.logging.LoggerContext;
 import org.slf4j.Logger;
@@ -63,7 +63,7 @@ public abstract class LogServerRole {
   /**
    * Logs a request.
    */
-  protected final <R extends LogRequest> R logRequest(R request) {
+  protected final <R extends Message> R logRequest(R request) {
     log.trace("Received {}", request);
     return request;
   }
@@ -71,7 +71,7 @@ public abstract class LogServerRole {
   /**
    * Logs a response.
    */
-  protected final <R extends LogResponse> R logResponse(R response) {
+  protected final <R extends Message> R logResponse(R response) {
     log.trace("Sending {}", response);
     return response;
   }
@@ -84,7 +84,7 @@ public abstract class LogServerRole {
    */
   public CompletableFuture<AppendResponse> append(AppendRequest request) {
     logRequest(request);
-    return CompletableFuture.completedFuture(logResponse(AppendResponse.error()));
+    return CompletableFuture.completedFuture(logResponse(AppendResponse.newBuilder().setStatus(ResponseStatus.ERROR).build()));
   }
 
   /**
@@ -95,7 +95,7 @@ public abstract class LogServerRole {
    */
   public CompletableFuture<ConsumeResponse> consume(ConsumeRequest request) {
     logRequest(request);
-    return CompletableFuture.completedFuture(logResponse(ConsumeResponse.error()));
+    return CompletableFuture.completedFuture(logResponse(ConsumeResponse.newBuilder().setStatus(ResponseStatus.ERROR).build()));
   }
 
   /**
@@ -115,7 +115,7 @@ public abstract class LogServerRole {
    */
   public CompletableFuture<BackupResponse> backup(BackupRequest request) {
     logRequest(request);
-    return CompletableFuture.completedFuture(logResponse(BackupResponse.error()));
+    return CompletableFuture.completedFuture(logResponse(BackupResponse.newBuilder().setStatus(ResponseStatus.ERROR).build()));
   }
 
   /**

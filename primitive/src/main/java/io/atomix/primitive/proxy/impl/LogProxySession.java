@@ -182,7 +182,7 @@ public class LogProxySession<S> implements ProxySession<S> {
   @SuppressWarnings("unchecked")
   private void consume(LogRecord record) {
     // Decode the raw log operation from the record.
-    LogOperation operation = decodeInternal(record.value());
+    LogOperation operation = decodeInternal(record.getValue().toByteArray());
 
     // If this operation is not destined for this primitive, ignore it.
     // TODO: If multiple primitives of different types are created and destroyed on the same distributed log,
@@ -195,10 +195,10 @@ public class LogProxySession<S> implements ProxySession<S> {
     Session session = getOrCreateSession(operation.sessionId());
 
     // Update the local context for the service.
-    currentIndex = record.index();
+    currentIndex = record.getIndex();
     currentSession = session;
     currentOperation = operation.operationId().type();
-    currentTimestamp = record.timestamp();
+    currentTimestamp = record.getTimestamp();
 
     // Apply the operation to the service.
     byte[] output = service.apply(new DefaultCommit<>(
@@ -218,7 +218,7 @@ public class LogProxySession<S> implements ProxySession<S> {
 
     // Iterate through pending reads and complete any reads at indexes less than or equal to the applied index.
     PendingRead pendingRead = pendingReads.peek();
-    while (pendingRead != null && pendingRead.index <= record.index()) {
+    while (pendingRead != null && pendingRead.index <= record.getIndex()) {
       session = getOrCreateSession(this.session.sessionId());
       currentSession = session;
       currentOperation = OperationType.QUERY;

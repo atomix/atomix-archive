@@ -15,13 +15,6 @@
  */
 package io.atomix.protocols.log.roles;
 
-import io.atomix.cluster.MemberId;
-import io.atomix.protocols.log.impl.DistributedLogServerContext;
-import io.atomix.protocols.log.protocol.BackupOperation;
-import io.atomix.protocols.log.protocol.BackupRequest;
-import io.atomix.protocols.log.protocol.LogResponse;
-import org.slf4j.Logger;
-
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
@@ -29,6 +22,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Queue;
 import java.util.concurrent.CompletableFuture;
+
+import io.atomix.cluster.MemberId;
+import io.atomix.protocols.log.impl.DistributedLogServerContext;
+import io.atomix.protocols.log.protocol.BackupOperation;
+import io.atomix.protocols.log.protocol.BackupRequest;
+import io.atomix.protocols.log.protocol.ResponseStatus;
+import org.slf4j.Logger;
 
 /**
  * Synchronous replicator.
@@ -47,12 +47,12 @@ class SynchronousReplicator implements Replicator {
   @Override
   public CompletableFuture<Void> replicate(BackupOperation operation) {
     if (context.followers().isEmpty()) {
-      context.setCommitIndex(operation.index());
+      context.setCommitIndex(operation.getIndex());
       return CompletableFuture.completedFuture(null);
     }
 
     CompletableFuture<Void> future = new CompletableFuture<>();
-    futures.put(operation.index(), future);
+    futures.put(operation.getIndex(), future);
     for (MemberId backup : context.followers()) {
       queues.computeIfAbsent(backup, BackupQueue::new).add(operation);
     }
@@ -123,21 +123,22 @@ class SynchronousReplicator implements Replicator {
       while (operations.size() < 100 && !this.operations.isEmpty()) {
         BackupOperation operation = this.operations.remove();
         operations.add(operation);
-        index = operation.index();
+        index = operation.getIndex();
       }
 
       long lastIndex = index;
-      BackupRequest request = BackupRequest.request(
-          context.memberId(),
-          context.currentTerm(),
-          context.getCommitIndex(),
-          operations);
+      BackupRequest request = BackupRequest.newBuilder()
+          .setLeader(context.memberId().id())
+          .setTerm(context.currentTerm())
+          .setIndex(context.getCommitIndex())
+          .addAllOperations(operations)
+          .build();
 
       log.trace("Sending {} to {}", request, memberId);
       context.protocol().backup(memberId, request).whenCompleteAsync((response, error) -> {
         if (error == null) {
           log.trace("Received {} from {}", response, memberId);
-          if (response.status() == LogResponse.Status.OK) {
+          if (response.getStatus() == ResponseStatus.OK) {
             ackedIndex = lastIndex;
             completeFutures();
           } else {

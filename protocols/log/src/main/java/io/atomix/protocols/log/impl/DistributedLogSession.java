@@ -20,6 +20,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 
 import com.google.common.collect.Sets;
+import com.google.protobuf.ByteString;
 import io.atomix.cluster.ClusterMembershipEvent;
 import io.atomix.cluster.ClusterMembershipEventListener;
 import io.atomix.cluster.ClusterMembershipService;
@@ -38,9 +39,9 @@ import io.atomix.primitive.session.SessionId;
 import io.atomix.protocols.log.protocol.AppendRequest;
 import io.atomix.protocols.log.protocol.ConsumeRequest;
 import io.atomix.protocols.log.protocol.LogClientProtocol;
-import io.atomix.protocols.log.protocol.LogResponse;
 import io.atomix.protocols.log.protocol.RecordsRequest;
 import io.atomix.protocols.log.protocol.ResetRequest;
+import io.atomix.protocols.log.protocol.ResponseStatus;
 import io.atomix.utils.concurrent.ThreadContext;
 import io.atomix.utils.logging.ContextualLoggerFactory;
 import io.atomix.utils.logging.LoggerContext;
@@ -215,11 +216,13 @@ public class DistributedLogSession implements LogSession {
     @Override
     public CompletableFuture<Long> append(byte[] value) {
       CompletableFuture<Long> future = new CompletableFuture<>();
-      term().thenCompose(term -> protocol.append(term.primary().memberId(), AppendRequest.request(value)))
+      term().thenCompose(term -> protocol.append(term.primary().memberId(), AppendRequest.newBuilder()
+          .setValue(ByteString.copyFrom(value))
+          .build()))
           .whenCompleteAsync((response, error) -> {
             if (error == null) {
-              if (response.status() == LogResponse.Status.OK) {
-                future.complete(response.index());
+              if (response.getStatus() == ResponseStatus.OK) {
+                future.complete(response.getIndex());
               } else {
                 future.completeExceptionally(new PrimitiveException.Unavailable());
               }
@@ -247,10 +250,14 @@ public class DistributedLogSession implements LogSession {
     private CompletableFuture<Void> register(MemberId leader) {
       CompletableFuture<Void> future = new CompletableFuture<>();
       this.leader = leader;
-      protocol.consume(leader, ConsumeRequest.request(memberId, subject, index + 1))
+      protocol.consume(leader, ConsumeRequest.newBuilder()
+          .setMemberId(memberId.id())
+          .setSubject(subject)
+          .setIndex(index + 1)
+          .build())
           .whenCompleteAsync((response, error) -> {
             if (error == null) {
-              if (response.status() == LogResponse.Status.OK) {
+              if (response.getStatus() == ResponseStatus.OK) {
                 future.complete(null);
               } else {
                 future.completeExceptionally(new PrimitiveException.Unavailable());
@@ -268,17 +275,21 @@ public class DistributedLogSession implements LogSession {
      * @param request the request to handle
      */
     private void handleRecords(RecordsRequest request) {
-      if (request.reset()) {
-        index = request.record().index() - 1;
+      if (request.getReset()) {
+        index = request.getRecord().getIndex() - 1;
       }
-      if (request.record().index() == index + 1) {
+      if (request.getRecord().getIndex() == index + 1) {
         Consumer<LogRecord> consumer = this.consumer;
         if (consumer != null) {
-          consumer.accept(request.record());
-          index = request.record().index();
+          consumer.accept(request.getRecord());
+          index = request.getRecord().getIndex();
         }
       } else {
-        protocol.reset(leader, ResetRequest.request(memberId, subject, index + 1));
+        protocol.reset(leader, ResetRequest.newBuilder()
+            .setMemberId(memberId.id())
+            .setSubject(subject)
+            .setIndex(index + 1)
+            .build());
       }
     }
 

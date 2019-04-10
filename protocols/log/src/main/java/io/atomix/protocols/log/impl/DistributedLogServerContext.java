@@ -24,6 +24,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
+import com.google.protobuf.Message;
 import io.atomix.cluster.ClusterMembershipService;
 import io.atomix.cluster.MemberId;
 import io.atomix.primitive.Replication;
@@ -41,7 +42,6 @@ import io.atomix.protocols.log.protocol.BackupResponse;
 import io.atomix.protocols.log.protocol.ConsumeRequest;
 import io.atomix.protocols.log.protocol.ConsumeResponse;
 import io.atomix.protocols.log.protocol.LogEntry;
-import io.atomix.protocols.log.protocol.LogResponse;
 import io.atomix.protocols.log.protocol.LogServerProtocol;
 import io.atomix.protocols.log.protocol.ResetRequest;
 import io.atomix.protocols.log.roles.FollowerRole;
@@ -434,7 +434,7 @@ public class DistributedLogServerContext implements Managed<Void> {
     role.reset(request);
   }
 
-  private <R extends LogResponse> CompletableFuture<R> runOnContext(Supplier<CompletableFuture<R>> function) {
+  private <R extends Message> CompletableFuture<R> runOnContext(Supplier<CompletableFuture<R>> function) {
     CompletableFuture<R> future = new CompletableFuture<>();
     threadContext.execute(() -> {
       function.get().whenComplete((response, error) -> {

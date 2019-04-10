@@ -90,7 +90,7 @@ public class DistributedLogTest extends ConcurrentTestCase {
     LogSession session2 = createSession(client2);
 
     session1.consumer().consume(1, record -> {
-      threadAssertTrue(Arrays.equals("Hello world!".getBytes(), record.value()));
+      threadAssertTrue(Arrays.equals("Hello world!".getBytes(), record.getValue().toByteArray()));
       resume();
     });
     session2.producer().append("Hello world!".getBytes());
@@ -110,8 +110,8 @@ public class DistributedLogTest extends ConcurrentTestCase {
     }
 
     session1.consumer().consume(10, record -> {
-      threadAssertTrue(record.index() == 10);
-      threadAssertTrue(Arrays.equals("10".getBytes(), record.value()));
+      threadAssertTrue(record.getIndex() == 10);
+      threadAssertTrue(Arrays.equals("10".getBytes(), record.getValue().toByteArray()));
       resume();
     });
 
@@ -134,7 +134,7 @@ public class DistributedLogTest extends ConcurrentTestCase {
     servers.forEach(server -> server.context.compact());
 
     session2.consumer().consume(1, record -> {
-      threadAssertTrue(record.index() > 1);
+      threadAssertTrue(record.getIndex() > 1);
       resume();
     });
     await(5000);
@@ -157,7 +157,7 @@ public class DistributedLogTest extends ConcurrentTestCase {
     servers.forEach(server -> server.context.compact());
 
     session2.consumer().consume(1, record -> {
-      threadAssertTrue(record.index() > 1);
+      threadAssertTrue(record.getIndex() > 1);
       resume();
     });
     await(5000);

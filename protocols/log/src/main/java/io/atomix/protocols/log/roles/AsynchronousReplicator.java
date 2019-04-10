@@ -15,14 +15,6 @@
  */
 package io.atomix.protocols.log.roles;
 
-import com.google.common.collect.ImmutableList;
-import io.atomix.cluster.MemberId;
-import io.atomix.protocols.log.impl.DistributedLogServerContext;
-import io.atomix.protocols.log.protocol.BackupOperation;
-import io.atomix.protocols.log.protocol.BackupRequest;
-import io.atomix.utils.concurrent.Scheduled;
-import org.slf4j.Logger;
-
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.LinkedList;
@@ -30,6 +22,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.Queue;
 import java.util.concurrent.CompletableFuture;
+
+import com.google.common.collect.ImmutableList;
+import io.atomix.cluster.MemberId;
+import io.atomix.protocols.log.impl.DistributedLogServerContext;
+import io.atomix.protocols.log.protocol.BackupOperation;
+import io.atomix.protocols.log.protocol.BackupRequest;
+import io.atomix.utils.concurrent.Scheduled;
+import org.slf4j.Logger;
 
 /**
  * Asynchronous replicator.
@@ -52,7 +52,7 @@ class AsynchronousReplicator implements Replicator {
     for (MemberId backup : context.followers()) {
       queues.computeIfAbsent(backup, BackupQueue::new).add(operation);
     }
-    context.setCommitIndex(operation.index());
+    context.setCommitIndex(operation.getIndex());
     return CompletableFuture.completedFuture(null);
   }
 
@@ -103,7 +103,12 @@ class AsynchronousReplicator implements Replicator {
     private void backup() {
       List<BackupOperation> batch = ImmutableList.copyOf(operations);
       operations.clear();
-      BackupRequest request = BackupRequest.request(context.memberId(), context.currentTerm(), context.getCommitIndex(), batch);
+      BackupRequest request = BackupRequest.newBuilder()
+          .setLeader(context.memberId().id())
+          .setTerm(context.currentTerm())
+          .setIndex(context.getCommitIndex())
+          .addAllOperations(batch)
+          .build();
       log.trace("Sending {} to {}", request, memberId);
       context.protocol().backup(memberId, request);
       lastSent = System.currentTimeMillis();

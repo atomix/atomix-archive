@@ -1,0 +1,13 @@
+syntax = "proto3";
+
+package atomix.primitive.log;
+
+option java_package = "io.atomix.primitive.log";
+option java_multiple_files = true;
+
+// Log record
+message LogRecord {
+    int64 index = 1;
+    int64 timestamp = 2;
+    bytes value = 3;
+}

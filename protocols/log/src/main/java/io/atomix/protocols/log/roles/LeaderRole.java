@@ -20,7 +20,6 @@ import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 
 import com.google.common.collect.Maps;
-import com.google.protobuf.ByteString;
 import io.atomix.cluster.MemberId;
 import io.atomix.primitive.log.LogRecord;
 import io.atomix.protocols.log.impl.DistributedLogServerContext;
@@ -32,6 +31,7 @@ import io.atomix.protocols.log.protocol.ConsumeResponse;
 import io.atomix.protocols.log.protocol.LogEntry;
 import io.atomix.protocols.log.protocol.RecordsRequest;
 import io.atomix.protocols.log.protocol.ResetRequest;
+import io.atomix.protocols.log.protocol.ResponseStatus;
 import io.atomix.storage.StorageException;
 import io.atomix.storage.journal.Indexed;
 import io.atomix.storage.journal.JournalReader;
@@ -66,35 +66,46 @@ public class LeaderRole extends LogServerRole {
       Indexed<LogEntry> entry = context.journal().writer().append(LogEntry.newBuilder()
           .setTerm(context.currentTerm())
           .setTimestamp(System.currentTimeMillis())
-          .setValue(ByteString.copyFrom(request.value()))
+          .setValue(request.getValue())
           .build());
-      return replicator.replicate(new BackupOperation(
-          entry.index(), entry.entry().getTerm(), entry.entry().getTimestamp(), entry.entry().getValue().toByteArray()))
+      return replicator.replicate(BackupOperation.newBuilder()
+          .setIndex(entry.index())
+          .setTerm(entry.entry().getTerm())
+          .setTimestamp(entry.entry().getTimestamp())
+          .setValue(entry.entry().getValue())
+          .build())
           .thenApply(v -> {
             consumers.values().forEach(consumer -> consumer.next());
-            return logResponse(AppendResponse.ok(entry.index()));
+            return logResponse(AppendResponse.newBuilder()
+                .setStatus(ResponseStatus.OK)
+                .setIndex(entry.index())
+                .build());
           });
     } catch (StorageException e) {
-      return CompletableFuture.completedFuture(logResponse(AppendResponse.error()));
+      return CompletableFuture.completedFuture(logResponse(AppendResponse.newBuilder()
+          .setStatus(ResponseStatus.ERROR)
+          .build()));
     }
   }
 
   @Override
   public CompletableFuture<ConsumeResponse> consume(ConsumeRequest request) {
     logRequest(request);
-    JournalReader<LogEntry> reader = context.journal().openReader(request.index(), JournalReader.Mode.COMMITS);
-    ConsumerSender consumer = new ConsumerSender(request.memberId(), request.subject(), reader);
-    consumers.put(new ConsumerKey(request.memberId(), request.subject()), consumer);
+    JournalReader<LogEntry> reader = context.journal().openReader(request.getIndex(), JournalReader.Mode.COMMITS);
+    ConsumerSender consumer = new ConsumerSender(MemberId.from(request.getMemberId()), request.getSubject(), reader);
+    consumers.put(new ConsumerKey(MemberId.from(request.getMemberId()), request.getSubject()), consumer);
     consumer.next();
-    return CompletableFuture.completedFuture(logResponse(ConsumeResponse.ok()));
+    return CompletableFuture.completedFuture(logResponse(ConsumeResponse.newBuilder()
+        .setStatus(ResponseStatus.OK)
+        .build()));
   }
 
   @Override
   public void reset(ResetRequest request) {
     logRequest(request);
-    ConsumerSender consumer = consumers.get(new ConsumerKey(request.memberId(), request.subject()));
+    ConsumerSender consumer = consumers.get(new ConsumerKey(MemberId.from(request.getMemberId()), request.getSubject()));
     if (consumer != null) {
-      consumer.reset(request.index());
+      consumer.reset(request.getIndex());
     }
   }
 
@@ -139,9 +150,16 @@ public class LeaderRole extends LogServerRole {
       context.threadContext().execute(() -> {
         if (reader.hasNext()) {
           Indexed<LogEntry> entry = reader.next();
-          LogRecord record = new LogRecord(entry.index(), entry.entry().getTimestamp(), entry.entry().getValue().toByteArray());
+          LogRecord record = LogRecord.newBuilder()
+              .setIndex(entry.index())
+              .setTimestamp(entry.entry().getTimestamp())
+              .setValue(entry.entry().getValue())
+              .build();
           boolean reset = reader.getFirstIndex() == entry.index();
-          RecordsRequest request = RecordsRequest.request(record, reset);
+          RecordsRequest request = RecordsRequest.newBuilder()
+              .setRecord(record)
+              .setReset(reset)
+              .build();
           log.trace("Sending {} to {} at {}", request, memberId, subject);
           context.protocol().produce(memberId, subject, request);
           next();
