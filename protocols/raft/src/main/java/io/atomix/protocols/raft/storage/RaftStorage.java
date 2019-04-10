@@ -16,7 +16,12 @@
 package io.atomix.protocols.raft.storage;
 
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.function.Predicate;
 
@@ -26,7 +31,6 @@ import io.atomix.protocols.raft.storage.snapshot.SnapshotStore;
 import io.atomix.protocols.raft.storage.system.MetaStore;
 import io.atomix.storage.StorageException;
 import io.atomix.storage.StorageLevel;
-import io.atomix.storage.buffer.FileBuffer;
 import io.atomix.storage.journal.JournalSegmentDescriptor;
 import io.atomix.storage.journal.JournalSegmentFile;
 import io.atomix.storage.statistics.StorageStatistics;
@@ -232,14 +236,18 @@ public class RaftStorage {
     File file = new File(directory, String.format(".%s.lock", prefix));
     try {
       if (file.createNewFile()) {
-        try (FileBuffer buffer = FileBuffer.allocate(file)) {
-          buffer.writeString(id).flush();
+        try (OutputStream output = new FileOutputStream(file)) {
+          output.write(id.getBytes(StandardCharsets.UTF_8));
         }
         return true;
       } else {
-        try (FileBuffer buffer = FileBuffer.allocate(file)) {
-          String lock = buffer.readString();
-          return lock != null && lock.equals(id);
+        try (InputStream input = new FileInputStream(file)) {
+          byte[] bytes = new byte[128];
+          if (input.read(bytes) != -1) {
+            String lock = new String(bytes, StandardCharsets.UTF_8);
+            return lock.equals(id);
+          }
+          return false;
         }
       }
     } catch (IOException e) {

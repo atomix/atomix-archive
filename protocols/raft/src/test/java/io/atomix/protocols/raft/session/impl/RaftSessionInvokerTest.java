@@ -28,7 +28,6 @@ import io.atomix.protocols.raft.TestPrimitiveType;
 import io.atomix.protocols.raft.protocol.OperationRequest;
 import io.atomix.protocols.raft.protocol.OperationResponse;
 import io.atomix.protocols.raft.protocol.ResponseStatus;
-import io.atomix.storage.buffer.HeapBytes;
 import io.atomix.utils.concurrent.Scheduled;
 import io.atomix.utils.concurrent.ThreadContext;
 import org.junit.Test;
@@ -70,7 +69,7 @@ public class RaftSessionInvokerTest {
     ThreadContext threadContext = new TestContext();
 
     RaftSessionInvoker submitter = new RaftSessionInvoker(connection, mock(RaftSessionConnection.class), state, new RaftSessionSequencer(state), manager, threadContext);
-    assertArrayEquals(submitter.invoke(operation(COMMAND, HeapBytes.EMPTY)).get(), "Hello world!".getBytes());
+    assertArrayEquals(submitter.invoke(operation(COMMAND, new byte[0])).get(), "Hello world!".getBytes());
     assertEquals(1, state.getCommandRequest());
     assertEquals(1, state.getCommandResponse());
     assertEquals(10, state.getResponseIndex());
