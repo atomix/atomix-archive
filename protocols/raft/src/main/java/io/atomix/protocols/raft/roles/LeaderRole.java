@@ -15,8 +15,18 @@
  */
 package io.atomix.protocols.raft.roles;
 
+import java.time.Duration;
+import java.time.Instant;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.stream.Collectors;
+
 import com.google.common.base.Throwables;
 import com.google.common.collect.Sets;
+import com.google.protobuf.ByteString;
 import io.atomix.cluster.ClusterMembershipEvent;
 import io.atomix.cluster.ClusterMembershipEventListener;
 import io.atomix.primitive.session.SessionId;
@@ -58,28 +68,20 @@ import io.atomix.protocols.raft.protocol.TransferResponse;
 import io.atomix.protocols.raft.protocol.VoteRequest;
 import io.atomix.protocols.raft.protocol.VoteResponse;
 import io.atomix.protocols.raft.session.RaftSession;
-import io.atomix.protocols.raft.storage.log.entry.CloseSessionEntry;
-import io.atomix.protocols.raft.storage.log.entry.CommandEntry;
-import io.atomix.protocols.raft.storage.log.entry.ConfigurationEntry;
-import io.atomix.protocols.raft.storage.log.entry.InitializeEntry;
-import io.atomix.protocols.raft.storage.log.entry.KeepAliveEntry;
-import io.atomix.protocols.raft.storage.log.entry.MetadataEntry;
-import io.atomix.protocols.raft.storage.log.entry.OpenSessionEntry;
-import io.atomix.protocols.raft.storage.log.entry.QueryEntry;
-import io.atomix.protocols.raft.storage.log.entry.RaftLogEntry;
+import io.atomix.protocols.raft.storage.log.CloseSessionEntry;
+import io.atomix.protocols.raft.storage.log.CommandEntry;
+import io.atomix.protocols.raft.storage.log.ConfigurationEntry;
+import io.atomix.protocols.raft.storage.log.InitializeEntry;
+import io.atomix.protocols.raft.storage.log.KeepAliveEntry;
+import io.atomix.protocols.raft.storage.log.MetadataEntry;
+import io.atomix.protocols.raft.storage.log.OpenSessionEntry;
+import io.atomix.protocols.raft.storage.log.QueryEntry;
+import io.atomix.protocols.raft.storage.log.RaftLogEntry;
 import io.atomix.protocols.raft.storage.system.Configuration;
 import io.atomix.storage.StorageException;
 import io.atomix.storage.journal.Indexed;
 import io.atomix.utils.concurrent.Futures;
 import io.atomix.utils.concurrent.Scheduled;
-
-import java.time.Duration;
-import java.time.Instant;
-import java.util.Collection;
-import java.util.Set;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionException;
-import java.util.stream.Collectors;
 
 /**
  * Leader state.
@@ -137,8 +139,12 @@ public final class LeaderRole extends ActiveRole {
    */
   private CompletableFuture<Void> appendInitialEntries() {
     final long term = raft.getTerm();
-
-    return appendAndCompact(new InitializeEntry(term, appender.getTime())).thenApply(index -> null);
+    return appendAndCompact(RaftLogEntry.newBuilder()
+        .setTerm(term)
+        .setTimestamp(appender.getTime())
+        .setInitialize(InitializeEntry.newBuilder().build())
+        .build())
+        .thenApply(index -> null);
   }
 
   /**
@@ -206,7 +212,15 @@ public final class LeaderRole extends ActiveRole {
   private void expireSession(RaftSession session) {
     if (expiring.add(session.sessionId())) {
       log.debug("Expiring session due to heartbeat failure: {}", session);
-      appendAndCompact(new CloseSessionEntry(raft.getTerm(), System.currentTimeMillis(), session.sessionId().id(), true, false))
+      appendAndCompact(RaftLogEntry.newBuilder()
+          .setTerm(raft.getTerm())
+          .setTimestamp(System.currentTimeMillis())
+          .setCloseSession(CloseSessionEntry.newBuilder()
+              .setSessionId(session.sessionId().id())
+              .setExpired(true)
+              .setDeleted(false)
+              .build())
+          .build())
           .whenCompleteAsync((entry, error) -> {
             if (error != null) {
               expiring.remove(session.sessionId());
@@ -256,13 +270,24 @@ public final class LeaderRole extends ActiveRole {
     raft.checkThread();
 
     final long term = raft.getTerm();
-
-    return appendAndCompact(new ConfigurationEntry(term, System.currentTimeMillis(), members))
+    return appendAndCompact(RaftLogEntry.newBuilder()
+        .setTerm(term)
+        .setTimestamp(System.currentTimeMillis())
+        .setConfiguration(ConfigurationEntry.newBuilder()
+            .addAllMembers(members.stream()
+                .map(member -> io.atomix.protocols.raft.storage.log.RaftMember.newBuilder()
+                    .setMemberId(member.memberId().id())
+                    .setType(io.atomix.protocols.raft.storage.log.RaftMember.Type.valueOf(member.getType().name()))
+                    .setUpdated(member.getLastUpdated().toEpochMilli())
+                    .build())
+                .collect(Collectors.toList()))
+            .build())
+        .build())
         .thenComposeAsync(entry -> {
           // Store the index of the configuration entry in order to prevent other configurations from
           // being logged and committed concurrently. This is an important safety property of Raft.
           configuring = entry.index();
-          raft.getCluster().configure(new Configuration(entry.index(), entry.entry().term(), entry.entry().timestamp(), entry.entry().members()));
+          raft.getCluster().configure(new Configuration(entry.index(), entry.entry().getTerm(), entry.entry().getTimestamp(), members));
 
           return appender.appendEntries(entry.index()).whenComplete((commitIndex, commitError) -> {
             raft.checkThread();
@@ -565,9 +590,15 @@ public final class LeaderRole extends ActiveRole {
     }
 
     CompletableFuture<MetadataResponse> future = new CompletableFuture<>();
-    Indexed<MetadataEntry> entry = new Indexed<>(
+    Indexed<RaftLogEntry> entry = new Indexed<>(
         raft.getLastApplied(),
-        new MetadataEntry(raft.getTerm(), System.currentTimeMillis(), request.session()), 0);
+        RaftLogEntry.newBuilder()
+            .setTerm(raft.getTerm())
+            .setTimestamp(System.currentTimeMillis())
+            .setMetadata(MetadataEntry.newBuilder()
+                .setSessionId(request.session())
+                .build())
+            .build(), 0);
     raft.getServiceManager().<MetadataResult>apply(entry).whenComplete((result, error) -> {
       if (error == null) {
         future.complete(logResponse(MetadataResponse.builder()
@@ -697,13 +728,21 @@ public final class LeaderRole extends ActiveRole {
     final long term = raft.getTerm();
     final long timestamp = System.currentTimeMillis();
 
-    CommandEntry command = new CommandEntry(term, timestamp, request.session(), request.sequenceNumber(), request.operation());
-    appendAndCompact(command)
+    appendAndCompact(RaftLogEntry.newBuilder()
+        .setTerm(term)
+        .setTimestamp(timestamp)
+        .setCommand(CommandEntry.newBuilder()
+            .setSessionId(request.session())
+            .setSequenceNumber(request.sequenceNumber())
+            .setOperation(request.operation().id().id())
+            .setValue(ByteString.copyFrom(request.operation().value()))
+            .build())
+        .build())
         .whenCompleteAsync((entry, error) -> {
           if (error != null) {
             Throwable cause = Throwables.getRootCause(error);
             if (Throwables.getRootCause(error) instanceof StorageException.TooLarge) {
-              log.warn("Failed to append command {}", command, cause);
+              log.warn("Failed to append command {}", request, cause);
               future.complete(CommandResponse.builder()
                   .withStatus(RaftResponse.Status.ERROR)
                   .withError(RaftError.Type.PROTOCOL_ERROR)
@@ -767,14 +806,18 @@ public final class LeaderRole extends ActiveRole {
           .build()));
     }
 
-    final Indexed<QueryEntry> entry = new Indexed<>(
+    final Indexed<RaftLogEntry> entry = new Indexed<>(
         request.index(),
-        new QueryEntry(
-            raft.getTerm(),
-            System.currentTimeMillis(),
-            request.session(),
-            request.sequenceNumber(),
-            request.operation()), 0);
+        RaftLogEntry.newBuilder()
+            .setTerm(raft.getTerm())
+            .setTimestamp(System.currentTimeMillis())
+            .setQuery(QueryEntry.newBuilder()
+                .setSessionId(request.session())
+                .setSequenceNumber(request.sequenceNumber())
+                .setOperation(request.operation().id().id())
+                .setValue(ByteString.copyFrom(request.operation().value()))
+                .build())
+            .build(), 0);
 
     final CompletableFuture<QueryResponse> future;
     switch (session.readConsistency()) {
@@ -800,7 +843,7 @@ public final class LeaderRole extends ActiveRole {
    * Bounded linearizable queries succeed as long as this server remains the leader. This is possible
    * since the leader will step down in the event it fails to contact a majority of the cluster.
    */
-  private CompletableFuture<QueryResponse> queryBoundedLinearizable(Indexed<QueryEntry> entry) {
+  private CompletableFuture<QueryResponse> queryBoundedLinearizable(Indexed<RaftLogEntry> entry) {
     return applyQuery(entry);
   }
 
@@ -810,7 +853,7 @@ public final class LeaderRole extends ActiveRole {
    * Linearizable queries are first sequenced with commands and then applied to the state machine. Once
    * applied, we verify the node's leadership prior to responding successfully to the query.
    */
-  private CompletableFuture<QueryResponse> queryLinearizable(Indexed<QueryEntry> entry) {
+  private CompletableFuture<QueryResponse> queryLinearizable(Indexed<RaftLogEntry> entry) {
     return applyQuery(entry)
         .thenComposeAsync(response -> appender.appendEntries()
             .thenApply(index -> response)
@@ -839,15 +882,17 @@ public final class LeaderRole extends ActiveRole {
     logRequest(request);
 
     CompletableFuture<OpenSessionResponse> future = new CompletableFuture<>();
-    appendAndCompact(new OpenSessionEntry(
-        term,
-        timestamp,
-        request.node(),
-        request.serviceName(),
-        request.serviceType(),
-        request.readConsistency(),
-        minTimeout,
-        maxTimeout))
+    appendAndCompact(RaftLogEntry.newBuilder()
+        .setTerm(term)
+        .setTimestamp(timestamp)
+        .setOpenSession(OpenSessionEntry.newBuilder()
+            .setMemberId(request.node())
+            .setServiceName(request.serviceName())
+            .setServiceType(request.serviceType())
+            .setReadConsistency(OpenSessionEntry.ReadConsistency.valueOf(request.readConsistency().name()))
+            .setTimeout(request.maxTimeout())
+            .build())
+        .build())
         .whenCompleteAsync((entry, error) -> {
           if (error != null) {
             future.complete(logResponse(OpenSessionResponse.builder()
@@ -912,7 +957,15 @@ public final class LeaderRole extends ActiveRole {
     logRequest(request);
 
     CompletableFuture<KeepAliveResponse> future = new CompletableFuture<>();
-    appendAndCompact(new KeepAliveEntry(term, timestamp, request.sessionIds(), request.commandSequenceNumbers(), request.eventIndexes()))
+    appendAndCompact(RaftLogEntry.newBuilder()
+        .setTerm(term)
+        .setTimestamp(timestamp)
+        .setKeepAlive(KeepAliveEntry.newBuilder()
+            .addAllSessionIds(Arrays.stream(request.sessionIds()).boxed().collect(Collectors.toList()))
+            .addAllCommandSequences(Arrays.stream(request.commandSequenceNumbers()).boxed().collect(Collectors.toList()))
+            .addAllEventIndexes(Arrays.stream(request.eventIndexes()).boxed().collect(Collectors.toList()))
+            .build())
+        .build())
         .whenCompleteAsync((entry, error) -> {
           if (error != null) {
             future.complete(logResponse(KeepAliveResponse.builder()
@@ -988,7 +1041,15 @@ public final class LeaderRole extends ActiveRole {
     logRequest(request);
 
     CompletableFuture<CloseSessionResponse> future = new CompletableFuture<>();
-    appendAndCompact(new CloseSessionEntry(term, timestamp, request.session(), false, request.delete()))
+    appendAndCompact(RaftLogEntry.newBuilder()
+        .setTerm(term)
+        .setTimestamp(timestamp)
+        .setCloseSession(CloseSessionEntry.newBuilder()
+            .setSessionId(request.session())
+            .setExpired(false)
+            .setDeleted(request.delete())
+            .build())
+        .build())
         .whenCompleteAsync((entry, error) -> {
           if (error != null) {
             future.complete(logResponse(CloseSessionResponse.builder()

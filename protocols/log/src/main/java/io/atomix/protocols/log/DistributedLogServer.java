@@ -15,12 +15,17 @@
  */
 package io.atomix.protocols.log;
 
+import java.io.File;
+import java.time.Duration;
+import java.util.concurrent.CompletableFuture;
+
 import io.atomix.cluster.ClusterMembershipService;
 import io.atomix.primitive.Replication;
 import io.atomix.primitive.partition.MemberGroupProvider;
 import io.atomix.primitive.partition.PrimaryElection;
 import io.atomix.primitive.partition.impl.DefaultMemberGroupService;
 import io.atomix.protocols.log.impl.DistributedLogServerContext;
+import io.atomix.protocols.log.protocol.DistributedLogCodec;
 import io.atomix.protocols.log.protocol.LogEntry;
 import io.atomix.protocols.log.protocol.LogServerProtocol;
 import io.atomix.storage.StorageLevel;
@@ -30,13 +35,7 @@ import io.atomix.utils.concurrent.ThreadContextFactory;
 import io.atomix.utils.concurrent.ThreadModel;
 import io.atomix.utils.logging.ContextualLoggerFactory;
 import io.atomix.utils.logging.LoggerContext;
-import io.atomix.utils.serializer.Namespace;
-import io.atomix.utils.serializer.Namespaces;
 import org.slf4j.Logger;
-
-import java.io.File;
-import java.time.Duration;
-import java.util.concurrent.CompletableFuture;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -416,11 +415,7 @@ public class DistributedLogServer implements Managed<DistributedLogServer> {
           .withName(serverName)
           .withDirectory(directory)
           .withStorageLevel(storageLevel)
-          .withNamespace(Namespace.builder()
-              .register(Namespaces.BASIC)
-              .register(LogEntry.class)
-              .register(byte[].class)
-              .build())
+          .withCodec(new DistributedLogCodec())
           .withMaxSegmentSize(maxSegmentSize)
           .withMaxEntrySize(maxEntrySize)
           .withIndexDensity(indexDensity)

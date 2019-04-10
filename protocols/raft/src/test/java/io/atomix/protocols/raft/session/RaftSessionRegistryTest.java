@@ -72,7 +72,6 @@ public class RaftSessionRegistryTest {
         "test",
         TestPrimitiveType.instance(),
         ReadConsistency.LINEARIZABLE,
-        100,
         5000,
         System.currentTimeMillis(),
         Serializer.using(Namespaces.BASIC),

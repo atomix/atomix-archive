@@ -15,13 +15,12 @@
  */
 package io.atomix.storage.journal;
 
-import io.atomix.storage.StorageException;
-import io.atomix.storage.journal.index.JournalIndex;
-import io.atomix.utils.serializer.Namespace;
-
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
+
+import io.atomix.storage.StorageException;
+import io.atomix.storage.journal.index.JournalIndex;
 
 /**
  * Mappable log segment reader.
@@ -31,7 +30,7 @@ class MappableJournalSegmentReader<E> implements JournalReader<E> {
   private final FileChannel channel;
   private final int maxEntrySize;
   private final JournalIndex index;
-  private final Namespace namespace;
+  private final JournalCodec<E> codec;
   private JournalReader<E> reader;
 
   MappableJournalSegmentReader(
@@ -39,13 +38,13 @@ class MappableJournalSegmentReader<E> implements JournalReader<E> {
       JournalSegment<E> segment,
       int maxEntrySize,
       JournalIndex index,
-      Namespace namespace) {
+      JournalCodec<E> codec) {
     this.channel = channel;
     this.segment = segment;
     this.maxEntrySize = maxEntrySize;
     this.index = index;
-    this.namespace = namespace;
-    this.reader = new FileChannelJournalSegmentReader<>(channel, segment, maxEntrySize, index, namespace);
+    this.codec = codec;
+    this.reader = new FileChannelJournalSegmentReader<>(channel, segment, maxEntrySize, index, codec);
   }
 
   /**
@@ -56,7 +55,7 @@ class MappableJournalSegmentReader<E> implements JournalReader<E> {
   void map(ByteBuffer buffer) {
     if (!(reader instanceof MappedJournalSegmentReader)) {
       JournalReader<E> reader = this.reader;
-      this.reader = new MappedJournalSegmentReader<>(buffer, segment, maxEntrySize, index, namespace);
+      this.reader = new MappedJournalSegmentReader<>(buffer, segment, maxEntrySize, index, codec);
       this.reader.reset(reader.getNextIndex());
       reader.close();
     }
@@ -68,7 +67,7 @@ class MappableJournalSegmentReader<E> implements JournalReader<E> {
   void unmap() {
     if (reader instanceof MappedJournalSegmentReader) {
       JournalReader<E> reader = this.reader;
-      this.reader = new FileChannelJournalSegmentReader<>(channel, segment, maxEntrySize, index, namespace);
+      this.reader = new FileChannelJournalSegmentReader<>(channel, segment, maxEntrySize, index, codec);
       this.reader.reset(reader.getNextIndex());
       reader.close();
     }

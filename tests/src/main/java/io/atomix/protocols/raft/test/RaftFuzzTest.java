@@ -103,14 +103,6 @@ import io.atomix.protocols.raft.protocol.VoteRequest;
 import io.atomix.protocols.raft.protocol.VoteResponse;
 import io.atomix.protocols.raft.session.CommunicationStrategy;
 import io.atomix.protocols.raft.storage.RaftStorage;
-import io.atomix.protocols.raft.storage.log.entry.CloseSessionEntry;
-import io.atomix.protocols.raft.storage.log.entry.CommandEntry;
-import io.atomix.protocols.raft.storage.log.entry.ConfigurationEntry;
-import io.atomix.protocols.raft.storage.log.entry.InitializeEntry;
-import io.atomix.protocols.raft.storage.log.entry.KeepAliveEntry;
-import io.atomix.protocols.raft.storage.log.entry.MetadataEntry;
-import io.atomix.protocols.raft.storage.log.entry.OpenSessionEntry;
-import io.atomix.protocols.raft.storage.log.entry.QueryEntry;
 import io.atomix.protocols.raft.storage.system.Configuration;
 import io.atomix.protocols.raft.test.protocol.LocalRaftProtocolFactory;
 import io.atomix.protocols.raft.test.protocol.RaftClientMessagingProtocol;
@@ -183,14 +175,6 @@ public class RaftFuzzTest implements Runnable {
       .register(ReadConsistency.class)
       .register(byte[].class)
       .register(long[].class)
-      .register(CloseSessionEntry.class)
-      .register(CommandEntry.class)
-      .register(ConfigurationEntry.class)
-      .register(InitializeEntry.class)
-      .register(KeepAliveEntry.class)
-      .register(MetadataEntry.class)
-      .register(OpenSessionEntry.class)
-      .register(QueryEntry.class)
       .register(PrimitiveOperation.class)
       .register(DefaultOperationId.class)
       .register(OperationType.class)
@@ -207,14 +191,6 @@ public class RaftFuzzTest implements Runnable {
       .build());
 
   private static final Namespace STORAGE_NAMESPACE = Namespace.builder()
-      .register(CloseSessionEntry.class)
-      .register(CommandEntry.class)
-      .register(ConfigurationEntry.class)
-      .register(InitializeEntry.class)
-      .register(KeepAliveEntry.class)
-      .register(MetadataEntry.class)
-      .register(OpenSessionEntry.class)
-      .register(QueryEntry.class)
       .register(PrimitiveOperation.class)
       .register(DefaultOperationId.class)
       .register(OperationType.class)

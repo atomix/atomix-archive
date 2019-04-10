@@ -31,24 +31,19 @@ import com.google.common.primitives.Longs;
 import io.atomix.cluster.MemberId;
 import io.atomix.primitive.PrimitiveId;
 import io.atomix.primitive.PrimitiveType;
+import io.atomix.primitive.operation.OperationId;
+import io.atomix.primitive.operation.PrimitiveOperation;
 import io.atomix.primitive.service.PrimitiveService;
 import io.atomix.primitive.session.SessionId;
 import io.atomix.primitive.session.SessionMetadata;
 import io.atomix.protocols.raft.RaftException;
 import io.atomix.protocols.raft.RaftServer;
+import io.atomix.protocols.raft.ReadConsistency;
 import io.atomix.protocols.raft.service.RaftServiceContext;
 import io.atomix.protocols.raft.session.RaftSession;
 import io.atomix.protocols.raft.storage.log.RaftLog;
+import io.atomix.protocols.raft.storage.log.RaftLogEntry;
 import io.atomix.protocols.raft.storage.log.RaftLogReader;
-import io.atomix.protocols.raft.storage.log.entry.CloseSessionEntry;
-import io.atomix.protocols.raft.storage.log.entry.CommandEntry;
-import io.atomix.protocols.raft.storage.log.entry.ConfigurationEntry;
-import io.atomix.protocols.raft.storage.log.entry.InitializeEntry;
-import io.atomix.protocols.raft.storage.log.entry.KeepAliveEntry;
-import io.atomix.protocols.raft.storage.log.entry.MetadataEntry;
-import io.atomix.protocols.raft.storage.log.entry.OpenSessionEntry;
-import io.atomix.protocols.raft.storage.log.entry.QueryEntry;
-import io.atomix.protocols.raft.storage.log.entry.RaftLogEntry;
 import io.atomix.protocols.raft.storage.snapshot.ServiceSnapshot;
 import io.atomix.protocols.raft.storage.snapshot.Snapshot;
 import io.atomix.storage.StorageLevel;
@@ -398,13 +393,13 @@ public class RaftServiceManager implements AutoCloseable {
    * @return A completable future to be completed with the result.
    */
   @SuppressWarnings("unchecked")
-  public <T> CompletableFuture<T> apply(Indexed<? extends RaftLogEntry> entry) {
+  public <T> CompletableFuture<T> apply(Indexed<RaftLogEntry> entry) {
     CompletableFuture<T> future = new CompletableFuture<>();
     stateContext.execute(() -> {
       logger.trace("Applying {}", entry);
       try {
-        if (entry.type() == QueryEntry.class) {
-          applyQuery(entry.cast()).whenComplete((r, e) -> {
+        if (entry.entry().hasQuery()) {
+          applyQuery(entry).whenComplete((r, e) -> {
             if (e != null) {
               future.completeExceptionally(e);
             } else {
@@ -424,21 +419,21 @@ public class RaftServiceManager implements AutoCloseable {
             }
           }
 
-          if (entry.type() == CommandEntry.class) {
-            future.complete((T) applyCommand(entry.cast()));
-          } else if (entry.type() == OpenSessionEntry.class) {
-            future.complete((T) (Long) applyOpenSession(entry.cast()));
-          } else if (entry.type() == KeepAliveEntry.class) {
-            future.complete((T) applyKeepAlive(entry.cast()));
-          } else if (entry.type() == CloseSessionEntry.class) {
-            applyCloseSession(entry.cast());
+          if (entry.entry().hasCommand()) {
+            future.complete((T) applyCommand(entry));
+          } else if (entry.entry().hasOpenSession()) {
+            future.complete((T) (Long) applyOpenSession(entry));
+          } else if (entry.entry().hasKeepAlive()) {
+            future.complete((T) applyKeepAlive(entry));
+          } else if (entry.entry().hasCloseSession()) {
+            applyCloseSession(entry);
             future.complete(null);
-          } else if (entry.type() == MetadataEntry.class) {
-            future.complete((T) applyMetadata(entry.cast()));
-          } else if (entry.type() == InitializeEntry.class) {
-            future.complete((T) applyInitialize(entry.cast()));
-          } else if (entry.type() == ConfigurationEntry.class) {
-            future.complete((T) applyConfiguration(entry.cast()));
+          } else if (entry.entry().hasMetadata()) {
+            future.complete((T) applyMetadata(entry));
+          } else if (entry.entry().hasInitialize()) {
+            future.complete((T) applyInitialize(entry));
+          } else if (entry.entry().hasConfiguration()) {
+            future.complete((T) applyConfiguration(entry));
           } else {
             future.completeExceptionally(new RaftException.ProtocolException("Unknown entry type"));
           }
@@ -541,9 +536,9 @@ public class RaftServiceManager implements AutoCloseable {
    * Initialize entries are used only at the beginning of a new leader's term to force the commitment of entries from
    * prior terms, therefore no logic needs to take place.
    */
-  private CompletableFuture<Void> applyInitialize(Indexed<InitializeEntry> entry) {
+  private CompletableFuture<Void> applyInitialize(Indexed<RaftLogEntry> entry) {
     for (RaftServiceContext service : raft.getServices()) {
-      service.keepAliveSessions(entry.index(), entry.entry().timestamp());
+      service.keepAliveSessions(entry.index(), entry.entry().getTimestamp());
     }
     return CompletableFuture.completedFuture(null);
   }
@@ -555,9 +550,9 @@ public class RaftServiceManager implements AutoCloseable {
    * needs to take place in the handling of configuration entries. We simply release the previous configuration entry
    * since it was overwritten by a more recent committed configuration entry.
    */
-  private CompletableFuture<Void> applyConfiguration(Indexed<ConfigurationEntry> entry) {
+  private CompletableFuture<Void> applyConfiguration(Indexed<RaftLogEntry> entry) {
     for (RaftServiceContext service : raft.getServices()) {
-      service.keepAliveSessions(entry.index(), entry.entry().timestamp());
+      service.keepAliveSessions(entry.index(), entry.entry().getTimestamp());
     }
     return CompletableFuture.completedFuture(null);
   }
@@ -584,24 +579,24 @@ public class RaftServiceManager implements AutoCloseable {
    * client's session is expired. This ensures for sessions that have long timeouts, keep alive entries cannot be
    * cleaned from the log before they're replicated to some servers.
    */
-  private long[] applyKeepAlive(Indexed<KeepAliveEntry> entry) {
+  private long[] applyKeepAlive(Indexed<RaftLogEntry> entry) {
 
     // Store the session/command/event sequence and event index instead of acquiring a reference to the entry.
-    long[] sessionIds = entry.entry().sessionIds();
-    long[] commandSequences = entry.entry().commandSequenceNumbers();
-    long[] eventIndexes = entry.entry().eventIndexes();
+    List<Long> sessionIds = entry.entry().getKeepAlive().getSessionIdsList();
+    List<Long> commandSequences = entry.entry().getKeepAlive().getCommandSequencesList();
+    List<Long> eventIndexes = entry.entry().getKeepAlive().getEventIndexesList();
 
     // Iterate through session identifiers and keep sessions alive.
-    List<Long> successfulSessionIds = new ArrayList<>(sessionIds.length);
+    List<Long> successfulSessionIds = new ArrayList<>(sessionIds.size());
     Set<RaftServiceContext> services = new HashSet<>();
-    for (int i = 0; i < sessionIds.length; i++) {
-      long sessionId = sessionIds[i];
-      long commandSequence = commandSequences[i];
-      long eventIndex = eventIndexes[i];
+    for (int i = 0; i < sessionIds.size(); i++) {
+      long sessionId = sessionIds.get(i);
+      long commandSequence = commandSequences.get(i);
+      long eventIndex = eventIndexes.get(i);
 
       RaftSession session = raft.getSessions().getSession(sessionId);
       if (session != null) {
-        if (session.getService().keepAlive(entry.index(), entry.entry().timestamp(), session, commandSequence, eventIndex)) {
+        if (session.getService().keepAlive(entry.index(), entry.entry().getTimestamp(), session, commandSequence, eventIndex)) {
           successfulSessionIds.add(sessionId);
           services.add(session.getService());
         }
@@ -610,10 +605,10 @@ public class RaftServiceManager implements AutoCloseable {
 
     // Iterate through services and complete keep-alives, causing sessions to be expired if necessary.
     for (RaftServiceContext service : services) {
-      service.completeKeepAlive(entry.index(), entry.entry().timestamp());
+      service.completeKeepAlive(entry.index(), entry.entry().getTimestamp());
     }
 
-    expireOrphanSessions(entry.entry().timestamp());
+    expireOrphanSessions(entry.entry().getTimestamp());
 
     return Longs.toArray(successfulSessionIds);
   }
@@ -671,52 +666,51 @@ public class RaftServiceManager implements AutoCloseable {
   /**
    * Applies an open session entry to the state machine.
    */
-  private long applyOpenSession(Indexed<OpenSessionEntry> entry) {
-    PrimitiveType primitiveType = raft.getPrimitiveTypes().getPrimitiveType(entry.entry().serviceType());
+  private long applyOpenSession(Indexed<RaftLogEntry> entry) {
+    PrimitiveType primitiveType = raft.getPrimitiveTypes().getPrimitiveType(entry.entry().getOpenSession().getServiceType());
 
     // Get the state machine executor or create one if it doesn't already exist.
     RaftServiceContext service = getOrInitializeService(
         PrimitiveId.from(entry.index()),
         primitiveType,
-        entry.entry().serviceName());
+        entry.entry().getOpenSession().getServiceName());
 
     if (service == null) {
-      throw new RaftException.UnknownService("Unknown service type " + entry.entry().serviceType());
+      throw new RaftException.UnknownService("Unknown service type " + entry.entry().getOpenSession().getServiceType());
     }
 
     SessionId sessionId = SessionId.from(entry.index());
     RaftSession session = raft.getSessions().addSession(new RaftSession(
         sessionId,
-        MemberId.from(entry.entry().memberId()),
-        entry.entry().serviceName(),
+        MemberId.from(entry.entry().getOpenSession().getMemberId()),
+        entry.entry().getOpenSession().getServiceName(),
         primitiveType,
-        entry.entry().readConsistency(),
-        entry.entry().minTimeout(),
-        entry.entry().maxTimeout(),
-        entry.entry().timestamp(),
+        ReadConsistency.valueOf(entry.entry().getOpenSession().getReadConsistency().name()),
+        entry.entry().getOpenSession().getTimeout(),
+        entry.entry().getTimestamp(),
         service.serializer(),
         service,
         raft,
         threadContextFactory));
-    return service.openSession(entry.index(), entry.entry().timestamp(), session);
+    return service.openSession(entry.index(), entry.entry().getTimestamp(), session);
   }
 
   /**
    * Applies a close session entry to the state machine.
    */
-  private void applyCloseSession(Indexed<CloseSessionEntry> entry) {
-    RaftSession session = raft.getSessions().getSession(entry.entry().session());
+  private void applyCloseSession(Indexed<RaftLogEntry> entry) {
+    RaftSession session = raft.getSessions().getSession(entry.entry().getCloseSession().getSessionId());
 
     // If the server session is null, the session either never existed or already expired.
     if (session == null) {
-      throw new RaftException.UnknownSession("Unknown session: " + entry.entry().session());
+      throw new RaftException.UnknownSession("Unknown session: " + entry.entry().getCloseSession().getSessionId());
     }
 
     RaftServiceContext service = session.getService();
-    service.closeSession(entry.index(), entry.entry().timestamp(), session, entry.entry().expired());
+    service.closeSession(entry.index(), entry.entry().getTimestamp(), session, entry.entry().getCloseSession().getExpired());
 
     // If this is a delete, unregister the service.
-    if (entry.entry().delete()) {
+    if (entry.entry().getCloseSession().getDeleted()) {
       raft.getServices().unregisterService(service);
       service.close();
     }
@@ -725,15 +719,15 @@ public class RaftServiceManager implements AutoCloseable {
   /**
    * Applies a metadata entry to the state machine.
    */
-  private MetadataResult applyMetadata(Indexed<MetadataEntry> entry) {
+  private MetadataResult applyMetadata(Indexed<RaftLogEntry> entry) {
     // If the session ID is non-zero, read the metadata for the associated state machine.
-    if (entry.entry().session() > 0) {
-      RaftSession session = raft.getSessions().getSession(entry.entry().session());
+    if (entry.entry().getMetadata().getSessionId() > 0) {
+      RaftSession session = raft.getSessions().getSession(entry.entry().getMetadata().getSessionId());
 
       // If the session is null, return an UnknownSessionException.
       if (session == null) {
-        logger.warn("Unknown session: " + entry.entry().session());
-        throw new RaftException.UnknownSession("Unknown session: " + entry.entry().session());
+        logger.warn("Unknown session: " + entry.entry().getMetadata().getSessionId());
+        throw new RaftException.UnknownSession("Unknown session: " + entry.entry().getMetadata().getSessionId());
       }
 
       Set<SessionMetadata> sessions = new HashSet<>();
@@ -766,9 +760,9 @@ public class RaftServiceManager implements AutoCloseable {
    * Otherwise, commands are assumed to have been received in sequential order. The reason for this assumption is
    * because leaders always sequence commands as they're written to the log, so no sequence number will be skipped.
    */
-  private OperationResult applyCommand(Indexed<CommandEntry> entry) {
+  private OperationResult applyCommand(Indexed<RaftLogEntry> entry) {
     // First check to ensure that the session exists.
-    RaftSession session = raft.getSessions().getSession(entry.entry().session());
+    RaftSession session = raft.getSessions().getSession(entry.entry().getCommand().getSessionId());
 
     // If the session is null, return an UnknownSessionException. Commands applied to the state machine must
     // have a session. We ensure that session register/unregister entries are not compacted from the log
@@ -776,8 +770,8 @@ public class RaftServiceManager implements AutoCloseable {
     // Note that it's possible for a session to be unknown if a later snapshot has been taken, so we don't want
     // to log warnings here.
     if (session == null) {
-      logger.debug("Unknown session: " + entry.entry().session());
-      throw new RaftException.UnknownSession("unknown session: " + entry.entry().session());
+      logger.debug("Unknown session: " + entry.entry().getCommand().getSessionId());
+      throw new RaftException.UnknownSession("unknown session: " + entry.entry().getCommand().getSessionId());
     }
 
     // Increment the load counter to avoid snapshotting under high load.
@@ -787,10 +781,12 @@ public class RaftServiceManager implements AutoCloseable {
     return session.getService()
         .executeCommand(
             entry.index(),
-            entry.entry().sequenceNumber(),
-            entry.entry().timestamp(),
+            entry.entry().getCommand().getSequenceNumber(),
+            entry.entry().getTimestamp(),
             session,
-            entry.entry().operation());
+            new PrimitiveOperation(
+                OperationId.command(entry.entry().getCommand().getOperation()),
+                entry.entry().getCommand().getValue().toByteArray()));
   }
 
   /**
@@ -810,24 +806,26 @@ public class RaftServiceManager implements AutoCloseable {
    * session events. Events require commands to be written to the Raft log to ensure fault-tolerance and consistency
    * across the cluster.
    */
-  private CompletableFuture<OperationResult> applyQuery(Indexed<QueryEntry> entry) {
-    RaftSession session = raft.getSessions().getSession(entry.entry().session());
+  private CompletableFuture<OperationResult> applyQuery(Indexed<RaftLogEntry> entry) {
+    RaftSession session = raft.getSessions().getSession(entry.entry().getQuery().getSessionId());
 
     // If the session is null then that indicates that the session already timed out or it never existed.
     // Return with an UnknownSessionException.
     if (session == null) {
-      logger.warn("Unknown session: " + entry.entry().session());
-      return Futures.exceptionalFuture(new RaftException.UnknownSession("unknown session " + entry.entry().session()));
+      logger.warn("Unknown session: " + entry.entry().getQuery().getSessionId());
+      return Futures.exceptionalFuture(new RaftException.UnknownSession("unknown session " + entry.entry().getQuery().getSessionId()));
     }
 
     // Execute the query using the state machine associated with the session.
     return session.getService()
         .executeQuery(
             entry.index(),
-            entry.entry().sequenceNumber(),
-            entry.entry().timestamp(),
+            entry.entry().getQuery().getSequenceNumber(),
+            entry.entry().getTimestamp(),
             session,
-            entry.entry().operation());
+            new PrimitiveOperation(
+                OperationId.query(entry.entry().getQuery().getOperation()),
+                entry.entry().getQuery().getValue().toByteArray()));
   }
 
   @Override

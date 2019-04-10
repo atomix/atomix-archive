@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-present Open Networking Foundation
+ * Copyright 2019-present Open Networking Foundation
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,14 +15,23 @@
  */
 package io.atomix.protocols.raft.storage.log;
 
-import io.atomix.storage.journal.DelegatingJournalWriter;
-import io.atomix.storage.journal.SegmentedJournalWriter;
+import java.io.IOException;
+import java.nio.ByteBuffer;
+
+import com.google.protobuf.CodedOutputStream;
+import io.atomix.storage.journal.JournalCodec;
 
 /**
- * Raft log writer.
+ * Raft log codec.
  */
-public class RaftLogWriter extends DelegatingJournalWriter<RaftLogEntry> {
-  public RaftLogWriter(SegmentedJournalWriter<RaftLogEntry> writer, RaftLog log) {
-    super(writer);
+public class RaftLogCodec implements JournalCodec<RaftLogEntry> {
+  @Override
+  public void encode(RaftLogEntry entry, ByteBuffer buffer) throws IOException {
+    entry.writeTo(CodedOutputStream.newInstance(buffer));
+  }
+
+  @Override
+  public RaftLogEntry decode(ByteBuffer buffer) throws IOException {
+    return RaftLogEntry.parseFrom(buffer);
   }
 }

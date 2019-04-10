@@ -15,11 +15,6 @@
  */
 package io.atomix.storage.journal;
 
-import com.esotericsoftware.kryo.KryoException;
-import io.atomix.storage.StorageException;
-import io.atomix.storage.journal.index.JournalIndex;
-import io.atomix.utils.serializer.Namespace;
-
 import java.io.IOException;
 import java.nio.BufferOverflowException;
 import java.nio.BufferUnderflowException;
@@ -27,6 +22,9 @@ import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.zip.CRC32;
 import java.util.zip.Checksum;
+
+import io.atomix.storage.StorageException;
+import io.atomix.storage.journal.index.JournalIndex;
 
 /**
  * Segment writer.
@@ -48,7 +46,7 @@ class FileChannelJournalSegmentWriter<E> implements JournalWriter<E> {
   private final JournalSegment segment;
   private final int maxEntrySize;
   private final JournalIndex index;
-  private final Namespace namespace;
+  private final JournalCodec<E> codec;
   private final ByteBuffer memory;
   private final long firstIndex;
   private Indexed<E> lastEntry;
@@ -58,14 +56,14 @@ class FileChannelJournalSegmentWriter<E> implements JournalWriter<E> {
       JournalSegment segment,
       int maxEntrySize,
       JournalIndex index,
-      Namespace namespace) {
+      JournalCodec<E> codec) {
     this.channel = channel;
     this.segment = segment;
     this.maxEntrySize = maxEntrySize;
     this.index = index;
     this.memory = ByteBuffer.allocate((maxEntrySize + Integer.BYTES + Integer.BYTES) * 2);
     memory.limit(0);
-    this.namespace = namespace;
+    this.codec = codec;
     this.firstIndex = segment.index();
     reset(0);
   }
@@ -108,7 +106,7 @@ class FileChannelJournalSegmentWriter<E> implements JournalWriter<E> {
         if (checksum == crc32.getValue()) {
           int limit = memory.limit();
           memory.limit(memory.position() + length);
-          final E entry = namespace.deserialize(memory);
+          final E entry = codec.decode(memory);
           memory.limit(limit);
           lastEntry = new Indexed<>(nextIndex, entry, length);
           this.index.index(nextIndex, (int) position);
@@ -232,8 +230,8 @@ class FileChannelJournalSegmentWriter<E> implements JournalWriter<E> {
       memory.clear();
       memory.position(Integer.BYTES + Integer.BYTES);
       try {
-        namespace.serialize(entry, memory);
-      } catch (KryoException e) {
+        codec.encode(entry, memory);
+      } catch (Exception e) {
         throw new StorageException.TooLarge("Entry size exceeds maximum allowed bytes (" + maxEntrySize + ")");
       }
       memory.flip();

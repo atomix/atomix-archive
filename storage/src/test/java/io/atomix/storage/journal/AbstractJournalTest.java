@@ -24,6 +24,7 @@ import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -51,6 +52,18 @@ public abstract class AbstractJournalTest {
       .register(TestEntry.class)
       .register(byte[].class)
       .build();
+
+  private static final JournalCodec<TestEntry> CODEC = new JournalCodec<TestEntry>() {
+    @Override
+    public void encode(TestEntry entry, ByteBuffer buffer) {
+      NAMESPACE.serialize(entry, buffer);
+    }
+
+    @Override
+    public TestEntry decode(ByteBuffer buffer) {
+      return NAMESPACE.deserialize(buffer);
+    }
+  };
 
   protected static final TestEntry ENTRY = new TestEntry(32);
   private static final Path PATH = Paths.get("target/test-logs/");
@@ -83,7 +96,7 @@ public abstract class AbstractJournalTest {
     return SegmentedJournal.<TestEntry>builder()
         .withName("test")
         .withDirectory(PATH.toFile())
-        .withNamespace(NAMESPACE)
+        .withCodec(CODEC)
         .withStorageLevel(storageLevel())
         .withMaxSegmentSize(maxSegmentSize)
         .withIndexDensity(.2)

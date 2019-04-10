@@ -15,6 +15,14 @@
  */
 package io.atomix.protocols.raft.session;
 
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Queue;
+
 import com.google.common.collect.Lists;
 import io.atomix.cluster.MemberId;
 import io.atomix.primitive.PrimitiveType;
@@ -38,14 +46,6 @@ import io.atomix.utils.misc.TimestampPrinter;
 import io.atomix.utils.serializer.Serializer;
 import org.slf4j.Logger;
 
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Queue;
-
 import static com.google.common.base.MoreObjects.toStringHelper;
 import static com.google.common.base.Preconditions.checkState;
 
@@ -55,8 +55,7 @@ import static com.google.common.base.Preconditions.checkState;
 public class RaftSession extends AbstractSession {
   private final Logger log;
   private final ReadConsistency readConsistency;
-  private final long minTimeout;
-  private final long maxTimeout;
+  private final long timeout;
   private final RaftServerProtocol protocol;
   private final RaftServiceContext context;
   private final RaftContext server;
@@ -82,8 +81,7 @@ public class RaftSession extends AbstractSession {
       String name,
       PrimitiveType primitiveType,
       ReadConsistency readConsistency,
-      long minTimeout,
-      long maxTimeout,
+      long timeout,
       long lastUpdated,
       Serializer serializer,
       RaftServiceContext context,
@@ -91,8 +89,7 @@ public class RaftSession extends AbstractSession {
       ThreadContextFactory threadContextFactory) {
     super(sessionId, name, primitiveType, member, serializer);
     this.readConsistency = readConsistency;
-    this.minTimeout = minTimeout;
-    this.maxTimeout = maxTimeout;
+    this.timeout = timeout;
     this.lastUpdated = lastUpdated;
     this.eventIndex = sessionId.id();
     this.completeIndex = sessionId.id();
@@ -118,21 +115,12 @@ public class RaftSession extends AbstractSession {
   }
 
   /**
-   * Returns the minimum session timeout.
+   * Returns the session timeout.
    *
-   * @return the minimum session timeout
+   * @return the session timeout
    */
-  public long minTimeout() {
-    return minTimeout;
-  }
-
-  /**
-   * Returns the maximum session timeout.
-   *
-   * @return the maximum session timeout
-   */
-  public long maxTimeout() {
-    return maxTimeout;
+  public long timeout() {
+    return timeout;
   }
 
   /**
@@ -170,7 +158,7 @@ public class RaftSession extends AbstractSession {
    */
   public boolean isTimedOut(long timestamp) {
     long lastUpdated = this.lastUpdated;
-    return lastUpdated > 0 && timestamp - lastUpdated > maxTimeout;
+    return lastUpdated > 0 && timestamp - lastUpdated > timeout;
   }
 
   @Override

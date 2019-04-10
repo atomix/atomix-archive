@@ -15,7 +15,6 @@
  */
 package io.atomix.protocols.raft.storage.log;
 
-import io.atomix.protocols.raft.storage.log.entry.RaftLogEntry;
 import io.atomix.storage.journal.DelegatingJournalReader;
 import io.atomix.storage.journal.SegmentedJournalReader;
 

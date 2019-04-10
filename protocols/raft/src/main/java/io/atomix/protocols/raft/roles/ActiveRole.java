@@ -15,6 +15,9 @@
  */
 package io.atomix.protocols.raft.roles;
 
+import java.util.concurrent.CompletableFuture;
+import java.util.stream.Collectors;
+
 import io.atomix.protocols.raft.RaftServer;
 import io.atomix.protocols.raft.impl.RaftContext;
 import io.atomix.protocols.raft.protocol.AppendRequest;
@@ -25,11 +28,8 @@ import io.atomix.protocols.raft.protocol.RaftRequest;
 import io.atomix.protocols.raft.protocol.RaftResponse;
 import io.atomix.protocols.raft.protocol.VoteRequest;
 import io.atomix.protocols.raft.protocol.VoteResponse;
-import io.atomix.protocols.raft.storage.log.entry.RaftLogEntry;
+import io.atomix.protocols.raft.storage.log.RaftLogEntry;
 import io.atomix.storage.journal.Indexed;
-
-import java.util.concurrent.CompletableFuture;
-import java.util.stream.Collectors;
 
 /**
  * Abstract active state.
@@ -198,8 +198,8 @@ public abstract class ActiveRole extends PassiveRole {
     }
 
     // If the candidate's last log term is lower than the local log's last entry term, reject the request.
-    if (lastTerm < lastEntry.entry().term()) {
-      log.debug("Rejected {}: candidate's last log entry ({}) is at a lower term than the local log ({})", request, lastTerm, lastEntry.entry().term());
+    if (lastTerm < lastEntry.entry().getTerm()) {
+      log.debug("Rejected {}: candidate's last log entry ({}) is at a lower term than the local log ({})", request, lastTerm, lastEntry.entry().getTerm());
       return false;
     }
 
@@ -207,7 +207,7 @@ public abstract class ActiveRole extends PassiveRole {
     // candidate's last index is less than the local log's last index. If the candidate's last log term is
     // greater than the local log's last term then it's considered up to date, and if both have the same term
     // then the candidate's last index must be greater than the local log's last index.
-    if (lastTerm == lastEntry.entry().term() && lastIndex < lastEntry.index()) {
+    if (lastTerm == lastEntry.entry().getTerm() && lastIndex < lastEntry.index()) {
       log.debug("Rejected {}: candidate's last log entry ({}) is at a lower index than the local log ({})", request, lastIndex, lastEntry.index());
       return false;
     }

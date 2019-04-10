@@ -27,8 +27,8 @@ import io.atomix.protocols.raft.protocol.InstallRequest;
 import io.atomix.protocols.raft.protocol.InstallResponse;
 import io.atomix.protocols.raft.protocol.RaftRequest;
 import io.atomix.protocols.raft.protocol.RaftResponse;
+import io.atomix.protocols.raft.storage.log.RaftLogEntry;
 import io.atomix.protocols.raft.storage.log.RaftLogReader;
-import io.atomix.protocols.raft.storage.log.entry.RaftLogEntry;
 import io.atomix.protocols.raft.storage.snapshot.Snapshot;
 import io.atomix.storage.journal.Indexed;
 import io.atomix.utils.logging.ContextualLoggerFactory;
@@ -106,7 +106,7 @@ abstract class AbstractAppender implements AutoCloseable {
         .withTerm(raft.getTerm())
         .withLeader(leader != null ? leader.memberId() : null)
         .withPrevLogIndex(prevEntry != null ? prevEntry.index() : reader != null ? reader.getFirstIndex() - 1 : 0)
-        .withPrevLogTerm(prevEntry != null ? prevEntry.entry().term() : 0)
+        .withPrevLogTerm(prevEntry != null ? prevEntry.entry().getTerm() : 0)
         .withEntries(Collections.emptyList())
         .withCommitIndex(raft.getCommitIndex())
         .build();
@@ -126,7 +126,7 @@ abstract class AbstractAppender implements AutoCloseable {
         .withTerm(raft.getTerm())
         .withLeader(leader != null ? leader.memberId() : null)
         .withPrevLogIndex(prevEntry != null ? prevEntry.index() : reader.getFirstIndex() - 1)
-        .withPrevLogTerm(prevEntry != null ? prevEntry.entry().term() : 0)
+        .withPrevLogTerm(prevEntry != null ? prevEntry.entry().getTerm() : 0)
         .withCommitIndex(raft.getCommitIndex());
 
     // Build a list of entries to send to the member.

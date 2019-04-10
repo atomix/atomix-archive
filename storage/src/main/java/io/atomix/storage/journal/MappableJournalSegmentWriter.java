@@ -15,13 +15,12 @@
  */
 package io.atomix.storage.journal;
 
-import io.atomix.storage.StorageException;
-import io.atomix.storage.journal.index.JournalIndex;
-import io.atomix.utils.serializer.Namespace;
-
 import java.io.IOException;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
+
+import io.atomix.storage.StorageException;
+import io.atomix.storage.journal.index.JournalIndex;
 
 /**
  * Mappable log segment writer.
@@ -31,7 +30,7 @@ class MappableJournalSegmentWriter<E> implements JournalWriter<E> {
   private final JournalSegment<E> segment;
   private final int maxEntrySize;
   private final JournalIndex index;
-  private final Namespace namespace;
+  private final JournalCodec<E> codec;
   private JournalWriter<E> writer;
 
   MappableJournalSegmentWriter(
@@ -39,13 +38,13 @@ class MappableJournalSegmentWriter<E> implements JournalWriter<E> {
       JournalSegment<E> segment,
       int maxEntrySize,
       JournalIndex index,
-      Namespace namespace) {
+      JournalCodec<E> codec) {
     this.channel = channel;
     this.segment = segment;
     this.maxEntrySize = maxEntrySize;
     this.index = index;
-    this.namespace = namespace;
-    this.writer = new FileChannelJournalSegmentWriter<>(channel, segment, maxEntrySize, index, namespace);
+    this.codec = codec;
+    this.writer = new FileChannelJournalSegmentWriter<>(channel, segment, maxEntrySize, index, codec);
   }
 
   /**
@@ -61,7 +60,7 @@ class MappableJournalSegmentWriter<E> implements JournalWriter<E> {
     try {
       JournalWriter<E> writer = this.writer;
       MappedByteBuffer buffer = channel.map(FileChannel.MapMode.READ_WRITE, 0, segment.descriptor().maxSegmentSize());
-      this.writer = new MappedJournalSegmentWriter<>(buffer, segment, maxEntrySize, index, namespace);
+      this.writer = new MappedJournalSegmentWriter<>(buffer, segment, maxEntrySize, index, codec);
       writer.close();
       return buffer;
     } catch (IOException e) {
@@ -75,7 +74,7 @@ class MappableJournalSegmentWriter<E> implements JournalWriter<E> {
   void unmap() {
     if (writer instanceof MappedJournalSegmentWriter) {
       JournalWriter<E> writer = this.writer;
-      this.writer = new FileChannelJournalSegmentWriter<>(channel, segment, maxEntrySize, index, namespace);
+      this.writer = new FileChannelJournalSegmentWriter<>(channel, segment, maxEntrySize, index, codec);
       writer.close();
     }
   }

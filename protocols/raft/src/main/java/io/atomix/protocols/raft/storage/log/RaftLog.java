@@ -15,13 +15,11 @@
  */
 package io.atomix.protocols.raft.storage.log;
 
-import io.atomix.protocols.raft.storage.log.entry.RaftLogEntry;
+import java.io.File;
+
 import io.atomix.storage.StorageLevel;
 import io.atomix.storage.journal.DelegatingJournal;
 import io.atomix.storage.journal.SegmentedJournal;
-import io.atomix.utils.serializer.Namespace;
-
-import java.io.File;
 
 /**
  * Raft log.
@@ -187,17 +185,6 @@ public class RaftLog extends DelegatingJournal<RaftLogEntry> {
     }
 
     /**
-     * Sets the log serialization namespace, returning the builder for method chaining.
-     *
-     * @param namespace The journal namespace.
-     * @return The journal builder.
-     */
-    public Builder withNamespace(Namespace namespace) {
-      journalBuilder.withNamespace(namespace);
-      return this;
-    }
-
-    /**
      * Sets the maximum segment size in bytes, returning the builder for method chaining.
      * <p>
      * The maximum segment size dictates when logs should roll over to new segments. As entries are written to
@@ -305,7 +292,7 @@ public class RaftLog extends DelegatingJournal<RaftLogEntry> {
 
     @Override
     public RaftLog build() {
-      return new RaftLog(journalBuilder.build(), flushOnCommit);
+      return new RaftLog(journalBuilder.withCodec(new RaftLogCodec()).build(), flushOnCommit);
     }
   }
 }

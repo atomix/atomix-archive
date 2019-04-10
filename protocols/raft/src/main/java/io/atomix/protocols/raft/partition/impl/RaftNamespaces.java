@@ -15,6 +15,12 @@
  */
 package io.atomix.protocols.raft.partition.impl;
 
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.LinkedList;
+
 import io.atomix.cluster.MemberId;
 import io.atomix.primitive.event.PrimitiveEvent;
 import io.atomix.primitive.event.impl.DefaultEventType;
@@ -60,23 +66,9 @@ import io.atomix.protocols.raft.protocol.ReconfigureResponse;
 import io.atomix.protocols.raft.protocol.ResetRequest;
 import io.atomix.protocols.raft.protocol.VoteRequest;
 import io.atomix.protocols.raft.protocol.VoteResponse;
-import io.atomix.protocols.raft.storage.log.entry.CloseSessionEntry;
-import io.atomix.protocols.raft.storage.log.entry.CommandEntry;
-import io.atomix.protocols.raft.storage.log.entry.ConfigurationEntry;
-import io.atomix.protocols.raft.storage.log.entry.InitializeEntry;
-import io.atomix.protocols.raft.storage.log.entry.KeepAliveEntry;
-import io.atomix.protocols.raft.storage.log.entry.MetadataEntry;
-import io.atomix.protocols.raft.storage.log.entry.OpenSessionEntry;
-import io.atomix.protocols.raft.storage.log.entry.QueryEntry;
 import io.atomix.protocols.raft.storage.system.Configuration;
 import io.atomix.utils.serializer.Namespace;
 import io.atomix.utils.serializer.Namespaces;
-
-import java.time.Instant;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.LinkedList;
 
 /**
  * Storage serializer namespaces.
@@ -126,14 +118,6 @@ public final class RaftNamespaces {
       .register(RaftError.Type.class)
       .register(ReadConsistency.class)
       .register(SessionMetadata.class)
-      .register(CloseSessionEntry.class)
-      .register(CommandEntry.class)
-      .register(ConfigurationEntry.class)
-      .register(InitializeEntry.class)
-      .register(KeepAliveEntry.class)
-      .register(MetadataEntry.class)
-      .register(OpenSessionEntry.class)
-      .register(QueryEntry.class)
       .register(PrimitiveOperation.class)
       .register(PrimitiveEvent.class)
       .register(DefaultEventType.class)
@@ -158,14 +142,6 @@ public final class RaftNamespaces {
   public static final Namespace RAFT_STORAGE = Namespace.builder()
       .register(Namespaces.BASIC)
       .nextId(Namespaces.BEGIN_USER_CUSTOM_ID + 100)
-      .register(CloseSessionEntry.class)
-      .register(CommandEntry.class)
-      .register(ConfigurationEntry.class)
-      .register(InitializeEntry.class)
-      .register(KeepAliveEntry.class)
-      .register(MetadataEntry.class)
-      .register(OpenSessionEntry.class)
-      .register(QueryEntry.class)
       .register(PrimitiveOperation.class)
       .register(DefaultOperationId.class)
       .register(OperationType.class)

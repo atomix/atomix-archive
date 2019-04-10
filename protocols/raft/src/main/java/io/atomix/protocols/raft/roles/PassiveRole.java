@@ -20,6 +20,7 @@ import java.io.OutputStream;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 
+import com.google.protobuf.ByteString;
 import io.atomix.primitive.PrimitiveException;
 import io.atomix.protocols.raft.RaftError;
 import io.atomix.protocols.raft.RaftException;
@@ -56,10 +57,10 @@ import io.atomix.protocols.raft.protocol.ReconfigureResponse;
 import io.atomix.protocols.raft.protocol.VoteRequest;
 import io.atomix.protocols.raft.protocol.VoteResponse;
 import io.atomix.protocols.raft.session.RaftSession;
+import io.atomix.protocols.raft.storage.log.QueryEntry;
+import io.atomix.protocols.raft.storage.log.RaftLogEntry;
 import io.atomix.protocols.raft.storage.log.RaftLogReader;
 import io.atomix.protocols.raft.storage.log.RaftLogWriter;
-import io.atomix.protocols.raft.storage.log.entry.QueryEntry;
-import io.atomix.protocols.raft.storage.log.entry.RaftLogEntry;
 import io.atomix.protocols.raft.storage.snapshot.Snapshot;
 import io.atomix.storage.StorageException;
 import io.atomix.storage.journal.Indexed;
@@ -180,14 +181,14 @@ public class PassiveRole extends InactiveRole {
 
           // Read the previous entry and validate that the term matches the request previous log term.
           Indexed<RaftLogEntry> previousEntry = reader.next();
-          if (request.prevLogTerm() != previousEntry.entry().term()) {
-            log.debug("Rejected {}: Previous entry term ({}) does not match local log's term for the same entry ({})", request, request.prevLogTerm(), previousEntry.entry().term());
+          if (request.prevLogTerm() != previousEntry.entry().getTerm()) {
+            log.debug("Rejected {}: Previous entry term ({}) does not match local log's term for the same entry ({})", request, request.prevLogTerm(), previousEntry.entry().getTerm());
             return failAppend(request.prevLogIndex() - 1, future);
           }
         }
         // If the previous log term doesn't equal the last entry term, fail the append, sending the prior entry.
-        else if (request.prevLogTerm() != lastEntry.entry().term()) {
-          log.debug("Rejected {}: Previous entry term ({}) does not equal the local log's last term ({})", request, request.prevLogTerm(), lastEntry.entry().term());
+        else if (request.prevLogTerm() != lastEntry.entry().getTerm()) {
+          log.debug("Rejected {}: Previous entry term ({}) does not equal the local log's last term ({})", request, request.prevLogTerm(), lastEntry.entry().getTerm());
           return failAppend(request.prevLogIndex() - 1, future);
         }
       } else {
@@ -251,7 +252,7 @@ public class PassiveRole extends InactiveRole {
 
             // If the existing entry term doesn't match the leader's term for the same entry, truncate
             // the log and append the leader's entry.
-            if (existingEntry.entry().term() != entry.term()) {
+            if (existingEntry.entry().getTerm() != entry.getTerm()) {
               writer.truncate(index - 1);
               if (!appendEntry(index, entry, writer, future)) {
                 return;
@@ -263,7 +264,7 @@ public class PassiveRole extends InactiveRole {
           else if (lastEntry.index() == index) {
             // If the last entry term doesn't match the leader's term for the same entry, truncate
             // the log and append the leader's entry.
-            if (lastEntry.entry().term() != entry.term()) {
+            if (lastEntry.entry().getTerm() != entry.getTerm()) {
               writer.truncate(index - 1);
               if (!appendEntry(index, entry, writer, future)) {
                 return;
@@ -400,14 +401,18 @@ public class PassiveRole extends InactiveRole {
         return queryForward(request);
       }
 
-      final Indexed<QueryEntry> entry = new Indexed<>(
+      final Indexed<RaftLogEntry> entry = new Indexed<>(
           request.index(),
-          new QueryEntry(
-              raft.getTerm(),
-              System.currentTimeMillis(),
-              request.session(),
-              request.sequenceNumber(),
-              request.operation()), 0);
+          RaftLogEntry.newBuilder()
+              .setTerm(raft.getTerm())
+              .setTimestamp(System.currentTimeMillis())
+              .setQuery(QueryEntry.newBuilder()
+                  .setSessionId(request.session())
+                  .setSequenceNumber(request.sequenceNumber())
+                  .setOperation(request.operation().id().id())
+                  .setValue(ByteString.copyFrom(request.operation().value()))
+                  .build())
+              .build(), 0);
 
       return applyQuery(entry).thenApply(this::logResponse);
     } else {
@@ -438,14 +443,14 @@ public class PassiveRole extends InactiveRole {
   /**
    * Performs a local query.
    */
-  protected CompletableFuture<QueryResponse> queryLocal(Indexed<QueryEntry> entry) {
+  protected CompletableFuture<QueryResponse> queryLocal(Indexed<RaftLogEntry> entry) {
     return applyQuery(entry);
   }
 
   /**
    * Applies a query to the state machine.
    */
-  protected CompletableFuture<QueryResponse> applyQuery(Indexed<QueryEntry> entry) {
+  protected CompletableFuture<QueryResponse> applyQuery(Indexed<RaftLogEntry> entry) {
     // In the case of the leader, the state machine is always up to date, so no queries will be queued and all query
     // indexes will be the last applied index.
     CompletableFuture<QueryResponse> future = new CompletableFuture<>();

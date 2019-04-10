@@ -16,7 +16,7 @@
 package io.atomix.protocols.raft.protocol;
 
 import io.atomix.cluster.MemberId;
-import io.atomix.protocols.raft.storage.log.entry.RaftLogEntry;
+import io.atomix.protocols.raft.storage.log.RaftLogEntry;
 
 import java.util.Arrays;
 import java.util.List;

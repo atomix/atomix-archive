@@ -242,8 +242,7 @@ public class RaftServiceContext implements ServiceContext {
           snapshot.getName(),
           primitiveType,
           ReadConsistency.valueOf(serviceSession.getReadConsistency()),
-          serviceSession.getMinTimeout(),
-          serviceSession.getMaxTimeout(),
+          serviceSession.getTimeout(),
           serviceSession.getTimestamp(),
           service.serializer(),
           this,
@@ -292,8 +291,7 @@ public class RaftServiceContext implements ServiceContext {
                 .setSessionId(session.sessionId().id())
                 .setMemberId(session.memberId().id())
                 .setReadConsistency(session.readConsistency().name())
-                .setMinTimeout(session.minTimeout())
-                .setMaxTimeout(session.maxTimeout())
+                .setTimeout(session.timeout())
                 .setTimestamp(session.getLastUpdated())
                 .setRequestSequence(session.getRequestSequence())
                 .setCommandSequence(session.getCommandSequence())

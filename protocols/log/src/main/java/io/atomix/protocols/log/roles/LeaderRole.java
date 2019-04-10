@@ -20,6 +20,7 @@ import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 
 import com.google.common.collect.Maps;
+import com.google.protobuf.ByteString;
 import io.atomix.cluster.MemberId;
 import io.atomix.primitive.log.LogRecord;
 import io.atomix.protocols.log.impl.DistributedLogServerContext;
@@ -62,10 +63,13 @@ public class LeaderRole extends LogServerRole {
   public CompletableFuture<AppendResponse> append(AppendRequest request) {
     logRequest(request);
     try {
-      Indexed<LogEntry> entry = context.journal().writer().append(
-          new LogEntry(context.currentTerm(), System.currentTimeMillis(), request.value()));
+      Indexed<LogEntry> entry = context.journal().writer().append(LogEntry.newBuilder()
+          .setTerm(context.currentTerm())
+          .setTimestamp(System.currentTimeMillis())
+          .setValue(ByteString.copyFrom(request.value()))
+          .build());
       return replicator.replicate(new BackupOperation(
-          entry.index(), entry.entry().term(), entry.entry().timestamp(), entry.entry().value()))
+          entry.index(), entry.entry().getTerm(), entry.entry().getTimestamp(), entry.entry().getValue().toByteArray()))
           .thenApply(v -> {
             consumers.values().forEach(consumer -> consumer.next());
             return logResponse(AppendResponse.ok(entry.index()));
@@ -135,7 +139,7 @@ public class LeaderRole extends LogServerRole {
       context.threadContext().execute(() -> {
         if (reader.hasNext()) {
           Indexed<LogEntry> entry = reader.next();
-          LogRecord record = new LogRecord(entry.index(), entry.entry().timestamp(), entry.entry().value());
+          LogRecord record = new LogRecord(entry.index(), entry.entry().getTimestamp(), entry.entry().getValue().toByteArray());
           boolean reset = reader.getFirstIndex() == entry.index();
           RecordsRequest request = RecordsRequest.request(record, reset);
           log.trace("Sending {} to {} at {}", request, memberId, subject);

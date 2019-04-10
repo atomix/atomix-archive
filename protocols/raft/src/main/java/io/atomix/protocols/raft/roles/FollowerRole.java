@@ -31,7 +31,7 @@ import io.atomix.protocols.raft.protocol.InstallResponse;
 import io.atomix.protocols.raft.protocol.PollRequest;
 import io.atomix.protocols.raft.protocol.VoteRequest;
 import io.atomix.protocols.raft.protocol.VoteResponse;
-import io.atomix.protocols.raft.storage.log.entry.RaftLogEntry;
+import io.atomix.protocols.raft.storage.log.RaftLogEntry;
 import io.atomix.protocols.raft.utils.Quorum;
 import io.atomix.storage.journal.Indexed;
 import io.atomix.utils.concurrent.Scheduled;
@@ -145,7 +145,7 @@ public final class FollowerRole extends ActiveRole {
 
     final long lastTerm;
     if (lastEntry != null) {
-      lastTerm = lastEntry.entry().term();
+      lastTerm = lastEntry.entry().getTerm();
     } else {
       lastTerm = 0;
     }

@@ -17,6 +17,7 @@ package io.atomix.protocols.log.roles;
 
 import java.util.concurrent.CompletableFuture;
 
+import com.google.protobuf.ByteString;
 import io.atomix.protocols.log.DistributedLogServer.Role;
 import io.atomix.protocols.log.impl.DistributedLogServerContext;
 import io.atomix.protocols.log.protocol.BackupOperation;
@@ -62,16 +63,24 @@ public class FollowerRole extends LogServerRole {
       // If the reader has no next entry, append the entry to the journal.
       if (!reader.hasNext()) {
         try {
-          writer.append(new LogEntry(operation.term(), operation.timestamp(), operation.value()));
+          writer.append(LogEntry.newBuilder()
+              .setTerm(operation.term())
+              .setTimestamp(operation.timestamp())
+              .setValue(ByteString.copyFrom(operation.value()))
+              .build());
         } catch (StorageException e) {
           return CompletableFuture.completedFuture(BackupResponse.error());
         }
       }
       // If the next entry's term does not match the operation term, append the entry to the journal.
-      else if (reader.next().entry().term() != operation.term()) {
+      else if (reader.next().entry().getTerm() != operation.term()) {
         writer.truncate(operation.index());
         try {
-          writer.append(new LogEntry(operation.term(), operation.timestamp(), operation.value()));
+          writer.append(LogEntry.newBuilder()
+              .setTerm(operation.term())
+              .setTimestamp(operation.timestamp())
+              .setValue(ByteString.copyFrom(operation.value()))
+              .build());
         } catch (StorageException e) {
           return CompletableFuture.completedFuture(BackupResponse.error());
         }

@@ -31,6 +31,7 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import com.google.protobuf.ByteString;
 import io.atomix.cluster.ClusterMembershipService;
 import io.atomix.cluster.MemberId;
 import io.atomix.primitive.PrimitiveBuilder;
@@ -51,15 +52,11 @@ import io.atomix.protocols.raft.cluster.RaftMember;
 import io.atomix.protocols.raft.cluster.impl.DefaultRaftMember;
 import io.atomix.protocols.raft.protocol.RaftServerProtocol;
 import io.atomix.protocols.raft.storage.RaftStorage;
+import io.atomix.protocols.raft.storage.log.CommandEntry;
+import io.atomix.protocols.raft.storage.log.InitializeEntry;
+import io.atomix.protocols.raft.storage.log.OpenSessionEntry;
+import io.atomix.protocols.raft.storage.log.RaftLogEntry;
 import io.atomix.protocols.raft.storage.log.RaftLogWriter;
-import io.atomix.protocols.raft.storage.log.entry.CloseSessionEntry;
-import io.atomix.protocols.raft.storage.log.entry.CommandEntry;
-import io.atomix.protocols.raft.storage.log.entry.ConfigurationEntry;
-import io.atomix.protocols.raft.storage.log.entry.InitializeEntry;
-import io.atomix.protocols.raft.storage.log.entry.KeepAliveEntry;
-import io.atomix.protocols.raft.storage.log.entry.MetadataEntry;
-import io.atomix.protocols.raft.storage.log.entry.OpenSessionEntry;
-import io.atomix.protocols.raft.storage.log.entry.QueryEntry;
 import io.atomix.protocols.raft.storage.snapshot.Snapshot;
 import io.atomix.utils.concurrent.ThreadModel;
 import io.atomix.utils.serializer.Namespace;
@@ -79,14 +76,6 @@ public class RaftServiceManagerTest {
   private static final Path PATH = Paths.get("target/test-logs/");
 
   private static final Namespace NAMESPACE = Namespace.builder()
-      .register(CloseSessionEntry.class)
-      .register(CommandEntry.class)
-      .register(ConfigurationEntry.class)
-      .register(InitializeEntry.class)
-      .register(KeepAliveEntry.class)
-      .register(MetadataEntry.class)
-      .register(OpenSessionEntry.class)
-      .register(QueryEntry.class)
       .register(ArrayList.class)
       .register(HashSet.class)
       .register(DefaultRaftMember.class)
@@ -107,16 +96,22 @@ public class RaftServiceManagerTest {
   @Test
   public void testSnapshotTakeInstall() throws Exception {
     RaftLogWriter writer = raft.getLogWriter();
-    writer.append(new InitializeEntry(1, System.currentTimeMillis()));
-    writer.append(new OpenSessionEntry(
-        1,
-        System.currentTimeMillis(),
-        "test-1",
-        "test",
-        "test",
-        ReadConsistency.LINEARIZABLE,
-        100,
-        1000));
+    writer.append(RaftLogEntry.newBuilder()
+        .setTerm(1)
+        .setTimestamp(System.currentTimeMillis())
+        .setInitialize(InitializeEntry.newBuilder().build())
+        .build());
+    writer.append(RaftLogEntry.newBuilder()
+        .setTerm(1)
+        .setTimestamp(System.currentTimeMillis())
+        .setOpenSession(OpenSessionEntry.newBuilder()
+            .setMemberId("test-1")
+            .setServiceType("test")
+            .setServiceName("test")
+            .setReadConsistency(OpenSessionEntry.ReadConsistency.LINEARIZABLE)
+            .setTimeout(1000)
+            .build())
+        .build());
     writer.commit(2);
 
     RaftServiceManager manager = raft.getServiceManager();
@@ -138,16 +133,22 @@ public class RaftServiceManagerTest {
   @Test
   public void testInstallSnapshotOnApply() throws Exception {
     RaftLogWriter writer = raft.getLogWriter();
-    writer.append(new InitializeEntry(1, System.currentTimeMillis()));
-    writer.append(new OpenSessionEntry(
-        1,
-        System.currentTimeMillis(),
-        "test-1",
-        "test",
-        "test",
-        ReadConsistency.LINEARIZABLE,
-        100,
-        1000));
+    writer.append(RaftLogEntry.newBuilder()
+        .setTerm(1)
+        .setTimestamp(System.currentTimeMillis())
+        .setInitialize(InitializeEntry.newBuilder().build())
+        .build());
+    writer.append(RaftLogEntry.newBuilder()
+        .setTerm(1)
+        .setTimestamp(System.currentTimeMillis())
+        .setOpenSession(OpenSessionEntry.newBuilder()
+            .setMemberId("test-1")
+            .setServiceType("test")
+            .setServiceName("test")
+            .setReadConsistency(OpenSessionEntry.ReadConsistency.LINEARIZABLE)
+            .setTimeout(1000)
+            .build())
+        .build());
     writer.commit(2);
 
     RaftServiceManager manager = raft.getServiceManager();
@@ -162,7 +163,16 @@ public class RaftServiceManagerTest {
 
     assertEquals(2, raft.getSnapshotStore().getCurrentSnapshot().index());
 
-    writer.append(new CommandEntry(1, System.currentTimeMillis(), 2, 1, new PrimitiveOperation(RUN, new byte[0])));
+    writer.append(RaftLogEntry.newBuilder()
+        .setTerm(1)
+        .setTimestamp(System.currentTimeMillis())
+        .setCommand(CommandEntry.newBuilder()
+            .setSessionId(2)
+            .setSequenceNumber(1)
+            .setOperation("run")
+            .setValue(ByteString.copyFrom("Hello world!".getBytes()))
+            .build())
+        .build());
     writer.commit(3);
 
     manager.apply(3).join();
