@@ -27,11 +27,15 @@ import io.atomix.storage.journal.JournalCodec;
 public class DistributedLogCodec implements JournalCodec<LogEntry> {
   @Override
   public void encode(LogEntry entry, ByteBuffer buffer) throws IOException {
-    entry.writeTo(CodedOutputStream.newInstance(buffer));
+    CodedOutputStream stream = CodedOutputStream.newInstance(buffer);
+    entry.writeTo(stream);
+    stream.flush();
   }
 
   @Override
   public LogEntry decode(ByteBuffer buffer) throws IOException {
-    return LogEntry.parseFrom(buffer);
+    LogEntry entry = LogEntry.parseFrom(buffer);
+    buffer.position(buffer.limit());
+    return entry;
   }
 }

@@ -27,11 +27,15 @@ import io.atomix.storage.journal.JournalCodec;
 public class RaftLogCodec implements JournalCodec<RaftLogEntry> {
   @Override
   public void encode(RaftLogEntry entry, ByteBuffer buffer) throws IOException {
-    entry.writeTo(CodedOutputStream.newInstance(buffer));
+    CodedOutputStream stream = CodedOutputStream.newInstance(buffer);
+    entry.writeTo(stream);
+    stream.flush();
   }
 
   @Override
   public RaftLogEntry decode(ByteBuffer buffer) throws IOException {
-    return RaftLogEntry.parseFrom(buffer);
+    RaftLogEntry entry = RaftLogEntry.parseFrom(buffer);
+    buffer.position(buffer.limit());
+    return entry;
   }
 }

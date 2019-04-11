@@ -58,7 +58,7 @@ public abstract class AbstractRole implements RaftRole {
    * Logs a request.
    */
   protected final <R extends Message> R logRequest(R request) {
-    log.trace("Received {}", request);
+    log.trace("Received {} {}", request.getClass().getSimpleName(), request);
     return request;
   }
 
@@ -66,7 +66,7 @@ public abstract class AbstractRole implements RaftRole {
    * Logs a response.
    */
   protected final <R extends Message> R logResponse(R response) {
-    log.trace("Sending {}", response);
+    log.trace("Sending {} {}", response.getClass().getSimpleName(), response);
     return response;
   }
 

@@ -232,9 +232,10 @@ public class DefaultProxySession<S> implements ProxySession<S> {
     public Object invoke(Object object, Method method, Object[] args) throws Throwable {
       OperationId operationId = operations.get(method);
       if (operationId != null) {
+        byte[] bytes = encode(args);
         future.set(session.execute(PrimitiveOperation.newBuilder()
             .setId(operationId)
-            .setValue(ByteString.copyFrom(encode(args)))
+            .setValue(bytes != null ? ByteString.copyFrom(bytes) : ByteString.EMPTY)
             .build())
             .thenApply(DefaultProxySession.this::decode));
       } else {

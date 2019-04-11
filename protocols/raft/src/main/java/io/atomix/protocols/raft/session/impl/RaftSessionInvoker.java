@@ -368,22 +368,24 @@ final class RaftSessionInvoker {
         else if (response.getError() == RaftError.COMMAND_FAILURE) {
           resubmit(response.getLastSequenceNumber(), this);
         }
-        // If a PROTOCOL_ERROR or APPLICATION_ERROR occurred, complete the request exceptionally with the error message.
+        // If a PROTOCOL_ERROR occurred, complete the request exceptionally with the error message.
         else if (response.getError() == RaftError.PROTOCOL_ERROR) {
-          complete(new RaftException.ProtocolException(response.getMessage()));
-        } else if (response.getError() == RaftError.APPLICATION_ERROR) {
-          complete(new RaftException.ApplicationException(response.getMessage()));
+          complete(new PrimitiveException.Unavailable(response.getMessage()));
+        }
+        // If an APPLICATION_ERROR occurred, complete the request with a ServiceException.
+        else if (response.getError() == RaftError.APPLICATION_ERROR) {
+          complete(new PrimitiveException.ServiceException(response.getMessage()));
         }
         // If the client is unknown by the cluster, close the session and complete the operation exceptionally.
         else if (response.getError() == RaftError.UNKNOWN_CLIENT
             || response.getError() == RaftError.UNKNOWN_SESSION) {
-          complete(new RaftException.UnknownSession(response.getMessage()));
+          complete(new PrimitiveException.UnknownSession(response.getMessage()));
           state.setState(PrimitiveState.EXPIRED);
         }
         // If the service is unknown by the cluster or the session was explicitly closed, set the session state to CLOSED.
         else if (response.getError() == RaftError.UNKNOWN_SERVICE
             || response.getError() == RaftError.CLOSED_SESSION) {
-          complete(new RaftException.UnknownService(response.getMessage()));
+          complete(new PrimitiveException.UnknownService(response.getMessage()));
           state.setState(PrimitiveState.CLOSED);
         }
         // For all other errors, use fibonacci backoff to resubmit the command.
@@ -406,7 +408,7 @@ final class RaftSessionInvoker {
       sequence(response, () -> {
         state.setCommandResponse(request.getSequenceNumber());
         state.setResponseIndex(response.getIndex());
-        future.complete(response.getOutput().toByteArray());
+        future.complete(!response.getOutput().isEmpty() ? response.getOutput().toByteArray() : null);
       });
     }
   }
@@ -445,14 +447,14 @@ final class RaftSessionInvoker {
           complete(response);
         } else if (response.getError() == RaftError.UNKNOWN_CLIENT
             || response.getError() == RaftError.UNKNOWN_SESSION) {
-          complete(new RaftException.UnknownSession("Unknown session"));
+          complete(new PrimitiveException.UnknownSession("Unknown session"));
           state.setState(PrimitiveState.EXPIRED);
         } else if (response.getError() == RaftError.UNKNOWN_SERVICE
             || response.getError() == RaftError.CLOSED_SESSION) {
-          complete(new RaftException.UnknownService("Unknown service"));
+          complete(new PrimitiveException.UnknownService("Unknown service"));
           state.setState(PrimitiveState.CLOSED);
         } else {
-          complete(new RaftException.QueryFailure("Query failed"));
+          complete(new PrimitiveException.QueryFailure("Query failed"));
         }
       } else {
         fail(error);

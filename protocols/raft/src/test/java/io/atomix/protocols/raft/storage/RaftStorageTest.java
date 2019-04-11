@@ -15,10 +15,6 @@
  */
 package io.atomix.protocols.raft.storage;
 
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
-
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.FileVisitResult;
@@ -27,6 +23,16 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
+
+import io.atomix.protocols.raft.storage.log.InitializeEntry;
+import io.atomix.protocols.raft.storage.log.MetadataEntry;
+import io.atomix.protocols.raft.storage.log.RaftLog;
+import io.atomix.protocols.raft.storage.log.RaftLogEntry;
+import io.atomix.protocols.raft.storage.log.RaftLogReader;
+import io.atomix.protocols.raft.storage.log.RaftLogWriter;
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -108,6 +114,36 @@ public class RaftStorageTest {
         .build();
 
     assertTrue(storage3.lock("a"));
+  }
+
+  @Test
+  public void testRaftLogReadWrite() throws Exception {
+    RaftStorage storage = RaftStorage.builder()
+        .withPrefix("foo")
+        .withDirectory(new File(PATH.toFile(), "foo"))
+        .withMaxSegmentSize(1024 * 1024)
+        .withMaxEntriesPerSegment(1024)
+        .build();
+
+    RaftLog log = storage.openLog();
+    RaftLogWriter writer = log.writer();
+    RaftLogReader reader = log.openReader(0);
+
+    writer.append(RaftLogEntry.newBuilder()
+        .setTerm(1)
+        .setTimestamp(2)
+        .setInitialize(InitializeEntry.newBuilder().build())
+        .build());
+    assertEquals(1, reader.next().entry().getTerm());
+
+    writer.append(RaftLogEntry.newBuilder()
+        .setTerm(2)
+        .setTimestamp(3)
+        .setMetadata(MetadataEntry.newBuilder()
+            .setSessionId(4)
+            .build())
+        .build());
+    assertEquals(2, reader.next().entry().getTerm());
   }
 
   @Before

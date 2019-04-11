@@ -23,7 +23,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.TimeoutException;
 import java.util.function.BiFunction;
-import java.util.function.Predicate;
 
 import com.google.protobuf.Message;
 import io.atomix.cluster.MemberId;
@@ -53,22 +52,6 @@ import static com.google.common.base.Preconditions.checkNotNull;
  * Client connection that recursively connects to servers in the cluster and attempts to submit requests.
  */
 public class RaftSessionConnection {
-  private static final Predicate<Message> COMPLETE_PREDICATE = response -> {
-    Object status = response.getField(response.getDescriptorForType().findFieldByName("status"));
-    if (status == ResponseStatus.OK) {
-      return true;
-    }
-
-    RaftError error = (RaftError) response.getField(response.getDescriptorForType().findFieldByName("error"));
-    return error == RaftError.COMMAND_FAILURE
-        || error == RaftError.QUERY_FAILURE
-        || error == RaftError.APPLICATION_ERROR
-        || error == RaftError.UNKNOWN_CLIENT
-        || error == RaftError.UNKNOWN_SESSION
-        || error == RaftError.UNKNOWN_SERVICE
-        || error == RaftError.PROTOCOL_ERROR;
-  };
-
   private final Logger log;
   private final RaftClientProtocol protocol;
   private final MemberSelector selector;
@@ -263,7 +246,7 @@ public class RaftSessionConnection {
   protected <T extends Message> void handleResponse(T request, BiFunction sender, int count, int selectionId, MemberId node, Message response, Throwable error, CompletableFuture future) {
     if (error == null) {
       log.trace("Received {} from {}", response, node);
-      if (COMPLETE_PREDICATE.test(response)) {
+      if (isComplete(response)) {
         future.complete(response);
         selector.reset();
       } else {
@@ -284,6 +267,32 @@ public class RaftSessionConnection {
         future.completeExceptionally(error);
       }
     }
+  }
+
+  private boolean isComplete(Message message) {
+    if (message instanceof OpenSessionResponse) {
+      return isComplete(((OpenSessionResponse) message).getStatus(), ((OpenSessionResponse) message).getError());
+    } else if (message instanceof KeepAliveResponse) {
+      return isComplete(((KeepAliveResponse) message).getStatus(), ((KeepAliveResponse) message).getError());
+    } else if (message instanceof CloseSessionResponse) {
+      return isComplete(((CloseSessionResponse) message).getStatus(), ((CloseSessionResponse) message).getError());
+    } else if (message instanceof OperationResponse) {
+      return isComplete(((OperationResponse) message).getStatus(), ((OperationResponse) message).getError());
+    } else if (message instanceof MetadataResponse) {
+      return isComplete(((MetadataResponse) message).getStatus(), ((MetadataResponse) message).getError());
+    }
+    return true;
+  }
+
+  private boolean isComplete(ResponseStatus status, RaftError error) {
+    return status == ResponseStatus.OK
+        || error == RaftError.COMMAND_FAILURE
+        || error == RaftError.QUERY_FAILURE
+        || error == RaftError.APPLICATION_ERROR
+        || error == RaftError.UNKNOWN_CLIENT
+        || error == RaftError.UNKNOWN_SESSION
+        || error == RaftError.UNKNOWN_SERVICE
+        || error == RaftError.PROTOCOL_ERROR;
   }
 
   private Throwable createException(Message response) {

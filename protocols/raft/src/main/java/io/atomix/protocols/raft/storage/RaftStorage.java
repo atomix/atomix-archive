@@ -241,8 +241,9 @@ public class RaftStorage {
       } else {
         try (InputStream input = new FileInputStream(file)) {
           byte[] bytes = new byte[128];
-          if (input.read(bytes) != -1) {
-            String lock = new String(bytes, StandardCharsets.UTF_8);
+          int length = input.read(bytes);
+          if (length != -1) {
+            String lock = new String(bytes, 0, length, StandardCharsets.UTF_8);
             return lock.equals(id);
           }
           return false;

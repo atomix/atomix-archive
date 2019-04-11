@@ -477,7 +477,7 @@ public class PassiveRole extends InactiveRole {
             .build());
       } else {
         future.complete(builder.setStatus(ResponseStatus.OK)
-            .setOutput(ByteString.copyFrom(result.result()))
+            .setOutput(result.result() != null ? ByteString.copyFrom(result.result()) : ByteString.EMPTY)
             .build());
       }
     } else if (error instanceof CompletionException && error.getCause() instanceof RaftException) {
