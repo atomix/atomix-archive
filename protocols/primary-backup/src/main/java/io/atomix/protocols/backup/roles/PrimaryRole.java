@@ -119,12 +119,12 @@ public class PrimaryRole extends PrimaryBackupRole {
                     .setType(OperationType.COMMAND)
                     .setName(request.getOperation())
                     .build(),
-                request.getValue().toByteArray(),
+                !request.getValue().isEmpty() ? request.getValue().toByteArray() : null,
                 context.setSession(session),
                 context.setTimestamp(timestamp)));
             return ExecuteResponse.newBuilder()
                 .setStatus(ResponseStatus.OK)
-                .setResult(ByteString.copyFrom(result))
+                .setResult(result != null ? ByteString.copyFrom(result) : ByteString.EMPTY)
                 .build();
           } catch (Exception e) {
             return ExecuteResponse.newBuilder()
@@ -169,12 +169,12 @@ public class PrimaryRole extends PrimaryBackupRole {
               .setType(OperationType.QUERY)
               .setName(request.getOperation())
               .build(),
-          request.getValue().toByteArray(),
+          !request.getValue().isEmpty() ? request.getValue().toByteArray() : null,
           context.setSession(session),
           context.currentTimestamp()));
       return ExecuteResponse.newBuilder()
           .setStatus(ResponseStatus.OK)
-          .setResult(ByteString.copyFrom(result))
+          .setResult(result != null ? ByteString.copyFrom(result) : ByteString.EMPTY)
           .build();
     } catch (Exception e) {
       return ExecuteResponse.newBuilder()

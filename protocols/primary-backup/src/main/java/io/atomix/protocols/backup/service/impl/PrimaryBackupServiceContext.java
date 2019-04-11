@@ -17,6 +17,7 @@
 package io.atomix.protocols.backup.service.impl;
 
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -583,12 +584,14 @@ public class PrimaryBackupServiceContext implements ServiceContext {
         log.debug("Term changed: {}", term);
         currentTerm = term.getTerm();
         primary = term.hasPrimary() ? MemberId.from(term.getPrimary().getMemberId()) : null;
-        backups = term.getCandidatesList()
-            .subList(1, Math.min(term.getCandidatesList().size(), descriptor.getBackups() + 1))
-            .stream()
-            .map(GroupMember::getMemberId)
-            .map(MemberId::from)
-            .collect(Collectors.toList());
+        backups = !term.getCandidatesList().isEmpty()
+            ? term.getCandidatesList()
+                .subList(1, Math.min(term.getCandidatesList().size(), descriptor.getBackups() + 1))
+                .stream()
+                .map(GroupMember::getMemberId)
+                .map(MemberId::from)
+                .collect(Collectors.toList())
+            : Collections.emptyList();
 
         if (Objects.equals(primary, clusterMembershipService.getLocalMember().id())) {
           if (this.role == null) {

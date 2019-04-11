@@ -114,7 +114,7 @@ public class BackupRole extends PrimaryBackupRole {
                 .setType(OperationType.COMMAND)
                 .setName(operation.getExecute().getOperation())
                 .build(),
-            operation.getExecute().getValue().toByteArray(),
+            !operation.getExecute().getValue().isEmpty() ? operation.getExecute().getValue().toByteArray() : null,
             context.setSession(session),
             context.setTimestamp(operation.getTimestamp())));
       } catch (Exception e) {

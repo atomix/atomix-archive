@@ -195,7 +195,7 @@ public class PrimaryBackupSessionClient implements SessionClient {
         if (error == null) {
           log.trace("Received {}", response);
           if (response.getStatus() == ResponseStatus.OK) {
-            future.complete(response.getResult().toByteArray());
+            future.complete(!response.getResult().isEmpty() ? response.getResult().toByteArray() : null);
           } else if (this.term.getTerm() > term.getTerm()) {
             execute(operation).whenComplete(future);
           } else {

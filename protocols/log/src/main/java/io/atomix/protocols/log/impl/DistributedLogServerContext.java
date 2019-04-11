@@ -17,6 +17,7 @@ package io.atomix.protocols.log.impl;
 
 import java.time.Duration;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
@@ -375,12 +376,14 @@ public class DistributedLogServerContext implements Managed<Void> {
         log.debug("{} - Term changed: {}", memberId, term);
         currentTerm = term.getTerm();
         leader = term.hasPrimary() ? MemberId.from(term.getPrimary().getMemberId()) : null;
-        followers = term.getCandidatesList()
-            .subList(1, Math.min(term.getCandidatesList().size(), replicationFactor))
-            .stream()
-            .map(GroupMember::getMemberId)
-            .map(MemberId::from)
-            .collect(Collectors.toList());
+        followers = !term.getCandidatesList().isEmpty()
+            ? term.getCandidatesList()
+                .subList(1, Math.min(term.getCandidatesList().size(), replicationFactor))
+                .stream()
+                .map(GroupMember::getMemberId)
+                .map(MemberId::from)
+                .collect(Collectors.toList())
+            : Collections.emptyList();
 
         if (Objects.equals(leader, clusterMembershipService.getLocalMember().id())) {
           if (this.role == null) {
