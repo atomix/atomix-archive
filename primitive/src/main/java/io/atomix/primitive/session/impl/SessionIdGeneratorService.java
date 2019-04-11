@@ -19,30 +19,23 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 
+import io.atomix.primitive.operation.OperationId;
+import io.atomix.primitive.operation.OperationType;
 import io.atomix.primitive.service.AbstractPrimitiveService;
+import io.atomix.primitive.service.Commit;
 import io.atomix.primitive.service.ServiceExecutor;
+import io.atomix.primitive.session.impl.proto.NextRequest;
+import io.atomix.primitive.session.impl.proto.NextResponse;
 import io.atomix.primitive.session.impl.proto.SessionIdGeneratorSnapshot;
-import io.atomix.utils.serializer.Namespace;
-import io.atomix.utils.serializer.Serializer;
 
 /**
  * ID generator service.
  */
 public class SessionIdGeneratorService extends AbstractPrimitiveService {
-
-  private static final Serializer SERIALIZER = Serializer.using(Namespace.builder()
-      .register(SessionIdGeneratorOperations.NAMESPACE)
-      .build());
-
   private long id;
 
   public SessionIdGeneratorService() {
     super(SessionIdGeneratorType.instance());
-  }
-
-  @Override
-  public Serializer serializer() {
-    return SERIALIZER;
   }
 
   @Override
@@ -61,7 +54,7 @@ public class SessionIdGeneratorService extends AbstractPrimitiveService {
 
   @Override
   protected void configure(ServiceExecutor executor) {
-    executor.register(SessionIdGeneratorOperations.NEXT, this::next);
+    executor.register(OperationId.newBuilder().setType(OperationType.COMMAND).setName("NEXT").build(), this::next);
   }
 
   /**
@@ -69,7 +62,9 @@ public class SessionIdGeneratorService extends AbstractPrimitiveService {
    *
    * @return the next session ID
    */
-  protected long next() {
-    return ++id;
+  protected NextResponse next(Commit<NextRequest> commit) {
+    return NextResponse.newBuilder()
+        .setSessionId(++id)
+        .build();
   }
 }

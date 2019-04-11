@@ -23,6 +23,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.function.BinaryOperator;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -208,4 +209,39 @@ public final class Futures {
     return allOf(futures).thenApply(resultList -> resultList.stream().reduce(reducer).orElse(emptyValue));
   }
 
+  @FunctionalInterface
+  public interface CheckedFunction<T, U> {
+    U apply(T t) throws Exception;
+  }
+
+  /**
+   * Converts the given checked function to an unchecked function.
+   *
+   * @param function the function to uncheck
+   * @param <T> the function argument
+   * @param <U> the function return type
+   * @return an unchecked function
+   */
+  public static <T, U> Function<T, U> uncheck(CheckedFunction<T, U> function) {
+    return uncheck(function, RuntimeException::new);
+  }
+
+  /**
+   * Converts the given checked function to an unchecked function.
+   *
+   * @param function the function to uncheck
+   * @param exceptionFactory the exception factory to use to construct an unchecked exception
+   * @param <T> the function argument
+   * @param <U> the function return type
+   * @return an unchecked function
+   */
+  public static <T, U> Function<T, U> uncheck(CheckedFunction<T, U> function, Function<Exception, RuntimeException> exceptionFactory) {
+    return t -> {
+      try {
+        return function.apply(t);
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
+    };
+  }
 }

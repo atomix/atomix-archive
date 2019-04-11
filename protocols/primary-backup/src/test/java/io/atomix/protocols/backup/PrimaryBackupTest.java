@@ -29,6 +29,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
+import com.google.protobuf.ByteString;
 import io.atomix.cluster.MemberId;
 import io.atomix.cluster.TestClusterMembershipService;
 import io.atomix.primitive.PrimitiveBuilder;
@@ -38,6 +39,8 @@ import io.atomix.primitive.Replication;
 import io.atomix.primitive.config.PrimitiveConfig;
 import io.atomix.primitive.event.EventType;
 import io.atomix.primitive.operation.OperationId;
+import io.atomix.primitive.operation.OperationType;
+import io.atomix.primitive.operation.PrimitiveOperation;
 import io.atomix.primitive.partition.MemberGroupStrategy;
 import io.atomix.primitive.partition.PartitionId;
 import io.atomix.primitive.partition.PrimaryElection;
@@ -60,7 +63,6 @@ import org.junit.Before;
 import org.junit.Ignore;
 import org.junit.Test;
 
-import static io.atomix.primitive.operation.PrimitiveOperation.operation;
 import static org.junit.Assert.assertEquals;
 
 /**
@@ -99,7 +101,9 @@ public class PrimaryBackupTest extends ConcurrentTestCase {
 
     PrimaryBackupClient client = createClient();
     SessionClient session = createProxy(client, backups, replication);
-    session.execute(operation(WRITE)).thenRun(this::resume);
+    session.execute(PrimitiveOperation.newBuilder()
+        .setId(WRITE)
+        .build()).thenRun(this::resume);
 
     await(5000);
   }
@@ -127,7 +131,9 @@ public class PrimaryBackupTest extends ConcurrentTestCase {
 
     PrimaryBackupClient client = createClient();
     SessionClient session = createProxy(client, backups, replication);
-    session.execute(operation(READ)).thenRun(this::resume);
+    session.execute(PrimitiveOperation.newBuilder()
+        .setId(READ)
+        .build()).thenRun(this::resume);
 
     await(5000);
   }
@@ -164,7 +170,10 @@ public class PrimaryBackupTest extends ConcurrentTestCase {
       resume();
     });
 
-    session.execute(operation(EVENT, SERIALIZER.encode(true)))
+    session.execute(PrimitiveOperation.newBuilder()
+        .setId(EVENT)
+        .setValue(ByteString.copyFrom(SERIALIZER.encode(true)))
+        .build())
         .<Long>thenApply(SERIALIZER::decode)
         .thenAccept(result -> {
           threadAssertNotNull(result);
@@ -211,11 +220,18 @@ public class PrimaryBackupTest extends ConcurrentTestCase {
       resume();
     });
 
-    session1.execute(operation(READ, null)).thenRun(this::resume);
-    session2.execute(operation(READ, null)).thenRun(this::resume);
+    session1.execute(PrimitiveOperation.newBuilder()
+        .setId(READ)
+        .build()).thenRun(this::resume);
+    session2.execute(PrimitiveOperation.newBuilder()
+        .setId(READ)
+        .build()).thenRun(this::resume);
     await(5000, 2);
 
-    session1.execute(operation(EVENT, SERIALIZER.encode(false))).thenRun(this::resume);
+    session1.execute(PrimitiveOperation.newBuilder()
+        .setId(EVENT)
+        .setValue(ByteString.copyFrom(SERIALIZER.encode(false)))
+        .build()).thenRun(this::resume);
     await(5000, 3);
   }
 
@@ -248,7 +264,10 @@ public class PrimaryBackupTest extends ConcurrentTestCase {
     });
 
     for (int i = 0; i < 10; i++) {
-      session.execute(operation(EVENT, SERIALIZER.encode(true))).thenRun(this::resume);
+      session.execute(PrimitiveOperation.newBuilder()
+          .setId(EVENT)
+          .setValue(ByteString.copyFrom(SERIALIZER.encode(true)))
+          .build()).thenRun(this::resume);
 
       await(5000, 2);
     }
@@ -280,7 +299,10 @@ public class PrimaryBackupTest extends ConcurrentTestCase {
     });
 
     for (int i = 0; i < 10; i++) {
-      session.execute(operation(EVENT, SERIALIZER.encode(true))).thenRun(this::resume);
+      session.execute(PrimitiveOperation.newBuilder()
+          .setId(EVENT)
+          .setValue(ByteString.copyFrom(SERIALIZER.encode(true)))
+          .build()).thenRun(this::resume);
 
       await(5000, 2);
     }
@@ -289,7 +311,10 @@ public class PrimaryBackupTest extends ConcurrentTestCase {
     leader.stop().get(10, TimeUnit.SECONDS);
 
     for (int i = 0; i < 10; i++) {
-      session.execute(operation(EVENT, SERIALIZER.encode(true))).thenRun(this::resume);
+      session.execute(PrimitiveOperation.newBuilder()
+          .setId(EVENT)
+          .setValue(ByteString.copyFrom(SERIALIZER.encode(true)))
+          .build()).thenRun(this::resume);
 
       await(5000, 2);
     }
@@ -325,14 +350,18 @@ public class PrimaryBackupTest extends ConcurrentTestCase {
     });
 
     SessionClient session1 = createProxy(createClient(), 2, replication);
-    session1.execute(operation(READ)).thenRun(this::resume);
+    session1.execute(PrimitiveOperation.newBuilder()
+        .setId(READ)
+        .build()).thenRun(this::resume);
     session1.addEventListener(CHANGE_EVENT, event -> {
       threadAssertNotNull(event);
       resume();
     });
 
     SessionClient session2 = createProxy(createClient(), 2, replication);
-    session2.execute(operation(READ)).thenRun(this::resume);
+    session2.execute(PrimitiveOperation.newBuilder()
+        .setId(READ)
+        .build()).thenRun(this::resume);
     session2.addEventListener(CHANGE_EVENT, event -> {
       threadAssertNotNull(event);
       resume();
@@ -341,7 +370,10 @@ public class PrimaryBackupTest extends ConcurrentTestCase {
     await(5000, 2);
 
     for (int i = 0; i < 10; i++) {
-      session.execute(operation(EVENT, SERIALIZER.encode(false))).thenRun(this::resume);
+      session.execute(PrimitiveOperation.newBuilder()
+          .setId(EVENT)
+          .setValue(ByteString.copyFrom(SERIALIZER.encode(false)))
+          .build()).thenRun(this::resume);
 
       await(10000, 4);
     }
@@ -366,11 +398,15 @@ public class PrimaryBackupTest extends ConcurrentTestCase {
     PrimaryBackupClient client1 = createClient();
     SessionClient session1 = createProxy(client1, 2, replication);
     PrimaryBackupClient client2 = createClient();
-    session1.execute(operation(CLOSE)).thenRun(this::resume);
+    session1.execute(PrimitiveOperation.newBuilder()
+        .setId(CLOSE)
+        .build()).thenRun(this::resume);
     await(Duration.ofSeconds(10).toMillis(), 1);
     session1.addEventListener(CLOSE_EVENT, e -> resume());
     SessionClient session2 = createProxy(client2, 2, replication);
-    session2.execute(operation(READ)).thenRun(this::resume);
+    session2.execute(PrimitiveOperation.newBuilder()
+        .setId(READ)
+        .build()).thenRun(this::resume);
     await(5000);
     session2.close().thenRun(this::resume);
     await(Duration.ofSeconds(10).toMillis(), 2);
@@ -432,7 +468,10 @@ public class PrimaryBackupTest extends ConcurrentTestCase {
     MemberId memberId = nextMemberId();
     PrimaryBackupClient client = PrimaryBackupClient.builder()
         .withClientName("test")
-        .withPartitionId(PartitionId.from("test", 1))
+        .withPartitionId(PartitionId.newBuilder()
+            .setGroup("test")
+            .setPartition(1)
+            .build())
         .withMembershipService(new TestClusterMembershipService(memberId, nodes))
         .withSessionIdProvider(() -> CompletableFuture.completedFuture(nextSessionId()))
         .withPrimaryElection(election)
@@ -475,15 +514,33 @@ public class PrimaryBackupTest extends ConcurrentTestCase {
     clients = new ArrayList<>();
     servers = new ArrayList<>();
     protocolFactory = new TestPrimaryBackupProtocolFactory();
-    election = new TestPrimaryElection(PartitionId.from("test", 1));
+    election = new TestPrimaryElection(PartitionId.newBuilder()
+        .setGroup("test")
+        .setPartition(1)
+        .build());
   }
 
-  private static final OperationId WRITE = OperationId.command("write");
-  private static final OperationId EVENT = OperationId.command("event");
-  private static final OperationId EXPIRE = OperationId.command("expire");
-  private static final OperationId CLOSE = OperationId.command("close");
+  private static final OperationId WRITE = OperationId.newBuilder()
+      .setType(OperationType.COMMAND)
+      .setName("write")
+      .build();
+  private static final OperationId EVENT = OperationId.newBuilder()
+      .setType(OperationType.COMMAND)
+      .setName("event")
+      .build();
+  private static final OperationId EXPIRE = OperationId.newBuilder()
+      .setType(OperationType.COMMAND)
+      .setName("expire")
+      .build();
+  private static final OperationId CLOSE = OperationId.newBuilder()
+      .setType(OperationType.COMMAND)
+      .setName("close")
+      .build();
 
-  private static final OperationId READ = OperationId.query("read");
+  private static final OperationId READ = OperationId.newBuilder()
+      .setType(OperationType.QUERY)
+      .setName("read")
+      .build();
 
   private static final EventType CHANGE_EVENT = EventType.from("change");
   private static final EventType EXPIRE_EVENT = EventType.from("expire");

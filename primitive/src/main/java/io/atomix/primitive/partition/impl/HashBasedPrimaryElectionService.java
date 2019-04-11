@@ -15,32 +15,32 @@
  */
 package io.atomix.primitive.partition.impl;
 
-import com.google.common.collect.Maps;
-import io.atomix.cluster.ClusterMembershipService;
-import io.atomix.cluster.messaging.ClusterCommunicationService;
-import io.atomix.primitive.partition.ManagedPrimaryElectionService;
-import io.atomix.primitive.partition.PartitionGroupMembershipService;
-import io.atomix.primitive.partition.PartitionId;
-import io.atomix.primitive.partition.PrimaryElection;
-import io.atomix.primitive.partition.PrimaryElectionEvent;
-import io.atomix.primitive.partition.PrimaryElectionEventListener;
-import io.atomix.primitive.partition.PrimaryElectionService;
-import io.atomix.utils.concurrent.Threads;
-import io.atomix.utils.event.AbstractListenerManager;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Consumer;
+
+import com.google.common.collect.Maps;
+import io.atomix.cluster.ClusterMembershipService;
+import io.atomix.cluster.messaging.ClusterCommunicationService;
+import io.atomix.primitive.event.AbstractListenable;
+import io.atomix.primitive.partition.ManagedPrimaryElectionService;
+import io.atomix.primitive.partition.PartitionGroupMembershipService;
+import io.atomix.primitive.partition.PartitionId;
+import io.atomix.primitive.partition.PrimaryElection;
+import io.atomix.primitive.partition.PrimaryElectionEvent;
+import io.atomix.primitive.partition.PrimaryElectionService;
+import io.atomix.utils.concurrent.Threads;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Hash-based primary election service.
  */
 public class HashBasedPrimaryElectionService
-    extends AbstractListenerManager<PrimaryElectionEvent, PrimaryElectionEventListener>
+    extends AbstractListenable<PrimaryElectionEvent>
     implements ManagedPrimaryElectionService {
 
   private final Logger log = LoggerFactory.getLogger(getClass());
@@ -48,7 +48,7 @@ public class HashBasedPrimaryElectionService
   private final PartitionGroupMembershipService groupMembershipService;
   private final ClusterCommunicationService messagingService;
   private final Map<PartitionId, HashBasedPrimaryElection> elections = Maps.newConcurrentMap();
-  private final PrimaryElectionEventListener primaryElectionListener = this::post;
+  private final Consumer<PrimaryElectionEvent> primaryElectionListener = this::post;
   private final ScheduledExecutorService executor;
   private final AtomicBoolean started = new AtomicBoolean();
 

@@ -15,43 +15,36 @@
  */
 package io.atomix.primitive.partition.impl;
 
+import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Consumer;
+
 import com.google.common.collect.Sets;
+import io.atomix.primitive.operation.OperationId;
+import io.atomix.primitive.operation.OperationType;
+import io.atomix.primitive.operation.PrimitiveOperation;
 import io.atomix.primitive.partition.GroupMember;
 import io.atomix.primitive.partition.ManagedPrimaryElection;
 import io.atomix.primitive.partition.PartitionId;
 import io.atomix.primitive.partition.PrimaryElection;
-import io.atomix.primitive.partition.PrimaryElectionEventListener;
+import io.atomix.primitive.partition.PrimaryElectionEvent;
 import io.atomix.primitive.partition.PrimaryElectionService;
 import io.atomix.primitive.partition.PrimaryTerm;
 import io.atomix.primitive.session.SessionClient;
-import io.atomix.utils.serializer.Namespace;
-import io.atomix.utils.serializer.Serializer;
-
-import java.util.Set;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 import static com.google.common.base.Preconditions.checkNotNull;
-import static io.atomix.primitive.operation.PrimitiveOperation.operation;
-import static io.atomix.primitive.partition.impl.PrimaryElectorOperations.ENTER;
-import static io.atomix.primitive.partition.impl.PrimaryElectorOperations.Enter;
-import static io.atomix.primitive.partition.impl.PrimaryElectorOperations.GET_TERM;
-import static io.atomix.primitive.partition.impl.PrimaryElectorOperations.GetTerm;
+import static io.atomix.utils.concurrent.Futures.uncheck;
 
 /**
  * Leader elector based primary election.
  */
 public class DefaultPrimaryElection implements ManagedPrimaryElection {
-  private static final Serializer SERIALIZER = Serializer.using(Namespace.builder()
-      .register(PrimaryElectorOperations.NAMESPACE)
-      .register(PrimaryElectorEvents.NAMESPACE)
-      .build());
-
   private final PartitionId partitionId;
   private final SessionClient proxy;
   private final PrimaryElectionService service;
-  private final Set<PrimaryElectionEventListener> listeners = Sets.newCopyOnWriteArraySet();
-  private final PrimaryElectionEventListener eventListener;
+  private final Set<Consumer<PrimaryElectionEvent>> listeners = Sets.newCopyOnWriteArraySet();
+  private final Consumer<PrimaryElectionEvent> eventListener;
   private final AtomicBoolean started = new AtomicBoolean();
 
   public DefaultPrimaryElection(PartitionId partitionId, SessionClient proxy, PrimaryElectionService service) {
@@ -59,8 +52,8 @@ public class DefaultPrimaryElection implements ManagedPrimaryElection {
     this.proxy = proxy;
     this.service = service;
     this.eventListener = event -> {
-      if (event.partitionId().equals(partitionId)) {
-        listeners.forEach(l -> l.event(event));
+      if (event.getPartitionId().equals(partitionId)) {
+        listeners.forEach(l -> l.accept(event));
       }
     };
     service.addListener(eventListener);
@@ -68,21 +61,44 @@ public class DefaultPrimaryElection implements ManagedPrimaryElection {
 
   @Override
   public CompletableFuture<PrimaryTerm> enter(GroupMember member) {
-    return proxy.execute(operation(ENTER, SERIALIZER.encode(new Enter(partitionId, member)))).thenApply(SERIALIZER::decode);
+    return proxy.execute(PrimitiveOperation.newBuilder()
+        .setId(OperationId.newBuilder()
+            .setType(OperationType.COMMAND)
+            .setName("ENTER")
+            .build())
+        .setValue(EnterRequest.newBuilder()
+            .setPartitionId(partitionId)
+            .setMember(member)
+            .build()
+            .toByteString())
+        .build())
+        .thenApply(uncheck(EnterResponse::parseFrom))
+        .thenApply(EnterResponse::getTerm);
   }
 
   @Override
   public CompletableFuture<PrimaryTerm> getTerm() {
-    return proxy.execute(operation(GET_TERM, SERIALIZER.encode(new GetTerm(partitionId)))).thenApply(SERIALIZER::decode);
+    return proxy.execute(PrimitiveOperation.newBuilder()
+        .setId(OperationId.newBuilder()
+            .setType(OperationType.QUERY)
+            .setName("GET_TERM")
+            .build())
+        .setValue(GetTermRequest.newBuilder()
+            .setPartitionId(partitionId)
+            .build()
+            .toByteString())
+        .build())
+        .thenApply(uncheck(GetTermResponse::parseFrom))
+        .thenApply(GetTermResponse::getTerm);
   }
 
   @Override
-  public synchronized void addListener(PrimaryElectionEventListener listener) {
+  public synchronized void addListener(Consumer<PrimaryElectionEvent> listener) {
     listeners.add(checkNotNull(listener));
   }
 
   @Override
-  public synchronized void removeListener(PrimaryElectionEventListener listener) {
+  public synchronized void removeListener(Consumer<PrimaryElectionEvent> listener) {
     listeners.remove(checkNotNull(listener));
   }
 

@@ -19,6 +19,7 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.function.Consumer;
+import java.util.function.Function;
 
 import com.google.common.base.Preconditions;
 import io.atomix.cluster.MemberId;
@@ -37,68 +38,106 @@ import io.atomix.protocols.raft.protocol.OperationResponse;
 import io.atomix.protocols.raft.protocol.PublishRequest;
 import io.atomix.protocols.raft.protocol.RaftClientProtocol;
 import io.atomix.protocols.raft.protocol.ResetRequest;
-import io.atomix.utils.serializer.Serializer;
+
+import static io.atomix.utils.concurrent.Futures.uncheck;
 
 /**
  * Raft client protocol that uses a cluster communicator.
  */
 public class RaftClientCommunicator implements RaftClientProtocol {
   private final RaftMessageContext context;
-  private final Serializer serializer;
   private final ClusterCommunicationService clusterCommunicator;
 
-  public RaftClientCommunicator(Serializer serializer, ClusterCommunicationService clusterCommunicator) {
-    this(null, serializer, clusterCommunicator);
+  public RaftClientCommunicator(ClusterCommunicationService clusterCommunicator) {
+    this(null, clusterCommunicator);
   }
 
-  public RaftClientCommunicator(String prefix, Serializer serializer, ClusterCommunicationService clusterCommunicator) {
+  public RaftClientCommunicator(String prefix, ClusterCommunicationService clusterCommunicator) {
     this.context = new RaftMessageContext(prefix);
-    this.serializer = Preconditions.checkNotNull(serializer, "serializer cannot be null");
     this.clusterCommunicator = Preconditions.checkNotNull(clusterCommunicator, "clusterCommunicator cannot be null");
   }
 
-  private <T, U> CompletableFuture<U> sendAndReceive(String subject, T request, MemberId memberId) {
-    return clusterCommunicator.send(subject, request, serializer::encode, serializer::decode, memberId);
+  private <T, U> CompletableFuture<U> sendAndReceive(
+      String subject, T request, Function<T, byte[]> encoder, Function<byte[], U> decoder, MemberId memberId) {
+    return clusterCommunicator.send(subject, request, encoder, decoder, memberId);
   }
 
   @Override
   public CompletableFuture<OpenSessionResponse> openSession(MemberId memberId, OpenSessionRequest request) {
-    return sendAndReceive(context.openSessionSubject, request, memberId);
+    return sendAndReceive(
+        context.openSessionSubject,
+        request,
+        OpenSessionRequest::toByteArray,
+        uncheck(OpenSessionResponse::parseFrom),
+        memberId);
   }
 
   @Override
   public CompletableFuture<CloseSessionResponse> closeSession(MemberId memberId, CloseSessionRequest request) {
-    return sendAndReceive(context.closeSessionSubject, request, memberId);
+    return sendAndReceive(
+        context.closeSessionSubject,
+        request,
+        CloseSessionRequest::toByteArray,
+        uncheck(CloseSessionResponse::parseFrom),
+        memberId);
   }
 
   @Override
   public CompletableFuture<KeepAliveResponse> keepAlive(MemberId memberId, KeepAliveRequest request) {
-    return sendAndReceive(context.keepAliveSubject, request, memberId);
+    return sendAndReceive(
+        context.keepAliveSubject,
+        request,
+        KeepAliveRequest::toByteArray,
+        uncheck(KeepAliveResponse::parseFrom),
+        memberId);
   }
 
   @Override
   public CompletableFuture<OperationResponse> query(MemberId memberId, OperationRequest request) {
-    return sendAndReceive(context.querySubject, request, memberId);
+    return sendAndReceive(
+        context.querySubject,
+        request,
+        OperationRequest::toByteArray,
+        uncheck(OperationResponse::parseFrom),
+        memberId);
   }
 
   @Override
   public CompletableFuture<OperationResponse> command(MemberId memberId, OperationRequest request) {
-    return sendAndReceive(context.commandSubject, request, memberId);
+    return sendAndReceive(
+        context.commandSubject,
+        request,
+        OperationRequest::toByteArray,
+        uncheck(OperationResponse::parseFrom),
+        memberId);
   }
 
   @Override
   public CompletableFuture<MetadataResponse> metadata(MemberId memberId, MetadataRequest request) {
-    return sendAndReceive(context.metadataSubject, request, memberId);
+    return sendAndReceive(
+        context.metadataSubject,
+        request,
+        MetadataRequest::toByteArray,
+        uncheck(MetadataResponse::parseFrom),
+        memberId);
   }
 
   @Override
   public void reset(Set<MemberId> members, ResetRequest request) {
-    clusterCommunicator.multicast(context.resetSubject(request.getSessionId()), request, serializer::encode, members);
+    clusterCommunicator.multicast(
+        context.resetSubject(request.getSessionId()),
+        request,
+        ResetRequest::toByteArray,
+        members);
   }
 
   @Override
   public void registerPublishListener(SessionId sessionId, Consumer<PublishRequest> listener, Executor executor) {
-    clusterCommunicator.subscribe(context.publishSubject(sessionId.id()), serializer::decode, listener, executor);
+    clusterCommunicator.subscribe(
+        context.publishSubject(sessionId.id()),
+        uncheck(PublishRequest::parseFrom),
+        listener,
+        executor);
   }
 
   @Override

@@ -15,6 +15,7 @@
  */
 package io.atomix.primitive.proxy.impl;
 
+import java.io.IOException;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -29,6 +30,7 @@ import java.util.function.Function;
 
 import com.google.common.base.Defaults;
 import com.google.common.collect.Maps;
+import com.google.protobuf.ByteString;
 import io.atomix.cluster.MemberId;
 import io.atomix.primitive.PrimitiveException;
 import io.atomix.primitive.PrimitiveId;
@@ -37,12 +39,12 @@ import io.atomix.primitive.PrimitiveType;
 import io.atomix.primitive.event.EventType;
 import io.atomix.primitive.event.Events;
 import io.atomix.primitive.event.PrimitiveEvent;
+import io.atomix.primitive.log.LogOperation;
 import io.atomix.primitive.log.LogRecord;
 import io.atomix.primitive.log.LogSession;
 import io.atomix.primitive.operation.OperationId;
 import io.atomix.primitive.operation.OperationType;
 import io.atomix.primitive.operation.Operations;
-import io.atomix.primitive.operation.impl.DefaultOperationId;
 import io.atomix.primitive.partition.PartitionId;
 import io.atomix.primitive.proxy.ProxySession;
 import io.atomix.primitive.service.PrimitiveService;
@@ -53,8 +55,6 @@ import io.atomix.primitive.session.SessionId;
 import io.atomix.primitive.session.impl.AbstractSession;
 import io.atomix.utils.concurrent.Futures;
 import io.atomix.utils.concurrent.ThreadContext;
-import io.atomix.utils.serializer.Namespace;
-import io.atomix.utils.serializer.Namespaces;
 import io.atomix.utils.serializer.Serializer;
 import io.atomix.utils.time.LogicalClock;
 import io.atomix.utils.time.LogicalTimestamp;
@@ -69,15 +69,6 @@ import static com.google.common.base.Preconditions.checkNotNull;
  * Log proxy session.
  */
 public class LogProxySession<S> implements ProxySession<S> {
-  private static final Serializer INTERNAL_SERIALIZER = Serializer.using(Namespace.builder()
-      .register(Namespaces.BASIC)
-      .nextId(Namespaces.BEGIN_USER_CUSTOM_ID)
-      .register(LogOperation.class)
-      .register(DefaultOperationId.class)
-      .register(OperationType.class)
-      .register(SessionId.class)
-      .build());
-
   private final Logger log = LoggerFactory.getLogger(getClass());
   private final String name;
   private final PrimitiveType type;
@@ -182,35 +173,41 @@ public class LogProxySession<S> implements ProxySession<S> {
   @SuppressWarnings("unchecked")
   private void consume(LogRecord record) {
     // Decode the raw log operation from the record.
-    LogOperation operation = decodeInternal(record.getValue().toByteArray());
+    LogOperation operation;
+    try {
+      operation = LogOperation.parseFrom(record.getValue());
+    } catch (IOException e) {
+      log.error("Failed to parse log operation");
+      return;
+    }
 
     // If this operation is not destined for this primitive, ignore it.
     // TODO: If multiple primitives of different types are created and destroyed on the same distributed log,
     // we need to be able to differentiate between different instances of a service by the service ID.
-    if (!operation.primitive().equals(name())) {
+    if (!operation.getPrimitive().equals(name())) {
       return;
     }
 
     // Create a session from the log record.
-    Session session = getOrCreateSession(operation.sessionId());
+    Session session = getOrCreateSession(SessionId.from(operation.getSessionId()));
 
     // Update the local context for the service.
     currentIndex = record.getIndex();
     currentSession = session;
-    currentOperation = operation.operationId().type();
+    currentOperation = operation.getOperationId().getType();
     currentTimestamp = record.getTimestamp();
 
     // Apply the operation to the service.
     byte[] output = service.apply(new DefaultCommit<>(
         currentIndex,
-        operation.operationId(),
-        operation.operation(),
+        operation.getOperationId(),
+        operation.getOperation().toByteArray(),
         currentSession,
         currentTimestamp));
 
     // If the operation session matches the local session, complete the write future.
-    if (operation.sessionId().equals(this.session.sessionId())) {
-      CompletableFuture future = writeFutures.remove(operation.operationIndex());
+    if (operation.getSessionId() == this.session.sessionId().id()) {
+      CompletableFuture future = writeFutures.remove(operation.getOperationIndex());
       if (future != null) {
         future.complete(decode(output));
       }
@@ -292,28 +289,6 @@ public class LogProxySession<S> implements ProxySession<S> {
    */
   protected <T> T decode(byte[] bytes) {
     return bytes != null ? userSerializer.decode(bytes) : null;
-  }
-
-  /**
-   * Encodes an internal object.
-   *
-   * @param object the object to encode
-   * @param <T>    the object type
-   * @return the encoded bytes
-   */
-  private <T> byte[] encodeInternal(T object) {
-    return INTERNAL_SERIALIZER.encode(object);
-  }
-
-  /**
-   * Decodes an internal object.
-   *
-   * @param bytes the bytes to decode
-   * @param <T>   the object type
-   * @return the internal object
-   */
-  private <T> T decodeInternal(byte[] bytes) {
-    return INTERNAL_SERIALIZER.decode(bytes);
   }
 
   /**
@@ -467,11 +442,17 @@ public class LogProxySession<S> implements ProxySession<S> {
         this.future.set(future);
         byte[] bytes = encode(args);
 
-        if (operationId.type() == OperationType.COMMAND) {
+        if (operationId.getType() == OperationType.COMMAND) {
           long index = operationIndex.incrementAndGet();
           writeFutures.put(index, future);
-          LogOperation operation = new LogOperation(session.sessionId(), name, index, operationId, bytes);
-          session.producer().append(encodeInternal(operation))
+          LogOperation operation = LogOperation.newBuilder()
+              .setSessionId(session.sessionId().id())
+              .setPrimitive(name)
+              .setOperationIndex(index)
+              .setOperationId(operationId)
+              .setOperation(ByteString.copyFrom(bytes))
+              .build();
+          session.producer().append(operation.toByteArray())
               .whenCompleteAsync((result, error) -> {
                 if (error == null) {
                   lastIndex = result;

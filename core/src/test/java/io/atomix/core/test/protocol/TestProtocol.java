@@ -110,10 +110,16 @@ public class TestProtocol implements ProxyProtocol {
               primitiveName,
               primitiveType,
               sessionId,
-              PartitionId.from(group(), partition),
+              PartitionId.newBuilder()
+                  .setGroup(group())
+                  .setPartition(partition)
+                  .build(),
               new ThreadPoolContext(threadPool),
               registry.getOrCreateService(
-                  PartitionId.from(group(), partition),
+                  PartitionId.newBuilder()
+                      .setGroup(group())
+                      .setPartition(partition)
+                      .build(),
                   primitiveName,
                   primitiveType));
         })

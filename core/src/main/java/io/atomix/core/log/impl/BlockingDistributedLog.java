@@ -15,14 +15,6 @@
  */
 package io.atomix.core.log.impl;
 
-import com.google.common.base.Throwables;
-import io.atomix.core.log.AsyncDistributedLog;
-import io.atomix.core.log.DistributedLog;
-import io.atomix.core.log.DistributedLogPartition;
-import io.atomix.core.log.Record;
-import io.atomix.primitive.PrimitiveException;
-import io.atomix.primitive.Synchronous;
-
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -32,6 +24,14 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Consumer;
+
+import com.google.common.base.Throwables;
+import io.atomix.core.log.AsyncDistributedLog;
+import io.atomix.core.log.DistributedLog;
+import io.atomix.core.log.DistributedLogPartition;
+import io.atomix.core.log.Record;
+import io.atomix.primitive.PrimitiveException;
+import io.atomix.primitive.Synchronous;
 
 /**
  * Default distributed log.

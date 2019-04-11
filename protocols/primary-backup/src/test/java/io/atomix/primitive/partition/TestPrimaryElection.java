@@ -15,15 +15,14 @@
  */
 package io.atomix.primitive.partition;
 
-import com.google.common.collect.Sets;
-import io.atomix.primitive.partition.PrimaryElectionEvent.Type;
-
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
+
+import com.google.common.collect.Sets;
 
 /**
  * Test primary election.
@@ -33,7 +32,7 @@ public class TestPrimaryElection implements PrimaryElection {
   private long counter;
   private PrimaryTerm term;
   private final List<GroupMember> candidates = new ArrayList<>();
-  private final Set<PrimaryElectionEventListener> listeners = Sets.newConcurrentHashSet();
+  private final Set<Consumer<PrimaryElectionEvent>> listeners = Sets.newConcurrentHashSet();
 
   public TestPrimaryElection(PartitionId partitionId) {
     this.partitionId = partitionId;
@@ -43,13 +42,24 @@ public class TestPrimaryElection implements PrimaryElection {
   public CompletableFuture<PrimaryTerm> enter(GroupMember member) {
     candidates.add(member);
     if (term == null) {
-      term = new PrimaryTerm(++counter, member, Collections.emptyList());
-      listeners.forEach(l -> l.event(new PrimaryElectionEvent(Type.CHANGED, partitionId, term)));
+      term = PrimaryTerm.newBuilder()
+          .setTerm(++counter)
+          .setPrimary(member)
+          .build();
+      listeners.forEach(l -> l.accept(PrimaryElectionEvent.newBuilder()
+          .setPartitionId(partitionId)
+          .setTerm(term)
+          .build()));
     } else {
-      term = new PrimaryTerm(term.term(), term.primary(), candidates.stream()
-          .filter(candidate -> !candidate.equals(term.primary()))
-          .collect(Collectors.toList()));
-      listeners.forEach(l -> l.event(new PrimaryElectionEvent(Type.CHANGED, partitionId, term)));
+      term = PrimaryTerm.newBuilder(term)
+          .addAllCandidates(candidates.stream()
+              .filter(candidate -> !candidate.getMemberId().equals(term.getPrimary().getMemberId()))
+              .collect(Collectors.toList()))
+          .build();
+      listeners.forEach(l -> l.accept(PrimaryElectionEvent.newBuilder()
+          .setPartitionId(partitionId)
+          .setTerm(term)
+          .build()));
     }
     return CompletableFuture.completedFuture(term);
   }
@@ -60,12 +70,12 @@ public class TestPrimaryElection implements PrimaryElection {
   }
 
   @Override
-  public void addListener(PrimaryElectionEventListener listener) {
+  public void addListener(Consumer<PrimaryElectionEvent> listener) {
     listeners.add(listener);
   }
 
   @Override
-  public void removeListener(PrimaryElectionEventListener listener) {
+  public void removeListener(Consumer<PrimaryElectionEvent> listener) {
     listeners.remove(listener);
   }
 }

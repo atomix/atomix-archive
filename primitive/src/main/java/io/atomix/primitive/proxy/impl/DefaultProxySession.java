@@ -15,7 +15,17 @@
  */
 package io.atomix.primitive.proxy.impl;
 
+import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Consumer;
+import java.util.function.Function;
+
 import com.google.common.base.Defaults;
+import com.google.protobuf.ByteString;
 import io.atomix.primitive.PrimitiveException;
 import io.atomix.primitive.PrimitiveState;
 import io.atomix.primitive.PrimitiveType;
@@ -31,15 +41,6 @@ import io.atomix.utils.concurrent.ThreadContext;
 import io.atomix.utils.serializer.Serializer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.lang.reflect.InvocationHandler;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
-import java.util.Map;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.function.Consumer;
-import java.util.function.Function;
 
 /**
  * Lazy partition proxy.
@@ -231,7 +232,10 @@ public class DefaultProxySession<S> implements ProxySession<S> {
     public Object invoke(Object object, Method method, Object[] args) throws Throwable {
       OperationId operationId = operations.get(method);
       if (operationId != null) {
-        future.set(session.execute(PrimitiveOperation.operation(operationId, encode(args)))
+        future.set(session.execute(PrimitiveOperation.newBuilder()
+            .setId(operationId)
+            .setValue(ByteString.copyFrom(encode(args)))
+            .build())
             .thenApply(DefaultProxySession.this::decode));
       } else {
         throw new PrimitiveException("Unknown primitive operation: " + method.getName());

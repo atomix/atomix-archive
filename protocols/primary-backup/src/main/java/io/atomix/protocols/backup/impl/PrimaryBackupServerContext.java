@@ -93,7 +93,9 @@ public class PrimaryBackupServerContext implements Managed<Void> {
    * @return the current server role
    */
   public Role getRole() {
-    return Objects.equals(Futures.get(primaryElection.getTerm()).primary().memberId(), clusterMembershipService.getLocalMember().id())
+    return Objects.equals(
+        Futures.get(primaryElection.getTerm()).getPrimary().getMemberId(),
+        clusterMembershipService.getLocalMember().id().id())
         ? Role.PRIMARY
         : Role.BACKUP;
   }
@@ -104,7 +106,10 @@ public class PrimaryBackupServerContext implements Managed<Void> {
     return memberGroupService.start().thenCompose(v -> {
       MemberGroup group = memberGroupService.getMemberGroup(clusterMembershipService.getLocalMember());
       if (group != null) {
-        return primaryElection.enter(new GroupMember(clusterMembershipService.getLocalMember().id(), group.id()));
+        return primaryElection.enter(GroupMember.newBuilder()
+            .setMemberId(clusterMembershipService.getLocalMember().id().id())
+            .setMemberGroupId(group.id().id())
+            .build());
       }
       return CompletableFuture.completedFuture(null);
     }).thenApply(v -> {

@@ -15,6 +15,16 @@
  */
 package io.atomix.protocols.raft.partition.impl;
 
+import java.io.IOException;
+import java.nio.file.FileVisitResult;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.SimpleFileVisitor;
+import java.nio.file.attribute.BasicFileAttributes;
+import java.time.Duration;
+import java.util.Collection;
+import java.util.concurrent.CompletableFuture;
+
 import io.atomix.cluster.ClusterMembershipService;
 import io.atomix.cluster.MemberId;
 import io.atomix.cluster.messaging.ClusterCommunicationService;
@@ -28,18 +38,7 @@ import io.atomix.storage.StorageException;
 import io.atomix.utils.Managed;
 import io.atomix.utils.concurrent.Futures;
 import io.atomix.utils.concurrent.ThreadContextFactory;
-import io.atomix.utils.serializer.Serializer;
 import org.slf4j.Logger;
-
-import java.io.IOException;
-import java.nio.file.FileVisitResult;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.SimpleFileVisitor;
-import java.nio.file.attribute.BasicFileAttributes;
-import java.time.Duration;
-import java.util.Collection;
-import java.util.concurrent.CompletableFuture;
 
 import static org.slf4j.LoggerFactory.getLogger;
 
@@ -159,7 +158,6 @@ public class RaftPartitionServer implements Managed<RaftPartitionServer> {
         .withMembershipService(membershipService)
         .withProtocol(new RaftServerCommunicator(
             partition.name(),
-            Serializer.using(RaftNamespaces.RAFT_PROTOCOL),
             clusterCommunicator))
         .withPrimitiveTypes(primitiveTypes)
         .withElectionTimeout(Duration.ofMillis(ELECTION_TIMEOUT_MILLIS))
@@ -174,7 +172,6 @@ public class RaftPartitionServer implements Managed<RaftPartitionServer> {
             .withDynamicCompaction(config.getCompactionConfig().isDynamic())
             .withFreeDiskBuffer(config.getCompactionConfig().getFreeDiskBuffer())
             .withFreeMemoryBuffer(config.getCompactionConfig().getFreeMemoryBuffer())
-            .withNamespace(RaftNamespaces.RAFT_STORAGE)
             .build())
         .withThreadContextFactory(threadContextFactory)
         .build();

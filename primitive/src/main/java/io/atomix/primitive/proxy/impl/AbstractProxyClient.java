@@ -15,6 +15,17 @@
  */
 package io.atomix.primitive.proxy.impl;
 
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.function.Consumer;
+import java.util.stream.Collectors;
+
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import io.atomix.primitive.PrimitiveState;
@@ -24,16 +35,6 @@ import io.atomix.primitive.protocol.PrimitiveProtocol;
 import io.atomix.primitive.proxy.ProxyClient;
 import io.atomix.primitive.proxy.ProxySession;
 import io.atomix.utils.concurrent.Futures;
-
-import java.util.Collection;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.function.Consumer;
-import java.util.stream.Collectors;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -64,7 +65,7 @@ public abstract class AbstractProxyClient<S> implements ProxyClient<S> {
       states.put(partition.partitionId(), PrimitiveState.CLOSED);
       partition.addStateChangeListener(state -> onStateChange(partition.partitionId(), state));
     });
-    Collections.sort(partitionIds);
+    Collections.sort(partitionIds, Comparator.comparingInt(PartitionId::getPartition));
   }
 
   @Override

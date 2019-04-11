@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+package atomix.primitive.operation;
+
+option java_package = "io.atomix.primitive.operation";
+option java_outer_classname = "OperationProto";
+option java_multiple_files = true;
+
+enum OperationType {
+    COMMAND = 0;
+    QUERY = 1;
+}
+
+message OperationId {
+    OperationType type = 1;
+    string name = 2;
+}
+
+message PrimitiveOperation {
+    OperationId id = 1;
+    bytes value = 2;
+}

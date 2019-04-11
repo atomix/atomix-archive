@@ -15,6 +15,15 @@
  */
 package io.atomix.protocols.log.partition;
 
+import java.io.File;
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.stream.Collectors;
+
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import io.atomix.primitive.Recovery;
@@ -36,15 +45,6 @@ import io.atomix.utils.serializer.Namespace;
 import io.atomix.utils.serializer.Namespaces;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.io.File;
-import java.time.Duration;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.CompletableFuture;
-import java.util.stream.Collectors;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -102,7 +102,10 @@ public class LogPartitionGroup implements ManagedPartitionGroup {
   private static Collection<LogPartition> buildPartitions(LogPartitionGroupConfig config) {
     List<LogPartition> partitions = new ArrayList<>(config.getPartitions());
     for (int i = 0; i < config.getPartitions(); i++) {
-      partitions.add(new LogPartition(PartitionId.from(config.getName(), i + 1), config));
+      partitions.add(new LogPartition(PartitionId.newBuilder()
+          .setGroup(config.getName())
+          .setPartition(i + 1)
+          .build(), config));
     }
     return partitions;
   }

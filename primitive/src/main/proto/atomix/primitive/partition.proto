@@ -1,0 +1,28 @@
+syntax = "proto3";
+
+package atomix.primitive.partition;
+
+option java_package = "io.atomix.primitive.partition";
+option java_outer_classname = "PartitionProto";
+option java_multiple_files = true;
+
+message PartitionId {
+    string group = 1;
+    int32 partition = 2;
+}
+
+message GroupMember {
+    string member_id = 1;
+    string member_group_id = 2;
+}
+
+message PrimaryTerm {
+    int64 term = 1;
+    GroupMember primary = 2;
+    repeated GroupMember candidates = 3;
+}
+
+message PrimaryElectionEvent {
+    PartitionId partition_id = 1;
+    PrimaryTerm term = 2;
+}

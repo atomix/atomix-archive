@@ -18,24 +18,23 @@ package io.atomix.primitive.session.impl;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import io.atomix.primitive.operation.OperationId;
+import io.atomix.primitive.operation.OperationType;
+import io.atomix.primitive.operation.PrimitiveOperation;
 import io.atomix.primitive.partition.PartitionGroup;
 import io.atomix.primitive.session.ManagedSessionIdService;
 import io.atomix.primitive.session.SessionClient;
 import io.atomix.primitive.session.SessionId;
 import io.atomix.primitive.session.SessionIdService;
-import io.atomix.utils.serializer.Namespace;
-import io.atomix.utils.serializer.Serializer;
+import io.atomix.primitive.session.impl.proto.NextRequest;
+import io.atomix.primitive.session.impl.proto.NextResponse;
 
-import static io.atomix.primitive.operation.PrimitiveOperation.operation;
-import static io.atomix.primitive.session.impl.SessionIdGeneratorOperations.NEXT;
+import static io.atomix.utils.concurrent.Futures.uncheck;
 
 /**
  * Replicated ID generator service.
  */
 public class ReplicatedSessionIdService implements ManagedSessionIdService {
-  private static final Serializer SERIALIZER = Serializer.using(Namespace.builder()
-      .register(SessionIdGeneratorOperations.NAMESPACE)
-      .build());
   private static final String PRIMITIVE_NAME = "session-id";
 
   private final PartitionGroup systemPartitionGroup;
@@ -48,9 +47,15 @@ public class ReplicatedSessionIdService implements ManagedSessionIdService {
 
   @Override
   public CompletableFuture<SessionId> nextSessionId() {
-    return proxy.execute(operation(NEXT))
-        .<Long>thenApply(SERIALIZER::decode)
-        .thenApply(SessionId::from);
+    return proxy.execute(PrimitiveOperation.newBuilder()
+        .setId(OperationId.newBuilder()
+            .setName("NEXT")
+            .setType(OperationType.COMMAND)
+            .build())
+        .setValue(NextRequest.newBuilder().build().toByteString())
+        .build())
+        .thenApply(uncheck(NextResponse::parseFrom))
+        .thenApply(response -> SessionId.from(response.getSessionId()));
   }
 
   @Override

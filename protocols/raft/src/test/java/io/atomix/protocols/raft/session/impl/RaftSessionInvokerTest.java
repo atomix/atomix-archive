@@ -22,6 +22,8 @@ import java.util.concurrent.CompletableFuture;
 
 import com.google.protobuf.ByteString;
 import io.atomix.primitive.operation.OperationId;
+import io.atomix.primitive.operation.OperationType;
+import io.atomix.primitive.operation.PrimitiveOperation;
 import io.atomix.primitive.session.SessionId;
 import io.atomix.protocols.raft.RaftException;
 import io.atomix.protocols.raft.TestPrimitiveType;
@@ -33,7 +35,6 @@ import io.atomix.utils.concurrent.ThreadContext;
 import org.junit.Test;
 import org.mockito.Mockito;
 
-import static io.atomix.primitive.operation.PrimitiveOperation.operation;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -48,8 +49,14 @@ import static org.mockito.Mockito.when;
  * @author <a href="http://github.com/kuujo">Jordan Halterman</a>
  */
 public class RaftSessionInvokerTest {
-  private static final OperationId COMMAND = OperationId.command("command");
-  private static final OperationId QUERY = OperationId.query("query");
+  private static final OperationId COMMAND = OperationId.newBuilder()
+      .setType(OperationType.COMMAND)
+      .setName("command")
+      .build();
+  private static final OperationId QUERY = OperationId.newBuilder()
+      .setType(OperationType.QUERY)
+      .setName("query")
+      .build();
 
   /**
    * Tests submitting a command to the cluster.
@@ -69,7 +76,10 @@ public class RaftSessionInvokerTest {
     ThreadContext threadContext = new TestContext();
 
     RaftSessionInvoker submitter = new RaftSessionInvoker(connection, mock(RaftSessionConnection.class), state, new RaftSessionSequencer(state), manager, threadContext);
-    assertArrayEquals(submitter.invoke(operation(COMMAND, new byte[0])).get(), "Hello world!".getBytes());
+    assertArrayEquals(submitter.invoke(PrimitiveOperation.newBuilder()
+        .setId(COMMAND)
+        .setValue(ByteString.copyFrom(new byte[0]))
+        .build()).get(), "Hello world!".getBytes());
     assertEquals(1, state.getCommandRequest());
     assertEquals(1, state.getCommandResponse());
     assertEquals(10, state.getResponseIndex());
@@ -94,8 +104,12 @@ public class RaftSessionInvokerTest {
 
     RaftSessionInvoker submitter = new RaftSessionInvoker(connection, mock(RaftSessionConnection.class), state, new RaftSessionSequencer(state), manager, threadContext);
 
-    CompletableFuture<byte[]> result1 = submitter.invoke(operation(COMMAND));
-    CompletableFuture<byte[]> result2 = submitter.invoke(operation(COMMAND));
+    CompletableFuture<byte[]> result1 = submitter.invoke(PrimitiveOperation.newBuilder()
+        .setId(COMMAND)
+        .build());
+    CompletableFuture<byte[]> result2 = submitter.invoke(PrimitiveOperation.newBuilder()
+        .setId(COMMAND)
+        .build());
 
     future2.complete(OperationResponse.newBuilder()
         .setStatus(ResponseStatus.OK)
@@ -144,7 +158,9 @@ public class RaftSessionInvokerTest {
     ThreadContext threadContext = new TestContext();
 
     RaftSessionInvoker submitter = new RaftSessionInvoker(mock(RaftSessionConnection.class), connection, state, new RaftSessionSequencer(state), manager, threadContext);
-    assertTrue(Arrays.equals(submitter.invoke(operation(QUERY)).get(), "Hello world!".getBytes()));
+    assertTrue(Arrays.equals(submitter.invoke(PrimitiveOperation.newBuilder()
+        .setId(QUERY)
+        .build()).get(), "Hello world!".getBytes()));
     assertEquals(10, state.getResponseIndex());
   }
 
@@ -167,8 +183,12 @@ public class RaftSessionInvokerTest {
 
     RaftSessionInvoker submitter = new RaftSessionInvoker(mock(RaftSessionConnection.class), connection, state, new RaftSessionSequencer(state), manager, threadContext);
 
-    CompletableFuture<byte[]> result1 = submitter.invoke(operation(QUERY));
-    CompletableFuture<byte[]> result2 = submitter.invoke(operation(QUERY));
+    CompletableFuture<byte[]> result1 = submitter.invoke(PrimitiveOperation.newBuilder()
+        .setId(QUERY)
+        .build());
+    CompletableFuture<byte[]> result2 = submitter.invoke(PrimitiveOperation.newBuilder()
+        .setId(QUERY)
+        .build());
 
     future2.complete(OperationResponse.newBuilder()
         .setStatus(ResponseStatus.OK)
@@ -214,8 +234,12 @@ public class RaftSessionInvokerTest {
 
     RaftSessionInvoker submitter = new RaftSessionInvoker(mock(RaftSessionConnection.class), connection, state, new RaftSessionSequencer(state), manager, threadContext);
 
-    CompletableFuture<byte[]> result1 = submitter.invoke(operation(QUERY));
-    CompletableFuture<byte[]> result2 = submitter.invoke(operation(QUERY));
+    CompletableFuture<byte[]> result1 = submitter.invoke(PrimitiveOperation.newBuilder()
+        .setId(QUERY)
+        .build());
+    CompletableFuture<byte[]> result2 = submitter.invoke(PrimitiveOperation.newBuilder()
+        .setId(QUERY)
+        .build());
 
     assertEquals(1, state.getResponseIndex());
 
@@ -252,7 +276,9 @@ public class RaftSessionInvokerTest {
 
     RaftSessionInvoker submitter = new RaftSessionInvoker(connection, mock(RaftSessionConnection.class), state, new RaftSessionSequencer(state), manager, threadContext);
 
-    CompletableFuture<byte[]> result = submitter.invoke(operation(COMMAND));
+    CompletableFuture<byte[]> result = submitter.invoke(PrimitiveOperation.newBuilder()
+        .setId(COMMAND)
+        .build());
 
     assertEquals(1, state.getResponseIndex());
 
@@ -280,7 +306,9 @@ public class RaftSessionInvokerTest {
 
     RaftSessionInvoker submitter = new RaftSessionInvoker(mock(RaftSessionConnection.class), connection, state, new RaftSessionSequencer(state), manager, threadContext);
 
-    CompletableFuture<byte[]> result = submitter.invoke(operation(QUERY));
+    CompletableFuture<byte[]> result = submitter.invoke(PrimitiveOperation.newBuilder()
+        .setId(QUERY)
+        .build());
 
     assertEquals(1, state.getResponseIndex());
 

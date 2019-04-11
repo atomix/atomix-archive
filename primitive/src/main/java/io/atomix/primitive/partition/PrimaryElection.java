@@ -15,9 +15,9 @@
  */
 package io.atomix.primitive.partition;
 
-import io.atomix.utils.event.ListenerService;
-
 import java.util.concurrent.CompletableFuture;
+
+import io.atomix.primitive.event.Listenable;
 
 /**
  * Partition primary election.
@@ -28,7 +28,7 @@ import java.util.concurrent.CompletableFuture;
  * <p>
  * The prioritization of candidates within a primary election is unspecified.
  */
-public interface PrimaryElection extends ListenerService<PrimaryElectionEvent, PrimaryElectionEventListener> {
+public interface PrimaryElection extends Listenable<PrimaryElectionEvent> {
 
   /**
    * Enters the primary election.

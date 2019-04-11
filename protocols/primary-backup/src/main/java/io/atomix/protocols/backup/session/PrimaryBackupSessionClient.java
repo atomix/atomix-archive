@@ -28,10 +28,10 @@ import java.util.function.Consumer;
 import com.google.common.base.Throwables;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
-import com.google.protobuf.ByteString;
 import io.atomix.cluster.ClusterMembershipEvent;
 import io.atomix.cluster.ClusterMembershipEventListener;
 import io.atomix.cluster.ClusterMembershipService;
+import io.atomix.cluster.MemberId;
 import io.atomix.primitive.Consistency;
 import io.atomix.primitive.PrimitiveException;
 import io.atomix.primitive.PrimitiveState;
@@ -43,7 +43,7 @@ import io.atomix.primitive.event.PrimitiveEvent;
 import io.atomix.primitive.operation.PrimitiveOperation;
 import io.atomix.primitive.partition.PartitionId;
 import io.atomix.primitive.partition.PrimaryElection;
-import io.atomix.primitive.partition.PrimaryElectionEventListener;
+import io.atomix.primitive.partition.PrimaryElectionEvent;
 import io.atomix.primitive.partition.PrimaryTerm;
 import io.atomix.primitive.session.SessionClient;
 import io.atomix.primitive.session.SessionId;
@@ -79,7 +79,7 @@ public class PrimaryBackupSessionClient implements SessionClient {
   private final ThreadContext threadContext;
   private final Set<Consumer<PrimitiveState>> stateChangeListeners = Sets.newIdentityHashSet();
   private final Map<EventType, Set<Consumer<PrimitiveEvent>>> eventListeners = Maps.newHashMap();
-  private final PrimaryElectionEventListener primaryElectionListener = event -> changeReplicas(event.term());
+  private final Consumer<PrimaryElectionEvent> primaryElectionListener = event -> changeReplicas(event.getTerm());
   private final ClusterMembershipEventListener membershipEventListener = this::handleClusterEvent;
   private PrimaryTerm term;
   private volatile PrimitiveState state = PrimitiveState.CLOSED;
@@ -155,10 +155,10 @@ public class PrimaryBackupSessionClient implements SessionClient {
   public CompletableFuture<byte[]> execute(PrimitiveOperation operation) {
     ComposableFuture<byte[]> future = new ComposableFuture<>();
     threadContext.execute(() -> {
-      if (term.primary() == null) {
+      if (!term.hasPrimary()) {
         primaryElection.getTerm().whenCompleteAsync((term, error) -> {
           if (error == null) {
-            if (term.term() <= this.term.term() || term.primary() == null) {
+            if (term.getTerm() <= this.term.getTerm() || !term.hasPrimary()) {
               future.completeExceptionally(new PrimitiveException.Unavailable());
             } else {
               this.term = term;
@@ -185,23 +185,23 @@ public class PrimaryBackupSessionClient implements SessionClient {
         .setPrimitive(descriptor)
         .setSessionId(sessionId.id())
         .setMemberId(clusterMembershipService.getLocalMember().id().id())
-        .setOperation(operation.id().id())
-        .setValue(ByteString.copyFrom(operation.value()))
+        .setOperation(operation.getId().getName())
+        .setValue(operation.getValue())
         .build();
-    log.trace("Sending {} to {}", request, term.primary());
+    log.trace("Sending {} to {}", request, term.getPrimary());
     PrimaryTerm term = this.term;
-    if (term.primary() != null) {
-      protocol.execute(term.primary().memberId(), request).whenCompleteAsync((response, error) -> {
+    if (term.hasPrimary()) {
+      protocol.execute(MemberId.from(term.getPrimary().getMemberId()), request).whenCompleteAsync((response, error) -> {
         if (error == null) {
           log.trace("Received {}", response);
           if (response.getStatus() == ResponseStatus.OK) {
             future.complete(response.getResult().toByteArray());
-          } else if (this.term.term() > term.term()) {
+          } else if (this.term.getTerm() > term.getTerm()) {
             execute(operation).whenComplete(future);
           } else {
             primaryElection.getTerm().whenComplete((newTerm, termError) -> {
               if (termError == null) {
-                if (newTerm.term() > term.term() && newTerm.primary() != null) {
+                if (newTerm.getTerm() > term.getTerm() && newTerm.getPrimary() != null) {
                   execute(operation).whenComplete(future);
                 } else {
                   threadContext.schedule(Duration.ofMillis(RETRY_DELAY), () -> execute(operation, attempt + 1, future));
@@ -216,7 +216,7 @@ public class PrimaryBackupSessionClient implements SessionClient {
               }
             });
           }
-        } else if (this.term.term() > term.term()) {
+        } else if (this.term.getTerm() > term.getTerm()) {
           execute(operation).whenComplete(future);
         } else {
           Throwable cause = Throwables.getRootCause(error);
@@ -247,7 +247,7 @@ public class PrimaryBackupSessionClient implements SessionClient {
    */
   private void changeReplicas(PrimaryTerm term) {
     threadContext.execute(() -> {
-      if (this.term == null || term.term() > this.term.term()) {
+      if (this.term == null || term.getTerm() > this.term.getTerm()) {
         this.term = term;
       }
     });
@@ -258,7 +258,8 @@ public class PrimaryBackupSessionClient implements SessionClient {
    */
   private void handleClusterEvent(ClusterMembershipEvent event) {
     PrimaryTerm term = this.term;
-    if (term != null && event.type() == ClusterMembershipEvent.Type.MEMBER_REMOVED && event.subject().id().equals(term.primary().memberId())) {
+    if (term != null && event.type() == ClusterMembershipEvent.Type.MEMBER_REMOVED
+        && event.subject().id().id().equals(term.getPrimary().getMemberId())) {
       threadContext.execute(() -> {
         state = PrimitiveState.SUSPENDED;
         stateChangeListeners.forEach(l -> l.accept(state));
@@ -297,7 +298,7 @@ public class PrimaryBackupSessionClient implements SessionClient {
 
     primaryElection.getTerm().whenCompleteAsync((term, error) -> {
       if (error == null) {
-        if (term.primary() == null) {
+        if (!term.hasPrimary()) {
           future.completeExceptionally(new PrimitiveException.Unavailable());
         } else {
           this.term = term;
@@ -319,8 +320,8 @@ public class PrimaryBackupSessionClient implements SessionClient {
   public CompletableFuture<Void> close() {
     CompletableFuture<Void> future = new CompletableFuture<>();
     PrimaryTerm term = this.term;
-    if (term.primary() != null) {
-      protocol.close(term.primary().memberId(), CloseRequest.newBuilder()
+    if (term.hasPrimary()) {
+      protocol.close(MemberId.from(term.getPrimary().getMemberId()), CloseRequest.newBuilder()
           .setPrimitive(descriptor)
           .setSessionId(sessionId.id())
           .build())

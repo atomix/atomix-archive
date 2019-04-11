@@ -52,8 +52,8 @@ public final class Operations {
     for (Method method : type.getDeclaredMethods()) {
       OperationId operationId = getOperationId(method);
       if (operationId != null) {
-        if (operations.values().stream().anyMatch(operation -> operation.id().equals(operationId.id()))) {
-          throw new IllegalStateException("Duplicate operation name '" + operationId.id() + "'");
+        if (operations.values().stream().anyMatch(operation -> operation.getName().equals(operationId.getName()))) {
+          throw new IllegalStateException("Duplicate operation name '" + operationId.getName() + "'");
         }
         operations.put(method, operationId);
       }
@@ -96,8 +96,8 @@ public final class Operations {
     for (Method method : type.getDeclaredMethods()) {
       OperationId operationId = getOperationId(method);
       if (operationId != null) {
-        if (operations.keySet().stream().anyMatch(operation -> operation.id().equals(operationId.id()))) {
-          throw new IllegalStateException("Duplicate operation name '" + operationId.id() + "'");
+        if (operations.keySet().stream().anyMatch(operation -> operation.getName().equals(operationId.getName()))) {
+          throw new IllegalStateException("Duplicate operation name '" + operationId.getName() + "'");
         }
         operations.put(operationId, method);
       }
@@ -118,17 +118,26 @@ public final class Operations {
     Command command = method.getAnnotation(Command.class);
     if (command != null) {
       String name = command.value().equals("") ? method.getName() : command.value();
-      return OperationId.from(name, OperationType.COMMAND);
+      return OperationId.newBuilder()
+          .setName(name)
+          .setType(OperationType.COMMAND)
+          .build();
     }
     Query query = method.getAnnotation(Query.class);
     if (query != null) {
       String name = query.value().equals("") ? method.getName() : query.value();
-      return OperationId.from(name, OperationType.QUERY);
+      return OperationId.newBuilder()
+          .setName(name)
+          .setType(OperationType.QUERY)
+          .build();
     }
     Operation operation = method.getAnnotation(Operation.class);
     if (operation != null) {
       String name = operation.value().equals("") ? method.getName() : operation.value();
-      return OperationId.from(name, operation.type());
+      return OperationId.newBuilder()
+          .setName(name)
+          .setType(operation.type())
+          .build();
     }
     return null;
   }

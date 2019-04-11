@@ -28,7 +28,6 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.BiConsumer;
 import java.util.function.Predicate;
 
-import com.google.protobuf.ByteString;
 import com.google.protobuf.Message;
 import io.atomix.primitive.PrimitiveException;
 import io.atomix.primitive.PrimitiveState;
@@ -92,7 +91,7 @@ final class RaftSessionInvoker {
    */
   public CompletableFuture<byte[]> invoke(PrimitiveOperation operation) {
     CompletableFuture<byte[]> future = new CompletableFuture<>();
-    switch (operation.id().type()) {
+    switch (operation.getId().getType()) {
       case COMMAND:
         context.execute(() -> invokeCommand(operation, future));
         break;
@@ -100,7 +99,7 @@ final class RaftSessionInvoker {
         context.execute(() -> invokeQuery(operation, future));
         break;
       default:
-        throw new IllegalArgumentException("Unknown operation type " + operation.id().type());
+        throw new IllegalArgumentException("Unknown operation type " + operation.getId().getType());
     }
     return future;
   }
@@ -113,8 +112,8 @@ final class RaftSessionInvoker {
         .setSessionId(state.getSessionId().id())
         .setSequenceNumber(state.nextCommandRequest())
         .setCommand(Command.newBuilder()
-            .setName(operation.id().id())
-            .setCommand(ByteString.copyFrom(operation.value()))
+            .setName(operation.getId().getName())
+            .setCommand(operation.getValue())
             .build())
         .build();
     invokeCommand(request, future);
@@ -135,8 +134,8 @@ final class RaftSessionInvoker {
         .setSessionId(state.getSessionId().id())
         .setSequenceNumber(state.getCommandRequest())
         .setQuery(Query.newBuilder()
-            .setName(operation.id().id())
-            .setQuery(ByteString.copyFrom(operation.value()))
+            .setName(operation.getId().getName())
+            .setQuery(operation.getValue())
             .setIndex(Math.max(state.getResponseIndex(), state.getEventIndex()))
             .build())
         .build();

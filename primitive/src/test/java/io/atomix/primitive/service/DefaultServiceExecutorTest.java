@@ -15,6 +15,10 @@
  */
 package io.atomix.primitive.service;
 
+import java.time.Duration;
+import java.util.HashSet;
+import java.util.Set;
+
 import io.atomix.primitive.PrimitiveId;
 import io.atomix.primitive.TestPrimitiveType;
 import io.atomix.primitive.operation.OperationId;
@@ -26,10 +30,6 @@ import io.atomix.utils.serializer.Namespaces;
 import io.atomix.utils.serializer.Serializer;
 import io.atomix.utils.time.WallClockTimestamp;
 import org.junit.Test;
-
-import java.time.Duration;
-import java.util.HashSet;
-import java.util.Set;
 
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
@@ -45,43 +45,43 @@ public class DefaultServiceExecutorTest {
     ServiceExecutor executor = executor();
     Set<String> calls = new HashSet<>();
 
-    executor.register(OperationId.command("a"), () -> calls.add("a"));
-    executor.<Void>register(OperationId.command("b"), commit -> calls.add("b"));
-    executor.register(OperationId.query("c"), commit -> {
+    executor.register(OperationId.newBuilder().setType(OperationType.COMMAND).setName("a").build(), () -> calls.add("a"));
+    executor.<Void>register(OperationId.newBuilder().setType(OperationType.COMMAND).setName("b").build(), commit -> calls.add("b"));
+    executor.register(OperationId.newBuilder().setType(OperationType.QUERY).setName("c").build(), commit -> {
       calls.add("c");
       return null;
     });
-    executor.register(OperationId.query("d"), () -> {
+    executor.register(OperationId.newBuilder().setType(OperationType.QUERY).setName("d").build(), () -> {
       calls.add("d");
       return null;
     });
-    executor.register(OperationId.command("e"), commit -> {
+    executor.register(OperationId.newBuilder().setType(OperationType.COMMAND).setName("e").build(), commit -> {
       calls.add("e");
       return commit.value();
     });
 
-    executor.apply(commit(OperationId.command("a"), 1, null, System.currentTimeMillis()));
+    executor.apply(commit(OperationId.newBuilder().setType(OperationType.COMMAND).setName("a").build(), 1, null, System.currentTimeMillis()));
     assertTrue(calls.contains("a"));
 
-    executor.apply(commit(OperationId.command("b"), 2, null, System.currentTimeMillis()));
+    executor.apply(commit(OperationId.newBuilder().setType(OperationType.COMMAND).setName("b").build(), 2, null, System.currentTimeMillis()));
     assertTrue(calls.contains("b"));
 
-    executor.apply(commit(OperationId.query("c"), 3, null, System.currentTimeMillis()));
+    executor.apply(commit(OperationId.newBuilder().setType(OperationType.QUERY).setName("c").build(), 3, null, System.currentTimeMillis()));
     assertTrue(calls.contains("c"));
 
-    executor.apply(commit(OperationId.query("d"), 4, null, System.currentTimeMillis()));
+    executor.apply(commit(OperationId.newBuilder().setType(OperationType.QUERY).setName("d").build(), 4, null, System.currentTimeMillis()));
     assertTrue(calls.contains("d"));
 
-    executor.apply(commit(OperationId.command("e"), 5, null, System.currentTimeMillis()));
+    executor.apply(commit(OperationId.newBuilder().setType(OperationType.COMMAND).setName("e").build(), 5, null, System.currentTimeMillis()));
     assertTrue(calls.contains("e"));
   }
 
   @Test
   public void testScheduling() throws Exception {
     ServiceExecutor executor = executor();
-    executor.register(OperationId.command("a"), () -> {
+    executor.register(OperationId.newBuilder().setType(OperationType.COMMAND).setName("a").build(), () -> {
     });
-    executor.apply(commit(OperationId.command("a"), 1, null, 0));
+    executor.apply(commit(OperationId.newBuilder().setType(OperationType.COMMAND).setName("a").build(), 1, null, 0));
 
     Set<String> calls = new HashSet<>();
     executor.tick(new WallClockTimestamp(1));

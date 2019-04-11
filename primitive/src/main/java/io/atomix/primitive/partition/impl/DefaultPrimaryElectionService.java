@@ -23,6 +23,8 @@ import java.util.function.Consumer;
 
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
+import com.google.protobuf.InvalidProtocolBufferException;
+import io.atomix.primitive.event.EventType;
 import io.atomix.primitive.event.PrimitiveEvent;
 import io.atomix.primitive.partition.ManagedPrimaryElection;
 import io.atomix.primitive.partition.ManagedPrimaryElectionService;
@@ -30,14 +32,10 @@ import io.atomix.primitive.partition.PartitionGroup;
 import io.atomix.primitive.partition.PartitionId;
 import io.atomix.primitive.partition.PrimaryElection;
 import io.atomix.primitive.partition.PrimaryElectionEvent;
-import io.atomix.primitive.partition.PrimaryElectionEventListener;
 import io.atomix.primitive.partition.PrimaryElectionService;
 import io.atomix.primitive.session.SessionClient;
-import io.atomix.utils.serializer.Namespace;
-import io.atomix.utils.serializer.Serializer;
 
 import static com.google.common.base.Preconditions.checkNotNull;
-import static io.atomix.primitive.partition.impl.PrimaryElectorEvents.CHANGE;
 
 /**
  * Default primary election service.
@@ -48,16 +46,14 @@ import static io.atomix.primitive.partition.impl.PrimaryElectorEvents.CHANGE;
 public class DefaultPrimaryElectionService implements ManagedPrimaryElectionService {
   private static final String PRIMITIVE_NAME = "atomix-primary-elector";
 
-  private static final Serializer SERIALIZER = Serializer.using(Namespace.builder()
-      .register(PrimaryElectorOperations.NAMESPACE)
-      .register(PrimaryElectorEvents.NAMESPACE)
-      .build());
-
   private final PartitionGroup partitions;
-  private final Set<PrimaryElectionEventListener> listeners = Sets.newCopyOnWriteArraySet();
+  private final Set<Consumer<PrimaryElectionEvent>> listeners = Sets.newCopyOnWriteArraySet();
   private final Consumer<PrimitiveEvent> eventListener = event -> {
-    PrimaryElectionEvent electionEvent = SERIALIZER.decode(event.value());
-    listeners.forEach(l -> l.event(electionEvent));
+    try {
+      PrimaryElectionEvent electionEvent = PrimaryElectionEvent.parseFrom(event.value());
+      listeners.forEach(l -> l.accept(electionEvent));
+    } catch (InvalidProtocolBufferException e) {
+    }
   };
   private final Map<PartitionId, ManagedPrimaryElection> elections = Maps.newConcurrentMap();
   private final AtomicBoolean started = new AtomicBoolean();
@@ -74,12 +70,12 @@ public class DefaultPrimaryElectionService implements ManagedPrimaryElectionServ
   }
 
   @Override
-  public void addListener(PrimaryElectionEventListener listener) {
+  public void addListener(Consumer<PrimaryElectionEvent> listener) {
     listeners.add(checkNotNull(listener));
   }
 
   @Override
-  public void removeListener(PrimaryElectionEventListener listener) {
+  public void removeListener(Consumer<PrimaryElectionEvent> listener) {
     listeners.remove(checkNotNull(listener));
   }
 
@@ -92,7 +88,7 @@ public class DefaultPrimaryElectionService implements ManagedPrimaryElectionServ
         .connect()
         .thenAccept(proxy -> {
           this.proxy = proxy;
-          proxy.addEventListener(CHANGE, eventListener);
+          proxy.addEventListener(EventType.from("CHANGE"), eventListener);
           started.set(true);
         })
         .thenApply(v -> this);

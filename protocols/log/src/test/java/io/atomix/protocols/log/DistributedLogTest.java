@@ -47,6 +47,7 @@ import io.atomix.primitive.config.PrimitiveConfig;
 import io.atomix.primitive.event.EventType;
 import io.atomix.primitive.log.LogSession;
 import io.atomix.primitive.operation.OperationId;
+import io.atomix.primitive.operation.OperationType;
 import io.atomix.primitive.partition.MemberGroupStrategy;
 import io.atomix.primitive.partition.PartitionId;
 import io.atomix.primitive.partition.PrimaryElection;
@@ -223,7 +224,10 @@ public class DistributedLogTest extends ConcurrentTestCase {
     MemberId memberId = nextMemberId();
     DistributedLogSessionClient client = DistributedLogSessionClient.builder()
         .withClientName("test")
-        .withPartitionId(PartitionId.from("test", 1))
+        .withPartitionId(PartitionId.newBuilder()
+            .setGroup("test")
+            .setPartition(1)
+            .build())
         .withMembershipService(new TestClusterMembershipService(memberId, nodes))
         .withSessionIdProvider(() -> CompletableFuture.completedFuture(nextSessionId()))
         .withPrimaryElection(election)
@@ -282,15 +286,33 @@ public class DistributedLogTest extends ConcurrentTestCase {
     clients = new ArrayList<>();
     servers = new ArrayList<>();
     protocolFactory = new TestLogProtocolFactory();
-    election = new TestPrimaryElection(PartitionId.from("test", 1));
+    election = new TestPrimaryElection(PartitionId.newBuilder()
+        .setGroup("test")
+        .setPartition(1)
+        .build());
   }
 
-  private static final OperationId WRITE = OperationId.command("write");
-  private static final OperationId EVENT = OperationId.command("event");
-  private static final OperationId EXPIRE = OperationId.command("expire");
-  private static final OperationId CLOSE = OperationId.command("close");
+  private static final OperationId WRITE = OperationId.newBuilder()
+      .setType(OperationType.COMMAND)
+      .setName("write")
+      .build();
+  private static final OperationId EVENT = OperationId.newBuilder()
+      .setType(OperationType.COMMAND)
+      .setName("event")
+      .build();
+  private static final OperationId EXPIRE = OperationId.newBuilder()
+      .setType(OperationType.COMMAND)
+      .setName("expire")
+      .build();
+  private static final OperationId CLOSE = OperationId.newBuilder()
+      .setType(OperationType.COMMAND)
+      .setName("close")
+      .build();
 
-  private static final OperationId READ = OperationId.query("read");
+  private static final OperationId READ = OperationId.newBuilder()
+      .setType(OperationType.QUERY)
+      .setName("read")
+      .build();
 
   private static final EventType CHANGE_EVENT = EventType.from("change");
   private static final EventType EXPIRE_EVENT = EventType.from("expire");

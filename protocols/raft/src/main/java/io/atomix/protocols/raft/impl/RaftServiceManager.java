@@ -32,6 +32,7 @@ import io.atomix.cluster.MemberId;
 import io.atomix.primitive.PrimitiveId;
 import io.atomix.primitive.PrimitiveType;
 import io.atomix.primitive.operation.OperationId;
+import io.atomix.primitive.operation.OperationType;
 import io.atomix.primitive.operation.PrimitiveOperation;
 import io.atomix.primitive.service.PrimitiveService;
 import io.atomix.primitive.session.SessionId;
@@ -792,9 +793,13 @@ public class RaftServiceManager implements AutoCloseable {
             entry.entry().getCommand().getSequenceNumber(),
             entry.entry().getTimestamp(),
             session,
-            new PrimitiveOperation(
-                OperationId.command(entry.entry().getCommand().getOperation()),
-                entry.entry().getCommand().getValue().toByteArray()));
+            PrimitiveOperation.newBuilder()
+                .setId(OperationId.newBuilder()
+                    .setType(OperationType.COMMAND)
+                    .setName(entry.entry().getCommand().getOperation())
+                    .build())
+                .setValue(entry.entry().getCommand().getValue())
+                .build());
   }
 
   /**
@@ -831,9 +836,13 @@ public class RaftServiceManager implements AutoCloseable {
             entry.entry().getQuery().getSequenceNumber(),
             entry.entry().getTimestamp(),
             session,
-            new PrimitiveOperation(
-                OperationId.query(entry.entry().getQuery().getOperation()),
-                entry.entry().getQuery().getValue().toByteArray()));
+            PrimitiveOperation.newBuilder()
+                .setId(OperationId.newBuilder()
+                    .setType(OperationType.QUERY)
+                    .setName(entry.entry().getQuery().getOperation())
+                    .build())
+                .setValue(entry.entry().getQuery().getValue())
+                .build());
   }
 
   @Override

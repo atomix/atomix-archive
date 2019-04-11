@@ -29,7 +29,6 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
@@ -57,10 +56,7 @@ import io.atomix.primitive.SyncPrimitive;
 import io.atomix.primitive.config.PrimitiveConfig;
 import io.atomix.primitive.event.Event;
 import io.atomix.primitive.operation.Command;
-import io.atomix.primitive.operation.OperationType;
-import io.atomix.primitive.operation.PrimitiveOperation;
 import io.atomix.primitive.operation.Query;
-import io.atomix.primitive.operation.impl.DefaultOperationId;
 import io.atomix.primitive.partition.PartitionId;
 import io.atomix.primitive.protocol.PrimitiveProtocol;
 import io.atomix.primitive.proxy.ProxyClient;
@@ -72,14 +68,12 @@ import io.atomix.primitive.session.SessionClient;
 import io.atomix.primitive.session.SessionId;
 import io.atomix.protocols.raft.cluster.RaftClusterEvent;
 import io.atomix.protocols.raft.cluster.RaftMember;
-import io.atomix.protocols.raft.cluster.impl.DefaultRaftMember;
 import io.atomix.protocols.raft.protocol.SessionMetadata;
 import io.atomix.protocols.raft.protocol.TestRaftProtocolFactory;
 import io.atomix.protocols.raft.storage.RaftStorage;
 import io.atomix.storage.StorageLevel;
 import io.atomix.utils.concurrent.SingleThreadContext;
 import io.atomix.utils.concurrent.ThreadContext;
-import io.atomix.utils.serializer.Namespace;
 import io.atomix.utils.serializer.Serializer;
 import net.jodah.concurrentunit.ConcurrentTestCase;
 import org.apache.commons.lang3.RandomStringUtils;
@@ -99,21 +93,6 @@ import static org.mockito.Mockito.when;
  * Raft test.
  */
 public class RaftTest extends ConcurrentTestCase {
-  private static final Namespace NAMESPACE = Namespace.builder()
-      .register(PrimitiveOperation.class)
-      .register(DefaultOperationId.class)
-      .register(OperationType.class)
-      .register(ReadConsistency.class)
-      .register(ArrayList.class)
-      .register(HashSet.class)
-      .register(DefaultRaftMember.class)
-      .register(MemberId.class)
-      .register(RaftMember.Type.class)
-      .register(Instant.class)
-      .register(byte[].class)
-      .register(long[].class)
-      .build();
-
   protected volatile int nextId;
   protected volatile List<RaftMember> members;
   protected volatile List<RaftClient> clients = new ArrayList<>();
@@ -471,13 +450,13 @@ public class RaftTest extends ConcurrentTestCase {
     final String entry = RandomStringUtils.random(entrySize);
     for (int i = 0; i < entries; i++) {
       primitive.write(entry)
-               .get(1_000, TimeUnit.MILLISECONDS);
+          .get(1_000, TimeUnit.MILLISECONDS);
     }
 
     // when
     CompletableFuture
         .allOf(servers.get(1).compact(),
-               servers.get(2).compact())
+            servers.get(2).compact())
         .get(15_000, TimeUnit.MILLISECONDS);
 
     // then
@@ -1281,7 +1260,6 @@ public class RaftTest extends ConcurrentTestCase {
         .withStorage(RaftStorage.builder()
             .withStorageLevel(StorageLevel.DISK)
             .withDirectory(new File(String.format("target/test-logs/%s", memberId)))
-            .withNamespace(NAMESPACE)
             .withMaxSegmentSize(1024 * 10)
             .withMaxEntriesPerSegment(10)
             .build());
@@ -1299,7 +1277,10 @@ public class RaftTest extends ConcurrentTestCase {
     MemberId memberId = nextNodeId();
     RaftClient client = RaftClient.builder()
         .withMemberId(memberId)
-        .withPartitionId(PartitionId.from("test", 1))
+        .withPartitionId(PartitionId.newBuilder()
+            .setGroup("test")
+            .setPartition(1)
+            .build())
         .withProtocol(protocolFactory.newClientProtocol(memberId))
         .build();
     client.connect(members.stream().map(RaftMember::memberId).collect(Collectors.toList())).thenRun(this::resume);

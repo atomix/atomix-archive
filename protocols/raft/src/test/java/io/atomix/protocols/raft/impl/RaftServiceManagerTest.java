@@ -24,11 +24,8 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
-import java.time.Instant;
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import com.google.protobuf.ByteString;
@@ -41,15 +38,10 @@ import io.atomix.primitive.PrimitiveTypeRegistry;
 import io.atomix.primitive.config.PrimitiveConfig;
 import io.atomix.primitive.operation.OperationId;
 import io.atomix.primitive.operation.OperationType;
-import io.atomix.primitive.operation.PrimitiveOperation;
-import io.atomix.primitive.operation.impl.DefaultOperationId;
 import io.atomix.primitive.service.AbstractPrimitiveService;
 import io.atomix.primitive.service.PrimitiveService;
 import io.atomix.primitive.service.ServiceExecutor;
 import io.atomix.protocols.raft.RaftServer;
-import io.atomix.protocols.raft.ReadConsistency;
-import io.atomix.protocols.raft.cluster.RaftMember;
-import io.atomix.protocols.raft.cluster.impl.DefaultRaftMember;
 import io.atomix.protocols.raft.protocol.RaftServerProtocol;
 import io.atomix.protocols.raft.storage.RaftStorage;
 import io.atomix.protocols.raft.storage.log.CommandEntry;
@@ -59,7 +51,6 @@ import io.atomix.protocols.raft.storage.log.RaftLogEntry;
 import io.atomix.protocols.raft.storage.log.RaftLogWriter;
 import io.atomix.protocols.raft.storage.snapshot.Snapshot;
 import io.atomix.utils.concurrent.ThreadModel;
-import io.atomix.utils.serializer.Namespace;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -74,20 +65,6 @@ import static org.mockito.Mockito.mock;
  */
 public class RaftServiceManagerTest {
   private static final Path PATH = Paths.get("target/test-logs/");
-
-  private static final Namespace NAMESPACE = Namespace.builder()
-      .register(ArrayList.class)
-      .register(HashSet.class)
-      .register(DefaultRaftMember.class)
-      .register(MemberId.class)
-      .register(RaftMember.Type.class)
-      .register(ReadConsistency.class)
-      .register(PrimitiveOperation.class)
-      .register(DefaultOperationId.class)
-      .register(OperationType.class)
-      .register(Instant.class)
-      .register(byte[].class)
-      .build();
 
   private RaftContext raft;
   private AtomicBoolean snapshotTaken;
@@ -179,7 +156,10 @@ public class RaftServiceManagerTest {
     assertTrue(snapshotInstalled.get());
   }
 
-  private static final OperationId RUN = OperationId.command("run");
+  private static final OperationId RUN = OperationId.newBuilder()
+      .setType(OperationType.COMMAND)
+      .setName("run")
+      .build();
 
   private class TestService extends AbstractPrimitiveService {
     protected TestService(PrimitiveType primitiveType) {
@@ -235,7 +215,6 @@ public class RaftServiceManagerTest {
     RaftStorage storage = RaftStorage.builder()
         .withPrefix("test")
         .withDirectory(PATH.toFile())
-        .withNamespace(NAMESPACE)
         .build();
     PrimitiveTypeRegistry registry = new PrimitiveTypeRegistry() {
       @Override

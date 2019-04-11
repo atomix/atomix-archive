@@ -55,113 +55,196 @@ import io.atomix.protocols.raft.protocol.TransferRequest;
 import io.atomix.protocols.raft.protocol.TransferResponse;
 import io.atomix.protocols.raft.protocol.VoteRequest;
 import io.atomix.protocols.raft.protocol.VoteResponse;
-import io.atomix.utils.serializer.Serializer;
+
+import static io.atomix.utils.concurrent.Futures.uncheck;
 
 /**
  * Raft server protocol that uses a {@link ClusterCommunicationService}.
  */
 public class RaftServerCommunicator implements RaftServerProtocol {
   private final RaftMessageContext context;
-  private final Serializer serializer;
   private final ClusterCommunicationService clusterCommunicator;
 
-  public RaftServerCommunicator(Serializer serializer, ClusterCommunicationService clusterCommunicator) {
-    this(null, serializer, clusterCommunicator);
+  public RaftServerCommunicator(ClusterCommunicationService clusterCommunicator) {
+    this(null, clusterCommunicator);
   }
 
-  public RaftServerCommunicator(String prefix, Serializer serializer, ClusterCommunicationService clusterCommunicator) {
+  public RaftServerCommunicator(String prefix, ClusterCommunicationService clusterCommunicator) {
     this.context = new RaftMessageContext(prefix);
-    this.serializer = Preconditions.checkNotNull(serializer, "serializer cannot be null");
     this.clusterCommunicator = Preconditions.checkNotNull(clusterCommunicator, "clusterCommunicator cannot be null");
   }
 
-  private <T, U> CompletableFuture<U> sendAndReceive(String subject, T request, MemberId memberId) {
-    return clusterCommunicator.send(subject, request, serializer::encode, serializer::decode, MemberId.from(memberId.id()));
+  private <T, U> CompletableFuture<U> sendAndReceive(
+      String subject, T request, Function<T, byte[]> encoder, Function<byte[], U> decoder, MemberId memberId) {
+    return clusterCommunicator.send(subject, request, encoder, decoder, MemberId.from(memberId.id()));
   }
 
   @Override
   public CompletableFuture<OpenSessionResponse> openSession(MemberId memberId, OpenSessionRequest request) {
-    return sendAndReceive(context.openSessionSubject, request, memberId);
+    return sendAndReceive(
+        context.openSessionSubject,
+        request,
+        OpenSessionRequest::toByteArray,
+        uncheck(OpenSessionResponse::parseFrom),
+        memberId);
   }
 
   @Override
   public CompletableFuture<CloseSessionResponse> closeSession(MemberId memberId, CloseSessionRequest request) {
-    return sendAndReceive(context.closeSessionSubject, request, memberId);
+    return sendAndReceive(
+        context.closeSessionSubject,
+        request,
+        CloseSessionRequest::toByteArray,
+        uncheck(CloseSessionResponse::parseFrom),
+        memberId);
   }
 
   @Override
   public CompletableFuture<KeepAliveResponse> keepAlive(MemberId memberId, KeepAliveRequest request) {
-    return sendAndReceive(context.keepAliveSubject, request, memberId);
+    return sendAndReceive(
+        context.keepAliveSubject,
+        request,
+        KeepAliveRequest::toByteArray,
+        uncheck(KeepAliveResponse::parseFrom),
+        memberId);
   }
 
   @Override
   public CompletableFuture<OperationResponse> query(MemberId memberId, OperationRequest request) {
-    return sendAndReceive(context.querySubject, request, memberId);
+    return sendAndReceive(
+        context.querySubject,
+        request,
+        OperationRequest::toByteArray,
+        uncheck(OperationResponse::parseFrom),
+        memberId);
   }
 
   @Override
   public CompletableFuture<OperationResponse> command(MemberId memberId, OperationRequest request) {
-    return sendAndReceive(context.commandSubject, request, memberId);
+    return sendAndReceive(
+        context.commandSubject,
+        request,
+        OperationRequest::toByteArray,
+        uncheck(OperationResponse::parseFrom),
+        memberId);
   }
 
   @Override
   public CompletableFuture<MetadataResponse> metadata(MemberId memberId, MetadataRequest request) {
-    return sendAndReceive(context.metadataSubject, request, memberId);
+    return sendAndReceive(
+        context.metadataSubject,
+        request,
+        MetadataRequest::toByteArray,
+        uncheck(MetadataResponse::parseFrom),
+        memberId);
   }
 
   @Override
   public CompletableFuture<JoinResponse> join(MemberId memberId, JoinRequest request) {
-    return sendAndReceive(context.joinSubject, request, memberId);
+    return sendAndReceive(
+        context.joinSubject,
+        request,
+        JoinRequest::toByteArray,
+        uncheck(JoinResponse::parseFrom),
+        memberId);
   }
 
   @Override
   public CompletableFuture<LeaveResponse> leave(MemberId memberId, LeaveRequest request) {
-    return sendAndReceive(context.leaveSubject, request, memberId);
+    return sendAndReceive(
+        context.leaveSubject,
+        request,
+        LeaveRequest::toByteArray,
+        uncheck(LeaveResponse::parseFrom),
+        memberId);
   }
 
   @Override
   public CompletableFuture<ConfigureResponse> configure(MemberId memberId, ConfigureRequest request) {
-    return sendAndReceive(context.configureSubject, request, memberId);
+    return sendAndReceive(
+        context.configureSubject,
+        request,
+        ConfigureRequest::toByteArray,
+        uncheck(ConfigureResponse::parseFrom),
+        memberId);
   }
 
   @Override
   public CompletableFuture<ReconfigureResponse> reconfigure(MemberId memberId, ReconfigureRequest request) {
-    return sendAndReceive(context.reconfigureSubject, request, memberId);
+    return sendAndReceive(
+        context.reconfigureSubject,
+        request,
+        ReconfigureRequest::toByteArray,
+        uncheck(ReconfigureResponse::parseFrom),
+        memberId);
   }
 
   @Override
   public CompletableFuture<InstallResponse> install(MemberId memberId, InstallRequest request) {
-    return sendAndReceive(context.installSubject, request, memberId);
+    return sendAndReceive(
+        context.installSubject,
+        request,
+        InstallRequest::toByteArray,
+        uncheck(InstallResponse::parseFrom),
+        memberId);
   }
 
   @Override
   public CompletableFuture<TransferResponse> transfer(MemberId memberId, TransferRequest request) {
-    return sendAndReceive(context.transferSubject, request, memberId);
+    return sendAndReceive(
+        context.transferSubject,
+        request,
+        TransferRequest::toByteArray,
+        uncheck(TransferResponse::parseFrom),
+        memberId);
   }
 
   @Override
   public CompletableFuture<PollResponse> poll(MemberId memberId, PollRequest request) {
-    return sendAndReceive(context.pollSubject, request, memberId);
+    return sendAndReceive(
+        context.pollSubject,
+        request,
+        PollRequest::toByteArray,
+        uncheck(PollResponse::parseFrom),
+        memberId);
   }
 
   @Override
   public CompletableFuture<VoteResponse> vote(MemberId memberId, VoteRequest request) {
-    return sendAndReceive(context.voteSubject, request, memberId);
+    return sendAndReceive(
+        context.voteSubject,
+        request,
+        VoteRequest::toByteArray,
+        uncheck(VoteResponse::parseFrom),
+        memberId);
   }
 
   @Override
   public CompletableFuture<AppendResponse> append(MemberId memberId, AppendRequest request) {
-    return sendAndReceive(context.appendSubject, request, memberId);
+    return sendAndReceive(
+        context.appendSubject,
+        request,
+        AppendRequest::toByteArray,
+        uncheck(AppendResponse::parseFrom),
+        memberId);
   }
 
   @Override
   public void publish(MemberId memberId, PublishRequest request) {
-    clusterCommunicator.unicast(context.publishSubject(request.getSessionId()), request, serializer::encode, memberId);
+    clusterCommunicator.unicast(
+        context.publishSubject(request.getSessionId()),
+        request,
+        PublishRequest::toByteArray,
+        memberId);
   }
 
   @Override
   public void registerOpenSessionHandler(Function<OpenSessionRequest, CompletableFuture<OpenSessionResponse>> handler) {
-    clusterCommunicator.subscribe(context.openSessionSubject, serializer::decode, handler, serializer::encode);
+    clusterCommunicator.subscribe(
+        context.openSessionSubject,
+        uncheck(OpenSessionRequest::parseFrom),
+        handler,
+        OpenSessionResponse::toByteArray);
   }
 
   @Override
@@ -171,7 +254,11 @@ public class RaftServerCommunicator implements RaftServerProtocol {
 
   @Override
   public void registerCloseSessionHandler(Function<CloseSessionRequest, CompletableFuture<CloseSessionResponse>> handler) {
-    clusterCommunicator.subscribe(context.closeSessionSubject, serializer::decode, handler, serializer::encode);
+    clusterCommunicator.subscribe(
+        context.closeSessionSubject,
+        uncheck(CloseSessionRequest::parseFrom),
+        handler,
+        CloseSessionResponse::toByteArray);
   }
 
   @Override
@@ -181,7 +268,11 @@ public class RaftServerCommunicator implements RaftServerProtocol {
 
   @Override
   public void registerKeepAliveHandler(Function<KeepAliveRequest, CompletableFuture<KeepAliveResponse>> handler) {
-    clusterCommunicator.subscribe(context.keepAliveSubject, serializer::decode, handler, serializer::encode);
+    clusterCommunicator.subscribe(
+        context.keepAliveSubject,
+        uncheck(KeepAliveRequest::parseFrom),
+        handler,
+        KeepAliveResponse::toByteArray);
   }
 
   @Override
@@ -191,7 +282,11 @@ public class RaftServerCommunicator implements RaftServerProtocol {
 
   @Override
   public void registerQueryHandler(Function<OperationRequest, CompletableFuture<OperationResponse>> handler) {
-    clusterCommunicator.subscribe(context.querySubject, serializer::decode, handler, serializer::encode);
+    clusterCommunicator.subscribe(
+        context.querySubject,
+        uncheck(OperationRequest::parseFrom),
+        handler,
+        OperationResponse::toByteArray);
   }
 
   @Override
@@ -201,7 +296,11 @@ public class RaftServerCommunicator implements RaftServerProtocol {
 
   @Override
   public void registerCommandHandler(Function<OperationRequest, CompletableFuture<OperationResponse>> handler) {
-    clusterCommunicator.subscribe(context.commandSubject, serializer::decode, handler, serializer::encode);
+    clusterCommunicator.subscribe(
+        context.commandSubject,
+        uncheck(OperationRequest::parseFrom),
+        handler,
+        OperationResponse::toByteArray);
   }
 
   @Override
@@ -211,7 +310,11 @@ public class RaftServerCommunicator implements RaftServerProtocol {
 
   @Override
   public void registerMetadataHandler(Function<MetadataRequest, CompletableFuture<MetadataResponse>> handler) {
-    clusterCommunicator.subscribe(context.metadataSubject, serializer::decode, handler, serializer::encode);
+    clusterCommunicator.subscribe(
+        context.metadataSubject,
+        uncheck(MetadataRequest::parseFrom),
+        handler,
+        MetadataResponse::toByteArray);
   }
 
   @Override
@@ -221,7 +324,11 @@ public class RaftServerCommunicator implements RaftServerProtocol {
 
   @Override
   public void registerJoinHandler(Function<JoinRequest, CompletableFuture<JoinResponse>> handler) {
-    clusterCommunicator.subscribe(context.joinSubject, serializer::decode, handler, serializer::encode);
+    clusterCommunicator.subscribe(
+        context.joinSubject,
+        uncheck(JoinRequest::parseFrom),
+        handler,
+        JoinResponse::toByteArray);
   }
 
   @Override
@@ -231,7 +338,11 @@ public class RaftServerCommunicator implements RaftServerProtocol {
 
   @Override
   public void registerLeaveHandler(Function<LeaveRequest, CompletableFuture<LeaveResponse>> handler) {
-    clusterCommunicator.subscribe(context.leaveSubject, serializer::decode, handler, serializer::encode);
+    clusterCommunicator.subscribe(
+        context.leaveSubject,
+        uncheck(LeaveRequest::parseFrom),
+        handler,
+        LeaveResponse::toByteArray);
   }
 
   @Override
@@ -241,7 +352,11 @@ public class RaftServerCommunicator implements RaftServerProtocol {
 
   @Override
   public void registerConfigureHandler(Function<ConfigureRequest, CompletableFuture<ConfigureResponse>> handler) {
-    clusterCommunicator.subscribe(context.configureSubject, serializer::decode, handler, serializer::encode);
+    clusterCommunicator.subscribe(
+        context.configureSubject,
+        uncheck(ConfigureRequest::parseFrom),
+        handler,
+        ConfigureResponse::toByteArray);
   }
 
   @Override
@@ -251,7 +366,11 @@ public class RaftServerCommunicator implements RaftServerProtocol {
 
   @Override
   public void registerReconfigureHandler(Function<ReconfigureRequest, CompletableFuture<ReconfigureResponse>> handler) {
-    clusterCommunicator.subscribe(context.reconfigureSubject, serializer::decode, handler, serializer::encode);
+    clusterCommunicator.subscribe(
+        context.reconfigureSubject,
+        uncheck(ReconfigureRequest::parseFrom),
+        handler,
+        ReconfigureResponse::toByteArray);
   }
 
   @Override
@@ -261,7 +380,11 @@ public class RaftServerCommunicator implements RaftServerProtocol {
 
   @Override
   public void registerInstallHandler(Function<InstallRequest, CompletableFuture<InstallResponse>> handler) {
-    clusterCommunicator.subscribe(context.installSubject, serializer::decode, handler, serializer::encode);
+    clusterCommunicator.subscribe(
+        context.installSubject,
+        uncheck(InstallRequest::parseFrom),
+        handler,
+        InstallResponse::toByteArray);
   }
 
   @Override
@@ -271,7 +394,11 @@ public class RaftServerCommunicator implements RaftServerProtocol {
 
   @Override
   public void registerTransferHandler(Function<TransferRequest, CompletableFuture<TransferResponse>> handler) {
-    clusterCommunicator.subscribe(context.transferSubject, serializer::decode, handler, serializer::encode);
+    clusterCommunicator.subscribe(
+        context.transferSubject,
+        uncheck(TransferRequest::parseFrom),
+        handler,
+        TransferResponse::toByteArray);
   }
 
   @Override
@@ -281,7 +408,11 @@ public class RaftServerCommunicator implements RaftServerProtocol {
 
   @Override
   public void registerPollHandler(Function<PollRequest, CompletableFuture<PollResponse>> handler) {
-    clusterCommunicator.subscribe(context.pollSubject, serializer::decode, handler, serializer::encode);
+    clusterCommunicator.subscribe(
+        context.pollSubject,
+        uncheck(PollRequest::parseFrom),
+        handler,
+        PollResponse::toByteArray);
   }
 
   @Override
@@ -291,7 +422,11 @@ public class RaftServerCommunicator implements RaftServerProtocol {
 
   @Override
   public void registerVoteHandler(Function<VoteRequest, CompletableFuture<VoteResponse>> handler) {
-    clusterCommunicator.subscribe(context.voteSubject, serializer::decode, handler, serializer::encode);
+    clusterCommunicator.subscribe(
+        context.voteSubject,
+        uncheck(VoteRequest::parseFrom),
+        handler,
+        VoteResponse::toByteArray);
   }
 
   @Override
@@ -301,7 +436,11 @@ public class RaftServerCommunicator implements RaftServerProtocol {
 
   @Override
   public void registerAppendHandler(Function<AppendRequest, CompletableFuture<AppendResponse>> handler) {
-    clusterCommunicator.subscribe(context.appendSubject, serializer::decode, handler, serializer::encode);
+    clusterCommunicator.subscribe(
+        context.appendSubject,
+        uncheck(AppendRequest::parseFrom),
+        handler,
+        AppendResponse::toByteArray);
   }
 
   @Override
@@ -311,7 +450,11 @@ public class RaftServerCommunicator implements RaftServerProtocol {
 
   @Override
   public void registerResetListener(SessionId sessionId, Consumer<ResetRequest> listener, Executor executor) {
-    clusterCommunicator.subscribe(context.resetSubject(sessionId.id()), serializer::decode, listener, executor);
+    clusterCommunicator.subscribe(
+        context.resetSubject(sessionId.id()),
+        uncheck(ResetRequest::parseFrom),
+        listener,
+        executor);
   }
 
   @Override

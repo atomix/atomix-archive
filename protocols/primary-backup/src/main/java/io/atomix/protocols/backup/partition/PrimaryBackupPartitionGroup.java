@@ -15,6 +15,15 @@
  */
 package io.atomix.protocols.backup.partition;
 
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.stream.Collectors;
+
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import io.atomix.primitive.Recovery;
@@ -35,14 +44,6 @@ import io.atomix.utils.serializer.Namespace;
 import io.atomix.utils.serializer.Namespaces;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.CompletableFuture;
-import java.util.stream.Collectors;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -97,7 +98,10 @@ public class PrimaryBackupPartitionGroup implements ManagedPartitionGroup {
   private static Collection<PrimaryBackupPartition> buildPartitions(PrimaryBackupPartitionGroupConfig config) {
     List<PrimaryBackupPartition> partitions = new ArrayList<>(config.getPartitions());
     for (int i = 0; i < config.getPartitions(); i++) {
-      partitions.add(new PrimaryBackupPartition(PartitionId.from(config.getName(), i + 1), config.getMemberGroupProvider()));
+      partitions.add(new PrimaryBackupPartition(PartitionId.newBuilder()
+          .setGroup(config.getName())
+          .setPartition(i + 1)
+          .build(), config.getMemberGroupProvider()));
     }
     return partitions;
   }
@@ -117,7 +121,7 @@ public class PrimaryBackupPartitionGroup implements ManagedPartitionGroup {
       this.partitions.put(p.id(), p);
       this.sortedPartitionIds.add(p.id());
     });
-    Collections.sort(sortedPartitionIds);
+    Collections.sort(sortedPartitionIds, Comparator.comparingInt(PartitionId::getPartition));
   }
 
   @Override

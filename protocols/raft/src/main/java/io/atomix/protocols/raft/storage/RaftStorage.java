@@ -34,7 +34,6 @@ import io.atomix.storage.StorageLevel;
 import io.atomix.storage.journal.JournalSegmentDescriptor;
 import io.atomix.storage.journal.JournalSegmentFile;
 import io.atomix.storage.statistics.StorageStatistics;
-import io.atomix.utils.serializer.Namespace;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
 import static com.google.common.base.Preconditions.checkArgument;
@@ -85,7 +84,6 @@ public class RaftStorage {
       String prefix,
       StorageLevel storageLevel,
       File directory,
-      Namespace namespace,
       int maxSegmentSize,
       int maxEntrySize,
       int maxEntriesPerSegment,
@@ -394,7 +392,6 @@ public class RaftStorage {
     private String prefix = DEFAULT_PREFIX;
     private StorageLevel storageLevel = StorageLevel.DISK;
     private File directory = new File(DEFAULT_DIRECTORY);
-    private Namespace namespace;
     private int maxSegmentSize = DEFAULT_MAX_SEGMENT_SIZE;
     private int maxEntrySize = DEFAULT_MAX_ENTRY_SIZE;
     private int maxEntriesPerSegment = DEFAULT_MAX_ENTRIES_PER_SEGMENT;
@@ -458,18 +455,6 @@ public class RaftStorage {
      */
     public Builder withDirectory(File directory) {
       this.directory = checkNotNull(directory, "directory");
-      return this;
-    }
-
-    /**
-     * Sets the storage namespace.
-     *
-     * @param namespace The storage namespace.
-     * @return The storage builder.
-     * @throws NullPointerException If the {@code namespace} is {@code null}
-     */
-    public Builder withNamespace(Namespace namespace) {
-      this.namespace = checkNotNull(namespace, "namespace cannot be null");
       return this;
     }
 
@@ -652,7 +637,6 @@ public class RaftStorage {
           prefix,
           storageLevel,
           directory,
-          namespace,
           maxSegmentSize,
           maxEntrySize,
           maxEntriesPerSegment,

@@ -519,7 +519,7 @@ public class RaftServiceContext implements ServiceContext {
   private OperationResult applyCommand(long index, long sequence, long timestamp, PrimitiveOperation operation, RaftSession session) {
     long eventIndex = session.getEventIndex();
 
-    Commit<byte[]> commit = new DefaultCommit<>(index, operation.id(), operation.value(), session, timestamp);
+    Commit<byte[]> commit = new DefaultCommit<>(index, operation.getId(), operation.getValue().toByteArray(), session, timestamp);
 
     OperationResult result;
     try {
@@ -661,7 +661,7 @@ public class RaftServiceContext implements ServiceContext {
     // Set the current operation type to QUERY to prevent events from being sent to clients.
     setOperation(OperationType.QUERY);
 
-    Commit<byte[]> commit = new DefaultCommit<>(currentIndex, operation.id(), operation.value(), session, timestamp);
+    Commit<byte[]> commit = new DefaultCommit<>(currentIndex, operation.getId(), operation.getValue().toByteArray(), session, timestamp);
 
     long eventIndex = session.getEventIndex();
 

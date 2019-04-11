@@ -15,6 +15,10 @@
  */
 package io.atomix.protocols.log.partition;
 
+import java.util.Collection;
+import java.util.concurrent.CompletableFuture;
+import java.util.stream.Collectors;
+
 import io.atomix.cluster.MemberId;
 import io.atomix.primitive.partition.GroupMember;
 import io.atomix.primitive.partition.Partition;
@@ -25,10 +29,6 @@ import io.atomix.protocols.log.partition.impl.LogPartitionClient;
 import io.atomix.protocols.log.partition.impl.LogPartitionServer;
 import io.atomix.utils.concurrent.Futures;
 import io.atomix.utils.concurrent.ThreadContextFactory;
-
-import java.util.Collection;
-import java.util.concurrent.CompletableFuture;
-import java.util.stream.Collectors;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
 
@@ -56,31 +56,33 @@ public class LogPartition implements Partition {
 
   @Override
   public long term() {
-    return Futures.get(election.getTerm()).term();
+    return Futures.get(election.getTerm()).getTerm();
   }
 
   @Override
   public Collection<MemberId> members() {
     return Futures.get(election.getTerm())
-        .candidates()
+        .getCandidatesList()
         .stream()
-        .map(GroupMember::memberId)
+        .map(GroupMember::getMemberId)
+        .map(MemberId::from)
         .collect(Collectors.toList());
   }
 
   @Override
   public MemberId primary() {
-    return Futures.get(election.getTerm())
-        .primary()
-        .memberId();
+    return MemberId.from(Futures.get(election.getTerm())
+        .getPrimary()
+        .getMemberId());
   }
 
   @Override
   public Collection<MemberId> backups() {
     return Futures.get(election.getTerm())
-        .candidates()
+        .getCandidatesList()
         .stream()
-        .map(GroupMember::memberId)
+        .map(GroupMember::getMemberId)
+        .map(MemberId::from)
         .collect(Collectors.toList());
   }
 
@@ -90,7 +92,7 @@ public class LogPartition implements Partition {
    * @return the partition name
    */
   public String name() {
-    return String.format("%s-partition-%d", partitionId.group(), partitionId.id());
+    return String.format("%s-partition-%d", partitionId.getGroup(), partitionId.getPartition());
   }
 
   @Override

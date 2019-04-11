@@ -21,6 +21,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
@@ -32,7 +33,7 @@ import io.atomix.primitive.partition.GroupMember;
 import io.atomix.primitive.partition.ManagedMemberGroupService;
 import io.atomix.primitive.partition.MemberGroup;
 import io.atomix.primitive.partition.PrimaryElection;
-import io.atomix.primitive.partition.PrimaryElectionEventListener;
+import io.atomix.primitive.partition.PrimaryElectionEvent;
 import io.atomix.primitive.partition.PrimaryTerm;
 import io.atomix.protocols.log.DistributedLogServer;
 import io.atomix.protocols.log.protocol.AppendRequest;
@@ -91,7 +92,7 @@ public class DistributedLogServerContext implements Managed<Void> {
   private final long maxLogSize;
   private final Duration maxLogAge;
   private Scheduled compactTimer;
-  private final PrimaryElectionEventListener primaryElectionListener = event -> changeRole(event.term());
+  private final Consumer<PrimaryElectionEvent> primaryElectionListener = event -> changeRole(event.getTerm());
   private final AtomicBoolean started = new AtomicBoolean();
 
   public DistributedLogServerContext(
@@ -216,7 +217,9 @@ public class DistributedLogServerContext implements Managed<Void> {
    * @return the current server role
    */
   public DistributedLogServer.Role getRole() {
-    return Objects.equals(Futures.get(primaryElection.getTerm()).primary().memberId(), clusterMembershipService.getLocalMember().id())
+    return Objects.equals(Futures.get(
+        primaryElection.getTerm()).getPrimary().getMemberId(),
+        clusterMembershipService.getLocalMember().id().id())
         ? DistributedLogServer.Role.LEADER
         : DistributedLogServer.Role.FOLLOWER;
   }
@@ -251,7 +254,7 @@ public class DistributedLogServerContext implements Managed<Void> {
   /**
    * Resets the current term to the given term.
    *
-   * @param term    the term to which to reset the current term
+   * @param term   the term to which to reset the current term
    * @param leader the primary for the given term
    */
   public void resetTerm(long term, MemberId leader) {
@@ -347,7 +350,10 @@ public class DistributedLogServerContext implements Managed<Void> {
       MemberGroup group = memberGroupService.getMemberGroup(clusterMembershipService.getLocalMember());
       primaryElection.addListener(primaryElectionListener);
       if (group != null) {
-        return primaryElection.enter(new GroupMember(clusterMembershipService.getLocalMember().id(), group.id()))
+        return primaryElection.enter(GroupMember.newBuilder()
+            .setMemberId(clusterMembershipService.getLocalMember().id().id())
+            .setMemberGroupId(group.id().id())
+            .build())
             .thenApply(term -> {
               changeRole(term);
               return null;
@@ -365,13 +371,15 @@ public class DistributedLogServerContext implements Managed<Void> {
    */
   private void changeRole(PrimaryTerm term) {
     threadContext.execute(() -> {
-      if (term.term() >= currentTerm) {
+      if (term.getTerm() >= currentTerm) {
         log.debug("{} - Term changed: {}", memberId, term);
-        currentTerm = term.term();
-        leader = term.primary() != null ? term.primary().memberId() : null;
-        followers = term.backups(replicationFactor - 1)
+        currentTerm = term.getTerm();
+        leader = term.hasPrimary() ? MemberId.from(term.getPrimary().getMemberId()) : null;
+        followers = term.getCandidatesList()
+            .subList(1, Math.min(term.getCandidatesList().size(), replicationFactor))
             .stream()
-            .map(GroupMember::memberId)
+            .map(GroupMember::getMemberId)
+            .map(MemberId::from)
             .collect(Collectors.toList());
 
         if (Objects.equals(leader, clusterMembershipService.getLocalMember().id())) {

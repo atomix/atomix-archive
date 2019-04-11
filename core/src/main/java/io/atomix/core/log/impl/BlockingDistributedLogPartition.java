@@ -15,18 +15,18 @@
  */
 package io.atomix.core.log.impl;
 
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.function.Consumer;
+
 import com.google.common.base.Throwables;
 import io.atomix.core.log.AsyncDistributedLogPartition;
 import io.atomix.core.log.DistributedLogPartition;
 import io.atomix.core.log.Record;
 import io.atomix.primitive.PrimitiveException;
 import io.atomix.primitive.Synchronous;
-
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
-import java.util.function.Consumer;
 
 /**
  * Blocking distributed log partition.

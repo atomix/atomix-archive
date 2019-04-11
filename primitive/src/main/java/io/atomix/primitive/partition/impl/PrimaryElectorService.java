@@ -34,25 +34,21 @@ import java.util.stream.Collectors;
 
 import com.google.common.base.MoreObjects;
 import com.google.common.collect.Lists;
-import io.atomix.cluster.MemberId;
+import io.atomix.primitive.event.EventType;
+import io.atomix.primitive.operation.OperationId;
+import io.atomix.primitive.operation.OperationType;
 import io.atomix.primitive.partition.GroupMember;
 import io.atomix.primitive.partition.MemberGroupId;
 import io.atomix.primitive.partition.PartitionId;
 import io.atomix.primitive.partition.PrimaryElectionEvent;
 import io.atomix.primitive.partition.PrimaryTerm;
-import io.atomix.primitive.partition.impl.proto.ElectionCandidate;
-import io.atomix.primitive.partition.impl.proto.ElectionMember;
-import io.atomix.primitive.partition.impl.proto.PrimaryElectorSnapshot;
 import io.atomix.primitive.service.AbstractPrimitiveService;
 import io.atomix.primitive.service.Commit;
 import io.atomix.primitive.service.ServiceExecutor;
 import io.atomix.primitive.session.Session;
 import io.atomix.utils.concurrent.Scheduled;
-import io.atomix.utils.serializer.Namespace;
-import io.atomix.utils.serializer.Serializer;
 
 import static com.google.common.base.Throwables.throwIfUnchecked;
-import static io.atomix.primitive.partition.impl.PrimaryElectorEvents.CHANGE;
 
 /**
  * Primary elector service.
@@ -64,14 +60,6 @@ public class PrimaryElectorService extends AbstractPrimitiveService {
 
   private static final Duration REBALANCE_DURATION = Duration.ofSeconds(15);
 
-  private static final Serializer SERIALIZER = Serializer.using(Namespace.builder()
-      .register(PrimaryElectorOperations.NAMESPACE)
-      .register(PrimaryElectorEvents.NAMESPACE)
-      .register(ElectionState.class)
-      .register(Registration.class)
-      .register(new LinkedHashMap<>().keySet().getClass())
-      .build());
-
   private Map<PartitionId, ElectionState> elections = new HashMap<>();
   private Map<Long, Session> listeners = new LinkedHashMap<>();
   private Scheduled rebalanceTimer;
@@ -81,33 +69,21 @@ public class PrimaryElectorService extends AbstractPrimitiveService {
   }
 
   @Override
-  public Serializer serializer() {
-    return SERIALIZER;
-  }
-
-  @Override
   public void backup(OutputStream output) throws IOException {
     PrimaryElectorSnapshot.newBuilder()
         .addAllSessions(listeners.keySet())
         .addAllElections(elections.values().stream()
-            .map(election -> io.atomix.primitive.partition.impl.proto.ElectionState.newBuilder()
-                .setPartitionId(election.partitionId.id())
-                .setGroup(election.partitionId.group())
+            .map(election -> io.atomix.primitive.partition.impl.ElectionState.newBuilder()
+                .setPartitionId(election.partitionId)
                 .setPrimary(ElectionCandidate.newBuilder()
-                    .setMember(ElectionMember.newBuilder()
-                        .setMemberId(election.primary.member.memberId().id())
-                        .setGroupId(election.primary.member.groupId().id())
-                        .build())
+                    .setMember(election.primary.member)
                     .setSessionId(election.primary.sessionId)
                     .build())
                 .setTerm(election.term)
                 .setTimestamp(election.termStartTime)
                 .addAllCandidates(election.registrations.stream()
                     .map(registration -> ElectionCandidate.newBuilder()
-                        .setMember(ElectionMember.newBuilder()
-                            .setMemberId(registration.member.memberId().id())
-                            .setGroupId(registration.member.groupId().id())
-                            .build())
+                        .setMember(registration.member)
                         .setSessionId(registration.sessionId)
                         .build())
                     .collect(Collectors.toList()))
@@ -124,15 +100,15 @@ public class PrimaryElectorService extends AbstractPrimitiveService {
     snapshot.getSessionsList().forEach(session -> listeners.put(session, getSession(session)));
     elections = new HashMap<>();
     snapshot.getElectionsList().forEach(election ->
-        elections.put(PartitionId.from(election.getGroup(), election.getPartitionId()), new ElectionState(
-            PartitionId.from(election.getGroup(), election.getPartitionId()),
+        elections.put(election.getPartitionId(), new ElectionState(
+            election.getPartitionId(),
             election.getCandidatesList().stream()
                 .map(candidate -> new Registration(
-                    new GroupMember(MemberId.from(candidate.getMember().getMemberId()), new MemberGroupId(candidate.getMember().getGroupId())),
+                    candidate.getMember(),
                     candidate.getSessionId()))
                 .collect(Collectors.toList()),
             new Registration(
-                new GroupMember(MemberId.from(election.getPrimary().getMember().getMemberId()), new MemberGroupId(election.getPrimary().getMember().getGroupId())),
+                election.getPrimary().getMember(),
                 election.getPrimary().getSessionId()),
             election.getTerm(),
             election.getTimestamp())));
@@ -141,12 +117,15 @@ public class PrimaryElectorService extends AbstractPrimitiveService {
 
   @Override
   protected void configure(ServiceExecutor executor) {
-    executor.register(PrimaryElectorOperations.ENTER, this::enter);
-    executor.register(PrimaryElectorOperations.GET_TERM, this::getTerm);
+    executor.register(OperationId.newBuilder().setType(OperationType.COMMAND).setName("ENTER").build(), this::enter);
+    executor.register(OperationId.newBuilder().setType(OperationType.QUERY).setName("GET_TERM").build(), this::enter);
   }
 
   private void notifyTermChange(PartitionId partitionId, PrimaryTerm term) {
-    listeners.values().forEach(session -> session.publish(CHANGE, new PrimaryElectionEvent(PrimaryElectionEvent.Type.CHANGED, partitionId, term)));
+    listeners.values().forEach(session -> session.publish(EventType.from("CHANGE"), PrimaryElectionEvent.newBuilder()
+        .setPartitionId(partitionId)
+        .setTerm(term)
+        .build()));
   }
 
   /**
@@ -203,17 +182,17 @@ public class PrimaryElectorService extends AbstractPrimitiveService {
   }
 
   /**
-   * Applies an {@link PrimaryElectorOperations.Enter} commit.
+   * Applies an {@link EnterRequest} commit.
    *
    * @param commit commit entry
    * @return topic leader. If no previous leader existed this is the node that just entered the race.
    */
-  protected PrimaryTerm enter(Commit<? extends PrimaryElectorOperations.Enter> commit) {
+  protected EnterResponse enter(Commit<? extends EnterRequest> commit) {
     try {
-      PartitionId partitionId = commit.value().partitionId();
+      PartitionId partitionId = commit.value().getPartitionId();
       PrimaryTerm oldTerm = term(partitionId);
       Registration registration = new Registration(
-          commit.value().member(),
+          commit.value().getMember(),
           commit.session().sessionId().id());
       PrimaryTerm newTerm = elections.compute(partitionId, (k, v) -> {
         if (v == null) {
@@ -232,7 +211,9 @@ public class PrimaryElectorService extends AbstractPrimitiveService {
         notifyTermChange(partitionId, newTerm);
         scheduleRebalance();
       }
-      return newTerm;
+      return EnterResponse.newBuilder()
+          .setTerm(newTerm)
+          .build();
     } catch (Exception e) {
       getLogger().error("State machine operation failed", e);
       throwIfUnchecked(e);
@@ -241,15 +222,17 @@ public class PrimaryElectorService extends AbstractPrimitiveService {
   }
 
   /**
-   * Applies an {@link PrimaryElectorOperations.GetTerm} commit.
+   * Applies an {@link GetTermRequest} commit.
    *
    * @param commit GetLeadership commit
    * @return leader
    */
-  protected PrimaryTerm getTerm(Commit<? extends PrimaryElectorOperations.GetTerm> commit) {
-    PartitionId partitionId = commit.value().partitionId();
+  protected GetTermResponse getTerm(Commit<? extends GetTermRequest> commit) {
+    PartitionId partitionId = commit.value().getPartitionId();
     try {
-      return term(partitionId);
+      return GetTermResponse.newBuilder()
+          .setTerm(term(partitionId))
+          .build();
     } catch (Exception e) {
       getLogger().error("State machine operation failed", e);
       throwIfUnchecked(e);
@@ -383,7 +366,11 @@ public class PrimaryElectorService extends AbstractPrimitiveService {
     }
 
     PrimaryTerm term() {
-      return new PrimaryTerm(term, primary(), candidates());
+      return PrimaryTerm.newBuilder()
+          .setTerm(term)
+          .setPrimary(primary())
+          .addAllCandidates(candidates())
+          .build();
     }
 
     GroupMember primary() {
@@ -440,7 +427,7 @@ public class PrimaryElectorService extends AbstractPrimitiveService {
     List<Registration> sortRegistrations(List<Registration> registrations) {
       // Count the number of distinct groups in the registrations list.
       int groupCount = (int) registrations.stream()
-          .map(r -> r.member().groupId())
+          .map(r -> r.member().getMemberGroupId())
           .distinct()
           .count();
 
@@ -458,7 +445,7 @@ public class PrimaryElectorService extends AbstractPrimitiveService {
           Registration registration = iterator.next();
 
           // If the registration's group has not been added to the list, add the registration.
-          if (groups.add(registration.member().groupId())) {
+          if (groups.add(MemberGroupId.from(registration.member().getMemberGroupId()))) {
             sortedRegistrations.add(registration);
             iterator.remove();
 

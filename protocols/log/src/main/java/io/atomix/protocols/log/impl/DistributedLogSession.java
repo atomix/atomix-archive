@@ -33,7 +33,7 @@ import io.atomix.primitive.log.LogRecord;
 import io.atomix.primitive.log.LogSession;
 import io.atomix.primitive.partition.PartitionId;
 import io.atomix.primitive.partition.PrimaryElection;
-import io.atomix.primitive.partition.PrimaryElectionEventListener;
+import io.atomix.primitive.partition.PrimaryElectionEvent;
 import io.atomix.primitive.partition.PrimaryTerm;
 import io.atomix.primitive.session.SessionId;
 import io.atomix.protocols.log.protocol.AppendRequest;
@@ -60,7 +60,7 @@ public class DistributedLogSession implements LogSession {
   private final ThreadContext threadContext;
   private final Set<Consumer<PrimitiveState>> stateChangeListeners = Sets.newIdentityHashSet();
   private final ClusterMembershipEventListener membershipEventListener = this::handleClusterEvent;
-  private final PrimaryElectionEventListener primaryElectionListener = event -> changeReplicas(event.term());
+  private final Consumer<PrimaryElectionEvent> primaryElectionListener = event -> changeReplicas(event.getTerm());
   private final DistributedLogProducer producer = new DistributedLogProducer();
   private final DistributedLogConsumer consumer = new DistributedLogConsumer();
   private final MemberId memberId;
@@ -82,13 +82,13 @@ public class DistributedLogSession implements LogSession {
     this.primaryElection = checkNotNull(primaryElection, "primaryElection cannot be null");
     this.threadContext = checkNotNull(threadContext, "threadContext cannot be null");
     this.memberId = clusterMembershipService.getLocalMember().id();
-    this.subject = String.format("%s-%s-%s", partitionId.group(), partitionId.id(), sessionId);
+    this.subject = String.format("%s-%s-%s", partitionId.getGroup(), partitionId.getPartition(), sessionId);
     clusterMembershipService.addListener(membershipEventListener);
     primaryElection.addListener(primaryElectionListener);
     this.log = ContextualLoggerFactory.getLogger(getClass(), LoggerContext.builder(DistributedLogProducer.class)
-        .addValue(partitionId.group() != null
-            ? String.format("%s-%d", partitionId.group(), partitionId.id())
-            : partitionId.id())
+        .addValue(partitionId.getGroup() != null
+            ? String.format("%s-%d", partitionId.getGroup(), partitionId.getPartition())
+            : partitionId.getPartition())
         .build());
   }
 
@@ -129,7 +129,7 @@ public class DistributedLogSession implements LogSession {
     PrimaryTerm term = this.term;
     if (term != null
         && event.type() == ClusterMembershipEvent.Type.MEMBER_REMOVED
-        && event.subject().id().equals(term.primary().memberId())) {
+        && event.subject().id().equals(term.getPrimary().getMemberId())) {
       changeState(PrimitiveState.SUSPENDED);
     }
   }
@@ -139,9 +139,9 @@ public class DistributedLogSession implements LogSession {
    */
   private void changeReplicas(PrimaryTerm term) {
     threadContext.execute(() -> {
-      if (this.term == null || term.term() > this.term.term()) {
+      if (this.term == null || term.getTerm() > this.term.getTerm()) {
         this.term = term;
-        consumer.register(term.primary().memberId());
+        consumer.register(MemberId.from(term.getPrimary().getMemberId()));
       }
     });
   }
@@ -216,7 +216,7 @@ public class DistributedLogSession implements LogSession {
     @Override
     public CompletableFuture<Long> append(byte[] value) {
       CompletableFuture<Long> future = new CompletableFuture<>();
-      term().thenCompose(term -> protocol.append(term.primary().memberId(), AppendRequest.newBuilder()
+      term().thenCompose(term -> protocol.append(MemberId.from(term.getPrimary().getMemberId()), AppendRequest.newBuilder()
           .setValue(ByteString.copyFrom(value))
           .build()))
           .whenCompleteAsync((response, error) -> {
@@ -299,7 +299,7 @@ public class DistributedLogSession implements LogSession {
         protocol.registerRecordsConsumer(subject, this::handleRecords, threadContext);
         this.consumer = consumer;
         this.index = index - 1;
-        return register(term.primary().memberId());
+        return register(MemberId.from(term.getPrimary().getMemberId()));
       });
     }
   }

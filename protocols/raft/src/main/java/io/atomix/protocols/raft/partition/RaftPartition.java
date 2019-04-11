@@ -15,23 +15,21 @@
  */
 package io.atomix.protocols.raft.partition;
 
+import java.io.File;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.concurrent.CompletableFuture;
+import java.util.stream.Collectors;
+
 import io.atomix.cluster.MemberId;
 import io.atomix.primitive.partition.Partition;
 import io.atomix.primitive.partition.PartitionId;
 import io.atomix.primitive.partition.PartitionManagementService;
 import io.atomix.primitive.partition.PartitionMetadata;
 import io.atomix.protocols.raft.partition.impl.RaftClientCommunicator;
-import io.atomix.protocols.raft.partition.impl.RaftNamespaces;
 import io.atomix.protocols.raft.partition.impl.RaftPartitionClient;
 import io.atomix.protocols.raft.partition.impl.RaftPartitionServer;
 import io.atomix.utils.concurrent.ThreadContextFactory;
-import io.atomix.utils.serializer.Serializer;
-
-import java.io.File;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.concurrent.CompletableFuture;
-import java.util.stream.Collectors;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
 
@@ -69,7 +67,7 @@ public class RaftPartition implements Partition {
    * @return the partition name
    */
   public String name() {
-    return String.format("%s-partition-%d", partitionId.group(), partitionId.id());
+    return String.format("%s-partition-%d", partitionId.getGroup(), partitionId.getPartition());
   }
 
   @Override
@@ -201,7 +199,6 @@ public class RaftPartition implements Partition {
         managementService.getMembershipService().getLocalMember().id(),
         new RaftClientCommunicator(
             name(),
-            Serializer.using(RaftNamespaces.RAFT_PROTOCOL),
             managementService.getMessagingService()),
         threadContextFactory);
   }

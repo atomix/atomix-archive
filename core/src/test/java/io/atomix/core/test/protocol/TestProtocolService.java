@@ -191,14 +191,14 @@ public class TestProtocolService {
 
       long timestamp = timestamp();
       this.session = session;
-      this.operationType = operation.id().type();
+      this.operationType = operation.getId().getType();
       service.tick(new WallClockTimestamp(timestamp));
 
       try {
         byte[] result = service.apply(new DefaultCommit<>(
             index.incrementAndGet(),
-            operation.id(),
-            operation.value(),
+            operation.getId(),
+            operation.getValue().toByteArray(),
             session,
             timestamp));
         future.complete(result);

@@ -15,6 +15,14 @@
  */
 package io.atomix.core.log.impl;
 
+import java.time.Duration;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.function.Consumer;
+
 import com.google.common.io.BaseEncoding;
 import io.atomix.core.log.AsyncDistributedLog;
 import io.atomix.core.log.AsyncDistributedLogPartition;
@@ -26,14 +34,6 @@ import io.atomix.primitive.log.LogClient;
 import io.atomix.primitive.protocol.PrimitiveProtocol;
 import io.atomix.utils.concurrent.Futures;
 import io.atomix.utils.serializer.Serializer;
-
-import java.time.Duration;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.function.Consumer;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -53,7 +53,7 @@ public class DefaultAsyncDistributedLog<E> implements AsyncDistributedLog<E> {
     this.serializer = checkNotNull(serializer);
     client.getPartitions().forEach(partition -> {
       DefaultAsyncDistributedLogPartition<E> logPartition = new DefaultAsyncDistributedLogPartition<>(this, partition, serializer);
-      partitions.put(partition.partitionId().id(), logPartition);
+      partitions.put(partition.partitionId().getPartition(), logPartition);
       sortedPartitions.add(logPartition);
     });
   }
@@ -107,13 +107,13 @@ public class DefaultAsyncDistributedLog<E> implements AsyncDistributedLog<E> {
 
   @Override
   public AsyncDistributedLogPartition<E> getPartition(E entry) {
-    return partitions.get(client.getPartitionId(BaseEncoding.base16().encode(encode(entry))).id());
+    return partitions.get(client.getPartitionId(BaseEncoding.base16().encode(encode(entry))).getPartition());
   }
 
   @Override
   public CompletableFuture<Void> produce(E entry) {
     byte[] bytes = encode(entry);
-    return partitions.get(client.getPartitionId(BaseEncoding.base16().encode(bytes)).id()).produce(bytes);
+    return partitions.get(client.getPartitionId(BaseEncoding.base16().encode(bytes)).getPartition()).produce(bytes);
   }
 
   @Override

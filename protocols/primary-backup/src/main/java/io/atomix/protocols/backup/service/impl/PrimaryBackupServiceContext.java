@@ -21,6 +21,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 import com.google.common.collect.ImmutableList;
@@ -35,7 +36,7 @@ import io.atomix.primitive.operation.OperationType;
 import io.atomix.primitive.partition.GroupMember;
 import io.atomix.primitive.partition.MemberGroupService;
 import io.atomix.primitive.partition.PrimaryElection;
-import io.atomix.primitive.partition.PrimaryElectionEventListener;
+import io.atomix.primitive.partition.PrimaryElectionEvent;
 import io.atomix.primitive.partition.PrimaryTerm;
 import io.atomix.primitive.service.PrimitiveService;
 import io.atomix.primitive.service.ServiceContext;
@@ -110,7 +111,7 @@ public class PrimaryBackupServiceContext implements ServiceContext {
   };
   private PrimaryBackupRole role;
   private final ClusterMembershipEventListener membershipEventListener = this::handleClusterEvent;
-  private final PrimaryElectionEventListener primaryElectionListener = event -> changeRole(event.term());
+  private final Consumer<PrimaryElectionEvent> primaryElectionListener = event -> changeRole(event.getTerm());
 
   @SuppressWarnings("unchecked")
   public PrimaryBackupServiceContext(
@@ -578,13 +579,15 @@ public class PrimaryBackupServiceContext implements ServiceContext {
    */
   private void changeRole(PrimaryTerm term) {
     threadContext.execute(() -> {
-      if (term.term() > currentTerm) {
+      if (term.getTerm() > currentTerm) {
         log.debug("Term changed: {}", term);
-        currentTerm = term.term();
-        primary = term.primary() != null ? term.primary().memberId() : null;
-        backups = term.backups(descriptor.getBackups())
+        currentTerm = term.getTerm();
+        primary = term.hasPrimary() ? MemberId.from(term.getPrimary().getMemberId()) : null;
+        backups = term.getCandidatesList()
+            .subList(1, Math.min(term.getCandidatesList().size(), descriptor.getBackups() + 1))
             .stream()
-            .map(GroupMember::memberId)
+            .map(GroupMember::getMemberId)
+            .map(MemberId::from)
             .collect(Collectors.toList());
 
         if (Objects.equals(primary, clusterMembershipService.getLocalMember().id())) {

@@ -45,7 +45,7 @@ public class DefaultAsyncDistributedLogPartition<E> implements AsyncDistributedL
 
   @Override
   public int id() {
-    return session.partitionId().id();
+    return session.partitionId().getPartition();
   }
 
   @Override

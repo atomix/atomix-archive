@@ -135,7 +135,7 @@ public class DefaultServiceExecutor implements ServiceExecutor {
   public void handle(OperationId operationId, Function<Commit<byte[]>, byte[]> callback) {
     checkNotNull(operationId, "operationId cannot be null");
     checkNotNull(callback, "callback cannot be null");
-    operations.put(operationId.id(), callback);
+    operations.put(operationId.getName(), callback);
     log.trace("Registered operation callback {}", operationId);
   }
 
@@ -167,11 +167,11 @@ public class DefaultServiceExecutor implements ServiceExecutor {
   public byte[] apply(Commit<byte[]> commit) {
     log.trace("Executing {}", commit);
 
-    this.operationType = commit.operation().type();
+    this.operationType = commit.operation().getType();
     this.timestamp = commit.wallClockTime().unixTimestamp();
 
     // Look up the registered callback for the operation.
-    Function<Commit<byte[]>, byte[]> operation = operations.get(commit.operation().id());
+    Function<Commit<byte[]>, byte[]> operation = operations.get(commit.operation().getName());
 
     if (operation == null) {
       throw new IllegalStateException("Unknown state machine operation: " + commit.operation());
