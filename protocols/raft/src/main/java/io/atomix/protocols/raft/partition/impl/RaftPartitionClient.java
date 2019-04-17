@@ -18,12 +18,10 @@ package io.atomix.protocols.raft.partition.impl;
 import java.util.concurrent.CompletableFuture;
 
 import io.atomix.cluster.MemberId;
-import io.atomix.primitive.PrimitiveType;
 import io.atomix.primitive.partition.PartitionClient;
 import io.atomix.protocols.raft.RaftClient;
 import io.atomix.protocols.raft.partition.RaftPartition;
-import io.atomix.protocols.raft.protocol.RaftClientProtocol;
-import io.atomix.protocols.raft.session.RaftSessionClient;
+import io.atomix.raft.protocol.RaftClientProtocol;
 import io.atomix.utils.Managed;
 import io.atomix.utils.concurrent.ThreadContextFactory;
 import org.slf4j.Logger;
@@ -38,18 +36,15 @@ public class RaftPartitionClient implements PartitionClient, Managed<RaftPartiti
   private final Logger log = getLogger(getClass());
 
   private final RaftPartition partition;
-  private final MemberId localMemberId;
   private final RaftClientProtocol protocol;
   private final ThreadContextFactory threadContextFactory;
   private RaftClient client;
 
   public RaftPartitionClient(
       RaftPartition partition,
-      MemberId localMemberId,
       RaftClientProtocol protocol,
       ThreadContextFactory threadContextFactory) {
     this.partition = partition;
-    this.localMemberId = localMemberId;
     this.protocol = protocol;
     this.threadContextFactory = threadContextFactory;
   }
@@ -73,8 +68,13 @@ public class RaftPartitionClient implements PartitionClient, Managed<RaftPartiti
   }
 
   @Override
-  public RaftSessionClient.Builder sessionBuilder(String primitiveName, PrimitiveType primitiveType) {
-    return client.sessionBuilder(primitiveName, primitiveType);
+  public CompletableFuture<byte[]> write(byte[] value) {
+    return client.write(value);
+  }
+
+  @Override
+  public CompletableFuture<byte[]> read(byte[] value) {
+    return client.read(value);
   }
 
   @Override
@@ -104,8 +104,6 @@ public class RaftPartitionClient implements PartitionClient, Managed<RaftPartiti
   private RaftClient newRaftClient(RaftClientProtocol protocol) {
     return RaftClient.builder()
         .withClientId(partition.name())
-        .withPartitionId(partition.id())
-        .withMemberId(localMemberId)
         .withProtocol(protocol)
         .withThreadContextFactory(threadContextFactory)
         .build();

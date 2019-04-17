@@ -48,6 +48,7 @@ import io.atomix.primitive.operation.Operations;
 import io.atomix.primitive.partition.PartitionId;
 import io.atomix.primitive.proxy.ProxySession;
 import io.atomix.primitive.service.PrimitiveService;
+import io.atomix.primitive.service.Role;
 import io.atomix.primitive.service.ServiceContext;
 import io.atomix.primitive.service.impl.DefaultCommit;
 import io.atomix.primitive.session.Session;
@@ -312,6 +313,11 @@ public class LogProxySession<S> implements ProxySession<S> {
 
     @Override
     public MemberId localMemberId() {
+      return null;
+    }
+
+    @Override
+    public Role role() {
       return null;
     }
 

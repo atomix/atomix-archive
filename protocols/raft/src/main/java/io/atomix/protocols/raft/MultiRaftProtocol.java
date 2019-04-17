@@ -15,19 +15,8 @@
  */
 package io.atomix.protocols.raft;
 
-import io.atomix.primitive.PrimitiveType;
-import io.atomix.primitive.partition.PartitionGroup;
-import io.atomix.primitive.partition.PartitionService;
 import io.atomix.primitive.protocol.PrimitiveProtocol;
 import io.atomix.primitive.protocol.ProxyProtocol;
-import io.atomix.primitive.proxy.ProxyClient;
-import io.atomix.primitive.proxy.impl.DefaultProxyClient;
-import io.atomix.primitive.session.SessionClient;
-import io.atomix.protocols.raft.partition.RaftPartition;
-import io.atomix.utils.config.ConfigurationException;
-
-import java.util.Collection;
-import java.util.stream.Collectors;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -103,24 +92,4 @@ public class MultiRaftProtocol implements ProxyProtocol {
     return config.getGroup();
   }
 
-  @Override
-  public <S> ProxyClient<S> newProxy(String primitiveName, PrimitiveType primitiveType, Class<S> serviceType, PartitionService partitionService) {
-    PartitionGroup partitionGroup = partitionService.getPartitionGroup(this);
-    if (partitionGroup == null) {
-      throw new ConfigurationException("No Raft partition group matching the configured protocol exists");
-    }
-
-    Collection<SessionClient> partitions = partitionGroup.getPartitions().stream()
-        .map(partition -> ((RaftPartition) partition).getClient()
-            .sessionBuilder(primitiveName, primitiveType)
-            .withTimeout(config.getTimeout())
-            .withReadConsistency(config.getReadConsistency())
-            .withCommunicationStrategy(config.getCommunicationStrategy())
-            .withRecoveryStrategy(config.getRecoveryStrategy())
-            .withMaxRetries(config.getMaxRetries())
-            .withRetryDelay(config.getRetryDelay())
-            .build())
-        .collect(Collectors.toList());
-    return new DefaultProxyClient<>(primitiveName, primitiveType, this, serviceType, partitions, config.getPartitioner());
-  }
 }

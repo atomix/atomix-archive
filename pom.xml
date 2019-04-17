@@ -187,6 +187,7 @@
     <module>grpc</module>
     <module>primitive</module>
     <module>protocols</module>
+    <module>raft</module>
     <module>rest</module>
     <module>storage</module>
     <module>utils</module>

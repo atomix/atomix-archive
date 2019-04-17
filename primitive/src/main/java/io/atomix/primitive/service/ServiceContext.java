@@ -63,6 +63,13 @@ public interface ServiceContext {
   MemberId localMemberId();
 
   /**
+   * Returns the service's role.
+   *
+   * @return the service's role
+   */
+  Role role();
+
+  /**
    * Returns the current state machine index.
    * <p>
    * The state index is indicative of the index of the current operation

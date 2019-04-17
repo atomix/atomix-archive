@@ -16,45 +16,35 @@
 package io.atomix.protocols.raft.partition.impl;
 
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Executor;
-import java.util.function.Consumer;
 import java.util.function.Function;
 
 import com.google.common.base.Preconditions;
 import io.atomix.cluster.MemberId;
 import io.atomix.cluster.messaging.ClusterCommunicationService;
-import io.atomix.primitive.session.SessionId;
-import io.atomix.protocols.raft.protocol.AppendRequest;
-import io.atomix.protocols.raft.protocol.AppendResponse;
-import io.atomix.protocols.raft.protocol.CloseSessionRequest;
-import io.atomix.protocols.raft.protocol.CloseSessionResponse;
-import io.atomix.protocols.raft.protocol.ConfigureRequest;
-import io.atomix.protocols.raft.protocol.ConfigureResponse;
-import io.atomix.protocols.raft.protocol.InstallRequest;
-import io.atomix.protocols.raft.protocol.InstallResponse;
-import io.atomix.protocols.raft.protocol.JoinRequest;
-import io.atomix.protocols.raft.protocol.JoinResponse;
-import io.atomix.protocols.raft.protocol.KeepAliveRequest;
-import io.atomix.protocols.raft.protocol.KeepAliveResponse;
-import io.atomix.protocols.raft.protocol.LeaveRequest;
-import io.atomix.protocols.raft.protocol.LeaveResponse;
-import io.atomix.protocols.raft.protocol.MetadataRequest;
-import io.atomix.protocols.raft.protocol.MetadataResponse;
-import io.atomix.protocols.raft.protocol.OpenSessionRequest;
-import io.atomix.protocols.raft.protocol.OpenSessionResponse;
-import io.atomix.protocols.raft.protocol.OperationRequest;
-import io.atomix.protocols.raft.protocol.OperationResponse;
-import io.atomix.protocols.raft.protocol.PollRequest;
-import io.atomix.protocols.raft.protocol.PollResponse;
-import io.atomix.protocols.raft.protocol.PublishRequest;
-import io.atomix.protocols.raft.protocol.RaftServerProtocol;
-import io.atomix.protocols.raft.protocol.ReconfigureRequest;
-import io.atomix.protocols.raft.protocol.ReconfigureResponse;
-import io.atomix.protocols.raft.protocol.ResetRequest;
-import io.atomix.protocols.raft.protocol.TransferRequest;
-import io.atomix.protocols.raft.protocol.TransferResponse;
-import io.atomix.protocols.raft.protocol.VoteRequest;
-import io.atomix.protocols.raft.protocol.VoteResponse;
+import io.atomix.raft.protocol.AppendRequest;
+import io.atomix.raft.protocol.AppendResponse;
+import io.atomix.raft.protocol.CommandRequest;
+import io.atomix.raft.protocol.CommandResponse;
+import io.atomix.raft.protocol.ConfigureRequest;
+import io.atomix.raft.protocol.ConfigureResponse;
+import io.atomix.raft.protocol.InstallRequest;
+import io.atomix.raft.protocol.InstallResponse;
+import io.atomix.raft.protocol.JoinRequest;
+import io.atomix.raft.protocol.JoinResponse;
+import io.atomix.raft.protocol.LeaveRequest;
+import io.atomix.raft.protocol.LeaveResponse;
+import io.atomix.raft.protocol.PollRequest;
+import io.atomix.raft.protocol.PollResponse;
+import io.atomix.raft.protocol.PublishRequest;
+import io.atomix.raft.protocol.QueryRequest;
+import io.atomix.raft.protocol.QueryResponse;
+import io.atomix.raft.protocol.RaftServerProtocol;
+import io.atomix.raft.protocol.ReconfigureRequest;
+import io.atomix.raft.protocol.ReconfigureResponse;
+import io.atomix.raft.protocol.TransferRequest;
+import io.atomix.raft.protocol.TransferResponse;
+import io.atomix.raft.protocol.VoteRequest;
+import io.atomix.raft.protocol.VoteResponse;
 
 import static io.atomix.utils.concurrent.Futures.uncheck;
 
@@ -80,62 +70,22 @@ public class RaftServerCommunicator implements RaftServerProtocol {
   }
 
   @Override
-  public CompletableFuture<OpenSessionResponse> openSession(MemberId memberId, OpenSessionRequest request) {
-    return sendAndReceive(
-        context.openSessionSubject,
-        request,
-        OpenSessionRequest::toByteArray,
-        uncheck(OpenSessionResponse::parseFrom),
-        memberId);
-  }
-
-  @Override
-  public CompletableFuture<CloseSessionResponse> closeSession(MemberId memberId, CloseSessionRequest request) {
-    return sendAndReceive(
-        context.closeSessionSubject,
-        request,
-        CloseSessionRequest::toByteArray,
-        uncheck(CloseSessionResponse::parseFrom),
-        memberId);
-  }
-
-  @Override
-  public CompletableFuture<KeepAliveResponse> keepAlive(MemberId memberId, KeepAliveRequest request) {
-    return sendAndReceive(
-        context.keepAliveSubject,
-        request,
-        KeepAliveRequest::toByteArray,
-        uncheck(KeepAliveResponse::parseFrom),
-        memberId);
-  }
-
-  @Override
-  public CompletableFuture<OperationResponse> query(MemberId memberId, OperationRequest request) {
+  public CompletableFuture<QueryResponse> query(MemberId memberId, QueryRequest request) {
     return sendAndReceive(
         context.querySubject,
         request,
-        OperationRequest::toByteArray,
-        uncheck(OperationResponse::parseFrom),
+        QueryRequest::toByteArray,
+        uncheck(QueryResponse::parseFrom),
         memberId);
   }
 
   @Override
-  public CompletableFuture<OperationResponse> command(MemberId memberId, OperationRequest request) {
+  public CompletableFuture<CommandResponse> command(MemberId memberId, CommandRequest request) {
     return sendAndReceive(
         context.commandSubject,
         request,
-        OperationRequest::toByteArray,
-        uncheck(OperationResponse::parseFrom),
-        memberId);
-  }
-
-  @Override
-  public CompletableFuture<MetadataResponse> metadata(MemberId memberId, MetadataRequest request) {
-    return sendAndReceive(
-        context.metadataSubject,
-        request,
-        MetadataRequest::toByteArray,
-        uncheck(MetadataResponse::parseFrom),
+        CommandRequest::toByteArray,
+        uncheck(CommandResponse::parseFrom),
         memberId);
   }
 
@@ -230,63 +180,12 @@ public class RaftServerCommunicator implements RaftServerProtocol {
   }
 
   @Override
-  public void publish(MemberId memberId, PublishRequest request) {
-    clusterCommunicator.unicast(
-        context.publishSubject(request.getSessionId()),
-        request,
-        PublishRequest::toByteArray,
-        memberId);
-  }
-
-  @Override
-  public void registerOpenSessionHandler(Function<OpenSessionRequest, CompletableFuture<OpenSessionResponse>> handler) {
-    clusterCommunicator.subscribe(
-        context.openSessionSubject,
-        uncheck(OpenSessionRequest::parseFrom),
-        handler,
-        OpenSessionResponse::toByteArray);
-  }
-
-  @Override
-  public void unregisterOpenSessionHandler() {
-    clusterCommunicator.unsubscribe(context.openSessionSubject);
-  }
-
-  @Override
-  public void registerCloseSessionHandler(Function<CloseSessionRequest, CompletableFuture<CloseSessionResponse>> handler) {
-    clusterCommunicator.subscribe(
-        context.closeSessionSubject,
-        uncheck(CloseSessionRequest::parseFrom),
-        handler,
-        CloseSessionResponse::toByteArray);
-  }
-
-  @Override
-  public void unregisterCloseSessionHandler() {
-    clusterCommunicator.unsubscribe(context.closeSessionSubject);
-  }
-
-  @Override
-  public void registerKeepAliveHandler(Function<KeepAliveRequest, CompletableFuture<KeepAliveResponse>> handler) {
-    clusterCommunicator.subscribe(
-        context.keepAliveSubject,
-        uncheck(KeepAliveRequest::parseFrom),
-        handler,
-        KeepAliveResponse::toByteArray);
-  }
-
-  @Override
-  public void unregisterKeepAliveHandler() {
-    clusterCommunicator.unsubscribe(context.keepAliveSubject);
-  }
-
-  @Override
-  public void registerQueryHandler(Function<OperationRequest, CompletableFuture<OperationResponse>> handler) {
+  public void registerQueryHandler(Function<QueryRequest, CompletableFuture<QueryResponse>> handler) {
     clusterCommunicator.subscribe(
         context.querySubject,
-        uncheck(OperationRequest::parseFrom),
+        uncheck(QueryRequest::parseFrom),
         handler,
-        OperationResponse::toByteArray);
+        QueryResponse::toByteArray);
   }
 
   @Override
@@ -295,31 +194,17 @@ public class RaftServerCommunicator implements RaftServerProtocol {
   }
 
   @Override
-  public void registerCommandHandler(Function<OperationRequest, CompletableFuture<OperationResponse>> handler) {
+  public void registerCommandHandler(Function<CommandRequest, CompletableFuture<CommandResponse>> handler) {
     clusterCommunicator.subscribe(
         context.commandSubject,
-        uncheck(OperationRequest::parseFrom),
+        uncheck(CommandRequest::parseFrom),
         handler,
-        OperationResponse::toByteArray);
+        CommandResponse::toByteArray);
   }
 
   @Override
   public void unregisterCommandHandler() {
     clusterCommunicator.unsubscribe(context.commandSubject);
-  }
-
-  @Override
-  public void registerMetadataHandler(Function<MetadataRequest, CompletableFuture<MetadataResponse>> handler) {
-    clusterCommunicator.subscribe(
-        context.metadataSubject,
-        uncheck(MetadataRequest::parseFrom),
-        handler,
-        MetadataResponse::toByteArray);
-  }
-
-  @Override
-  public void unregisterMetadataHandler() {
-    clusterCommunicator.unsubscribe(context.metadataSubject);
   }
 
   @Override
@@ -446,19 +331,5 @@ public class RaftServerCommunicator implements RaftServerProtocol {
   @Override
   public void unregisterAppendHandler() {
     clusterCommunicator.unsubscribe(context.appendSubject);
-  }
-
-  @Override
-  public void registerResetListener(SessionId sessionId, Consumer<ResetRequest> listener, Executor executor) {
-    clusterCommunicator.subscribe(
-        context.resetSubject(sessionId.id()),
-        uncheck(ResetRequest::parseFrom),
-        listener,
-        executor);
-  }
-
-  @Override
-  public void unregisterResetListener(SessionId sessionId) {
-    clusterCommunicator.unsubscribe(context.resetSubject(sessionId.id()));
   }
 }

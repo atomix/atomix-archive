@@ -24,7 +24,6 @@ import java.util.function.Consumer;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import com.google.protobuf.InvalidProtocolBufferException;
-import io.atomix.primitive.event.EventType;
 import io.atomix.primitive.event.PrimitiveEvent;
 import io.atomix.primitive.partition.ManagedPrimaryElection;
 import io.atomix.primitive.partition.ManagedPrimaryElectionService;
@@ -82,16 +81,8 @@ public class DefaultPrimaryElectionService implements ManagedPrimaryElectionServ
   @Override
   @SuppressWarnings("unchecked")
   public CompletableFuture<PrimaryElectionService> start() {
-    return partitions.getPartitions().iterator().next().getClient()
-        .sessionBuilder(PRIMITIVE_NAME, PrimaryElectorType.instance())
-        .build()
-        .connect()
-        .thenAccept(proxy -> {
-          this.proxy = proxy;
-          proxy.addEventListener(EventType.from("CHANGE"), eventListener);
-          started.set(true);
-        })
-        .thenApply(v -> this);
+    // TODO: Open the proxy
+    return CompletableFuture.completedFuture(this);
   }
 
   @Override

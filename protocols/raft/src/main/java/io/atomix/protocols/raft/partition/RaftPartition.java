@@ -26,6 +26,7 @@ import io.atomix.primitive.partition.Partition;
 import io.atomix.primitive.partition.PartitionId;
 import io.atomix.primitive.partition.PartitionManagementService;
 import io.atomix.primitive.partition.PartitionMetadata;
+import io.atomix.primitive.service.impl.PrimitiveStateMachine;
 import io.atomix.protocols.raft.partition.impl.RaftClientCommunicator;
 import io.atomix.protocols.raft.partition.impl.RaftPartitionClient;
 import io.atomix.protocols.raft.partition.impl.RaftPartitionServer;
@@ -131,25 +132,17 @@ public class RaftPartition implements Partition {
     this.client = createClient(managementService);
     if (partition.members().contains(managementService.getMembershipService().getLocalMember().id())) {
       server = createServer(managementService);
-      return server.start()
+      return server.start(new PrimitiveStateMachine(
+          managementService.getPrimitiveTypes(),
+          managementService.getMembershipService(),
+          managementService.getMessagingService(),
+          threadContextFactory.createContext(),
+          threadContextFactory))
           .thenCompose(v -> client.start())
           .thenApply(v -> null);
     }
     return client.start()
         .thenApply(v -> this);
-  }
-
-  /**
-   * Updates the partition with the given metadata.
-   */
-  CompletableFuture<Void> update(PartitionMetadata metadata, PartitionManagementService managementService) {
-    if (server == null && metadata.members().contains(managementService.getMembershipService().getLocalMember().id())) {
-      server = createServer(managementService);
-      return server.join(metadata.members());
-    } else if (server != null && !metadata.members().contains(managementService.getMembershipService().getLocalMember().id())) {
-      return server.leave().thenRun(() -> server = null);
-    }
-    return CompletableFuture.completedFuture(null);
   }
 
   /**
@@ -184,9 +177,7 @@ public class RaftPartition implements Partition {
         this,
         config,
         managementService.getMembershipService().getLocalMember().id(),
-        managementService.getMembershipService(),
         managementService.getMessagingService(),
-        managementService.getPrimitiveTypes(),
         threadContextFactory);
   }
 
@@ -196,7 +187,6 @@ public class RaftPartition implements Partition {
   private RaftPartitionClient createClient(PartitionManagementService managementService) {
     return new RaftPartitionClient(
         this,
-        managementService.getMembershipService().getLocalMember().id(),
         new RaftClientCommunicator(
             name(),
             managementService.getMessagingService()),

@@ -29,6 +29,7 @@ import io.atomix.primitive.partition.GroupMember;
 import io.atomix.primitive.partition.PartitionId;
 import io.atomix.primitive.partition.PrimaryTerm;
 import io.atomix.primitive.service.Commit;
+import io.atomix.primitive.service.Role;
 import io.atomix.primitive.service.ServiceContext;
 import io.atomix.primitive.service.impl.DefaultCommit;
 import io.atomix.primitive.session.Session;
@@ -299,6 +300,11 @@ public class PrimaryElectorServiceTest {
 
       @Override
       public MemberId localMemberId() {
+        return null;
+      }
+
+      @Override
+      public Role role() {
         return null;
       }
 

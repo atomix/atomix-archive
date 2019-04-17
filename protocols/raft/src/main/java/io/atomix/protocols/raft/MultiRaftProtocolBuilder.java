@@ -21,7 +21,6 @@ import java.util.concurrent.TimeUnit;
 import io.atomix.primitive.Recovery;
 import io.atomix.primitive.partition.Partitioner;
 import io.atomix.primitive.protocol.PrimitiveProtocolBuilder;
-import io.atomix.protocols.raft.session.CommunicationStrategy;
 
 /**
  * Multi-Raft protocol builder.

@@ -1,0 +1,180 @@
+syntax = "proto3";
+
+package atomix.raft.protocol;
+
+import "atomix/raft/raft.proto";
+import "atomix/raft/log.proto";
+
+option java_package = "io.atomix.raft.protocol";
+option java_outer_classname = "RaftProtocolProto";
+option java_multiple_files = true;
+
+message JoinRequest {
+    RaftMember member = 1;
+}
+
+message JoinResponse {
+    ResponseStatus status = 1;
+    RaftError error = 2;
+    int64 index = 3;
+    int64 term = 4;
+    int64 timestamp = 5;
+    repeated RaftMember members = 6;
+}
+
+message ConfigureRequest {
+    int64 term = 1;
+    string leader = 2;
+    int64 index = 3;
+    int64 timestamp = 4;
+    repeated RaftMember members = 5;
+}
+
+message ConfigureResponse {
+    ResponseStatus status = 1;
+    RaftError error = 2;
+}
+
+message ReconfigureRequest {
+    RaftMember member = 1;
+    int64 index = 2;
+    int64 term = 3;
+}
+
+message ReconfigureResponse {
+    ResponseStatus status = 1;
+    RaftError error = 2;
+    int64 index = 3;
+    int64 term = 4;
+    int64 timestamp = 5;
+    repeated RaftMember members = 6;
+}
+
+message LeaveRequest {
+    RaftMember member = 1;
+}
+
+message LeaveResponse {
+    ResponseStatus status = 1;
+    RaftError error = 2;
+    int64 index = 3;
+    int64 term = 4;
+    int64 timestamp = 5;
+    repeated RaftMember members = 6;
+}
+
+message PollRequest {
+    int64 term = 1;
+    string candidate = 2;
+    int64 last_log_index = 3;
+    int64 last_log_term = 4;
+}
+
+message PollResponse {
+    ResponseStatus status = 1;
+    RaftError error = 2;
+    int64 term = 3;
+    bool accepted = 4;
+}
+
+message VoteRequest {
+    int64 term = 1;
+    string candidate = 2;
+    int64 last_log_index = 3;
+    int64 last_log_term = 4;
+}
+
+message VoteResponse {
+    ResponseStatus status = 1;
+    RaftError error = 2;
+    int64 term = 3;
+    bool voted = 4;
+}
+
+message TransferRequest {
+    string member_id = 1;
+}
+
+message TransferResponse {
+    ResponseStatus status = 1;
+    RaftError error = 2;
+}
+
+message AppendRequest {
+    int64 term = 1;
+    string leader = 2;
+    int64 prev_log_index = 3;
+    int64 prev_log_term = 4;
+    repeated atomix.raft.storage.log.RaftLogEntry entries = 5;
+    int64 commit_index = 6;
+}
+
+message AppendResponse {
+    ResponseStatus status = 1;
+    RaftError error = 2;
+    int64 term = 3;
+    bool succeeded = 4;
+    int64 last_log_index = 5;
+}
+
+message InstallRequest {
+    int64 term = 1;
+    string leader = 2;
+    int64 index = 3;
+    int64 timestamp = 4;
+    bytes data = 5;
+    bool complete = 6;
+}
+
+message InstallResponse {
+    ResponseStatus status = 1;
+    RaftError error = 2;
+}
+
+message CommandRequest {
+    int64 sequence_number = 1;
+    bytes value = 2;
+}
+
+message CommandResponse {
+    ResponseStatus status = 1;
+    RaftError error = 2;
+    string message = 3;
+    string leader = 4;
+    int64 term = 5;
+    repeated string members = 6;
+    int64 index = 7;
+    bytes output = 8;
+}
+
+message QueryRequest {
+    bytes value = 1;
+    ReadConsistency read_consistency = 2;
+}
+
+message QueryResponse {
+    ResponseStatus status = 1;
+    RaftError error = 2;
+    string message = 3;
+    bytes output = 4;
+}
+
+enum ResponseStatus {
+    OK = 0;
+    ERROR = 1;
+}
+
+enum RaftError {
+    NO_LEADER = 0;
+    QUERY_FAILURE = 1;
+    COMMAND_FAILURE = 2;
+    APPLICATION_ERROR = 3;
+    ILLEGAL_MEMBER_STATE = 4;
+    UNKNOWN_CLIENT = 5;
+    UNKNOWN_SESSION = 6;
+    UNKNOWN_SERVICE = 7;
+    CLOSED_SESSION = 8;
+    PROTOCOL_ERROR = 9;
+    CONFIGURATION_ERROR = 10;
+    UNAVAILABLE = 11;
+}

@@ -15,7 +15,6 @@
  */
 package io.atomix.protocols.raft.partition.impl;
 
-import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.function.Consumer;
@@ -24,20 +23,12 @@ import java.util.function.Function;
 import com.google.common.base.Preconditions;
 import io.atomix.cluster.MemberId;
 import io.atomix.cluster.messaging.ClusterCommunicationService;
-import io.atomix.primitive.session.SessionId;
-import io.atomix.protocols.raft.protocol.CloseSessionRequest;
-import io.atomix.protocols.raft.protocol.CloseSessionResponse;
-import io.atomix.protocols.raft.protocol.KeepAliveRequest;
-import io.atomix.protocols.raft.protocol.KeepAliveResponse;
-import io.atomix.protocols.raft.protocol.MetadataRequest;
-import io.atomix.protocols.raft.protocol.MetadataResponse;
-import io.atomix.protocols.raft.protocol.OpenSessionRequest;
-import io.atomix.protocols.raft.protocol.OpenSessionResponse;
-import io.atomix.protocols.raft.protocol.OperationRequest;
-import io.atomix.protocols.raft.protocol.OperationResponse;
-import io.atomix.protocols.raft.protocol.PublishRequest;
-import io.atomix.protocols.raft.protocol.RaftClientProtocol;
-import io.atomix.protocols.raft.protocol.ResetRequest;
+import io.atomix.raft.protocol.CommandRequest;
+import io.atomix.raft.protocol.CommandResponse;
+import io.atomix.raft.protocol.PublishRequest;
+import io.atomix.raft.protocol.QueryRequest;
+import io.atomix.raft.protocol.QueryResponse;
+import io.atomix.raft.protocol.RaftClientProtocol;
 
 import static io.atomix.utils.concurrent.Futures.uncheck;
 
@@ -63,85 +54,22 @@ public class RaftClientCommunicator implements RaftClientProtocol {
   }
 
   @Override
-  public CompletableFuture<OpenSessionResponse> openSession(MemberId memberId, OpenSessionRequest request) {
-    return sendAndReceive(
-        context.openSessionSubject,
-        request,
-        OpenSessionRequest::toByteArray,
-        uncheck(OpenSessionResponse::parseFrom),
-        memberId);
-  }
-
-  @Override
-  public CompletableFuture<CloseSessionResponse> closeSession(MemberId memberId, CloseSessionRequest request) {
-    return sendAndReceive(
-        context.closeSessionSubject,
-        request,
-        CloseSessionRequest::toByteArray,
-        uncheck(CloseSessionResponse::parseFrom),
-        memberId);
-  }
-
-  @Override
-  public CompletableFuture<KeepAliveResponse> keepAlive(MemberId memberId, KeepAliveRequest request) {
-    return sendAndReceive(
-        context.keepAliveSubject,
-        request,
-        KeepAliveRequest::toByteArray,
-        uncheck(KeepAliveResponse::parseFrom),
-        memberId);
-  }
-
-  @Override
-  public CompletableFuture<OperationResponse> query(MemberId memberId, OperationRequest request) {
+  public CompletableFuture<QueryResponse> query(MemberId memberId, QueryRequest request) {
     return sendAndReceive(
         context.querySubject,
         request,
-        OperationRequest::toByteArray,
-        uncheck(OperationResponse::parseFrom),
+        QueryRequest::toByteArray,
+        uncheck(QueryResponse::parseFrom),
         memberId);
   }
 
   @Override
-  public CompletableFuture<OperationResponse> command(MemberId memberId, OperationRequest request) {
+  public CompletableFuture<CommandResponse> command(MemberId memberId, CommandRequest request) {
     return sendAndReceive(
         context.commandSubject,
         request,
-        OperationRequest::toByteArray,
-        uncheck(OperationResponse::parseFrom),
+        CommandRequest::toByteArray,
+        uncheck(CommandResponse::parseFrom),
         memberId);
-  }
-
-  @Override
-  public CompletableFuture<MetadataResponse> metadata(MemberId memberId, MetadataRequest request) {
-    return sendAndReceive(
-        context.metadataSubject,
-        request,
-        MetadataRequest::toByteArray,
-        uncheck(MetadataResponse::parseFrom),
-        memberId);
-  }
-
-  @Override
-  public void reset(Set<MemberId> members, ResetRequest request) {
-    clusterCommunicator.multicast(
-        context.resetSubject(request.getSessionId()),
-        request,
-        ResetRequest::toByteArray,
-        members);
-  }
-
-  @Override
-  public void registerPublishListener(SessionId sessionId, Consumer<PublishRequest> listener, Executor executor) {
-    clusterCommunicator.subscribe(
-        context.publishSubject(sessionId.id()),
-        uncheck(PublishRequest::parseFrom),
-        listener,
-        executor);
-  }
-
-  @Override
-  public void unregisterPublishListener(SessionId sessionId) {
-    clusterCommunicator.unsubscribe(context.publishSubject(sessionId.id()));
   }
 }

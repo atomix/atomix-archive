@@ -15,8 +15,7 @@
  */
 package io.atomix.primitive.partition;
 
-import io.atomix.primitive.PrimitiveType;
-import io.atomix.primitive.session.SessionClient;
+import java.util.concurrent.CompletableFuture;
 
 /**
  * Primitive client.
@@ -24,12 +23,19 @@ import io.atomix.primitive.session.SessionClient;
 public interface PartitionClient {
 
   /**
-   * Returns a new session builder for the given primitive type.
+   * Sends a write to the partition.
    *
-   * @param primitiveName the proxy name
-   * @param primitiveType the type for which to return a new proxy builder
-   * @return a new proxy builder for the given primitive type
+   * @param value the value to write
+   * @return a future to be completed with the result
    */
-  SessionClient.Builder sessionBuilder(String primitiveName, PrimitiveType primitiveType);
+  CompletableFuture<byte[]> write(byte[] value);
+
+  /**
+   * Sets a read to the partition.
+   *
+   * @param value the read parameter
+   * @return a future to be completed with the result
+   */
+  CompletableFuture<byte[]> read(byte[] value);
 
 }

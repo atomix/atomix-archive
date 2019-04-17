@@ -60,15 +60,8 @@ public class ReplicatedSessionIdService implements ManagedSessionIdService {
 
   @Override
   public CompletableFuture<SessionIdService> start() {
-    return systemPartitionGroup.getPartitions().iterator().next().getClient()
-        .sessionBuilder(PRIMITIVE_NAME, SessionIdGeneratorType.instance())
-        .build()
-        .connect()
-        .thenApply(proxy -> {
-          this.proxy = proxy;
-          started.set(true);
-          return this;
-        });
+    // TODO Open the proxy session
+    return CompletableFuture.completedFuture(this);
   }
 
   @Override

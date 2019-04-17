@@ -163,8 +163,8 @@ public abstract class PrimitiveBuilder<B extends PrimitiveBuilder<B, C, P>, C ex
     PrimitiveProtocol protocol = protocol();
     if (protocol instanceof ProxyProtocol) {
       try {
-        return CompletableFuture.completedFuture(((ProxyProtocol) protocol)
-            .newProxy(name, type, serviceType, managementService.getPartitionService()));
+        // TODO
+        return CompletableFuture.completedFuture(null);
       } catch (Exception e) {
         return Futures.exceptionalFuture(e);
       }
