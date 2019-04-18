@@ -15,16 +15,13 @@
  */
 package io.atomix.core;
 
+import java.util.HashMap;
+import java.util.Map;
+
 import io.atomix.cluster.ClusterConfig;
-import io.atomix.core.profile.ProfileConfig;
 import io.atomix.primitive.config.PrimitiveConfig;
 import io.atomix.primitive.partition.PartitionGroupConfig;
 import io.atomix.utils.config.Config;
-
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -40,7 +37,6 @@ public class AtomixConfig implements Config {
   private Map<String, PartitionGroupConfig<?>> partitionGroups = new HashMap<>();
   private Map<String, PrimitiveConfig> primitiveDefaults = new HashMap<>();
   private Map<String, PrimitiveConfig> primitives = new HashMap<>();
-  private List<ProfileConfig> profiles = new ArrayList<>();
   private boolean typeRegistrationRequired = false;
   private boolean compatibleSerialization = false;
 
@@ -211,37 +207,6 @@ public class AtomixConfig implements Config {
   @SuppressWarnings("unchecked")
   public <C extends PrimitiveConfig<C>> C getPrimitive(String name) {
     return (C) primitives.get(name);
-  }
-
-  /**
-   * Returns the Atomix profile.
-   *
-   * @return the Atomix profile
-   */
-  public List<ProfileConfig> getProfiles() {
-    return profiles;
-  }
-
-  /**
-   * Sets the Atomix profile.
-   *
-   * @param profiles the profiles
-   * @return the Atomix configuration
-   */
-  public AtomixConfig setProfiles(List<ProfileConfig> profiles) {
-    this.profiles = profiles;
-    return this;
-  }
-
-  /**
-   * Adds an Atomix profile.
-   *
-   * @param profile the profile to add
-   * @return the Atomix configuration
-   */
-  public AtomixConfig addProfile(ProfileConfig profile) {
-    profiles.add(checkNotNull(profile, "profile cannot be null"));
-    return this;
   }
 
   /**

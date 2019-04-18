@@ -41,43 +41,13 @@ import io.atomix.cluster.messaging.ManagedMessagingService;
 import io.atomix.cluster.messaging.ManagedUnicastService;
 import io.atomix.cluster.protocol.GroupMembershipProtocol;
 import io.atomix.cluster.protocol.GroupMembershipProtocolConfig;
-import io.atomix.core.barrier.DistributedCyclicBarrier;
-import io.atomix.core.counter.AtomicCounter;
-import io.atomix.core.counter.DistributedCounter;
-import io.atomix.core.election.LeaderElection;
-import io.atomix.core.idgenerator.AtomicIdGenerator;
 import io.atomix.core.impl.CorePrimitiveCache;
 import io.atomix.core.impl.CorePrimitivesService;
 import io.atomix.core.impl.CoreSerializationService;
-import io.atomix.core.list.DistributedList;
-import io.atomix.core.lock.AtomicLock;
-import io.atomix.core.lock.DistributedLock;
-import io.atomix.core.map.AtomicCounterMap;
-import io.atomix.core.map.AtomicMap;
-import io.atomix.core.map.AtomicNavigableMap;
-import io.atomix.core.map.AtomicSortedMap;
-import io.atomix.core.map.DistributedMap;
-import io.atomix.core.map.DistributedNavigableMap;
-import io.atomix.core.map.DistributedSortedMap;
-import io.atomix.core.multimap.AtomicMultimap;
-import io.atomix.core.multimap.DistributedMultimap;
-import io.atomix.core.multiset.DistributedMultiset;
-import io.atomix.core.profile.Profile;
-import io.atomix.core.profile.ProfileConfig;
-import io.atomix.core.queue.DistributedQueue;
-import io.atomix.core.semaphore.AtomicSemaphore;
-import io.atomix.core.semaphore.DistributedSemaphore;
-import io.atomix.core.set.DistributedNavigableSet;
-import io.atomix.core.set.DistributedSet;
-import io.atomix.core.set.DistributedSortedSet;
 import io.atomix.core.transaction.TransactionBuilder;
 import io.atomix.core.transaction.TransactionService;
-import io.atomix.core.tree.AtomicDocumentTree;
 import io.atomix.core.utils.config.PolymorphicConfigMapper;
 import io.atomix.core.utils.config.PolymorphicTypeMapper;
-import io.atomix.core.value.AtomicValue;
-import io.atomix.core.value.DistributedValue;
-import io.atomix.core.workqueue.WorkQueue;
 import io.atomix.primitive.PrimitiveBuilder;
 import io.atomix.primitive.PrimitiveInfo;
 import io.atomix.primitive.PrimitiveType;
@@ -313,7 +283,6 @@ public class Atomix extends AtomixCluster implements PrimitivesService {
         new PolymorphicTypeMapper("type", PrimitiveConfig.class, PrimitiveType.class),
         new PolymorphicTypeMapper(null, PrimitiveConfig.class, PrimitiveType.class),
         new PolymorphicTypeMapper("type", PrimitiveProtocolConfig.class, PrimitiveProtocol.Type.class),
-        new PolymorphicTypeMapper("type", ProfileConfig.class, Profile.Type.class),
         new PolymorphicTypeMapper("type", NodeDiscoveryConfig.class, NodeDiscoveryProvider.Type.class),
         new PolymorphicTypeMapper("type", GroupMembershipProtocolConfig.class, GroupMembershipProtocol.Type.class));
     return mapper.loadFiles(AtomixConfig.class, files, Lists.newArrayList(RESOURCES));
@@ -496,7 +465,6 @@ public class Atomix extends AtomixCluster implements PrimitivesService {
       ManagedUnicastService unicastService,
       ManagedBroadcastService broadcastService) {
     super(config.getClusterConfig(), VERSION, messagingService, unicastService, broadcastService);
-    config.getProfiles().forEach(profile -> profile.getType().newProfile(profile).configure(config));
     this.executorService = Executors.newScheduledThreadPool(
         Math.max(Math.min(Runtime.getRuntime().availableProcessors() * 2, 8), 4),
         Threads.namedThreads("atomix-primitive-%d", LOGGER));
@@ -608,190 +576,9 @@ public class Atomix extends AtomixCluster implements PrimitivesService {
   }
 
   @Override
-  public <K, V> DistributedMap<K, V> getMap(String name) {
-    checkRunning();
-    return primitives.getMap(name);
-  }
-
-  @Override
-  public <K extends Comparable<K>, V> DistributedSortedMap<K, V> getSortedMap(String name) {
-    checkRunning();
-    return primitives.getSortedMap(name);
-  }
-
-  @Override
-  public <K extends Comparable<K>, V> DistributedNavigableMap<K, V> getNavigableMap(String name) {
-    checkRunning();
-    return primitives.getNavigableMap(name);
-  }
-
-  @Override
-  public <K, V> DistributedMultimap<K, V> getMultimap(String name) {
-    checkRunning();
-    return primitives.getMultimap(name);
-  }
-
-  @Override
-  public <K, V> AtomicMap<K, V> getAtomicMap(String name) {
-    checkRunning();
-    return primitives.getAtomicMap(name);
-  }
-
-  @Override
-  public <V> AtomicDocumentTree<V> getAtomicDocumentTree(String name) {
-    checkRunning();
-    return primitives.getAtomicDocumentTree(name);
-  }
-
-  @Override
-  public <K extends Comparable<K>, V> AtomicSortedMap<K, V> getAtomicSortedMap(String name) {
-    checkRunning();
-    return primitives.getAtomicSortedMap(name);
-  }
-
-  @Override
-  public <K extends Comparable<K>, V> AtomicNavigableMap<K, V> getAtomicNavigableMap(String name) {
-    checkRunning();
-    return primitives.getAtomicNavigableMap(name);
-  }
-
-  @Override
-  public <K, V> AtomicMultimap<K, V> getAtomicMultimap(String name) {
-    checkRunning();
-    return primitives.getAtomicMultimap(name);
-  }
-
-  @Override
-  public <K> AtomicCounterMap<K> getAtomicCounterMap(String name) {
-    checkRunning();
-    return primitives.getAtomicCounterMap(name);
-  }
-
-  @Override
-  public <E> DistributedSet<E> getSet(String name) {
-    checkRunning();
-    return primitives.getSet(name);
-  }
-
-  @Override
-  public <E extends Comparable<E>> DistributedSortedSet<E> getSortedSet(String name) {
-    checkRunning();
-    return primitives.getSortedSet(name);
-  }
-
-  @Override
-  public <E extends Comparable<E>> DistributedNavigableSet<E> getNavigableSet(String name) {
-    checkRunning();
-    return primitives.getNavigableSet(name);
-  }
-
-  @Override
-  public <E> DistributedQueue<E> getQueue(String name) {
-    checkRunning();
-    return primitives.getQueue(name);
-  }
-
-  @Override
-  public <E> DistributedList<E> getList(String name) {
-    checkRunning();
-    return primitives.getList(name);
-  }
-
-  @Override
-  public <E> DistributedMultiset<E> getMultiset(String name) {
-    checkRunning();
-    return primitives.getMultiset(name);
-  }
-
-  @Override
-  public DistributedCounter getCounter(String name) {
-    checkRunning();
-    return primitives.getCounter(name);
-  }
-
-  @Override
-  public AtomicCounter getAtomicCounter(String name) {
-    checkRunning();
-    return primitives.getAtomicCounter(name);
-  }
-
-  @Override
-  public AtomicIdGenerator getAtomicIdGenerator(String name) {
-    checkRunning();
-    return primitives.getAtomicIdGenerator(name);
-  }
-
-  @Override
-  public <V> DistributedValue<V> getValue(String name) {
-    checkRunning();
-    return primitives.getValue(name);
-  }
-
-  @Override
-  public <V> AtomicValue<V> getAtomicValue(String name) {
-    checkRunning();
-    return primitives.getAtomicValue(name);
-  }
-
-  @Override
-  public <T> LeaderElection<T> getLeaderElection(String name) {
-    checkRunning();
-    return primitives.getLeaderElection(name);
-  }
-
-  @Override
-  public DistributedLock getLock(String name) {
-    checkRunning();
-    return primitives.getLock(name);
-  }
-
-  @Override
-  public AtomicLock getAtomicLock(String name) {
-    checkRunning();
-    return primitives.getAtomicLock(name);
-  }
-
-  @Override
-  public DistributedCyclicBarrier getCyclicBarrier(String name) {
-    checkRunning();
-    return primitives.getCyclicBarrier(name);
-  }
-
-  @Override
-  public DistributedSemaphore getSemaphore(String name) {
-    checkRunning();
-    return primitives.getSemaphore(name);
-  }
-
-  @Override
-  public AtomicSemaphore getAtomicSemaphore(String name) {
-    checkRunning();
-    return primitives.getAtomicSemaphore(name);
-  }
-
-  @Override
-  public <E> WorkQueue<E> getWorkQueue(String name) {
-    checkRunning();
-    return primitives.getWorkQueue(name);
-  }
-
-  @Override
   public PrimitiveType getPrimitiveType(String typeName) {
     checkRunning();
     return primitives.getPrimitiveType(typeName);
-  }
-
-  @Override
-  public <P extends SyncPrimitive> CompletableFuture<P> getPrimitiveAsync(String name, PrimitiveType<?, ?, P> primitiveType) {
-    checkRunning();
-    return primitives.getPrimitiveAsync(name, primitiveType);
-  }
-
-  @Override
-  public <C extends PrimitiveConfig<C>, P extends SyncPrimitive> CompletableFuture<P> getPrimitiveAsync(
-      String name, PrimitiveType<?, C, P> primitiveType, C primitiveConfig) {
-    checkRunning();
-    return primitives.getPrimitiveAsync(name, primitiveType, primitiveConfig);
   }
 
   @Override

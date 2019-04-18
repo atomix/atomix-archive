@@ -15,13 +15,6 @@
  */
 package io.atomix.rest.resources;
 
-import com.google.common.collect.Maps;
-import io.atomix.primitive.AsyncPrimitive;
-import io.atomix.primitive.PrimitiveFactory;
-import io.atomix.primitive.PrimitiveType;
-import io.atomix.primitive.SyncPrimitive;
-import io.atomix.primitive.config.PrimitiveConfig;
-
 import javax.ws.rs.Consumes;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
@@ -36,6 +29,13 @@ import javax.ws.rs.core.Response;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
+
+import com.google.common.collect.Maps;
+import io.atomix.primitive.AsyncPrimitive;
+import io.atomix.primitive.PrimitiveFactory;
+import io.atomix.primitive.PrimitiveType;
+import io.atomix.primitive.SyncPrimitive;
+import io.atomix.primitive.config.PrimitiveConfig;
 
 /**
  * Primitive resource.
@@ -52,7 +52,7 @@ public abstract class PrimitiveResource<P extends AsyncPrimitive, C extends Prim
 
   @SuppressWarnings("unchecked")
   protected CompletableFuture<P> getPrimitive(String name) {
-    return primitives.getPrimitiveAsync(name, type).thenApply(primitive -> ((SyncPrimitive) primitive).async());
+    return primitives.primitiveBuilder(name, type).getAsync().thenApply(primitive -> ((SyncPrimitive) primitive).async());
   }
 
   @GET
@@ -74,7 +74,7 @@ public abstract class PrimitiveResource<P extends AsyncPrimitive, C extends Prim
       @PathParam("name") String name,
       C config,
       @Suspended AsyncResponse response) {
-    primitives.getPrimitiveAsync(name, type, config).whenComplete((result, error) -> {
+    primitives.primitiveBuilder(name, type).getAsync().whenComplete((result, error) -> {
       if (error == null) {
         response.resume(Response.ok().build());
       } else {

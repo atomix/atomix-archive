@@ -39,9 +39,6 @@ import io.atomix.primitive.protocol.set.SetCompatibleBuilder;
 import io.atomix.primitive.protocol.set.SetProtocol;
 import io.atomix.primitive.protocol.value.ValueCompatibleBuilder;
 import io.atomix.primitive.protocol.value.ValueProtocol;
-import io.atomix.protocols.backup.MultiPrimaryProtocol;
-import io.atomix.protocols.gossip.AntiEntropyProtocol;
-import io.atomix.protocols.gossip.CrdtProtocol;
 import io.atomix.protocols.log.DistributedLogProtocol;
 import io.atomix.protocols.raft.MultiRaftProtocol;
 import io.grpc.Metadata;
@@ -272,9 +269,8 @@ public class PrimitiveExecutor<S extends SyncPrimitive, A extends AsyncPrimitive
 
     Descriptors.FieldDescriptor multiPrimaryField = id.getDescriptorForType().findFieldByName(MULTI_PRIMARY_PROTOCOL);
     if (multiPrimaryField != null && id.hasField(multiPrimaryField)) {
-      String group = ((io.atomix.grpc.protocol.MultiPrimaryProtocol) id.getField(multiPrimaryField)).getGroup();
-      return MultiPrimaryProtocol.builder(group)
-          .build();
+      // TODO
+      throw new UnsupportedOperationException();
     }
 
     Descriptors.FieldDescriptor logField = id.getDescriptorForType().findFieldByName(LOG_PROTOCOL);
@@ -282,16 +278,6 @@ public class PrimitiveExecutor<S extends SyncPrimitive, A extends AsyncPrimitive
       String group = ((io.atomix.grpc.protocol.DistributedLogProtocol) id.getField(logField)).getGroup();
       return DistributedLogProtocol.builder(group)
           .build();
-    }
-
-    Descriptors.FieldDescriptor gossipField = id.getDescriptorForType().findFieldByName(GOSSIP_PROTOCOL);
-    if (gossipField != null && id.hasField(gossipField)) {
-      return AntiEntropyProtocol.builder().build();
-    }
-
-    Descriptors.FieldDescriptor crdtField = id.getDescriptorForType().findFieldByName(CRDT_PROTOCOL);
-    if (crdtField != null && id.hasField(crdtField)) {
-      return CrdtProtocol.builder().build();
     }
     return null;
   }
