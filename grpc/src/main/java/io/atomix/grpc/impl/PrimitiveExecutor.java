@@ -31,14 +31,6 @@ import io.atomix.primitive.protocol.LogProtocol;
 import io.atomix.primitive.protocol.PrimitiveProtocol;
 import io.atomix.primitive.protocol.ProxyCompatibleBuilder;
 import io.atomix.primitive.protocol.ProxyProtocol;
-import io.atomix.primitive.protocol.counter.CounterCompatibleBuilder;
-import io.atomix.primitive.protocol.counter.CounterProtocol;
-import io.atomix.primitive.protocol.map.MapCompatibleBuilder;
-import io.atomix.primitive.protocol.map.MapProtocol;
-import io.atomix.primitive.protocol.set.SetCompatibleBuilder;
-import io.atomix.primitive.protocol.set.SetProtocol;
-import io.atomix.primitive.protocol.value.ValueCompatibleBuilder;
-import io.atomix.primitive.protocol.value.ValueProtocol;
 import io.atomix.protocols.log.DistributedLogProtocol;
 import io.atomix.protocols.raft.MultiRaftProtocol;
 import io.grpc.Metadata;
@@ -55,8 +47,6 @@ public class PrimitiveExecutor<S extends SyncPrimitive, A extends AsyncPrimitive
   private static final String RAFT_PROTOCOL = "raft";
   private static final String MULTI_PRIMARY_PROTOCOL = "multi_primary";
   private static final String LOG_PROTOCOL = "log";
-  private static final String GOSSIP_PROTOCOL = "gossip";
-  private static final String CRDT_PROTOCOL = "crdt";
 
   private final Atomix atomix;
   private final PrimitiveType<?, ?, ?> type;
@@ -200,30 +190,6 @@ public class PrimitiveExecutor<S extends SyncPrimitive, A extends AsyncPrimitive
     } else if (protocol instanceof ProxyProtocol) {
       if (builder instanceof ProxyCompatibleBuilder) {
         ((ProxyCompatibleBuilder) builder).withProtocol((ProxyProtocol) protocol);
-      } else {
-        throw new AssertionError();
-      }
-    } else if (protocol instanceof MapProtocol) {
-      if (builder instanceof MapCompatibleBuilder) {
-        ((MapCompatibleBuilder) builder).withProtocol((MapProtocol) protocol);
-      } else {
-        throw new AssertionError();
-      }
-    } else if (protocol instanceof CounterProtocol) {
-      if (builder instanceof CounterCompatibleBuilder) {
-        ((CounterCompatibleBuilder) builder).withProtocol((CounterProtocol) protocol);
-      } else {
-        throw new AssertionError();
-      }
-    } else if (protocol instanceof SetProtocol) {
-      if (builder instanceof SetCompatibleBuilder) {
-        ((SetCompatibleBuilder) builder).withProtocol((SetProtocol) protocol);
-      } else {
-        throw new AssertionError();
-      }
-    } else if (protocol instanceof ValueProtocol) {
-      if (builder instanceof ValueCompatibleBuilder) {
-        ((ValueCompatibleBuilder) builder).withProtocol((ValueProtocol) protocol);
       } else {
         throw new AssertionError();
       }

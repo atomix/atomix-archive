@@ -37,9 +37,9 @@ import static com.google.common.base.MoreObjects.toStringHelper;
  * Lock service.
  */
 public class LockService extends AbstractLockService {
-  private LockHolder lock;
-  private Queue<LockHolder> queue = new ArrayDeque<>();
-  private final Map<Long, Scheduled> timers = new HashMap<>();
+  LockHolder lock;
+  Queue<LockHolder> queue = new ArrayDeque<>();
+  final Map<Long, Scheduled> timers = new HashMap<>();
 
   @Override
   public LockResponse lock(LockRequest request) {

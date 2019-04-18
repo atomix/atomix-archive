@@ -15,14 +15,6 @@
  */
 package io.atomix.core;
 
-import io.atomix.cluster.Node;
-import io.atomix.cluster.discovery.BootstrapDiscoveryProvider;
-import io.atomix.cluster.discovery.MulticastDiscoveryProvider;
-import io.atomix.core.profile.Profile;
-import io.atomix.utils.net.Address;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
-
 import java.io.File;
 import java.io.IOException;
 import java.net.ServerSocket;
@@ -36,6 +28,13 @@ import java.util.List;
 import java.util.Properties;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+
+import io.atomix.cluster.Node;
+import io.atomix.cluster.discovery.BootstrapDiscoveryProvider;
+import io.atomix.cluster.discovery.MulticastDiscoveryProvider;
+import io.atomix.utils.net.Address;
+import org.junit.AfterClass;
+import org.junit.BeforeClass;
 
 /**
  * Base Atomix test.
@@ -82,20 +81,6 @@ public abstract class AbstractAtomixTest {
         .withProperties(properties)
         .withMulticastEnabled()
         .withMembershipProvider(!nodes.isEmpty() ? new BootstrapDiscoveryProvider(nodes) : new MulticastDiscoveryProvider());
-  }
-
-  /**
-   * Creates an Atomix instance.
-   */
-  protected static Atomix createAtomix(int id, List<Integer> bootstrapIds, Profile... profiles) {
-    return createAtomix(id, bootstrapIds, new Properties(), profiles);
-  }
-
-  /**
-   * Creates an Atomix instance.
-   */
-  protected static Atomix createAtomix(int id, List<Integer> bootstrapIds, Properties properties, Profile... profiles) {
-    return createAtomix(id, bootstrapIds, properties, b -> b.withProfiles(profiles).build());
   }
 
   /**

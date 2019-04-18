@@ -19,7 +19,7 @@ import io.atomix.core.Atomix;
 import io.atomix.core.types.Type1;
 import io.atomix.core.types.Type2;
 import io.atomix.core.types.Type3;
-import io.atomix.protocols.backup.MultiPrimaryProtocol;
+import io.atomix.protocols.raft.MultiRaftProtocol;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
@@ -36,7 +36,7 @@ public class DistributedSetConfigTest {
     DistributedSetConfig config = Atomix.config(getClass().getClassLoader().getResource("primitives.conf").getPath())
         .getPrimitive("set");
     assertEquals("set", config.getName());
-    assertEquals(MultiPrimaryProtocol.TYPE, config.getProtocolConfig().getType());
+    assertEquals(MultiRaftProtocol.TYPE, config.getProtocolConfig().getType());
     assertFalse(config.isReadOnly());
     assertSame(Type1.class, config.getElementType());
     assertSame(Type3.class, config.getExtraTypes().get(0));

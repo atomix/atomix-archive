@@ -16,7 +16,7 @@
 package io.atomix.core.idgenerator;
 
 import io.atomix.core.Atomix;
-import io.atomix.protocols.backup.MultiPrimaryProtocol;
+import io.atomix.protocols.raft.MultiRaftProtocol;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
@@ -31,7 +31,7 @@ public class IdGeneratorConfigTest {
     AtomicIdGeneratorConfig config = Atomix.config(getClass().getClassLoader().getResource("primitives.conf").getPath())
         .getPrimitive("atomic-id-generator");
     assertEquals("atomic-id-generator", config.getName());
-    assertEquals(MultiPrimaryProtocol.TYPE, config.getProtocolConfig().getType());
+    assertEquals(MultiRaftProtocol.TYPE, config.getProtocolConfig().getType());
     assertFalse(config.isReadOnly());
   }
 }

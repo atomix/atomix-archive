@@ -13,17 +13,24 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.atomix.core.tree;
+package io.atomix.core.test.partition;
+
+import io.atomix.primitive.partition.PartitionGroup;
+import io.atomix.primitive.partition.PartitionGroupConfig;
 
 /**
- * Caching document tree test.
+ * Raft partition group configuration.
  */
-public class CachingAtomicDocumentTreeTest extends AtomicDocumentTreeTest {
+public class TestPartitionGroupConfig extends PartitionGroupConfig<TestPartitionGroupConfig> {
+  private static final int DEFAULT_PARTITIONS = 3;
+
   @Override
-  protected AtomicDocumentTree<String> newTree(String name) throws Exception {
-    return atomix().<String>atomicDocumentTreeBuilder(name)
-        .withProtocol(protocol())
-        .withCacheEnabled()
-        .build();
+  public PartitionGroup.Type getType() {
+    return TestPartitionGroup.TYPE;
+  }
+
+  @Override
+  protected int getDefaultPartitions() {
+    return DEFAULT_PARTITIONS;
   }
 }

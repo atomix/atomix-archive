@@ -13,13 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.atomix.core.election.impl;
+package io.atomix.core.set.impl;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 
-import io.atomix.core.election.LeaderElectionType;
-import io.atomix.core.election.Leadership;
+import io.atomix.core.set.DistributedSetType;
 import io.atomix.primitive.PrimitiveId;
 import io.atomix.primitive.service.ServiceContext;
 import io.atomix.primitive.session.Session;
@@ -27,44 +26,37 @@ import io.atomix.primitive.session.SessionId;
 import io.atomix.utils.time.WallClock;
 import org.junit.Test;
 
-import static org.junit.Assert.assertArrayEquals;
-import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 /**
- * Leader elector service test.
+ * Consistent map service test.
  */
-public class DefaultLeaderElectionServiceTest {
+public class SetServiceTest {
   @Test
+  @SuppressWarnings("unchecked")
   public void testSnapshot() throws Exception {
     ServiceContext context = mock(ServiceContext.class);
-    when(context.serviceType()).thenReturn(LeaderElectionType.instance());
+    when(context.serviceType()).thenReturn(DistributedSetType.instance());
     when(context.serviceName()).thenReturn("test");
     when(context.serviceId()).thenReturn(PrimitiveId.from(1));
     when(context.wallClock()).thenReturn(new WallClock());
 
     Session session = mock(Session.class);
     when(session.sessionId()).thenReturn(SessionId.from(1));
-    when(context.currentSession()).thenReturn(session);
 
-    DefaultLeaderElectionService service = new DefaultLeaderElectionService();
+    SetService service = new SetService();
     service.init(context);
-    service.register(session);
 
-    byte[] id = "a".getBytes();
-    service.run(id);
+    service.add(AddRequest.newBuilder().addValues("foo").build());
 
     ByteArrayOutputStream os = new ByteArrayOutputStream();
     service.backup(os);
 
-    service = new DefaultLeaderElectionService();
-    service.init(context);
-    service.register(session);
+    service = new SetService();
     service.restore(new ByteArrayInputStream(os.toByteArray()));
 
-    Leadership<byte[]> value = service.getLeadership();
-    assertNotNull(value);
-    assertArrayEquals(id, value.leader().id());
+    assertTrue(service.contains(ContainsRequest.newBuilder().addValues("foo").build()).getContains());
   }
 }

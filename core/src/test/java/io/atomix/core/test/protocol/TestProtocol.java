@@ -15,27 +15,19 @@
  */
 package io.atomix.core.test.protocol;
 
-import java.util.Collection;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.stream.Collectors;
-import java.util.stream.IntStream;
-
+import io.atomix.core.test.partition.TestPartition;
+import io.atomix.primitive.PrimitiveManagementService;
 import io.atomix.primitive.PrimitiveType;
-import io.atomix.primitive.partition.PartitionId;
-import io.atomix.primitive.partition.PartitionService;
+import io.atomix.primitive.partition.Partition;
 import io.atomix.primitive.protocol.PrimitiveProtocol;
 import io.atomix.primitive.protocol.ProxyProtocol;
-import io.atomix.primitive.proxy.ProxyClient;
-import io.atomix.primitive.proxy.impl.DefaultProxyClient;
+import io.atomix.primitive.service.StateMachine;
+import io.atomix.primitive.service.impl.PrimitiveStateMachine;
 import io.atomix.primitive.session.SessionClient;
-import io.atomix.primitive.session.SessionId;
-import io.atomix.utils.concurrent.ThreadPoolContext;
+import io.atomix.utils.concurrent.BlockingAwareThreadPoolContextFactory;
+import io.atomix.utils.concurrent.ThreadContextFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import static io.atomix.utils.concurrent.Threads.namedThreads;
 
 /**
  * Test primitive protocol.
@@ -76,15 +68,14 @@ public class TestProtocol implements ProxyProtocol {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(TestProtocol.class);
 
-  private final ScheduledExecutorService threadPool = Executors.newScheduledThreadPool(
-      4, namedThreads("test-protocol-service-%d", LOGGER));
+  private final ThreadContextFactory threadContextFactory = new BlockingAwareThreadPoolContextFactory(
+      "test-protocol", 4, LOGGER);
   private final TestProtocolConfig config;
-  private final TestProtocolServiceRegistry registry;
-  private final AtomicLong sessionIds = new AtomicLong();
+  private final TestStateMachineContext context = new TestStateMachineContext();
+  private StateMachine stateMachine;
 
   TestProtocol(TestProtocolConfig config) {
     this.config = config;
-    this.registry = new TestProtocolServiceRegistry(threadPool);
   }
 
   @Override
@@ -98,45 +89,17 @@ public class TestProtocol implements ProxyProtocol {
   }
 
   @Override
-  public <S> ProxyClient<S> newProxy(
-      String primitiveName,
-      PrimitiveType primitiveType,
-      Class<S> serviceType,
-      PartitionService partitionService) {
-    Collection<SessionClient> partitions = IntStream.range(0, config.getPartitions())
-        .mapToObj(partition -> {
-          SessionId sessionId = SessionId.from(sessionIds.incrementAndGet());
-          return new TestSessionClient(
-              primitiveName,
-              primitiveType,
-              sessionId,
-              PartitionId.newBuilder()
-                  .setGroup(group())
-                  .setPartition(partition)
-                  .build(),
-              new ThreadPoolContext(threadPool),
-              registry.getOrCreateService(
-                  PartitionId.newBuilder()
-                      .setGroup(group())
-                      .setPartition(partition)
-                      .build(),
-                  primitiveName,
-                  primitiveType));
-        })
-        .collect(Collectors.toList());
-    return new DefaultProxyClient<>(
-        primitiveName,
-        primitiveType,
-        this,
-        serviceType,
-        partitions,
-        config.getPartitioner());
-  }
-
-  /**
-   * Closes the protocol.
-   */
-  public void close() {
-    threadPool.shutdownNow();
+  public synchronized SessionClient newClient(
+      String name, PrimitiveType type, Partition partition, PrimitiveManagementService managementService) {
+    if (stateMachine == null) {
+      stateMachine = new PrimitiveStateMachine(
+          managementService.getPrimitiveTypeRegistry(),
+          managementService.getMembershipService(),
+          managementService.getCommunicationService(),
+          threadContextFactory.createContext(),
+          threadContextFactory);
+      stateMachine.init(context);
+    }
+    return ((TestPartition) partition).newClient(name, type, managementService, stateMachine, context);
   }
 }

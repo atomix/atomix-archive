@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-present Open Networking Foundation
+ * Copyright 2018-present Open Networking Foundation
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,12 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.atomix.core.queue.impl;
+package io.atomix.core.value.impl;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 
-import io.atomix.core.set.DistributedSetType;
+import com.google.protobuf.ByteString;
+import io.atomix.core.map.AtomicMapType;
 import io.atomix.primitive.PrimitiveId;
 import io.atomix.primitive.service.ServiceContext;
 import io.atomix.primitive.session.Session;
@@ -26,37 +27,60 @@ import io.atomix.primitive.session.SessionId;
 import io.atomix.utils.time.WallClock;
 import org.junit.Test;
 
-import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertArrayEquals;
+import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 /**
- * Distributed queue service test.
+ * Atomic value service test.
  */
-public class DefaultDistributedQueueServiceTest {
+public class ValueServiceTest {
+
   @Test
   @SuppressWarnings("unchecked")
   public void testSnapshot() throws Exception {
     ServiceContext context = mock(ServiceContext.class);
-    when(context.serviceType()).thenReturn(DistributedSetType.instance());
+    when(context.serviceType()).thenReturn(AtomicMapType.instance());
     when(context.serviceName()).thenReturn("test");
     when(context.serviceId()).thenReturn(PrimitiveId.from(1));
     when(context.wallClock()).thenReturn(new WallClock());
+    when(context.currentIndex()).thenReturn(1L);
 
     Session session = mock(Session.class);
     when(session.sessionId()).thenReturn(SessionId.from(1));
 
-    DefaultDistributedQueueService service = new DefaultDistributedQueueService();
+    ValueService service = new ValueService();
     service.init(context);
 
-    service.add("foo");
+    assertTrue(service.get(GetRequest.newBuilder().build()).getValue().isEmpty());
 
     ByteArrayOutputStream os = new ByteArrayOutputStream();
     service.backup(os);
 
-    service = new DefaultDistributedQueueService();
+    assertTrue(service.get(GetRequest.newBuilder().build()).getValue().isEmpty());
+
+    service = new ValueService();
+    service.init(context);
     service.restore(new ByteArrayInputStream(os.toByteArray()));
 
-    assertEquals("foo", service.remove());
+    assertTrue(service.get(GetRequest.newBuilder().build()).getValue().isEmpty());
+
+    service.set(SetRequest.newBuilder().setValue(ByteString.copyFrom("Hello world!".getBytes())).build());
+    assertArrayEquals("Hello world!".getBytes(), service.get(GetRequest.newBuilder().build()).getValue().toByteArray());
+
+    os = new ByteArrayOutputStream();
+    service.backup(os);
+
+    assertArrayEquals("Hello world!".getBytes(), service.get(GetRequest.newBuilder().build()).getValue().toByteArray());
+
+    service = new ValueService();
+    service.init(context);
+    service.restore(new ByteArrayInputStream(os.toByteArray()));
+
+    assertArrayEquals("Hello world!".getBytes(), service.get(GetRequest.newBuilder().build()).getValue().toByteArray());
+
+    service.set(null);
+    assertTrue(service.get(GetRequest.newBuilder().build()).getValue().isEmpty());
   }
 }

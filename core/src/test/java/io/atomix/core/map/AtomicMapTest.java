@@ -15,6 +15,16 @@
  */
 package io.atomix.core.map;
 
+import java.time.Duration;
+import java.util.Arrays;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.stream.Collectors;
+
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import io.atomix.core.AbstractPrimitiveTest;
@@ -24,17 +34,6 @@ import io.atomix.core.transaction.Transaction;
 import io.atomix.core.transaction.TransactionalMap;
 import io.atomix.utils.time.Versioned;
 import org.junit.Test;
-
-import java.time.Duration;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.stream.Collectors;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -103,11 +102,6 @@ public class AtomicMapTest extends AbstractPrimitiveTest {
     Versioned<String> value = map.putIfAbsent("foo", "Hello foo again!");
     assertNotNull(value);
     assertEquals(fooValue, value.value());
-
-    Map<String, Versioned<String>> values = map.getAllPresent(Collections.singleton("foo"));
-    assertNotNull(values);
-    assertEquals(1, values.size());
-    assertEquals(fooValue, values.get("foo").value());
 
     assertNull(map.putIfAbsent("bar", barValue));
     assertEquals(2, map.size());
@@ -395,11 +389,6 @@ public class AtomicMapTest extends AbstractPrimitiveTest {
         .build();
     assertEquals("baz", map.get("foo").value());
     assertEquals("baz", map.get("bar").value());
-
-    Map<String, Versioned<String>> result = map.getAllPresent(Collections.singleton("foo"));
-    assertNotNull(result);
-    assertTrue(result.size() == 1);
-    assertEquals("baz", result.get("foo").value());
   }
 
   private static class TestAtomicMapEventListener implements AtomicMapEventListener<String, String> {

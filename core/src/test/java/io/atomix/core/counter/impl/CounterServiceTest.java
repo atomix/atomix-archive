@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.atomix.core.map.impl;
+package io.atomix.core.counter.impl;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -23,21 +23,21 @@ import org.junit.Test;
 import static org.junit.Assert.assertEquals;
 
 /**
- * Atomic counter map service test.
+ * Counter service test.
  */
-public class DefaultAtomicCounterMapServiceTest {
+public class CounterServiceTest {
   @Test
   public void testSnapshot() throws Exception {
-    DefaultAtomicCounterMapService service = new DefaultAtomicCounterMapService();
-    service.put("foo", 1);
+    CounterService service = new CounterService();
+    service.set(SetRequest.newBuilder().setValue(1).build());
 
     ByteArrayOutputStream os = new ByteArrayOutputStream();
     service.backup(os);
 
-    service = new DefaultAtomicCounterMapService();
+    service = new CounterService();
     service.restore(new ByteArrayInputStream(os.toByteArray()));
 
-    long value = service.get("foo");
+    long value = service.get(GetRequest.newBuilder().build()).getValue();
     assertEquals(1, value);
   }
 }
