@@ -15,9 +15,9 @@
  */
 package io.atomix.primitive.partition;
 
-import io.atomix.cluster.MemberId;
-
 import java.util.Collection;
+
+import io.atomix.cluster.MemberId;
 
 /**
  * Atomix partition.
@@ -58,12 +58,5 @@ public interface Partition {
    * @return the partition's backups
    */
   Collection<MemberId> backups();
-
-  /**
-   * Returns the partition client.
-   *
-   * @return the partition client
-   */
-  PartitionClient getClient();
 
 }

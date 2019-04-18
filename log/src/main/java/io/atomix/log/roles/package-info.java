@@ -13,25 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.atomix.primitive.log;
 
 /**
- * Log session.
+ * Provides classes and interfaces for role-based management of primary-backup replication.
  */
-public interface LogSession {
-
-  /**
-   * Returns the log producer.
-   *
-   * @return the log producer
-   */
-  LogProducer producer();
-
-  /**
-   * Returns the log consumer.
-   *
-   * @return the log consumer
-   */
-  LogConsumer consumer();
-
-}
+package io.atomix.log.roles;

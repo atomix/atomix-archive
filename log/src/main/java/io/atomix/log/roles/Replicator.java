@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-present Open Networking Foundation
+ * Copyright 2017-present Open Networking Foundation
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,25 +13,27 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.atomix.primitive.log;
+package io.atomix.log.roles;
+
+import java.util.concurrent.CompletableFuture;
+
+import io.atomix.log.protocol.BackupOperation;
 
 /**
- * Log session.
+ * Backup replicator.
  */
-public interface LogSession {
+interface Replicator {
 
   /**
-   * Returns the log producer.
+   * Backs up the given operation.
    *
-   * @return the log producer
+   * @param operation the operation to back up
+   * @return a future to be completed with the operation index
    */
-  LogProducer producer();
+  CompletableFuture<Void> replicate(BackupOperation operation);
 
   /**
-   * Returns the log consumer.
-   *
-   * @return the log consumer
+   * Closes the replicator.
    */
-  LogConsumer consumer();
-
+  void close();
 }

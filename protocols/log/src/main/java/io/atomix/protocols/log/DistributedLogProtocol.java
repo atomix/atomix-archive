@@ -18,14 +18,11 @@ package io.atomix.protocols.log;
 import java.util.Collection;
 import java.util.stream.Collectors;
 
-import io.atomix.primitive.PrimitiveType;
 import io.atomix.primitive.log.LogClient;
 import io.atomix.primitive.log.LogSession;
 import io.atomix.primitive.partition.PartitionService;
 import io.atomix.primitive.protocol.LogProtocol;
 import io.atomix.primitive.protocol.PrimitiveProtocol;
-import io.atomix.primitive.proxy.ProxyClient;
-import io.atomix.primitive.proxy.impl.LogProxyClient;
 import io.atomix.protocols.log.impl.DistributedLogClient;
 import io.atomix.protocols.log.partition.LogPartition;
 
@@ -108,17 +105,8 @@ public class DistributedLogProtocol implements LogProtocol {
     Collection<LogSession> partitions = partitionService.getPartitionGroup(this)
         .getPartitions()
         .stream()
-        .map(partition -> ((LogPartition) partition).getClient().logSessionBuilder().build())
+        .map(partition -> ((LogPartition) partition).getClient())
         .collect(Collectors.toList());
     return new DistributedLogClient(this, partitions, config.getPartitioner());
-  }
-
-  @Override
-  public <S> ProxyClient<S> newProxy(
-      String primitiveName,
-      PrimitiveType primitiveType,
-      Class<S> serviceType,
-      PartitionService partitionService) {
-    return new LogProxyClient<S>(primitiveName, primitiveType, this, serviceType, newClient(partitionService));
   }
 }

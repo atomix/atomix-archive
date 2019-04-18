@@ -1,0 +1,71 @@
+syntax = "proto3";
+
+package atomix.protocols.log;
+
+option java_package = "io.atomix.log.protocol";
+option java_outer_classname = "LogProto";
+option java_multiple_files = true;
+
+enum Replication {
+    SYNCHRONOUS = 0;
+    ASYNCHRONOUS = 1;
+}
+
+message AppendRequest {
+    bytes value = 1;
+}
+
+message AppendResponse {
+    ResponseStatus status = 1;
+    int64 index = 2;
+}
+
+message ConsumeRequest {
+    string member_id = 1;
+    int64 consumer_id = 2;
+    int64 index = 3;
+}
+
+message ConsumeResponse {
+    ResponseStatus status = 1;
+}
+
+message BackupRequest {
+    string leader = 1;
+    int64 term = 2;
+    int64 index = 3;
+    repeated BackupOperation operations = 5;
+}
+
+message BackupResponse {
+    ResponseStatus status = 1;
+}
+
+message RecordsRequest {
+    LogRecord record = 1;
+    bool reset = 2;
+}
+
+message LogRecord {
+    int64 index = 1;
+    int64 timestamp = 2;
+    bytes value = 3;
+}
+
+message ResetRequest {
+    string member_id = 1;
+    int64 consumer_id = 2;
+    int64 index = 3;
+}
+
+message BackupOperation {
+    int64 index = 1;
+    int64 term = 2;
+    int64 timestamp = 3;
+    bytes value = 4;
+}
+
+enum ResponseStatus {
+    OK = 0;
+    ERROR = 1;
+}

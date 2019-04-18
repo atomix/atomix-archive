@@ -95,7 +95,11 @@ public class LogPartition implements Partition {
     return String.format("%s-partition-%d", partitionId.getGroup(), partitionId.getPartition());
   }
 
-  @Override
+  /**
+   * Returns the log partition client.
+   *
+   * @return the log partition client
+   */
   public LogPartitionClient getClient() {
     return client;
   }
@@ -112,7 +116,7 @@ public class LogPartition implements Partition {
         managementService,
         config,
         threadFactory);
-    client = new LogPartitionClient(this, managementService, threadFactory);
+    client = new LogPartitionClient(this, managementService, config, threadFactory);
     return server.start().thenCompose(v -> client.start()).thenApply(v -> this);
   }
 
@@ -123,7 +127,7 @@ public class LogPartition implements Partition {
       PartitionManagementService managementService,
       ThreadContextFactory threadFactory) {
     election = managementService.getElectionService().getElectionFor(partitionId);
-    client = new LogPartitionClient(this, managementService, threadFactory);
+    client = new LogPartitionClient(this, managementService, config, threadFactory);
     return client.start().thenApply(v -> this);
   }
 

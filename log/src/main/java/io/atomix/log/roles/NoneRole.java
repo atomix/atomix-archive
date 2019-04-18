@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-present Open Networking Foundation
+ * Copyright 2017-present Open Networking Foundation
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,25 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.atomix.primitive.log;
+package io.atomix.log.roles;
+
+import io.atomix.log.DistributedLogServer;
+import io.atomix.log.impl.DistributedLogServerContext;
 
 /**
- * Log session.
+ * None role.
  */
-public interface LogSession {
-
-  /**
-   * Returns the log producer.
-   *
-   * @return the log producer
-   */
-  LogProducer producer();
-
-  /**
-   * Returns the log consumer.
-   *
-   * @return the log consumer
-   */
-  LogConsumer consumer();
-
+public class NoneRole extends LogServerRole {
+  public NoneRole(DistributedLogServerContext service) {
+    super(DistributedLogServer.Role.NONE, service);
+  }
 }

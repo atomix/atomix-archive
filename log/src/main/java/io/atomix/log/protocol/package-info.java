@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-present Open Networking Foundation
+ * Copyright 2019-present Open Networking Foundation
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,25 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.atomix.primitive.log;
 
 /**
- * Log session.
+ * Distributed log protocol requests/responses.
  */
-public interface LogSession {
-
-  /**
-   * Returns the log producer.
-   *
-   * @return the log producer
-   */
-  LogProducer producer();
-
-  /**
-   * Returns the log consumer.
-   *
-   * @return the log consumer
-   */
-  LogConsumer consumer();
-
-}
+package io.atomix.log.protocol;

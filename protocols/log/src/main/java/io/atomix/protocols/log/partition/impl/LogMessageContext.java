@@ -19,12 +19,14 @@ package io.atomix.protocols.log.partition.impl;
  * Protocol message context.
  */
 class LogMessageContext {
+  private final String prefix;
   final String appendSubject;
   final String consumeSubject;
   final String resetSubject;
   final String backupSubject;
 
   LogMessageContext(String prefix) {
+    this.prefix = prefix;
     this.appendSubject = getSubject(prefix, "append");
     this.consumeSubject = getSubject(prefix, "consume");
     this.resetSubject = getSubject(prefix, "reset");
@@ -33,5 +35,9 @@ class LogMessageContext {
 
   private static String getSubject(String prefix, String type) {
     return String.format("%s-%s", prefix, type);
+  }
+
+  String recordsSubject(long consumerId) {
+    return String.format("%s-%d-records", prefix, consumerId);
   }
 }

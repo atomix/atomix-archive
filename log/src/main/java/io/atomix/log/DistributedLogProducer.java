@@ -13,25 +13,21 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.atomix.primitive.log;
+package io.atomix.log;
+
+import java.util.concurrent.CompletableFuture;
 
 /**
- * Log session.
+ * Log producer.
  */
-public interface LogSession {
+public interface DistributedLogProducer {
 
   /**
-   * Returns the log producer.
+   * Appends the given entry to the log.
    *
-   * @return the log producer
+   * @param value the entry to append
+   * @return a future to be completed once the entry has been appended
    */
-  LogProducer producer();
-
-  /**
-   * Returns the log consumer.
-   *
-   * @return the log consumer
-   */
-  LogConsumer consumer();
+  CompletableFuture<Long> append(byte[] value);
 
 }
