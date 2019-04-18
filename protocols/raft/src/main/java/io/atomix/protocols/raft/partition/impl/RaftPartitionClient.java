@@ -16,11 +16,12 @@
 package io.atomix.protocols.raft.partition.impl;
 
 import java.util.concurrent.CompletableFuture;
+import java.util.stream.Collectors;
 
 import io.atomix.cluster.MemberId;
 import io.atomix.primitive.partition.PartitionClient;
-import io.atomix.protocols.raft.RaftClient;
 import io.atomix.protocols.raft.partition.RaftPartition;
+import io.atomix.raft.RaftClient;
 import io.atomix.raft.protocol.RaftClientProtocol;
 import io.atomix.utils.Managed;
 import io.atomix.utils.concurrent.ThreadContextFactory;
@@ -64,7 +65,7 @@ public class RaftPartitionClient implements PartitionClient, Managed<RaftPartiti
    * @return the partition leader
    */
   public MemberId leader() {
-    return client != null ? client.leader() : null;
+    return client != null ? MemberId.from(client.leader()) : null;
   }
 
   @Override
@@ -82,13 +83,17 @@ public class RaftPartitionClient implements PartitionClient, Managed<RaftPartiti
     synchronized (RaftPartitionClient.this) {
       client = newRaftClient(protocol);
     }
-    return client.connect(partition.members()).whenComplete((r, e) -> {
-      if (e == null) {
-        log.debug("Successfully started client for partition {}", partition.id());
-      } else {
-        log.warn("Failed to start client for partition {}", partition.id(), e);
-      }
-    }).thenApply(v -> null);
+    return client.connect(partition.members()
+        .stream()
+        .map(MemberId::id)
+        .collect(Collectors.toList()))
+        .whenComplete((r, e) -> {
+          if (e == null) {
+            log.debug("Successfully started client for partition {}", partition.id());
+          } else {
+            log.warn("Failed to start client for partition {}", partition.id(), e);
+          }
+        }).thenApply(v -> null);
   }
 
   @Override

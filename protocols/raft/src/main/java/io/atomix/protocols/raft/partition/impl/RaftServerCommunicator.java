@@ -35,7 +35,6 @@ import io.atomix.raft.protocol.LeaveRequest;
 import io.atomix.raft.protocol.LeaveResponse;
 import io.atomix.raft.protocol.PollRequest;
 import io.atomix.raft.protocol.PollResponse;
-import io.atomix.raft.protocol.PublishRequest;
 import io.atomix.raft.protocol.QueryRequest;
 import io.atomix.raft.protocol.QueryResponse;
 import io.atomix.raft.protocol.RaftServerProtocol;
@@ -70,113 +69,113 @@ public class RaftServerCommunicator implements RaftServerProtocol {
   }
 
   @Override
-  public CompletableFuture<QueryResponse> query(MemberId memberId, QueryRequest request) {
+  public CompletableFuture<QueryResponse> query(String memberId, QueryRequest request) {
     return sendAndReceive(
         context.querySubject,
         request,
         QueryRequest::toByteArray,
         uncheck(QueryResponse::parseFrom),
-        memberId);
+        MemberId.from(memberId));
   }
 
   @Override
-  public CompletableFuture<CommandResponse> command(MemberId memberId, CommandRequest request) {
+  public CompletableFuture<CommandResponse> command(String memberId, CommandRequest request) {
     return sendAndReceive(
         context.commandSubject,
         request,
         CommandRequest::toByteArray,
         uncheck(CommandResponse::parseFrom),
-        memberId);
+        MemberId.from(memberId));
   }
 
   @Override
-  public CompletableFuture<JoinResponse> join(MemberId memberId, JoinRequest request) {
+  public CompletableFuture<JoinResponse> join(String memberId, JoinRequest request) {
     return sendAndReceive(
         context.joinSubject,
         request,
         JoinRequest::toByteArray,
         uncheck(JoinResponse::parseFrom),
-        memberId);
+        MemberId.from(memberId));
   }
 
   @Override
-  public CompletableFuture<LeaveResponse> leave(MemberId memberId, LeaveRequest request) {
+  public CompletableFuture<LeaveResponse> leave(String memberId, LeaveRequest request) {
     return sendAndReceive(
         context.leaveSubject,
         request,
         LeaveRequest::toByteArray,
         uncheck(LeaveResponse::parseFrom),
-        memberId);
+        MemberId.from(memberId));
   }
 
   @Override
-  public CompletableFuture<ConfigureResponse> configure(MemberId memberId, ConfigureRequest request) {
+  public CompletableFuture<ConfigureResponse> configure(String memberId, ConfigureRequest request) {
     return sendAndReceive(
         context.configureSubject,
         request,
         ConfigureRequest::toByteArray,
         uncheck(ConfigureResponse::parseFrom),
-        memberId);
+        MemberId.from(memberId));
   }
 
   @Override
-  public CompletableFuture<ReconfigureResponse> reconfigure(MemberId memberId, ReconfigureRequest request) {
+  public CompletableFuture<ReconfigureResponse> reconfigure(String memberId, ReconfigureRequest request) {
     return sendAndReceive(
         context.reconfigureSubject,
         request,
         ReconfigureRequest::toByteArray,
         uncheck(ReconfigureResponse::parseFrom),
-        memberId);
+        MemberId.from(memberId));
   }
 
   @Override
-  public CompletableFuture<InstallResponse> install(MemberId memberId, InstallRequest request) {
+  public CompletableFuture<InstallResponse> install(String memberId, InstallRequest request) {
     return sendAndReceive(
         context.installSubject,
         request,
         InstallRequest::toByteArray,
         uncheck(InstallResponse::parseFrom),
-        memberId);
+        MemberId.from(memberId));
   }
 
   @Override
-  public CompletableFuture<TransferResponse> transfer(MemberId memberId, TransferRequest request) {
+  public CompletableFuture<TransferResponse> transfer(String memberId, TransferRequest request) {
     return sendAndReceive(
         context.transferSubject,
         request,
         TransferRequest::toByteArray,
         uncheck(TransferResponse::parseFrom),
-        memberId);
+        MemberId.from(memberId));
   }
 
   @Override
-  public CompletableFuture<PollResponse> poll(MemberId memberId, PollRequest request) {
+  public CompletableFuture<PollResponse> poll(String memberId, PollRequest request) {
     return sendAndReceive(
         context.pollSubject,
         request,
         PollRequest::toByteArray,
         uncheck(PollResponse::parseFrom),
-        memberId);
+        MemberId.from(memberId));
   }
 
   @Override
-  public CompletableFuture<VoteResponse> vote(MemberId memberId, VoteRequest request) {
+  public CompletableFuture<VoteResponse> vote(String memberId, VoteRequest request) {
     return sendAndReceive(
         context.voteSubject,
         request,
         VoteRequest::toByteArray,
         uncheck(VoteResponse::parseFrom),
-        memberId);
+        MemberId.from(memberId));
   }
 
   @Override
-  public CompletableFuture<AppendResponse> append(MemberId memberId, AppendRequest request) {
+  public CompletableFuture<AppendResponse> append(String memberId, AppendRequest request) {
     return sendAndReceive(
         context.appendSubject,
         request,
         AppendRequest::toByteArray,
         uncheck(AppendResponse::parseFrom),
-        memberId);
+        MemberId.from(memberId));
   }
 
   @Override

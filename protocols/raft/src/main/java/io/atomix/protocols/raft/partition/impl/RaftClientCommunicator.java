@@ -16,8 +16,6 @@
 package io.atomix.protocols.raft.partition.impl;
 
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Executor;
-import java.util.function.Consumer;
 import java.util.function.Function;
 
 import com.google.common.base.Preconditions;
@@ -25,7 +23,6 @@ import io.atomix.cluster.MemberId;
 import io.atomix.cluster.messaging.ClusterCommunicationService;
 import io.atomix.raft.protocol.CommandRequest;
 import io.atomix.raft.protocol.CommandResponse;
-import io.atomix.raft.protocol.PublishRequest;
 import io.atomix.raft.protocol.QueryRequest;
 import io.atomix.raft.protocol.QueryResponse;
 import io.atomix.raft.protocol.RaftClientProtocol;
@@ -54,22 +51,22 @@ public class RaftClientCommunicator implements RaftClientProtocol {
   }
 
   @Override
-  public CompletableFuture<QueryResponse> query(MemberId memberId, QueryRequest request) {
+  public CompletableFuture<QueryResponse> query(String memberId, QueryRequest request) {
     return sendAndReceive(
         context.querySubject,
         request,
         QueryRequest::toByteArray,
         uncheck(QueryResponse::parseFrom),
-        memberId);
+        MemberId.from(memberId));
   }
 
   @Override
-  public CompletableFuture<CommandResponse> command(MemberId memberId, CommandRequest request) {
+  public CompletableFuture<CommandResponse> command(String memberId, CommandRequest request) {
     return sendAndReceive(
         context.commandSubject,
         request,
         CommandRequest::toByteArray,
         uncheck(CommandResponse::parseFrom),
-        memberId);
+        MemberId.from(memberId));
   }
 }

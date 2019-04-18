@@ -23,14 +23,15 @@ import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
+import java.util.stream.Collectors;
 
 import io.atomix.cluster.MemberId;
 import io.atomix.cluster.messaging.ClusterCommunicationService;
 import io.atomix.primitive.partition.Partition;
 import io.atomix.primitive.service.StateMachine;
-import io.atomix.protocols.raft.RaftServer;
 import io.atomix.protocols.raft.partition.RaftPartition;
 import io.atomix.protocols.raft.partition.RaftPartitionGroupConfig;
+import io.atomix.raft.RaftServer;
 import io.atomix.raft.storage.RaftStorage;
 import io.atomix.storage.StorageException;
 import io.atomix.utils.concurrent.Futures;
@@ -89,7 +90,10 @@ public class RaftPartitionServer {
           return Futures.exceptionalFuture(e);
         }
       }
-      serverOpenFuture = server.bootstrap(partition.members());
+      serverOpenFuture = server.bootstrap(partition.members()
+          .stream()
+          .map(MemberId::id)
+          .collect(Collectors.toList()));
     } else {
       serverOpenFuture = CompletableFuture.completedFuture(null);
     }
@@ -153,12 +157,12 @@ public class RaftPartitionServer {
   }
 
   private RaftServer buildServer(StateMachine stateMachine) {
-    return RaftServer.builder(localMemberId)
+    return RaftServer.builder(localMemberId.id())
         .withName(partition.name())
         .withProtocol(new RaftServerCommunicator(
             partition.name(),
             clusterCommunicator))
-        .withStateMachine(stateMachine)
+        .withStateMachine(new RaftPartitionStateMachine(stateMachine))
         .withElectionTimeout(Duration.ofMillis(ELECTION_TIMEOUT_MILLIS))
         .withHeartbeatInterval(Duration.ofMillis(HEARTBEAT_INTERVAL_MILLIS))
         .withStorage(RaftStorage.builder()

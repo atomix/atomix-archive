@@ -702,6 +702,11 @@ public class RaftTest extends ConcurrentTestCase {
 
   public static class TestStateMachine implements RaftStateMachine {
     @Override
+    public void init(Context context) {
+
+    }
+
+    @Override
     public void snapshot(OutputStream output) {
 
     }
@@ -717,13 +722,13 @@ public class RaftTest extends ConcurrentTestCase {
     }
 
     @Override
-    public CompletableFuture<byte[]> write(byte[] write) {
-      return CompletableFuture.completedFuture(null);
+    public CompletableFuture<byte[]> apply(RaftCommand command) {
+      return null;
     }
 
     @Override
-    public CompletableFuture<byte[]> read(byte[] read) {
-      return CompletableFuture.completedFuture(null);
+    public CompletableFuture<byte[]> apply(RaftQuery query) {
+      return null;
     }
   }
 

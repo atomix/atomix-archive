@@ -27,6 +27,8 @@ import java.nio.file.attribute.BasicFileAttributes;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import io.atomix.raft.RaftCommand;
+import io.atomix.raft.RaftQuery;
 import io.atomix.raft.RaftServer;
 import io.atomix.raft.RaftStateMachine;
 import io.atomix.raft.protocol.RaftServerProtocol;
@@ -171,6 +173,11 @@ public class RaftStateMachineTest {
 
   private class TestStateMachine implements RaftStateMachine {
     @Override
+    public void init(Context context) {
+
+    }
+
+    @Override
     public void snapshot(OutputStream output) {
 
     }
@@ -186,12 +193,12 @@ public class RaftStateMachineTest {
     }
 
     @Override
-    public CompletableFuture<byte[]> write(byte[] write) {
+    public CompletableFuture<byte[]> apply(RaftCommand command) {
       return null;
     }
 
     @Override
-    public CompletableFuture<byte[]> read(byte[] read) {
+    public CompletableFuture<byte[]> apply(RaftQuery query) {
       return null;
     }
   }

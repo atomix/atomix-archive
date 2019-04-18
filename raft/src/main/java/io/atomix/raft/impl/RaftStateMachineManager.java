@@ -23,7 +23,9 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
 import com.google.common.collect.Maps;
+import io.atomix.raft.RaftCommand;
 import io.atomix.raft.RaftException;
+import io.atomix.raft.RaftQuery;
 import io.atomix.raft.RaftServer;
 import io.atomix.raft.RaftStateMachine;
 import io.atomix.raft.storage.log.RaftLog;
@@ -45,7 +47,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
 /**
  * Internal server state machine.
  */
-public class RaftStateMachineManager implements AutoCloseable {
+public class RaftStateMachineManager implements RaftStateMachine.Context, AutoCloseable {
   private static final Duration SNAPSHOT_INTERVAL = Duration.ofSeconds(10);
   private static final Duration SNAPSHOT_COMPLETION_DELAY = Duration.ofSeconds(10);
   private static final Duration COMPACT_DELAY = Duration.ofSeconds(10);
@@ -60,6 +62,8 @@ public class RaftStateMachineManager implements AutoCloseable {
   private final RaftLogReader reader;
   private final Map<Long, CompletableFuture> futures = Maps.newHashMap();
   private volatile CompletableFuture<Void> compactFuture;
+  private long lastIndex;
+  private long lastTimestamp;
   private long lastEnqueued;
   private long lastCompacted;
 
@@ -74,15 +78,22 @@ public class RaftStateMachineManager implements AutoCloseable {
         .build());
     this.lastEnqueued = reader.getFirstIndex() - 1;
     scheduleSnapshots();
+    stateMachine.init(this);
   }
 
-  /**
-   * Returns the service thread context.
-   *
-   * @return the service thread context
-   */
-  public ThreadContext executor() {
-    return stateContext;
+  @Override
+  public long getIndex() {
+    return lastIndex;
+  }
+
+  @Override
+  public long getTimestamp() {
+    return lastTimestamp;
+  }
+
+  @Override
+  public RaftServer.Role getRole() {
+    return raft.getRole();
   }
 
   /**
@@ -474,7 +485,13 @@ public class RaftStateMachineManager implements AutoCloseable {
    */
   private CompletableFuture<OperationResult> applyCommand(Indexed<RaftLogEntry> entry) {
     raft.getLoadMonitor().recordEvent();
-    return stateMachine.write(entry.entry().getCommand().getValue().toByteArray())
+    lastIndex = entry.index();
+    lastTimestamp = Math.max(lastTimestamp, entry.entry().getTimestamp());
+    RaftCommand command = new RaftCommand(
+        lastIndex,
+        lastTimestamp,
+        entry.entry().getCommand().getValue().toByteArray());
+    return stateMachine.apply(command)
         .thenApply(OperationResult::succeeded)
         .exceptionally(OperationResult::failed);
   }
@@ -483,7 +500,11 @@ public class RaftStateMachineManager implements AutoCloseable {
    * Applies a query entry to the state machine.
    */
   private CompletableFuture<OperationResult> applyQuery(Indexed<RaftLogEntry> entry) {
-    return stateMachine.read(entry.entry().getQuery().getValue().toByteArray())
+    RaftQuery query = new RaftQuery(
+        lastIndex,
+        lastTimestamp,
+        entry.entry().getCommand().getValue().toByteArray());
+    return stateMachine.apply(query)
         .thenApply(OperationResult::succeeded)
         .exceptionally(OperationResult::failed);
   }

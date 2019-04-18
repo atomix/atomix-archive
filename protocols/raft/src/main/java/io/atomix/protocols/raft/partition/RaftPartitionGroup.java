@@ -47,7 +47,7 @@ import io.atomix.primitive.partition.PartitionMetadata;
 import io.atomix.primitive.protocol.PrimitiveProtocol;
 import io.atomix.primitive.protocol.ProxyProtocol;
 import io.atomix.protocols.raft.MultiRaftProtocol;
-import io.atomix.protocols.raft.RaftClient;
+import io.atomix.raft.RaftClient;
 import io.atomix.raft.impl.DefaultRaftClient;
 import io.atomix.storage.StorageLevel;
 import io.atomix.utils.concurrent.BlockingAwareThreadPoolContextFactory;

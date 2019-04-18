@@ -19,6 +19,8 @@ import java.time.Duration;
 
 import io.atomix.primitive.Recovery;
 import io.atomix.primitive.partition.Partitioner;
+import io.atomix.raft.CommunicationStrategy;
+import io.atomix.raft.ReadConsistency;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;

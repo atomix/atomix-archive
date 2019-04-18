@@ -21,6 +21,8 @@ import io.atomix.primitive.Recovery;
 import io.atomix.primitive.partition.Partitioner;
 import io.atomix.primitive.protocol.PrimitiveProtocol;
 import io.atomix.primitive.protocol.PrimitiveProtocolConfig;
+import io.atomix.raft.CommunicationStrategy;
+import io.atomix.raft.ReadConsistency;
 
 /**
  * Raft protocol configuration.

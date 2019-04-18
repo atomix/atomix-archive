@@ -20,7 +20,18 @@ import java.util.function.Function;
 /**
  * State machine command.
  */
-public interface Command<T> extends Operation<T> {
+public class Command<T> extends Operation<T> {
+  public Command(long index, long timestamp, T value) {
+    super(index, timestamp, value);
+  }
+
   @Override
-  <U> Command<U> map(Function<T, U> mapper);
+  public Type type() {
+    return Type.COMMAND;
+  }
+
+  @Override
+  public <U> Command<U> map(Function<T, U> mapper) {
+    return new Command<>(index(), timestamp(), mapper.apply(value()));
+  }
 }

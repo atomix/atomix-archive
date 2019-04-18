@@ -25,6 +25,41 @@ import java.util.concurrent.CompletableFuture;
 public interface RaftStateMachine {
 
   /**
+   * State machine context.
+   */
+  interface Context {
+
+    /**
+     * Returns the current state machine index.
+     *
+     * @return the current state machine index
+     */
+    long getIndex();
+
+    /**
+     * Returns the current state machine timestamp.
+     *
+     * @return the current state machine timestamp
+     */
+    long getTimestamp();
+
+    /**
+     * Returns the current role of the state machine.
+     *
+     * @return the current role of the state machine
+     */
+    RaftServer.Role getRole();
+
+  }
+
+  /**
+   * Initializes the state machine.
+   *
+   * @param context the state machine context
+   */
+  void init(Context context);
+
+  /**
    * Takes a snapshot of the state machine.
    *
    * @param output the output
@@ -47,19 +82,19 @@ public interface RaftStateMachine {
   boolean canDelete(long index);
 
   /**
-   * Applies the given write to the state machine.
+   * Applies the given command to the state machine.
    *
-   * @param write the write to apply
+   * @param command the command to apply
    * @return the state machine output
    */
-  CompletableFuture<byte[]> write(byte[] write);
+  CompletableFuture<byte[]> apply(RaftCommand command);
 
   /**
-   * Applies the given read to the state machine.
+   * Applies the given query to the state machine.
    *
-   * @param read the read to apply
+   * @param query the query to apply
    * @return the state machine output
    */
-  CompletableFuture<byte[]> read(byte[] read);
+  CompletableFuture<byte[]> apply(RaftQuery query);
 
 }
