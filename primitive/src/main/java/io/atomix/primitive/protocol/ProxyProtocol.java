@@ -15,6 +15,11 @@
  */
 package io.atomix.primitive.protocol;
 
+import io.atomix.primitive.PrimitiveManagementService;
+import io.atomix.primitive.PrimitiveType;
+import io.atomix.primitive.partition.Partition;
+import io.atomix.primitive.session.SessionClient;
+
 /**
  * State machine replication-based primitive protocol.
  */
@@ -26,5 +31,16 @@ public interface ProxyProtocol extends PrimitiveProtocol {
    * @return the protocol partition group name
    */
   String group();
+
+  /**
+   * Returns a new client for the given partition.
+   *
+   * @param name              the primitive name
+   * @param type              the primitive type
+   * @param partition         the partition for which to return the session
+   * @param managementService the partition management service
+   * @return a new client for the given partition
+   */
+  SessionClient newClient(String name, PrimitiveType type, Partition partition, PrimitiveManagementService managementService);
 
 }

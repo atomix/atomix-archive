@@ -16,19 +16,18 @@
 
 package io.atomix.core.map;
 
-import com.google.common.util.concurrent.MoreExecutors;
-import io.atomix.core.collection.DistributedCollection;
-import io.atomix.core.set.DistributedSet;
-import io.atomix.primitive.SyncPrimitive;
-import io.atomix.utils.time.Versioned;
-
 import java.time.Duration;
-import java.util.Map;
 import java.util.Map.Entry;
 import java.util.concurrent.Executor;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.Predicate;
+
+import com.google.common.util.concurrent.MoreExecutors;
+import io.atomix.core.collection.DistributedCollection;
+import io.atomix.core.set.DistributedSet;
+import io.atomix.primitive.SyncPrimitive;
+import io.atomix.utils.time.Versioned;
 
 /**
  * {@code ConsistentMap} provides the same functionality as {@link AsyncAtomicMap} with
@@ -78,18 +77,6 @@ public interface AtomicMap<K, V> extends SyncPrimitive {
    * this map contains no mapping for the key
    */
   Versioned<V> get(K key);
-
-  /**
-   * Returns a map of the values associated with the {@code keys} in this map. The returned map
-   * will only contain entries which already exist in the map.
-   * <p>
-   * Note that duplicate elements in {@code keys}, as determined by {@link Object#equals}, will be
-   * ignored.
-   *
-   * @param keys the keys whose associated values are to be returned
-   * @return the unmodifiable mapping of keys to values for the specified keys found in the map
-   */
-  Map<K, Versioned<V>> getAllPresent(Iterable<K> keys);
 
   /**
    * Returns the value (and version) to which the specified key is mapped, or the provided
@@ -188,31 +175,6 @@ public interface AtomicMap<K, V> extends SyncPrimitive {
    * no mapping for key.
    */
   Versioned<V> put(K key, V value, Duration ttl);
-
-  /**
-   * Associates the specified value with the specified key in this map (optional operation).
-   * If the map previously contained a mapping for the key, the old value is replaced by the
-   * specified value.
-   *
-   * @param key   key with which the specified value is to be associated
-   * @param value value to be associated with the specified key
-   * @return new value.
-   */
-  default Versioned<V> putAndGet(K key, V value) {
-    return putAndGet(key, value, Duration.ZERO);
-  }
-
-  /**
-   * Associates the specified value with the specified key in this map (optional operation).
-   * If the map previously contained a mapping for the key, the old value is replaced by the
-   * specified value.
-   *
-   * @param key   key with which the specified value is to be associated
-   * @param value value to be associated with the specified key
-   * @param ttl   the time to live after which to remove the value
-   * @return new value.
-   */
-  Versioned<V> putAndGet(K key, V value, Duration ttl);
 
   /**
    * Removes the mapping for a key from this map if it is present (optional operation).

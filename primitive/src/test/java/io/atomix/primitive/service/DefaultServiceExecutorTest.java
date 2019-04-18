@@ -23,11 +23,10 @@ import io.atomix.primitive.PrimitiveId;
 import io.atomix.primitive.TestPrimitiveType;
 import io.atomix.primitive.operation.OperationId;
 import io.atomix.primitive.operation.OperationType;
+import io.atomix.primitive.operation.impl.DefaultOperationId;
 import io.atomix.primitive.service.impl.DefaultCommit;
 import io.atomix.primitive.service.impl.DefaultServiceExecutor;
 import io.atomix.primitive.session.Session;
-import io.atomix.utils.serializer.Namespaces;
-import io.atomix.utils.serializer.Serializer;
 import io.atomix.utils.time.WallClockTimestamp;
 import org.junit.Test;
 
@@ -45,43 +44,43 @@ public class DefaultServiceExecutorTest {
     ServiceExecutor executor = executor();
     Set<String> calls = new HashSet<>();
 
-    executor.register(OperationId.newBuilder().setType(OperationType.COMMAND).setName("a").build(), () -> calls.add("a"));
-    executor.<Void>register(OperationId.newBuilder().setType(OperationType.COMMAND).setName("b").build(), commit -> calls.add("b"));
-    executor.register(OperationId.newBuilder().setType(OperationType.QUERY).setName("c").build(), commit -> {
+    executor.register(new DefaultOperationId("a", OperationType.COMMAND), () -> calls.add("a"));
+    executor.<Void>register(new DefaultOperationId("b", OperationType.COMMAND), commit -> calls.add("b"), b -> null);
+    executor.register(new DefaultOperationId("c", OperationType.QUERY), bytes -> {
       calls.add("c");
       return null;
-    });
-    executor.register(OperationId.newBuilder().setType(OperationType.QUERY).setName("d").build(), () -> {
+    }, b -> b, b -> null);
+    executor.register(new DefaultOperationId("d", OperationType.QUERY), () -> {
       calls.add("d");
       return null;
-    });
-    executor.register(OperationId.newBuilder().setType(OperationType.COMMAND).setName("e").build(), commit -> {
+    }, b -> null);
+    executor.register(new DefaultOperationId("e", OperationType.COMMAND), bytes -> {
       calls.add("e");
-      return commit.value();
-    });
+      return bytes;
+    }, b -> b, b -> b);
 
-    executor.apply(commit(OperationId.newBuilder().setType(OperationType.COMMAND).setName("a").build(), 1, null, System.currentTimeMillis()));
+    executor.apply(commit(new DefaultOperationId("a", OperationType.COMMAND), 1, null, System.currentTimeMillis()));
     assertTrue(calls.contains("a"));
 
-    executor.apply(commit(OperationId.newBuilder().setType(OperationType.COMMAND).setName("b").build(), 2, null, System.currentTimeMillis()));
+    executor.apply(commit(new DefaultOperationId("b", OperationType.COMMAND), 2, null, System.currentTimeMillis()));
     assertTrue(calls.contains("b"));
 
-    executor.apply(commit(OperationId.newBuilder().setType(OperationType.QUERY).setName("c").build(), 3, null, System.currentTimeMillis()));
+    executor.apply(commit(new DefaultOperationId("c", OperationType.QUERY), 3, null, System.currentTimeMillis()));
     assertTrue(calls.contains("c"));
 
-    executor.apply(commit(OperationId.newBuilder().setType(OperationType.QUERY).setName("d").build(), 4, null, System.currentTimeMillis()));
+    executor.apply(commit(new DefaultOperationId("d", OperationType.QUERY), 4, null, System.currentTimeMillis()));
     assertTrue(calls.contains("d"));
 
-    executor.apply(commit(OperationId.newBuilder().setType(OperationType.COMMAND).setName("e").build(), 5, null, System.currentTimeMillis()));
+    executor.apply(commit(new DefaultOperationId("e", OperationType.COMMAND), 5, null, System.currentTimeMillis()));
     assertTrue(calls.contains("e"));
   }
 
   @Test
   public void testScheduling() throws Exception {
     ServiceExecutor executor = executor();
-    executor.register(OperationId.newBuilder().setType(OperationType.COMMAND).setName("a").build(), () -> {
+    executor.register(new DefaultOperationId("a", OperationType.COMMAND), () -> {
     });
-    executor.apply(commit(OperationId.newBuilder().setType(OperationType.COMMAND).setName("a").build(), 1, null, 0));
+    executor.apply(commit(new DefaultOperationId("a", OperationType.COMMAND), 1, null, 0));
 
     Set<String> calls = new HashSet<>();
     executor.tick(new WallClockTimestamp(1));
@@ -98,7 +97,7 @@ public class DefaultServiceExecutorTest {
     when(context.serviceType()).thenReturn(TestPrimitiveType.instance());
     when(context.serviceName()).thenReturn("test");
     when(context.currentOperation()).thenReturn(OperationType.COMMAND);
-    return new DefaultServiceExecutor(context, Serializer.using(Namespaces.BASIC));
+    return new DefaultServiceExecutor(context);
   }
 
   @SuppressWarnings("unchecked")

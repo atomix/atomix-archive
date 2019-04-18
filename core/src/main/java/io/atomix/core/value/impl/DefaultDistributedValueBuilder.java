@@ -22,10 +22,9 @@ import io.atomix.core.value.DistributedValue;
 import io.atomix.core.value.DistributedValueBuilder;
 import io.atomix.core.value.DistributedValueConfig;
 import io.atomix.primitive.PrimitiveManagementService;
-import io.atomix.primitive.protocol.GossipProtocol;
+import io.atomix.primitive.partition.Partition;
 import io.atomix.primitive.protocol.PrimitiveProtocol;
-import io.atomix.primitive.protocol.value.ValueProtocol;
-import io.atomix.utils.concurrent.Futures;
+import io.atomix.primitive.protocol.ProxyProtocol;
 import io.atomix.utils.serializer.Serializer;
 
 /**
@@ -42,26 +41,23 @@ public class DefaultDistributedValueBuilder<V> extends DistributedValueBuilder<V
   @SuppressWarnings("unchecked")
   public CompletableFuture<DistributedValue<V>> buildAsync() {
     PrimitiveProtocol protocol = protocol();
-    if (protocol instanceof GossipProtocol) {
-      if (protocol instanceof ValueProtocol) {
-        CompletableFuture<AsyncDistributedValue<V>> future = managementService.getPrimitiveCache().getPrimitive(name, () ->
-            CompletableFuture.completedFuture(((ValueProtocol) protocol).<V>newValueDelegate(name, serializer(), managementService))
-                .thenApply(map -> new GossipDistributedValue<>(name, protocol, map)));
-        return future.thenApply(AsyncDistributedValue::sync);
-      } else {
-        return Futures.exceptionalFuture(new UnsupportedOperationException("Values are not supported by the provided gossip protocol"));
-      }
-    } else {
-      return newProxy(AtomicValueService.class)
-          .thenCompose(proxy -> new AtomicValueProxy(proxy, managementService.getPrimitiveRegistry()).connect())
-          .thenApply(elector -> {
-            Serializer serializer = serializer();
-            return new TranscodingAsyncAtomicValue<V, byte[]>(
-                elector,
-                key -> serializer.encode(key),
-                bytes -> serializer.decode(bytes));
-          })
-          .thenApply(value -> new DelegatingAsyncDistributedValue<>(value).sync());
-    }
+    return managementService.getPrimitiveRegistry().createPrimitive(name, type)
+        .thenCompose(v -> {
+          Partition partition = managementService.getPartitionService()
+              .getPartitionGroup((ProxyProtocol) protocol)
+              .getPartition(name);
+          return ((ProxyProtocol) protocol).newClient(name, type, partition, managementService).connect();
+        })
+        .thenApply(ValueProxy::new)
+        .thenApply(RawAsyncAtomicValue::new)
+        .thenApply(rawValue -> {
+          Serializer serializer = serializer();
+          return new TranscodingAsyncAtomicValue<V, byte[]>(
+              rawValue,
+              key -> serializer.encode(key),
+              bytes -> serializer.decode(bytes));
+        })
+        .thenApply(DelegatingAsyncDistributedValue::new)
+        .thenApply(AsyncDistributedValue::sync);
   }
 }

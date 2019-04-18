@@ -17,7 +17,6 @@
 package io.atomix.core.map.impl;
 
 import java.time.Duration;
-import java.util.Map;
 import java.util.Map.Entry;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
@@ -71,11 +70,6 @@ public class DelegatingAsyncAtomicMap<K, V>
   }
 
   @Override
-  public CompletableFuture<Map<K, Versioned<V>>> getAllPresent(Iterable<K> keys) {
-    return delegate().getAllPresent(keys);
-  }
-
-  @Override
   public CompletableFuture<Versioned<V>> getOrDefault(K key, V defaultValue) {
     return delegate().getOrDefault(key, defaultValue);
   }
@@ -90,11 +84,6 @@ public class DelegatingAsyncAtomicMap<K, V>
   @Override
   public CompletableFuture<Versioned<V>> put(K key, V value, Duration ttl) {
     return delegate().put(key, value, ttl);
-  }
-
-  @Override
-  public CompletableFuture<Versioned<V>> putAndGet(K key, V value, Duration ttl) {
-    return delegate().putAndGet(key, value, ttl);
   }
 
   @Override

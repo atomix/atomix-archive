@@ -29,7 +29,7 @@ import io.atomix.primitive.PrimitiveException;
 import io.atomix.primitive.PrimitiveId;
 import io.atomix.primitive.PrimitiveType;
 import io.atomix.primitive.PrimitiveTypeRegistry;
-import io.atomix.primitive.operation.OperationId;
+import io.atomix.primitive.operation.OperationMetadata;
 import io.atomix.primitive.operation.OperationType;
 import io.atomix.primitive.operation.PrimitiveOperation;
 import io.atomix.primitive.service.CloseSessionRequest;
@@ -263,7 +263,7 @@ public class PrimitiveStateMachine implements StateMachine {
             command.timestamp(),
             session,
             PrimitiveOperation.newBuilder()
-                .setId(OperationId.newBuilder()
+                .setMetadata(OperationMetadata.newBuilder()
                     .setType(OperationType.COMMAND)
                     .setName(command.value().getCommand().getName())
                     .build())
@@ -297,7 +297,6 @@ public class PrimitiveStateMachine implements StateMachine {
         primitiveType,
         openSession.value().getTimeout(),
         openSession.timestamp(),
-        service.serializer(),
         communicationService,
         service,
         threadContextFactory));
@@ -381,7 +380,7 @@ public class PrimitiveStateMachine implements StateMachine {
             query.timestamp(),
             session,
             PrimitiveOperation.newBuilder()
-                .setId(OperationId.newBuilder()
+                .setMetadata(OperationMetadata.newBuilder()
                     .setType(OperationType.QUERY)
                     .setName(query.value().getQuery().getName())
                     .build())

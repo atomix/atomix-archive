@@ -74,10 +74,10 @@ public class DefaultTransactionalMapBuilder<K, V> extends TransactionalMapBuilde
           TransactionalMapParticipant<K, V> transactionalMap;
           switch (transaction.isolation()) {
             case READ_COMMITTED:
-              transactionalMap = new ReadCommittedTransactionalMap<>(transaction.transactionId(), map.async());
+              transactionalMap = new ReadCommittedTransactionalMap<>(transaction.transactionId(), (ProxyProtocol) protocol(), map.async());
               break;
             case REPEATABLE_READS:
-              transactionalMap = new RepeatableReadsTransactionalMap<>(transaction.transactionId(), map.async());
+              transactionalMap = new RepeatableReadsTransactionalMap<>(transaction.transactionId(), (ProxyProtocol) protocol(), map.async());
               break;
             default:
               throw new AssertionError();

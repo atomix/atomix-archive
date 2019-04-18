@@ -21,7 +21,6 @@ import java.io.OutputStream;
 
 import io.atomix.primitive.session.Session;
 import io.atomix.primitive.session.SessionId;
-import io.atomix.utils.serializer.Serializer;
 import io.atomix.utils.time.WallClockTimestamp;
 
 /**
@@ -47,13 +46,6 @@ public interface PrimitiveService {
    * @param timestamp the service timestamp
    */
   void tick(WallClockTimestamp timestamp);
-
-  /**
-   * Returns the primitive service serializer.
-   *
-   * @return the primitive service serializer
-   */
-  Serializer serializer();
 
   /**
    * Backs up the service state to the given output stream.

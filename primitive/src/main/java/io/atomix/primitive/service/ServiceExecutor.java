@@ -16,17 +16,19 @@
 
 package io.atomix.primitive.service;
 
+import java.util.concurrent.Executor;
+import java.util.function.Consumer;
+import java.util.function.Function;
+import java.util.function.Supplier;
+
 import io.atomix.primitive.Consistency;
+import io.atomix.primitive.operation.OperationDecoder;
+import io.atomix.primitive.operation.OperationEncoder;
 import io.atomix.primitive.operation.OperationId;
 import io.atomix.primitive.operation.OperationType;
 import io.atomix.primitive.operation.PrimitiveOperation;
 import io.atomix.utils.concurrent.Scheduler;
 import io.atomix.utils.time.WallClockTimestamp;
-
-import java.util.concurrent.Executor;
-import java.util.function.Consumer;
-import java.util.function.Function;
-import java.util.function.Supplier;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -91,7 +93,7 @@ public interface ServiceExecutor extends Executor, Scheduler {
    * @param callback    the operation callback
    * @throws NullPointerException if the {@code operationId} or {@code callback} is null
    */
-  void handle(OperationId operationId, Function<Commit<byte[]>, byte[]> callback);
+  void handle(OperationId operationId, Function<byte[], byte[]> callback);
 
   /**
    * Registers a operation callback.
@@ -114,26 +116,30 @@ public interface ServiceExecutor extends Executor, Scheduler {
    *
    * @param operationId the operation identifier
    * @param callback    the operation callback
+   * @param encoder     the response encoder
    * @throws NullPointerException if the {@code operationId} or {@code callback} is null
    */
-  <R> void register(OperationId operationId, Supplier<R> callback);
+  <R> void register(OperationId operationId, Supplier<R> callback, OperationEncoder<R> encoder);
 
   /**
    * Registers a operation callback.
    *
    * @param operationId the operation identifier
    * @param callback    the operation callback
+   * @param decoder     the operation decoder
    * @throws NullPointerException if the {@code operationId} or {@code callback} is null
    */
-  <T> void register(OperationId operationId, Consumer<Commit<T>> callback);
+  <T> void register(OperationId operationId, Consumer<T> callback, OperationDecoder<T> decoder);
 
   /**
    * Registers an operation callback.
    *
    * @param operationId the operation identifier
    * @param callback    the operation callback
+   * @param decoder     the operation decoder
+   * @param encoder     the response encoder
    * @throws NullPointerException if the {@code operationId} or {@code callback} is null
    */
-  <T, R> void register(OperationId operationId, Function<Commit<T>, R> callback);
+  <T, R> void register(OperationId operationId, Function<T, R> callback, OperationDecoder<T> decoder, OperationEncoder<R> encoder);
 
 }

@@ -19,8 +19,7 @@ import io.atomix.cluster.MemberId;
 import io.atomix.primitive.PrimitiveType;
 import io.atomix.primitive.event.EventType;
 import io.atomix.primitive.event.PrimitiveEvent;
-
-import java.util.function.Consumer;
+import io.atomix.primitive.operation.OperationEncoder;
 
 /**
  * Provides an interface to communicating with a client via session events.
@@ -45,7 +44,7 @@ import java.util.function.Consumer;
  * When the message is published, it will be queued to be sent to the other side of the connection. Raft guarantees
  * that the message will eventually be received by the client unless the session itself times out or is closed.
  */
-public interface Session<C> {
+public interface Session {
 
   /**
    * Returns the session identifier.
@@ -88,7 +87,7 @@ public interface Session<C> {
    * @param eventType the event type
    */
   default void publish(EventType eventType) {
-    publish(eventType, null);
+    publish(eventType, null, v -> null);
   }
 
   /**
@@ -96,9 +95,10 @@ public interface Session<C> {
    *
    * @param eventType the event identifier
    * @param event     the event value
+   * @param encoder   the event encoder
    * @param <T>       the event type
    */
-  <T> void publish(EventType eventType, T event);
+  <T> void publish(EventType eventType, T event, OperationEncoder<T> encoder);
 
   /**
    * Publishes an event to the session.
@@ -106,13 +106,6 @@ public interface Session<C> {
    * @param event the event to publish
    */
   void publish(PrimitiveEvent event);
-
-  /**
-   * Sends an event to the client via the client proxy.
-   *
-   * @param event the client proxy operation
-   */
-  void accept(Consumer<C> event);
 
   /**
    * Session state enums.

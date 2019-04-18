@@ -15,10 +15,10 @@
  */
 package io.atomix.core.iterator.impl;
 
-import io.atomix.core.iterator.AsyncIterator;
-
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
+
+import io.atomix.core.iterator.AsyncIterator;
 
 /**
  * Transcoding iterator.
@@ -40,10 +40,5 @@ public class TranscodingIterator<T1, T2> implements AsyncIterator<T1> {
   @Override
   public CompletableFuture<T1> next() {
     return backingIterator.next().thenApply(elementDecoder);
-  }
-
-  @Override
-  public CompletableFuture<Void> close() {
-    return backingIterator.close();
   }
 }

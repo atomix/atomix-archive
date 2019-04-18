@@ -20,6 +20,6 @@ message LogOperation {
     int64 session_id = 1;
     string primitive = 2;
     int64 operation_index = 3;
-    atomix.primitive.operation.OperationId operation_id = 4;
+    atomix.primitive.operation.OperationMetadata metadata = 4;
     bytes operation = 5;
 }

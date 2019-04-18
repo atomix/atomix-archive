@@ -19,10 +19,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 
-import io.atomix.primitive.operation.OperationId;
-import io.atomix.primitive.operation.OperationType;
 import io.atomix.primitive.service.AbstractPrimitiveService;
-import io.atomix.primitive.service.Commit;
 import io.atomix.primitive.service.ServiceExecutor;
 import io.atomix.primitive.session.impl.proto.NextRequest;
 import io.atomix.primitive.session.impl.proto.NextResponse;
@@ -33,10 +30,6 @@ import io.atomix.primitive.session.impl.proto.SessionIdGeneratorSnapshot;
  */
 public class SessionIdGeneratorService extends AbstractPrimitiveService {
   private long id;
-
-  public SessionIdGeneratorService() {
-    super(SessionIdGeneratorType.instance());
-  }
 
   @Override
   public void backup(OutputStream output) throws IOException {
@@ -54,15 +47,10 @@ public class SessionIdGeneratorService extends AbstractPrimitiveService {
 
   @Override
   protected void configure(ServiceExecutor executor) {
-    executor.register(OperationId.newBuilder().setType(OperationType.COMMAND).setName("NEXT").build(), this::next);
+    executor.register(SessionIdGeneratorOperations.NEXT, this::next, NextRequest::parseFrom, NextResponse::toByteArray);
   }
 
-  /**
-   * Returns the next session ID.
-   *
-   * @return the next session ID
-   */
-  protected NextResponse next(Commit<NextRequest> commit) {
+  protected NextResponse next(NextRequest request) {
     return NextResponse.newBuilder()
         .setSessionId(++id)
         .build();

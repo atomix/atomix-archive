@@ -15,6 +15,8 @@
  */
 package io.atomix.core.set.impl;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
 import com.google.common.io.BaseEncoding;
@@ -23,10 +25,10 @@ import io.atomix.core.set.DistributedSet;
 import io.atomix.core.set.DistributedSetBuilder;
 import io.atomix.core.set.DistributedSetConfig;
 import io.atomix.primitive.PrimitiveManagementService;
-import io.atomix.primitive.protocol.GossipProtocol;
+import io.atomix.primitive.partition.PartitionId;
+import io.atomix.primitive.partition.Partitioner;
 import io.atomix.primitive.protocol.PrimitiveProtocol;
-import io.atomix.primitive.protocol.set.SetProtocol;
-import io.atomix.primitive.proxy.ProxyClient;
+import io.atomix.primitive.protocol.ProxyProtocol;
 import io.atomix.utils.concurrent.Futures;
 import io.atomix.utils.serializer.Serializer;
 
@@ -44,34 +46,35 @@ public class DefaultDistributedSetBuilder<E> extends DistributedSetBuilder<E> {
   @SuppressWarnings("unchecked")
   public CompletableFuture<DistributedSet<E>> buildAsync() {
     PrimitiveProtocol protocol = protocol();
-    if (protocol instanceof GossipProtocol) {
-      if (protocol instanceof SetProtocol) {
-        return managementService.getPrimitiveCache().getPrimitive(name, () ->
-            CompletableFuture.completedFuture(((SetProtocol) protocol).<E>newSetDelegate(name, serializer(), managementService))
-                .thenApply(set -> new GossipDistributedSet<>(name, protocol, set)))
-            .thenApply(AsyncDistributedSet::sync);
-      } else {
-        return Futures.exceptionalFuture(new UnsupportedOperationException("Sets are not supported by the provided gossip protocol"));
-      }
-    } else {
-      return newProxy(DistributedSetService.class)
-          .thenCompose(proxy -> new DistributedSetProxy((ProxyClient) proxy, managementService.getPrimitiveRegistry()).connect())
-          .thenApply(rawSet -> {
-            Serializer serializer = serializer();
-            AsyncDistributedSet<E> set = new TranscodingAsyncDistributedSet<>(
-                rawSet,
-                element -> BaseEncoding.base16().encode(serializer.encode(element)),
-                string -> serializer.decode(BaseEncoding.base16().decode(string)));
-
-            if (config.getCacheConfig().isEnabled()) {
-              set = new CachingAsyncDistributedSet<>(set, config.getCacheConfig());
-            }
-
-            if (config.isReadOnly()) {
-              set = new UnmodifiableAsyncDistributedSet<>(set);
-            }
-            return set.sync();
-          });
-    }
+    return managementService.getPrimitiveRegistry().createPrimitive(name, type)
+        .thenCompose(v -> {
+          Map<PartitionId, AsyncDistributedSet<String>> partitions = new HashMap<>();
+          return Futures.allOf(managementService.getPartitionService().getPartitionGroup((ProxyProtocol) protocol()).getPartitions().stream()
+              .map(partition -> ((ProxyProtocol) protocol).newClient(name, type, partition, managementService).connect()
+                  .thenApply(session -> new SetProxy(session))
+                  .thenApply(proxy -> partitions.put(partition.id(), new RawAsyncDistributedSet(proxy)))))
+              .thenApply(w -> partitions);
+        })
+        .thenApply(partitions -> new PartitionedAsyncDistributedSet(name, type, partitions, Partitioner.MURMUR3))
+        .thenApply(rawSet -> {
+          Serializer serializer = serializer();
+          return new TranscodingAsyncDistributedSet<E, String>(
+              rawSet,
+              element -> BaseEncoding.base16().encode(serializer.encode(element)),
+              string -> serializer.decode(BaseEncoding.base16().decode(string)));
+        })
+        .thenApply(set -> {
+          if (config.getCacheConfig().isEnabled()) {
+            return new CachingAsyncDistributedSet<>(set, config.getCacheConfig());
+          }
+          return set;
+        })
+        .thenApply(set -> {
+          if (config.isReadOnly()) {
+            return new UnmodifiableAsyncDistributedSet<>(set);
+          }
+          return set;
+        })
+        .thenApply(AsyncDistributedSet::sync);
   }
 }

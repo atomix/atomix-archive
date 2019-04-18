@@ -78,7 +78,11 @@ public class CorePrimitivesService implements ManagedPrimitivesService {
       ConfigService configService) {
     this.cache = checkNotNull(primitiveCache);
     this.registry = checkNotNull(registry);
-    this.primitiveRegistry = new CorePrimitiveRegistry(partitionService, new DefaultPrimitiveTypeRegistry(registry.getTypes(PrimitiveType.class)));
+    this.primitiveRegistry = new CorePrimitiveRegistry(
+        partitionService,
+        membershipService,
+        communicationService,
+        new DefaultPrimitiveTypeRegistry(registry.getTypes(PrimitiveType.class)));
     this.managementService = new CorePrimitiveManagementService(
         executorService,
         membershipService,

@@ -15,14 +15,14 @@
  */
 package io.atomix.core.iterator.impl;
 
-import io.atomix.core.iterator.AsyncIterator;
-import io.atomix.core.iterator.SyncIterator;
-import io.atomix.primitive.PrimitiveException;
-
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+
+import io.atomix.core.iterator.AsyncIterator;
+import io.atomix.core.iterator.SyncIterator;
+import io.atomix.primitive.PrimitiveException;
 
 /**
  * Blocking iterator.
@@ -44,11 +44,6 @@ public class BlockingIterator<T> implements SyncIterator<T> {
   @Override
   public T next() {
     return complete(asyncIterator.next());
-  }
-
-  @Override
-  public void close() {
-    complete(asyncIterator.close());
   }
 
   @Override

@@ -82,7 +82,7 @@ final class PrimitiveSessionInvoker {
    */
   public CompletableFuture<byte[]> invoke(PrimitiveOperation operation) {
     CompletableFuture<byte[]> future = new CompletableFuture<>();
-    switch (operation.getId().getType()) {
+    switch (operation.getMetadata().getType()) {
       case COMMAND:
         context.execute(() -> invokeCommand(operation, future));
         break;
@@ -90,7 +90,7 @@ final class PrimitiveSessionInvoker {
         context.execute(() -> invokeQuery(operation, future));
         break;
       default:
-        throw new IllegalArgumentException("Unknown operation type " + operation.getId().getType());
+        throw new IllegalArgumentException("Unknown operation type " + operation.getMetadata().getType());
     }
     return future;
   }
@@ -103,7 +103,7 @@ final class PrimitiveSessionInvoker {
         .setSessionId(state.getSessionId().id())
         .setSequenceNumber(state.nextCommandRequest())
         .setCommand(CommandRequest.newBuilder()
-            .setName(operation.getId().getName())
+            .setName(operation.getMetadata().getName())
             .setCommand(operation.getValue())
             .build())
         .build();
@@ -126,7 +126,7 @@ final class PrimitiveSessionInvoker {
         .setSequenceNumber(state.getCommandRequest())
         .setQuery(QueryRequest.newBuilder()
             .setIndex(Math.max(state.getResponseIndex(), state.getEventIndex()))
-            .setName(operation.getId().getName())
+            .setName(operation.getMetadata().getName())
             .setQuery(operation.getValue())
             .build())
         .build();

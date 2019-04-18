@@ -20,6 +20,7 @@ import java.util.concurrent.CompletableFuture;
 import io.atomix.core.set.impl.SetUpdate;
 import io.atomix.core.transaction.TransactionLog;
 import io.atomix.core.transaction.TransactionParticipant;
+import io.atomix.primitive.protocol.ProxyProtocol;
 
 /**
  * Singleton transactional set.
@@ -30,6 +31,11 @@ public class SingletonTransactionalSet<E> extends DelegatingTransactionalSet<E> 
   public SingletonTransactionalSet(TransactionalSetParticipant<E> set) {
     super(set);
     this.set = set;
+  }
+
+  @Override
+  public ProxyProtocol protocol() {
+    return set.protocol();
   }
 
   @Override

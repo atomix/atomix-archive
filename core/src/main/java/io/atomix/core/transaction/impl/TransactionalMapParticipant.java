@@ -15,6 +15,9 @@
  */
 package io.atomix.core.transaction.impl;
 
+import java.time.Duration;
+import java.util.concurrent.CompletableFuture;
+
 import io.atomix.core.map.AsyncAtomicMap;
 import io.atomix.core.map.impl.MapUpdate;
 import io.atomix.core.transaction.AsyncTransactionalMap;
@@ -22,9 +25,7 @@ import io.atomix.core.transaction.TransactionId;
 import io.atomix.core.transaction.TransactionParticipant;
 import io.atomix.core.transaction.TransactionalMap;
 import io.atomix.primitive.PrimitiveType;
-
-import java.time.Duration;
-import java.util.concurrent.CompletableFuture;
+import io.atomix.primitive.protocol.ProxyProtocol;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -34,10 +35,12 @@ import static com.google.common.base.Preconditions.checkNotNull;
  */
 public abstract class TransactionalMapParticipant<K, V> implements AsyncTransactionalMap<K, V>, TransactionParticipant<MapUpdate<K, V>> {
   protected final TransactionId transactionId;
+  protected final ProxyProtocol protocol;
   protected final AsyncAtomicMap<K, V> consistentMap;
 
-  protected TransactionalMapParticipant(TransactionId transactionId, AsyncAtomicMap<K, V> consistentMap) {
+  protected TransactionalMapParticipant(TransactionId transactionId, ProxyProtocol protocol, AsyncAtomicMap<K, V> consistentMap) {
     this.transactionId = checkNotNull(transactionId);
+    this.protocol = checkNotNull(protocol);
     this.consistentMap = checkNotNull(consistentMap);
   }
 
@@ -49,6 +52,11 @@ public abstract class TransactionalMapParticipant<K, V> implements AsyncTransact
   @Override
   public PrimitiveType type() {
     return consistentMap.type();
+  }
+
+  @Override
+  public ProxyProtocol protocol() {
+    return protocol;
   }
 
   @Override

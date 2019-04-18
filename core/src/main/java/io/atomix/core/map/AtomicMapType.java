@@ -15,22 +15,11 @@
  */
 package io.atomix.core.map;
 
-import io.atomix.core.iterator.impl.IteratorBatch;
 import io.atomix.core.map.impl.DefaultAtomicMapBuilder;
-import io.atomix.core.map.impl.DefaultAtomicMapService;
-import io.atomix.core.map.impl.MapEntryUpdateResult;
-import io.atomix.core.map.impl.MapUpdate;
-import io.atomix.core.transaction.TransactionId;
-import io.atomix.core.transaction.TransactionLog;
-import io.atomix.core.transaction.impl.CommitResult;
-import io.atomix.core.transaction.impl.PrepareResult;
-import io.atomix.core.transaction.impl.RollbackResult;
+import io.atomix.core.map.impl.MapService;
 import io.atomix.primitive.PrimitiveManagementService;
 import io.atomix.primitive.PrimitiveType;
 import io.atomix.primitive.service.PrimitiveService;
-import io.atomix.utils.serializer.Namespace;
-import io.atomix.utils.serializer.Namespaces;
-import io.atomix.utils.time.Versioned;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
 
@@ -60,32 +49,8 @@ public class AtomicMapType<K, V> implements PrimitiveType<AtomicMapBuilder<K, V>
   }
 
   @Override
-  public Namespace namespace() {
-    return Namespace.builder()
-        .register(PrimitiveType.super.namespace())
-        .register(Namespaces.BASIC)
-        .nextId(Namespaces.BEGIN_USER_CUSTOM_ID)
-        .register(TransactionId.class)
-        .register(TransactionLog.class)
-        .register(MapUpdate.class)
-        .register(MapUpdate.Type.class)
-        .register(PrepareResult.class)
-        .register(CommitResult.class)
-        .register(RollbackResult.class)
-        .register(MapEntryUpdateResult.class)
-        .register(MapEntryUpdateResult.Status.class)
-        .register(Versioned.class)
-        .register(AtomicMapEvent.class)
-        .register(AtomicMapEvent.Type.class)
-        .register(IteratorBatch.class)
-        .register(Versioned.class)
-        .register(byte[].class)
-        .build();
-  }
-
-  @Override
   public PrimitiveService newService() {
-    return new DefaultAtomicMapService();
+    return new MapService();
   }
 
   @Override

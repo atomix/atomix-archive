@@ -21,7 +21,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
 import com.google.common.collect.Sets;
-import io.atomix.primitive.operation.OperationId;
+import io.atomix.primitive.operation.OperationMetadata;
 import io.atomix.primitive.operation.OperationType;
 import io.atomix.primitive.operation.PrimitiveOperation;
 import io.atomix.primitive.partition.GroupMember;
@@ -62,9 +62,9 @@ public class DefaultPrimaryElection implements ManagedPrimaryElection {
   @Override
   public CompletableFuture<PrimaryTerm> enter(GroupMember member) {
     return proxy.execute(PrimitiveOperation.newBuilder()
-        .setId(OperationId.newBuilder()
+        .setMetadata(OperationMetadata.newBuilder()
             .setType(OperationType.COMMAND)
-            .setName("ENTER")
+            .setName(PrimaryElectorOperations.ENTER.id())
             .build())
         .setValue(EnterRequest.newBuilder()
             .setPartitionId(partitionId)
@@ -79,9 +79,9 @@ public class DefaultPrimaryElection implements ManagedPrimaryElection {
   @Override
   public CompletableFuture<PrimaryTerm> getTerm() {
     return proxy.execute(PrimitiveOperation.newBuilder()
-        .setId(OperationId.newBuilder()
+        .setMetadata(OperationMetadata.newBuilder()
             .setType(OperationType.QUERY)
-            .setName("GET_TERM")
+            .setName(PrimaryElectorOperations.GET_TERM.id())
             .build())
         .setValue(GetTermRequest.newBuilder()
             .setPartitionId(partitionId)

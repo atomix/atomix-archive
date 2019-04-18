@@ -15,12 +15,12 @@
  */
 package io.atomix.core.iterator;
 
-import io.atomix.core.iterator.impl.BlockingIterator;
-import io.atomix.primitive.DistributedPrimitive;
-
 import java.time.Duration;
 import java.util.Iterator;
 import java.util.concurrent.CompletableFuture;
+
+import io.atomix.core.iterator.impl.BlockingIterator;
+import io.atomix.primitive.DistributedPrimitive;
 
 /**
  * Asynchronous iterator.
@@ -40,13 +40,6 @@ public interface AsyncIterator<T> {
    * @return the next item in the iterator
    */
   CompletableFuture<T> next();
-
-  /**
-   * Closes the iterator.
-   *
-   * @return a future to be completed once the iterator has been closed
-   */
-  CompletableFuture<Void> close();
 
   /**
    * Returns a synchronous iterator.

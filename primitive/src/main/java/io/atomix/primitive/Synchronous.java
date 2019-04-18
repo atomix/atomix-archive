@@ -15,12 +15,11 @@
  */
 package io.atomix.primitive;
 
-import io.atomix.primitive.protocol.PrimitiveProtocol;
-import io.atomix.utils.AtomixRuntimeException;
-
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+
+import io.atomix.utils.AtomixRuntimeException;
 
 /**
  * DistributedPrimitive that is a synchronous (blocking) version of
@@ -44,11 +43,6 @@ public abstract class Synchronous<T extends AsyncPrimitive> implements SyncPrimi
   @Override
   public PrimitiveType type() {
     return primitive.type();
-  }
-
-  @Override
-  public PrimitiveProtocol protocol() {
-    return primitive.protocol();
   }
 
   @Override

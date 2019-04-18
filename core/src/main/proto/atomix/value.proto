@@ -1,0 +1,122 @@
+syntax = "proto3";
+
+package atomix.value.service;
+
+import "atomix/metadata.proto";
+import "atomix/primitive/service.proto";
+
+option java_package = "io.atomix.core.value.impl";
+option java_outer_classname = "ValueProto";
+option java_multiple_files = true;
+
+// Atomic value snapshot
+message AtomicValueSnapshot {
+    int64 version = 1;
+    bytes value = 2;
+    repeated int64 listeners = 3;
+}
+
+message GetRequest {
+
+}
+
+message GetResponse {
+    atomix.metadata.Metadata metadata = 1;
+    bytes value = 2;
+    int64 version = 3;
+}
+
+message SetRequest {
+    bytes value = 1;
+}
+
+message SetResponse {
+    atomix.metadata.Metadata metadata = 1;
+    int64 version = 2;
+    bytes previous_value = 3;
+    int64 previous_version = 4;
+}
+
+message CheckAndSetRequest {
+    bytes check = 1;
+    bytes update = 2;
+    int64 version = 3;
+}
+
+message CheckAndSetResponse {
+    atomix.metadata.Metadata metadata = 1;
+    int64 version = 2;
+    bool succeeded = 3;
+}
+
+message ListenRequest {
+
+}
+
+message ListenResponse {
+    atomix.metadata.Metadata metadata = 1;
+}
+
+message ValueEvent {
+    atomix.metadata.Metadata metadata = 1;
+    Type type = 2;
+    bytes previous_value = 3;
+    int64 previous_version = 4;
+    bytes new_value = 5;
+    int64 new_version = 6;
+
+    enum Type {
+        UPDATED = 0;
+    }
+}
+
+message UnlistenRequest {
+
+}
+
+message UnlistenResponse {
+    atomix.metadata.Metadata metadata = 1;
+}
+
+service ValueService {
+    rpc Set(SetRequest) returns (SetResponse) {
+        option (atomix.primitive.service.operation) = {
+            name: "set"
+            type: COMMAND
+        };
+    }
+
+    rpc Get(GetRequest) returns (GetResponse) {
+        option (atomix.primitive.service.operation) = {
+            name: "get"
+            type: QUERY
+        };
+    }
+
+    rpc CheckAndSet(CheckAndSetRequest) returns (CheckAndSetResponse) {
+        option (atomix.primitive.service.operation) = {
+            name: "cas"
+            type: COMMAND
+        };
+    }
+
+    rpc Listen(ListenRequest) returns (ListenResponse) {
+        option (atomix.primitive.service.operation) = {
+            name: "listen"
+            type: COMMAND
+        };
+    }
+
+    rpc OnEvent(atomix.primitive.service.EventListener) returns (stream ValueEvent) {
+        option (atomix.primitive.service.event) = {
+            name: "event"
+        };
+    }
+
+    rpc Unlisten(UnlistenRequest) returns (UnlistenResponse) {
+        option (atomix.primitive.service.operation) = {
+            name: "unlisten"
+            type: COMMAND
+        };
+    }
+}

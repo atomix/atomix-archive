@@ -15,18 +15,17 @@
  */
 package io.atomix.core.registry;
 
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Map;
+
 import com.google.common.collect.Maps;
 import io.atomix.cluster.discovery.NodeDiscoveryProvider;
 import io.atomix.core.AtomixRegistry;
-import io.atomix.core.profile.Profile;
 import io.atomix.primitive.PrimitiveType;
 import io.atomix.primitive.partition.PartitionGroup;
 import io.atomix.primitive.protocol.PrimitiveProtocol;
 import io.atomix.utils.NamedType;
-
-import java.util.Collection;
-import java.util.Collections;
-import java.util.Map;
 
 /**
  * Static Atomix registry.
@@ -67,17 +66,6 @@ public class SimpleRegistry implements AtomixRegistry {
    */
   public static class Builder implements io.atomix.utils.Builder<AtomixRegistry> {
     private final Map<Class<?>, Map<String, NamedType>> registrations = Maps.newHashMap();
-
-    /**
-     * Adds a profile type to the builder.
-     *
-     * @param profileType the profile type to add
-     * @return the registry builder
-     */
-    public Builder addProfileType(Profile.Type profileType) {
-      registrations.computeIfAbsent(Profile.Type.class, t -> Maps.newHashMap()).put(profileType.name(), profileType);
-      return this;
-    }
 
     /**
      * Adds a node discovery provider type.

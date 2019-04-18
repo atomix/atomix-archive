@@ -2,9 +2,33 @@ syntax = "proto3";
 
 package atomix.primitive.service;
 
+import "google/protobuf/descriptor.proto";
+import "atomix/primitive/operation.proto";
+
 option java_package = "io.atomix.primitive.service";
-option java_outer_classname = "ServiceProto";
+option java_outer_classname = "PrimitiveServiceProto";
 option java_multiple_files = true;
+
+extend google.protobuf.ServiceOptions {
+    string base_name = 50001;
+}
+
+message ServiceOperation {
+    string name = 1;
+    atomix.primitive.operation.OperationType type = 2;
+}
+
+message ServiceEvent {
+    string name = 1;
+}
+
+message EventListener {
+}
+
+extend google.protobuf.MethodOptions {
+    ServiceOperation operation = 50002;
+    ServiceEvent event = 50003;
+}
 
 // Service snapshot
 message ServiceSnapshot {

@@ -11,12 +11,12 @@ enum OperationType {
     QUERY = 1;
 }
 
-message OperationId {
+message OperationMetadata {
     OperationType type = 1;
     string name = 2;
 }
 
 message PrimitiveOperation {
-    OperationId id = 1;
+    OperationMetadata metadata = 1;
     bytes value = 2;
 }

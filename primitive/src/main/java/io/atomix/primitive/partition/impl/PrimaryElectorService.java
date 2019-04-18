@@ -34,16 +34,12 @@ import java.util.stream.Collectors;
 
 import com.google.common.base.MoreObjects;
 import com.google.common.collect.Lists;
-import io.atomix.primitive.event.EventType;
-import io.atomix.primitive.operation.OperationId;
-import io.atomix.primitive.operation.OperationType;
 import io.atomix.primitive.partition.GroupMember;
 import io.atomix.primitive.partition.MemberGroupId;
 import io.atomix.primitive.partition.PartitionId;
 import io.atomix.primitive.partition.PrimaryElectionEvent;
 import io.atomix.primitive.partition.PrimaryTerm;
 import io.atomix.primitive.service.AbstractPrimitiveService;
-import io.atomix.primitive.service.Commit;
 import io.atomix.primitive.service.ServiceExecutor;
 import io.atomix.primitive.session.Session;
 import io.atomix.utils.concurrent.Scheduled;
@@ -63,10 +59,6 @@ public class PrimaryElectorService extends AbstractPrimitiveService {
   private Map<PartitionId, ElectionState> elections = new HashMap<>();
   private Map<Long, Session> listeners = new LinkedHashMap<>();
   private Scheduled rebalanceTimer;
-
-  public PrimaryElectorService() {
-    super(PrimaryElectorType.instance());
-  }
 
   @Override
   public void backup(OutputStream output) throws IOException {
@@ -117,15 +109,16 @@ public class PrimaryElectorService extends AbstractPrimitiveService {
 
   @Override
   protected void configure(ServiceExecutor executor) {
-    executor.register(OperationId.newBuilder().setType(OperationType.COMMAND).setName("ENTER").build(), this::enter);
-    executor.register(OperationId.newBuilder().setType(OperationType.QUERY).setName("GET_TERM").build(), this::enter);
+    executor.register(PrimaryElectorOperations.ENTER, this::enter, EnterRequest::parseFrom, EnterResponse::toByteArray);
+    executor.register(PrimaryElectorOperations.GET_TERM, this::getTerm, GetTermRequest::parseFrom, GetTermResponse::toByteArray);
   }
 
   private void notifyTermChange(PartitionId partitionId, PrimaryTerm term) {
-    listeners.values().forEach(session -> session.publish(EventType.from("CHANGE"), PrimaryElectionEvent.newBuilder()
-        .setPartitionId(partitionId)
-        .setTerm(term)
-        .build()));
+    listeners.values().forEach(session -> session.publish(PrimaryElectorEvents.CHANGE, PrimaryElectionEvent.newBuilder()
+            .setPartitionId(partitionId)
+            .setTerm(term)
+            .build(),
+        PrimaryElectionEvent::toByteArray));
   }
 
   /**
@@ -184,16 +177,16 @@ public class PrimaryElectorService extends AbstractPrimitiveService {
   /**
    * Applies an {@link EnterRequest} commit.
    *
-   * @param commit commit entry
+   * @param request request
    * @return topic leader. If no previous leader existed this is the node that just entered the race.
    */
-  protected EnterResponse enter(Commit<? extends EnterRequest> commit) {
+  protected EnterResponse enter(EnterRequest request) {
     try {
-      PartitionId partitionId = commit.value().getPartitionId();
+      PartitionId partitionId = request.getPartitionId();
       PrimaryTerm oldTerm = term(partitionId);
       Registration registration = new Registration(
-          commit.value().getMember(),
-          commit.session().sessionId().id());
+          request.getMember(),
+          getCurrentSession().sessionId().id());
       PrimaryTerm newTerm = elections.compute(partitionId, (k, v) -> {
         if (v == null) {
           return new ElectionState(partitionId, registration);
@@ -224,11 +217,11 @@ public class PrimaryElectorService extends AbstractPrimitiveService {
   /**
    * Applies an {@link GetTermRequest} commit.
    *
-   * @param commit GetLeadership commit
+   * @param request GetTermRequest request
    * @return leader
    */
-  protected GetTermResponse getTerm(Commit<? extends GetTermRequest> commit) {
-    PartitionId partitionId = commit.value().getPartitionId();
+  protected GetTermResponse getTerm(GetTermRequest request) {
+    PartitionId partitionId = request.getPartitionId();
     try {
       return GetTermResponse.newBuilder()
           .setTerm(term(partitionId))

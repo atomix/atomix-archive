@@ -29,19 +29,18 @@ import io.atomix.cluster.messaging.ClusterCommunicationService;
 import io.atomix.primitive.PrimitiveType;
 import io.atomix.primitive.event.EventType;
 import io.atomix.primitive.event.PrimitiveEvent;
+import io.atomix.primitive.operation.OperationEncoder;
 import io.atomix.primitive.operation.OperationType;
 import io.atomix.primitive.service.EventRequest;
 import io.atomix.primitive.service.ResetRequest;
 import io.atomix.primitive.service.Role;
 import io.atomix.primitive.session.Session;
 import io.atomix.primitive.session.SessionId;
-import io.atomix.primitive.session.impl.AbstractSession;
 import io.atomix.utils.concurrent.ThreadContext;
 import io.atomix.utils.concurrent.ThreadContextFactory;
 import io.atomix.utils.logging.ContextualLoggerFactory;
 import io.atomix.utils.logging.LoggerContext;
 import io.atomix.utils.misc.TimestampPrinter;
-import io.atomix.utils.serializer.Serializer;
 import org.slf4j.Logger;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
@@ -50,8 +49,12 @@ import static com.google.common.base.Preconditions.checkState;
 /**
  * Primitive session.
  */
-public class PrimitiveSession extends AbstractSession {
+public class PrimitiveSession implements Session {
   private final Logger log;
+  private final SessionId sessionId;
+  private final MemberId memberId;
+  private final String primitiveName;
+  private final PrimitiveType primitiveType;
   private final long timeout;
   private final ClusterCommunicationService clusterCommunicator;
   private final PrimitiveServiceContext context;
@@ -75,16 +78,18 @@ public class PrimitiveSession extends AbstractSession {
 
   public PrimitiveSession(
       SessionId sessionId,
-      MemberId member,
-      String name,
+      MemberId memberId,
+      String primitiveName,
       PrimitiveType primitiveType,
       long timeout,
       long lastUpdated,
-      Serializer serializer,
       ClusterCommunicationService clusterCommunicator,
       PrimitiveServiceContext context,
       ThreadContextFactory threadContextFactory) {
-    super(sessionId, name, primitiveType, member, serializer);
+    this.sessionId = sessionId;
+    this.memberId = memberId;
+    this.primitiveName = primitiveName;
+    this.primitiveType = primitiveType;
     this.timeout = timeout;
     this.lastUpdated = lastUpdated;
     this.eventIndex = sessionId.id();
@@ -93,13 +98,33 @@ public class PrimitiveSession extends AbstractSession {
     this.clusterCommunicator = clusterCommunicator;
     this.context = context;
     this.eventExecutor = threadContextFactory.createContext();
-    eventSubject = String.format("%s-%d-event", member.id(), sessionId.id());
-    resetSubject = String.format("%s-%d-reset", member.id(), sessionId.id());
+    eventSubject = String.format("%s-%d-event", memberId.id(), sessionId.id());
+    resetSubject = String.format("%s-%d-reset", memberId.id(), sessionId.id());
     this.log = ContextualLoggerFactory.getLogger(getClass(), LoggerContext.builder(Session.class)
         .addValue(sessionId)
         .add("type", context.serviceType())
         .add("name", context.serviceName())
         .build());
+  }
+
+  @Override
+  public SessionId sessionId() {
+    return sessionId;
+  }
+
+  @Override
+  public String primitiveName() {
+    return primitiveName;
+  }
+
+  @Override
+  public PrimitiveType primitiveType() {
+    return primitiveType;
+  }
+
+  @Override
+  public MemberId memberId() {
+    return memberId;
   }
 
   /**
@@ -305,7 +330,7 @@ public class PrimitiveSession extends AbstractSession {
    * Registers a sequence command.
    *
    * @param sequence the sequence number
-   * @param command the command to execute
+   * @param command  the command to execute
    */
   public void registerSequenceCommand(long sequence, Runnable command) {
     sequenceCommands.put(sequence, command);
@@ -373,10 +398,10 @@ public class PrimitiveSession extends AbstractSession {
   }
 
   @Override
-  public void publish(EventType eventType, Object event) {
+  public <T> void publish(EventType eventType, T event, OperationEncoder<T> encoder) {
     publish(io.atomix.primitive.service.PrimitiveEvent.newBuilder()
         .setType(eventType.id())
-        .setValue(ByteString.copyFrom(encode(event)))
+        .setValue(ByteString.copyFrom(OperationEncoder.encode(event, encoder)))
         .build());
   }
 

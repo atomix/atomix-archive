@@ -20,23 +20,16 @@ import io.atomix.primitive.PrimitiveManagementService;
 import io.atomix.primitive.protocol.PrimitiveProtocol;
 import io.atomix.primitive.protocol.ProxyCompatibleBuilder;
 import io.atomix.primitive.protocol.ProxyProtocol;
-import io.atomix.primitive.protocol.counter.CounterCompatibleBuilder;
-import io.atomix.primitive.protocol.counter.CounterProtocol;
 
 /**
  * Builder for DistributedCounter.
  */
 public abstract class DistributedCounterBuilder
     extends PrimitiveBuilder<DistributedCounterBuilder, DistributedCounterConfig, DistributedCounter>
-    implements ProxyCompatibleBuilder<DistributedCounterBuilder>, CounterCompatibleBuilder<DistributedCounterBuilder> {
+    implements ProxyCompatibleBuilder<DistributedCounterBuilder> {
 
   protected DistributedCounterBuilder(String name, DistributedCounterConfig config, PrimitiveManagementService managementService) {
     super(DistributedCounterType.instance(), name, config, managementService);
-  }
-
-  @Override
-  public DistributedCounterBuilder withProtocol(CounterProtocol protocol) {
-    return withProtocol((PrimitiveProtocol) protocol);
   }
 
   @Override

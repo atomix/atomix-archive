@@ -15,10 +15,10 @@
  */
 package io.atomix.core.iterator.impl;
 
-import io.atomix.core.iterator.AsyncIterator;
-
 import java.util.Iterator;
 import java.util.concurrent.CompletableFuture;
+
+import io.atomix.core.iterator.AsyncIterator;
 
 /**
  * Asynchronous Java iterator.
@@ -38,10 +38,5 @@ public class AsyncJavaIterator<E> implements AsyncIterator<E> {
   @Override
   public CompletableFuture<E> next() {
     return CompletableFuture.completedFuture(iterator.next());
-  }
-
-  @Override
-  public CompletableFuture<Void> close() {
-    return CompletableFuture.completedFuture(null);
   }
 }

@@ -18,30 +18,33 @@ package io.atomix.core.impl;
 import java.util.Collection;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
+import io.atomix.cluster.ClusterMembershipService;
+import io.atomix.cluster.messaging.ClusterCommunicationService;
+import io.atomix.cluster.messaging.ClusterEventService;
 import io.atomix.core.map.AsyncAtomicMap;
-import io.atomix.core.map.AtomicMapType;
-import io.atomix.core.map.impl.AtomicMapProxy;
-import io.atomix.core.map.impl.AtomicMapService;
-import io.atomix.core.map.impl.TranscodingAsyncAtomicMap;
+import io.atomix.core.map.AtomicMapConfig;
+import io.atomix.core.map.impl.DefaultAtomicMapBuilder;
 import io.atomix.primitive.DistributedPrimitive;
 import io.atomix.primitive.ManagedPrimitiveRegistry;
+import io.atomix.primitive.PrimitiveCache;
 import io.atomix.primitive.PrimitiveException;
 import io.atomix.primitive.PrimitiveInfo;
+import io.atomix.primitive.PrimitiveManagementService;
 import io.atomix.primitive.PrimitiveRegistry;
 import io.atomix.primitive.PrimitiveType;
 import io.atomix.primitive.PrimitiveTypeRegistry;
+import io.atomix.primitive.partition.PartitionGroupTypeRegistry;
 import io.atomix.primitive.partition.PartitionService;
-import io.atomix.primitive.protocol.ProxyProtocol;
-import io.atomix.primitive.proxy.ProxyClient;
+import io.atomix.primitive.protocol.PrimitiveProtocolTypeRegistry;
+import io.atomix.primitive.serialization.SerializationService;
 import io.atomix.utils.serializer.Namespaces;
 import io.atomix.utils.serializer.Serializer;
-
-import static com.google.common.base.Preconditions.checkNotNull;
 
 /**
  * Core primitive registry.
@@ -50,13 +53,21 @@ public class CorePrimitiveRegistry implements ManagedPrimitiveRegistry {
   private static final Serializer SERIALIZER = Serializer.using(Namespaces.BASIC);
 
   private final PartitionService partitionService;
+  private final ClusterMembershipService membershipService;
+  private final ClusterCommunicationService communicationService;
   private final PrimitiveTypeRegistry primitiveTypeRegistry;
   private final AtomicBoolean started = new AtomicBoolean();
   private AsyncAtomicMap<String, String> primitives;
 
-  public CorePrimitiveRegistry(PartitionService partitionService, PrimitiveTypeRegistry primitiveTypeRegistry) {
-    this.partitionService = checkNotNull(partitionService);
-    this.primitiveTypeRegistry = checkNotNull(primitiveTypeRegistry);
+  public CorePrimitiveRegistry(
+      PartitionService partitionService,
+      ClusterMembershipService membershipService,
+      ClusterCommunicationService communicationService,
+      PrimitiveTypeRegistry primitiveTypeRegistry) {
+    this.partitionService = partitionService;
+    this.membershipService = membershipService;
+    this.communicationService = communicationService;
+    this.primitiveTypeRegistry = primitiveTypeRegistry;
   }
 
   @Override
@@ -114,21 +125,11 @@ public class CorePrimitiveRegistry implements ManagedPrimitiveRegistry {
   @Override
   @SuppressWarnings("unchecked")
   public CompletableFuture<PrimitiveRegistry> start() {
-    ProxyProtocol protocol = partitionService.getSystemPartitionGroup().newProtocol();
-    ProxyClient proxy = protocol.newProxy(
-        "primitives",
-        AtomicMapType.instance(),
-        AtomicMapService.class,
-        partitionService);
-    return proxy.connect()
-        .thenApply(v -> {
-          AtomicMapProxy mapProxy = new AtomicMapProxy(proxy, this);
-          primitives = new TranscodingAsyncAtomicMap<>(
-              mapProxy,
-              key -> key,
-              key -> key,
-              value -> value != null ? SERIALIZER.encode(value) : null,
-              value -> value != null ? SERIALIZER.decode(value) : null);
+    return new DefaultAtomicMapBuilder<String, String>("primitives", new AtomicMapConfig(), new PartialPrimitiveManagementService())
+        .withProtocol(partitionService.getSystemPartitionGroup().newProtocol())
+        .buildAsync()
+        .thenApply(map -> {
+          this.primitives = map.async();
           started.set(true);
           return this;
         });
@@ -145,5 +146,62 @@ public class CorePrimitiveRegistry implements ManagedPrimitiveRegistry {
       return primitives.close().exceptionally(e -> null);
     }
     return CompletableFuture.completedFuture(null);
+  }
+
+  private class PartialPrimitiveManagementService implements PrimitiveManagementService {
+    @Override
+    public ScheduledExecutorService getExecutorService() {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public ClusterMembershipService getMembershipService() {
+      return membershipService;
+    }
+
+    @Override
+    public ClusterCommunicationService getCommunicationService() {
+      return communicationService;
+    }
+
+    @Override
+    public ClusterEventService getEventService() {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public SerializationService getSerializationService() {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public PartitionService getPartitionService() {
+      return partitionService;
+    }
+
+    @Override
+    public PrimitiveCache getPrimitiveCache() {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public PrimitiveRegistry getPrimitiveRegistry() {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public PrimitiveTypeRegistry getPrimitiveTypeRegistry() {
+      return primitiveTypeRegistry;
+    }
+
+    @Override
+    public PrimitiveProtocolTypeRegistry getProtocolTypeRegistry() {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public PartitionGroupTypeRegistry getPartitionGroupTypeRegistry() {
+      throw new UnsupportedOperationException();
+    }
   }
 }

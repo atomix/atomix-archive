@@ -15,6 +15,9 @@
  */
 package io.atomix.core.transaction.impl;
 
+import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import io.atomix.core.set.AsyncDistributedSet;
@@ -23,22 +26,14 @@ import io.atomix.core.transaction.TransactionId;
 import io.atomix.core.transaction.TransactionLog;
 import io.atomix.primitive.protocol.ProxyProtocol;
 
-import java.util.Map;
-import java.util.concurrent.CompletableFuture;
-
 /**
  * Default transactional set.
  */
 public class ReadCommittedTransactionalSet<E> extends TransactionalSetParticipant<E> {
   private final Map<E, SetUpdate<E>> updates = Maps.newConcurrentMap();
 
-  public ReadCommittedTransactionalSet(TransactionId transactionId, AsyncDistributedSet<E> set) {
-    super(transactionId, set);
-  }
-
-  @Override
-  public ProxyProtocol protocol() {
-    return (ProxyProtocol) set.protocol();
+  public ReadCommittedTransactionalSet(TransactionId transactionId, ProxyProtocol protocol, AsyncDistributedSet<E> set) {
+    super(transactionId, protocol, set);
   }
 
   @Override

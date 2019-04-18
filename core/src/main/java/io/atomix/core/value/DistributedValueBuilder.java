@@ -19,8 +19,6 @@ import io.atomix.primitive.PrimitiveManagementService;
 import io.atomix.primitive.protocol.PrimitiveProtocol;
 import io.atomix.primitive.protocol.ProxyCompatibleBuilder;
 import io.atomix.primitive.protocol.ProxyProtocol;
-import io.atomix.primitive.protocol.value.ValueCompatibleBuilder;
-import io.atomix.primitive.protocol.value.ValueProtocol;
 
 /**
  * Builder for constructing new DistributedValue instances.
@@ -29,7 +27,7 @@ import io.atomix.primitive.protocol.value.ValueProtocol;
  */
 public abstract class DistributedValueBuilder<V>
     extends ValueBuilder<DistributedValueBuilder<V>, DistributedValueConfig, DistributedValue<V>, V>
-    implements ProxyCompatibleBuilder<DistributedValueBuilder<V>>, ValueCompatibleBuilder<DistributedValueBuilder<V>> {
+    implements ProxyCompatibleBuilder<DistributedValueBuilder<V>> {
 
   protected DistributedValueBuilder(String name, DistributedValueConfig config, PrimitiveManagementService managementService) {
     super(DistributedValueType.instance(), name, config, managementService);
@@ -37,11 +35,6 @@ public abstract class DistributedValueBuilder<V>
 
   @Override
   public DistributedValueBuilder<V> withProtocol(ProxyProtocol protocol) {
-    return withProtocol((PrimitiveProtocol) protocol);
-  }
-
-  @Override
-  public DistributedValueBuilder<V> withProtocol(ValueProtocol protocol) {
     return withProtocol((PrimitiveProtocol) protocol);
   }
 }

@@ -15,6 +15,16 @@
  */
 package io.atomix.core.map.impl;
 
+import java.time.Duration;
+import java.util.Collection;
+import java.util.Map;
+import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
+import java.util.function.BiFunction;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+
 import com.google.common.collect.Maps;
 import io.atomix.core.collection.AsyncDistributedCollection;
 import io.atomix.core.collection.CollectionEvent;
@@ -41,19 +51,8 @@ import io.atomix.core.transaction.TransactionId;
 import io.atomix.core.transaction.TransactionLog;
 import io.atomix.primitive.PrimitiveType;
 import io.atomix.primitive.impl.DelegatingAsyncPrimitive;
-import io.atomix.primitive.protocol.PrimitiveProtocol;
 import io.atomix.utils.concurrent.Futures;
 import io.atomix.utils.time.Versioned;
-
-import java.time.Duration;
-import java.util.Collection;
-import java.util.Map;
-import java.util.Objects;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Executor;
-import java.util.function.BiFunction;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 
 /**
  * Distributed map implementation that delegates to an atomic map.
@@ -214,11 +213,6 @@ public class DelegatingAsyncDistributedMap<K, V> extends DelegatingAsyncPrimitiv
     }
 
     @Override
-    public PrimitiveProtocol protocol() {
-      return DelegatingAsyncDistributedMap.this.protocol();
-    }
-
-    @Override
     public CompletableFuture<Boolean> add(V element) {
       return Futures.exceptionalFuture(new UnsupportedOperationException());
     }
@@ -336,11 +330,6 @@ public class DelegatingAsyncDistributedMap<K, V> extends DelegatingAsyncPrimitiv
     @Override
     public PrimitiveType type() {
       return DistributedSetType.instance();
-    }
-
-    @Override
-    public PrimitiveProtocol protocol() {
-      return DelegatingAsyncDistributedMap.this.protocol();
     }
 
     @Override

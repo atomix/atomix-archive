@@ -15,6 +15,13 @@
  */
 package io.atomix.core.transaction.impl;
 
+import java.time.Duration;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.stream.Collectors;
+
 import com.google.common.collect.Sets;
 import io.atomix.core.transaction.AsyncTransaction;
 import io.atomix.core.transaction.CommitStatus;
@@ -31,15 +38,7 @@ import io.atomix.core.transaction.TransactionalSetBuilder;
 import io.atomix.core.transaction.TransactionalSetConfig;
 import io.atomix.primitive.PrimitiveManagementService;
 import io.atomix.primitive.PrimitiveType;
-import io.atomix.primitive.protocol.PrimitiveProtocol;
 import io.atomix.utils.concurrent.Futures;
-
-import java.time.Duration;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Set;
-import java.util.concurrent.CompletableFuture;
-import java.util.stream.Collectors;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
@@ -68,11 +67,6 @@ public class DefaultTransaction implements AsyncTransaction {
   @Override
   public PrimitiveType type() {
     return TransactionType.instance();
-  }
-
-  @Override
-  public PrimitiveProtocol protocol() {
-    throw new UnsupportedOperationException();
   }
 
   @Override

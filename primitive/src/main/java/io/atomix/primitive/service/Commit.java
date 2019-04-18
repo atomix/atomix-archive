@@ -15,14 +15,14 @@
  */
 package io.atomix.primitive.service;
 
+import java.util.function.Function;
+
 import io.atomix.primitive.event.PrimitiveEvent;
 import io.atomix.primitive.operation.OperationId;
 import io.atomix.primitive.operation.PrimitiveOperation;
 import io.atomix.primitive.session.Session;
 import io.atomix.utils.time.LogicalTimestamp;
 import io.atomix.utils.time.WallClockTimestamp;
-
-import java.util.function.Function;
 
 /**
  * Represents the committed state and metadata of a Raft state machine operation.

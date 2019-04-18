@@ -22,12 +22,9 @@ import io.atomix.core.counter.DistributedCounter;
 import io.atomix.core.counter.DistributedCounterBuilder;
 import io.atomix.core.counter.DistributedCounterConfig;
 import io.atomix.primitive.PrimitiveManagementService;
-import io.atomix.primitive.protocol.GossipProtocol;
+import io.atomix.primitive.partition.Partition;
 import io.atomix.primitive.protocol.PrimitiveProtocol;
 import io.atomix.primitive.protocol.ProxyProtocol;
-import io.atomix.primitive.protocol.counter.CounterProtocol;
-import io.atomix.utils.concurrent.Futures;
-import io.atomix.utils.config.ConfigurationException;
 
 /**
  * Default distributed counter builder.
@@ -40,22 +37,16 @@ public class DefaultDistributedCounterBuilder extends DistributedCounterBuilder 
   @Override
   public CompletableFuture<DistributedCounter> buildAsync() {
     PrimitiveProtocol protocol = protocol();
-    if (protocol instanceof GossipProtocol) {
-      if (protocol instanceof CounterProtocol) {
-        return managementService.getPrimitiveCache().getPrimitive(name, () -> CompletableFuture.completedFuture(
-            new GossipDistributedCounter(name, (GossipProtocol) protocol, ((CounterProtocol) protocol)
-                .newCounterDelegate(name, managementService))))
-            .thenApply(AsyncDistributedCounter::sync);
-      } else {
-        return Futures.exceptionalFuture(new UnsupportedOperationException("Counter is not supported by the provided gossip protocol"));
-      }
-    } else if (protocol instanceof ProxyProtocol) {
-      return newProxy(AtomicCounterService.class)
-          .thenCompose(proxy -> new AtomicCounterProxy(proxy, managementService.getPrimitiveRegistry()).connect())
-          .thenApply(DelegatingDistributedCounter::new)
-          .thenApply(AsyncDistributedCounter::sync);
-    } else {
-      return Futures.exceptionalFuture(new ConfigurationException("Invalid protocol type"));
-    }
+    return managementService.getPrimitiveRegistry().createPrimitive(name, type)
+        .thenCompose(v -> {
+          Partition partition = managementService.getPartitionService()
+              .getPartitionGroup((ProxyProtocol) protocol)
+              .getPartition(name);
+          return ((ProxyProtocol) protocol).newClient(name, type, partition, managementService).connect();
+        })
+        .thenApply(CounterProxy::new)
+        .thenApply(DefaultAsyncAtomicCounter::new)
+        .thenApply(DelegatingDistributedCounter::new)
+        .thenApply(AsyncDistributedCounter::sync);
   }
 }

@@ -15,6 +15,10 @@
  */
 package io.atomix.core.transaction.impl;
 
+import java.util.Map;
+import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
+
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import io.atomix.core.map.AsyncAtomicMap;
@@ -25,10 +29,6 @@ import io.atomix.core.transaction.TransactionLog;
 import io.atomix.primitive.protocol.ProxyProtocol;
 import io.atomix.utils.time.Versioned;
 
-import java.util.Map;
-import java.util.Objects;
-import java.util.concurrent.CompletableFuture;
-
 /**
  * Default transactional map.
  */
@@ -36,13 +36,8 @@ public class RepeatableReadsTransactionalMap<K, V> extends TransactionalMapParti
   private final Map<K, CompletableFuture<Versioned<V>>> cache = Maps.newConcurrentMap();
   private final Map<K, MapUpdate<K, V>> updates = Maps.newConcurrentMap();
 
-  public RepeatableReadsTransactionalMap(TransactionId transactionId, AsyncAtomicMap<K, V> consistentMap) {
-    super(transactionId, consistentMap);
-  }
-
-  @Override
-  public ProxyProtocol protocol() {
-    return (ProxyProtocol) consistentMap.protocol();
+  public RepeatableReadsTransactionalMap(TransactionId transactionId, ProxyProtocol protocol, AsyncAtomicMap<K, V> consistentMap) {
+    super(transactionId, protocol, consistentMap);
   }
 
   private CompletableFuture<Versioned<V>> read(K key) {

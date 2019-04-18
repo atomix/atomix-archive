@@ -15,15 +15,15 @@
  */
 package io.atomix.primitive.service.impl;
 
+import java.util.Objects;
+import java.util.function.Function;
+
 import io.atomix.primitive.operation.OperationId;
 import io.atomix.primitive.service.Commit;
 import io.atomix.primitive.session.Session;
 import io.atomix.utils.misc.ArraySizeHashPrinter;
 import io.atomix.utils.time.LogicalTimestamp;
 import io.atomix.utils.time.WallClockTimestamp;
-
-import java.util.Objects;
-import java.util.function.Function;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
 

@@ -21,7 +21,6 @@ import java.util.concurrent.CompletableFuture;
 import io.atomix.core.transaction.AsyncTransactionalMap;
 import io.atomix.core.transaction.TransactionalMap;
 import io.atomix.primitive.PrimitiveType;
-import io.atomix.primitive.protocol.ProxyProtocol;
 
 /**
  * Delegating transactional map.
@@ -41,11 +40,6 @@ public class DelegatingTransactionalMap<K, V> implements AsyncTransactionalMap<K
   @Override
   public PrimitiveType type() {
     return map.type();
-  }
-
-  @Override
-  public ProxyProtocol protocol() {
-    return (ProxyProtocol) map.protocol();
   }
 
   @Override

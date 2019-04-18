@@ -15,20 +15,6 @@
  */
 package io.atomix.primitive.service.impl;
 
-import io.atomix.primitive.PrimitiveException;
-import io.atomix.primitive.operation.OperationId;
-import io.atomix.primitive.operation.OperationType;
-import io.atomix.primitive.service.Commit;
-import io.atomix.primitive.service.PrimitiveService;
-import io.atomix.primitive.service.ServiceContext;
-import io.atomix.primitive.service.ServiceExecutor;
-import io.atomix.utils.concurrent.Scheduled;
-import io.atomix.utils.logging.ContextualLoggerFactory;
-import io.atomix.utils.logging.LoggerContext;
-import io.atomix.utils.serializer.Serializer;
-import io.atomix.utils.time.WallClockTimestamp;
-import org.slf4j.Logger;
-
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -41,54 +27,45 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
+import io.atomix.primitive.PrimitiveException;
+import io.atomix.primitive.operation.OperationDecoder;
+import io.atomix.primitive.operation.OperationEncoder;
+import io.atomix.primitive.operation.OperationId;
+import io.atomix.primitive.operation.OperationType;
+import io.atomix.primitive.service.Commit;
+import io.atomix.primitive.service.PrimitiveService;
+import io.atomix.primitive.service.ServiceContext;
+import io.atomix.primitive.service.ServiceExecutor;
+import io.atomix.utils.concurrent.Scheduled;
+import io.atomix.utils.logging.ContextualLoggerFactory;
+import io.atomix.utils.logging.LoggerContext;
+import io.atomix.utils.time.WallClockTimestamp;
+import org.slf4j.Logger;
+
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
+import static io.atomix.primitive.operation.OperationDecoder.decode;
+import static io.atomix.primitive.operation.OperationEncoder.encode;
 
 /**
  * Default operation executor.
  */
 public class DefaultServiceExecutor implements ServiceExecutor {
-  private final Serializer serializer;
-  private final ServiceContext context;
   private final Logger log;
   private final Queue<Runnable> tasks = new LinkedList<>();
   private final List<ScheduledTask> scheduledTasks = new ArrayList<>();
   private final List<ScheduledTask> complete = new ArrayList<>();
-  private final Map<String, Function<Commit<byte[]>, byte[]>> operations = new HashMap<>();
+  private final Map<String, Function<byte[], byte[]>> operations = new HashMap<>();
   private OperationType operationType;
   private long timestamp;
 
-  public DefaultServiceExecutor(ServiceContext context, Serializer serializer) {
-    this.serializer = checkNotNull(serializer);
-    this.context = checkNotNull(context);
+  public DefaultServiceExecutor(ServiceContext context) {
     this.log = ContextualLoggerFactory.getLogger(getClass(), LoggerContext.builder(PrimitiveService.class)
         .addValue(context.serviceId())
         .add("type", context.serviceType())
         .add("name", context.serviceName())
         .build());
-  }
-
-  /**
-   * Encodes the given object using the configured {@link #serializer}.
-   *
-   * @param object the object to encode
-   * @param <T>    the object type
-   * @return the encoded bytes
-   */
-  protected <T> byte[] encode(T object) {
-    return object != null ? serializer.encode(object) : null;
-  }
-
-  /**
-   * Decodes the given object using the configured {@link #serializer}.
-   *
-   * @param bytes the bytes to decode
-   * @param <T>   the object type
-   * @return the decoded object
-   */
-  protected <T> T decode(byte[] bytes) {
-    return bytes != null ? serializer.decode(bytes) : null;
   }
 
   @Override
@@ -132,46 +109,46 @@ public class DefaultServiceExecutor implements ServiceExecutor {
   }
 
   @Override
-  public void handle(OperationId operationId, Function<Commit<byte[]>, byte[]> callback) {
+  public void handle(OperationId operationId, Function<byte[], byte[]> callback) {
     checkNotNull(operationId, "operationId cannot be null");
     checkNotNull(callback, "callback cannot be null");
-    operations.put(operationId.getName(), callback);
+    operations.put(operationId.id(), callback);
     log.trace("Registered operation callback {}", operationId);
   }
 
   @Override
-  public <R> void register(OperationId operationId, Supplier<R> callback) {
+  public <R> void register(OperationId operationId, Supplier<R> callback, OperationEncoder<R> encoder) {
     checkNotNull(operationId, "operationId cannot be null");
     checkNotNull(callback, "callback cannot be null");
-    handle(operationId, commit -> encode(callback.get()));
+    handle(operationId, commit -> encode(callback.get(), encoder));
   }
 
   @Override
-  public <T> void register(OperationId operationId, Consumer<Commit<T>> callback) {
+  public <T> void register(OperationId operationId, Consumer<T> callback, OperationDecoder<T> decoder) {
     checkNotNull(operationId, "operationId cannot be null");
     checkNotNull(callback, "callback cannot be null");
-    handle(operationId, commit -> {
-      callback.accept(commit.map(this::decode));
+    handle(operationId, bytes -> {
+      callback.accept(decode(bytes, decoder));
       return null;
     });
   }
 
   @Override
-  public <T, R> void register(OperationId operationId, Function<Commit<T>, R> callback) {
+  public <T, R> void register(OperationId operationId, Function<T, R> callback, OperationDecoder<T> decoder, OperationEncoder<R> encoder) {
     checkNotNull(operationId, "operationId cannot be null");
     checkNotNull(callback, "callback cannot be null");
-    handle(operationId, commit -> encode(callback.apply(commit.map(this::decode))));
+    handle(operationId, bytes -> encode(callback.apply(decode(bytes, decoder)), encoder));
   }
 
   @Override
   public byte[] apply(Commit<byte[]> commit) {
     log.trace("Executing {}", commit);
 
-    this.operationType = commit.operation().getType();
+    this.operationType = commit.operation().type();
     this.timestamp = commit.wallClockTime().unixTimestamp();
 
     // Look up the registered callback for the operation.
-    Function<Commit<byte[]>, byte[]> operation = operations.get(commit.operation().getName());
+    Function<byte[], byte[]> operation = operations.get(commit.operation().id());
 
     if (operation == null) {
       throw new IllegalStateException("Unknown state machine operation: " + commit.operation());
@@ -179,7 +156,7 @@ public class DefaultServiceExecutor implements ServiceExecutor {
       // Execute the operation. If the operation return value is a Future, await the result,
       // otherwise immediately complete the execution future.
       try {
-        return operation.apply(commit);
+        return operation.apply(commit.value());
       } catch (Exception e) {
         log.warn("State machine operation failed: {}", e.getMessage());
         throw new PrimitiveException.ServiceException(e);

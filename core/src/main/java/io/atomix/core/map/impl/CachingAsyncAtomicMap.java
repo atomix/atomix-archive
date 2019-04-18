@@ -15,6 +15,15 @@
  */
 package io.atomix.core.map.impl;
 
+import java.util.Map;
+import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executor;
+import java.util.function.BiFunction;
+import java.util.function.Consumer;
+import java.util.function.Predicate;
+
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
@@ -25,15 +34,6 @@ import io.atomix.core.map.AtomicMapEventListener;
 import io.atomix.primitive.PrimitiveState;
 import io.atomix.utils.time.Versioned;
 import org.slf4j.Logger;
-
-import java.util.Map;
-import java.util.Objects;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Executor;
-import java.util.function.BiFunction;
-import java.util.function.Consumer;
-import java.util.function.Predicate;
 
 import static org.slf4j.LoggerFactory.getLogger;
 
@@ -136,12 +136,6 @@ public class CachingAsyncAtomicMap<K, V> extends DelegatingAsyncAtomicMap<K, V> 
   @Override
   public CompletableFuture<Versioned<V>> put(K key, V value) {
     return super.put(key, value)
-        .whenComplete((r, e) -> cache.invalidate(key));
-  }
-
-  @Override
-  public CompletableFuture<Versioned<V>> putAndGet(K key, V value) {
-    return super.putAndGet(key, value)
         .whenComplete((r, e) -> cache.invalidate(key));
   }
 

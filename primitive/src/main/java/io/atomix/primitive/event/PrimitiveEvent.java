@@ -15,10 +15,10 @@
  */
 package io.atomix.primitive.event;
 
-import io.atomix.utils.misc.ArraySizeHashPrinter;
-
 import java.util.Arrays;
 import java.util.Objects;
+
+import io.atomix.utils.misc.ArraySizeHashPrinter;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
 
@@ -45,7 +45,7 @@ public class PrimitiveEvent {
    * @return the primitive event
    */
   public static PrimitiveEvent event(EventType eventType, byte[] value) {
-    return new PrimitiveEvent(EventType.canonical(eventType), value);
+    return new PrimitiveEvent(eventType, value);
   }
 
   private final EventType type;

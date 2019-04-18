@@ -31,7 +31,7 @@ import io.atomix.core.log.DistributedLogType;
 import io.atomix.core.log.Record;
 import io.atomix.primitive.PrimitiveType;
 import io.atomix.primitive.log.LogClient;
-import io.atomix.primitive.protocol.PrimitiveProtocol;
+import io.atomix.primitive.log.LogSession;
 import io.atomix.utils.concurrent.Futures;
 import io.atomix.utils.serializer.Serializer;
 
@@ -51,9 +51,10 @@ public class DefaultAsyncDistributedLog<E> implements AsyncDistributedLog<E> {
     this.name = checkNotNull(name);
     this.client = checkNotNull(client);
     this.serializer = checkNotNull(serializer);
-    client.getPartitions().forEach(partition -> {
-      DefaultAsyncDistributedLogPartition<E> logPartition = new DefaultAsyncDistributedLogPartition<>(this, partition, serializer);
-      partitions.put(partition.partitionId().getPartition(), logPartition);
+    client.getPartitionIds().forEach(partitionId -> {
+      LogSession partition = client.getPartition(partitionId);
+      DefaultAsyncDistributedLogPartition<E> logPartition = new DefaultAsyncDistributedLogPartition<>(this, partitionId, partition, serializer);
+      partitions.put(partitionId.getPartition(), logPartition);
       sortedPartitions.add(logPartition);
     });
   }
@@ -66,11 +67,6 @@ public class DefaultAsyncDistributedLog<E> implements AsyncDistributedLog<E> {
   @Override
   public PrimitiveType type() {
     return DistributedLogType.instance();
-  }
-
-  @Override
-  public PrimitiveProtocol protocol() {
-    return client.protocol();
   }
 
   /**
@@ -130,11 +126,11 @@ public class DefaultAsyncDistributedLog<E> implements AsyncDistributedLog<E> {
 
   @Override
   public CompletableFuture<Void> close() {
-    return client.close();
+    return CompletableFuture.completedFuture(null);
   }
 
   @Override
   public CompletableFuture<Void> delete() {
-    return client.close();
+    return CompletableFuture.completedFuture(null);
   }
 }

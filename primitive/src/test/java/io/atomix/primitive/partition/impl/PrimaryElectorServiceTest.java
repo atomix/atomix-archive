@@ -17,21 +17,19 @@ package io.atomix.primitive.partition.impl;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.function.Consumer;
 
 import io.atomix.cluster.MemberId;
 import io.atomix.primitive.PrimitiveId;
 import io.atomix.primitive.PrimitiveType;
 import io.atomix.primitive.event.EventType;
 import io.atomix.primitive.event.PrimitiveEvent;
+import io.atomix.primitive.operation.OperationEncoder;
 import io.atomix.primitive.operation.OperationType;
 import io.atomix.primitive.partition.GroupMember;
 import io.atomix.primitive.partition.PartitionId;
 import io.atomix.primitive.partition.PrimaryTerm;
-import io.atomix.primitive.service.Commit;
 import io.atomix.primitive.service.Role;
 import io.atomix.primitive.service.ServiceContext;
-import io.atomix.primitive.service.impl.DefaultCommit;
 import io.atomix.primitive.session.Session;
 import io.atomix.primitive.session.SessionId;
 import io.atomix.utils.time.LogicalClock;
@@ -55,7 +53,7 @@ public class PrimaryElectorServiceTest {
 
     // 1st member to enter should be primary.
     GroupMember m1 = createGroupMember("node1", "group1");
-    Session<?> s1 = createSession(m1);
+    Session s1 = createSession(m1);
     term = elector.enter(createEnterOp(partition, m1, s1)).getTerm();
     assertEquals(1L, term.getTerm());
     assertEquals(m1, term.getPrimary());
@@ -63,7 +61,7 @@ public class PrimaryElectorServiceTest {
 
     // 2nd member to enter should be added to candidates.
     GroupMember m2 = createGroupMember("node2", "group1");
-    Session<?> s2 = createSession(m2);
+    Session s2 = createSession(m2);
     term = elector.enter(createEnterOp(partition, m2, s2)).getTerm();
     assertEquals(1L, term.getTerm());
     assertEquals(m1, term.getPrimary());
@@ -91,7 +89,7 @@ public class PrimaryElectorServiceTest {
       for (int i = 0; i < numMembers; i++) {
         GroupMember m = createGroupMember("node" + i, "group1");
         allMembers.get(p).add(m);
-        Session<?> s = createSession(m);
+        Session s = createSession(m);
         term = elector.enter(createEnterOp(partId, m, s)).getTerm();
       }
 
@@ -126,7 +124,7 @@ public class PrimaryElectorServiceTest {
     for (int i = 0; i < numMembers; i++) {
       GroupMember m = createGroupMember("node" + i, "group" + (i / 3));
       members.add(m);
-      Session<?> s = createSession(m);
+      Session s = createSession(m);
       term = elector.enter(createEnterOp(partId, m, s)).getTerm();
     }
 
@@ -155,12 +153,12 @@ public class PrimaryElectorServiceTest {
     int numMembers = 9;
 
     // Add 9 members in 3 different groups.
-    List<Session<?>> sessions = new ArrayList<>();
+    List<Session> sessions = new ArrayList<>();
     List<GroupMember> members = new ArrayList<>();
     for (int i = 0; i < numMembers; i++) {
       GroupMember m = createGroupMember("node" + i, "group" + (i / 3));
       members.add(m);
-      Session<?> s = createSession(m);
+      Session s = createSession(m);
       sessions.add(s);
       term = elector.enter(createEnterOp(partId, m, s)).getTerm();
     }
@@ -262,14 +260,12 @@ public class PrimaryElectorServiceTest {
     return elector.enter(createEnterOp(partId, member, session)).getTerm();
   }
 
-  Commit<EnterRequest> createEnterOp(PartitionId partition, GroupMember member, Session<?> session) {
-    EnterRequest enter = EnterRequest.newBuilder().setPartitionId(partition).setMember(member).build();
-    return new DefaultCommit<>(0, null, enter, session, System.currentTimeMillis());
+  EnterRequest createEnterOp(PartitionId partition, GroupMember member, Session session) {
+    return EnterRequest.newBuilder().setPartitionId(partition).setMember(member).build();
   }
 
-  Commit<GetTermRequest> createGetTermOp(PartitionId partition, GroupMember member, Session<?> session) {
-    GetTermRequest getTerm = GetTermRequest.newBuilder().setPartitionId(partition).build();
-    return new DefaultCommit<>(0, null, getTerm, session, System.currentTimeMillis());
+  GetTermRequest createGetTermOp(PartitionId partition, GroupMember member, Session session) {
+    return GetTermRequest.newBuilder().setPartitionId(partition).build();
   }
 
   GroupMember createGroupMember(String id, String groupId) {
@@ -314,7 +310,7 @@ public class PrimaryElectorServiceTest {
       }
 
       @Override
-      public Session<?> currentSession() {
+      public Session currentSession() {
         return null;
       }
 
@@ -338,7 +334,7 @@ public class PrimaryElectorServiceTest {
   }
 
   @SuppressWarnings("rawtypes")
-  Session<?> createSession(final GroupMember member) {
+  Session createSession(final GroupMember member) {
     return new Session() {
       long sessionId = sessionNum++;
 
@@ -368,17 +364,12 @@ public class PrimaryElectorServiceTest {
       }
 
       @Override
-      public void publish(EventType eventType, Object event) {
+      public void publish(EventType eventType, Object event, OperationEncoder encoder) {
         // not used in test
       }
 
       @Override
       public void publish(PrimitiveEvent event) {
-        // not used in test
-      }
-
-      @Override
-      public void accept(Consumer event) {
         // not used in test
       }
 

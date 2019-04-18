@@ -15,6 +15,11 @@
  */
 package io.atomix.core.collection.impl;
 
+import java.time.Duration;
+import java.util.Collection;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
+
 import io.atomix.core.collection.AsyncDistributedCollection;
 import io.atomix.core.collection.CollectionEventListener;
 import io.atomix.core.collection.DistributedCollection;
@@ -22,24 +27,16 @@ import io.atomix.core.collection.DistributedCollectionType;
 import io.atomix.core.iterator.AsyncIterator;
 import io.atomix.core.iterator.impl.AsyncJavaIterator;
 import io.atomix.primitive.PrimitiveType;
-import io.atomix.primitive.protocol.PrimitiveProtocol;
-
-import java.time.Duration;
-import java.util.Collection;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Executor;
 
 /**
  * Asynchronous distributed Java-backed collection.
  */
 public class AsyncDistributedJavaCollection<E> implements AsyncDistributedCollection<E> {
   private final String name;
-  private final PrimitiveProtocol protocol;
   private final Collection<E> collection;
 
-  public AsyncDistributedJavaCollection(String name, PrimitiveProtocol protocol, Collection<E> collection) {
+  public AsyncDistributedJavaCollection(String name, Collection<E> collection) {
     this.name = name;
-    this.protocol = protocol;
     this.collection = collection;
   }
 
@@ -51,11 +48,6 @@ public class AsyncDistributedJavaCollection<E> implements AsyncDistributedCollec
   @Override
   public PrimitiveType type() {
     return DistributedCollectionType.instance();
-  }
-
-  @Override
-  public PrimitiveProtocol protocol() {
-    return protocol;
   }
 
   @Override

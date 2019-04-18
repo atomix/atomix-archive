@@ -112,7 +112,7 @@ public class PrimitiveSessionClient implements SessionClient {
   @Override
   public void addEventListener(EventType eventType, Consumer<PrimitiveEvent> listener) {
     Consumer<io.atomix.primitive.service.PrimitiveEvent> wrappedListener = event ->
-        listener.accept(new PrimitiveEvent(EventType.from(event.getType()), event.getValue().toByteArray()));
+        listener.accept(new PrimitiveEvent(eventType, event.getValue().toByteArray()));
     eventListeners.put(listener, wrappedListener);
     this.listener.addEventListener(eventType.id(), wrappedListener);
   }

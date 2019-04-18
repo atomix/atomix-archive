@@ -15,14 +15,11 @@
  */
 package io.atomix.core.map.impl;
 
-import com.google.common.collect.ImmutableMap;
-import io.atomix.core.map.AsyncAtomicMap;
-import io.atomix.utils.time.Versioned;
-
-import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
-import java.util.stream.Collectors;
+
+import io.atomix.core.map.AsyncAtomicMap;
+import io.atomix.utils.time.Versioned;
 
 /**
  * {@link AsyncAtomicMap} that doesn't allow null values.
@@ -47,13 +44,6 @@ public class NotNullAsyncAtomicMap<K, V> extends DelegatingAsyncAtomicMap<K, V> 
   }
 
   @Override
-  public CompletableFuture<Map<K, Versioned<V>>> getAllPresent(Iterable<K> keys) {
-    return super.getAllPresent(keys).thenApply(m -> ImmutableMap.copyOf(m.entrySet()
-        .stream().filter(e -> e.getValue().value() != null)
-        .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue))));
-  }
-
-  @Override
   public CompletableFuture<Versioned<V>> getOrDefault(K key, V defaultValue) {
     return super.getOrDefault(key, defaultValue).thenApply(v -> v != null && v.value() == null ? null : v);
   }
@@ -64,14 +54,6 @@ public class NotNullAsyncAtomicMap<K, V> extends DelegatingAsyncAtomicMap<K, V> 
       return super.remove(key);
     }
     return super.put(key, value);
-  }
-
-  @Override
-  public CompletableFuture<Versioned<V>> putAndGet(K key, V value) {
-    if (value == null) {
-      return super.remove(key).thenApply(v -> null);
-    }
-    return super.putAndGet(key, value);
   }
 
   @Override

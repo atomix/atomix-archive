@@ -74,10 +74,10 @@ public class DefaultTransactionalSetBuilder<E> extends TransactionalSetBuilder<E
           TransactionalSetParticipant<E> transactionalSet;
           switch (transaction.isolation()) {
             case READ_COMMITTED:
-              transactionalSet = new ReadCommittedTransactionalSet<>(transaction.transactionId(), set.async());
+              transactionalSet = new ReadCommittedTransactionalSet<>(transaction.transactionId(), (ProxyProtocol) protocol(), set.async());
               break;
             case REPEATABLE_READS:
-              transactionalSet = new RepeatableReadsTransactionalSet<>(transaction.transactionId(), set.async());
+              transactionalSet = new RepeatableReadsTransactionalSet<>(transaction.transactionId(), (ProxyProtocol) protocol(), set.async());
               break;
             default:
               throw new AssertionError();

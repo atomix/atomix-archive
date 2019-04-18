@@ -25,7 +25,7 @@ import io.atomix.core.log.DistributedLogPartition;
 import io.atomix.core.log.Record;
 import io.atomix.primitive.PrimitiveType;
 import io.atomix.primitive.log.LogSession;
-import io.atomix.primitive.protocol.PrimitiveProtocol;
+import io.atomix.primitive.partition.PartitionId;
 import io.atomix.utils.concurrent.Futures;
 import io.atomix.utils.serializer.Serializer;
 
@@ -34,18 +34,20 @@ import io.atomix.utils.serializer.Serializer;
  */
 public class DefaultAsyncDistributedLogPartition<E> implements AsyncDistributedLogPartition<E> {
   private final AsyncDistributedLog<E> log;
+  private final PartitionId partitionId;
   private final LogSession session;
   private final Serializer serializer;
 
-  public DefaultAsyncDistributedLogPartition(AsyncDistributedLog<E> log, LogSession session, Serializer serializer) {
+  public DefaultAsyncDistributedLogPartition(AsyncDistributedLog<E> log, PartitionId partitionId, LogSession session, Serializer serializer) {
     this.log = log;
+    this.partitionId = partitionId;
     this.session = session;
     this.serializer = serializer;
   }
 
   @Override
   public int id() {
-    return session.partitionId().getPartition();
+    return partitionId.getPartition();
   }
 
   @Override
@@ -56,11 +58,6 @@ public class DefaultAsyncDistributedLogPartition<E> implements AsyncDistributedL
   @Override
   public PrimitiveType type() {
     return log.type();
-  }
-
-  @Override
-  public PrimitiveProtocol protocol() {
-    return log.protocol();
   }
 
   /**
@@ -108,7 +105,7 @@ public class DefaultAsyncDistributedLogPartition<E> implements AsyncDistributedL
 
   @Override
   public CompletableFuture<Void> close() {
-    return session.close();
+    return CompletableFuture.completedFuture(null);
   }
 
   @Override

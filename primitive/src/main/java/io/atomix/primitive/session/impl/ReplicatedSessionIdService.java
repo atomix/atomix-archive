@@ -18,7 +18,7 @@ package io.atomix.primitive.session.impl;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import io.atomix.primitive.operation.OperationId;
+import io.atomix.primitive.operation.OperationMetadata;
 import io.atomix.primitive.operation.OperationType;
 import io.atomix.primitive.operation.PrimitiveOperation;
 import io.atomix.primitive.partition.PartitionGroup;
@@ -48,8 +48,8 @@ public class ReplicatedSessionIdService implements ManagedSessionIdService {
   @Override
   public CompletableFuture<SessionId> nextSessionId() {
     return proxy.execute(PrimitiveOperation.newBuilder()
-        .setId(OperationId.newBuilder()
-            .setName("NEXT")
+        .setMetadata(OperationMetadata.newBuilder()
+            .setName(SessionIdGeneratorOperations.NEXT.id())
             .setType(OperationType.COMMAND)
             .build())
         .setValue(NextRequest.newBuilder().build().toByteString())

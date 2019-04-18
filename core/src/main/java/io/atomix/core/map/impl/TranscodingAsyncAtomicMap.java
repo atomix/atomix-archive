@@ -16,7 +16,15 @@
 
 package io.atomix.core.map.impl;
 
-import com.google.common.collect.ImmutableMap;
+import java.time.Duration;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
+import java.util.function.BiFunction;
+import java.util.function.Function;
+import java.util.function.Predicate;
+
 import com.google.common.collect.Maps;
 import io.atomix.core.collection.AsyncDistributedCollection;
 import io.atomix.core.collection.impl.TranscodingAsyncDistributedCollection;
@@ -31,18 +39,6 @@ import io.atomix.core.transaction.TransactionLog;
 import io.atomix.primitive.impl.DelegatingAsyncPrimitive;
 import io.atomix.utils.concurrent.Futures;
 import io.atomix.utils.time.Versioned;
-
-import java.time.Duration;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Map.Entry;
-import java.util.Set;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Executor;
-import java.util.function.BiFunction;
-import java.util.function.Function;
-import java.util.function.Predicate;
-import java.util.stream.Collectors;
 
 /**
  * An {@code AsyncConsistentMap} that maps its operations to operations on a
@@ -118,22 +114,6 @@ public class TranscodingAsyncAtomicMap<K1, V1, K2, V2> extends DelegatingAsyncPr
   }
 
   @Override
-  public CompletableFuture<Map<K1, Versioned<V1>>> getAllPresent(Iterable<K1> keys) {
-    try {
-      Set<K2> uniqueKeys = new HashSet<>();
-      for (K1 key : keys) {
-        uniqueKeys.add(keyEncoder.apply(key));
-      }
-      return backingMap.getAllPresent(uniqueKeys).thenApply(
-          entries -> ImmutableMap.copyOf(entries.entrySet().stream()
-              .collect(Collectors.toMap(o -> keyDecoder.apply(o.getKey()),
-                  o -> versionedValueDecoder.apply(o.getValue())))));
-    } catch (Exception e) {
-      return Futures.exceptionalFuture(e);
-    }
-  }
-
-  @Override
   public CompletableFuture<Versioned<V1>> getOrDefault(K1 key, V1 defaultValue) {
     try {
       return backingMap.getOrDefault(keyEncoder.apply(key), valueEncoder.apply(defaultValue))
@@ -162,16 +142,6 @@ public class TranscodingAsyncAtomicMap<K1, V1, K2, V2> extends DelegatingAsyncPr
   public CompletableFuture<Versioned<V1>> put(K1 key, V1 value, Duration ttl) {
     try {
       return backingMap.put(keyEncoder.apply(key), valueEncoder.apply(value), ttl)
-          .thenApply(versionedValueDecoder);
-    } catch (Exception e) {
-      return Futures.exceptionalFuture(e);
-    }
-  }
-
-  @Override
-  public CompletableFuture<Versioned<V1>> putAndGet(K1 key, V1 value, Duration ttl) {
-    try {
-      return backingMap.putAndGet(keyEncoder.apply(key), valueEncoder.apply(value), ttl)
           .thenApply(versionedValueDecoder);
     } catch (Exception e) {
       return Futures.exceptionalFuture(e);

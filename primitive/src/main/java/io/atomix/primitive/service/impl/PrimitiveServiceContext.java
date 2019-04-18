@@ -29,6 +29,7 @@ import io.atomix.primitive.PrimitiveId;
 import io.atomix.primitive.PrimitiveType;
 import io.atomix.primitive.operation.OperationType;
 import io.atomix.primitive.operation.PrimitiveOperation;
+import io.atomix.primitive.operation.impl.DefaultOperationId;
 import io.atomix.primitive.service.Commit;
 import io.atomix.primitive.service.PrimitiveService;
 import io.atomix.primitive.service.Role;
@@ -42,7 +43,6 @@ import io.atomix.utils.concurrent.ThreadContext;
 import io.atomix.utils.concurrent.ThreadContextFactory;
 import io.atomix.utils.logging.ContextualLoggerFactory;
 import io.atomix.utils.logging.LoggerContext;
-import io.atomix.utils.serializer.Serializer;
 import io.atomix.utils.time.LogicalClock;
 import io.atomix.utils.time.LogicalTimestamp;
 import io.atomix.utils.time.WallClock;
@@ -148,10 +148,6 @@ public class PrimitiveServiceContext implements ServiceContext {
     return primitiveType;
   }
 
-  public Serializer serializer() {
-    return service.serializer();
-  }
-
   @Override
   public Role role() {
     return context.getRole();
@@ -250,7 +246,6 @@ public class PrimitiveServiceContext implements ServiceContext {
           primitiveType,
           serviceSession.getTimeout(),
           serviceSession.getTimestamp(),
-          service.serializer(),
           communicationService,
           this,
           threadContextFactory));
@@ -533,7 +528,14 @@ public class PrimitiveServiceContext implements ServiceContext {
       CompletableFuture<OperationResult> future) {
     long eventIndex = session.getEventIndex();
 
-    Commit<byte[]> commit = new DefaultCommit<>(index, operation.getId(), operation.getValue().toByteArray(), session, timestamp);
+    Commit<byte[]> commit = new DefaultCommit<>(
+        index,
+        new DefaultOperationId(
+            operation.getMetadata().getName(),
+            operation.getMetadata().getType()),
+        operation.getValue().toByteArray(),
+        session,
+        timestamp);
 
     OperationResult result;
     try {
@@ -675,7 +677,14 @@ public class PrimitiveServiceContext implements ServiceContext {
     // Set the current operation type to QUERY to prevent events from being sent to clients.
     setOperation(OperationType.QUERY);
 
-    Commit<byte[]> commit = new DefaultCommit<>(currentIndex, operation.getId(), operation.getValue().toByteArray(), session, timestamp);
+    Commit<byte[]> commit = new DefaultCommit<>(
+        currentIndex,
+        new DefaultOperationId(
+            operation.getMetadata().getName(),
+            operation.getMetadata().getType()),
+        operation.getValue().toByteArray(),
+        session,
+        timestamp);
 
     long eventIndex = session.getEventIndex();
 

@@ -25,10 +25,7 @@ import io.atomix.primitive.config.PrimitiveConfig;
 import io.atomix.primitive.partition.PartitionGroup;
 import io.atomix.primitive.protocol.PrimitiveProtocol;
 import io.atomix.primitive.protocol.PrimitiveProtocolConfig;
-import io.atomix.primitive.protocol.ProxyProtocol;
-import io.atomix.primitive.proxy.ProxyClient;
 import io.atomix.utils.Builder;
-import io.atomix.utils.concurrent.Futures;
 import io.atomix.utils.config.ConfigurationException;
 import io.atomix.utils.serializer.Namespace;
 import io.atomix.utils.serializer.NamespaceConfig;
@@ -157,19 +154,6 @@ public abstract class PrimitiveBuilder<B extends PrimitiveBuilder<B, C, P>, C ex
       }
     }
     return serializer;
-  }
-
-  protected <S> CompletableFuture<ProxyClient<S>> newProxy(Class<S> serviceType) {
-    PrimitiveProtocol protocol = protocol();
-    if (protocol instanceof ProxyProtocol) {
-      try {
-        // TODO
-        return CompletableFuture.completedFuture(null);
-      } catch (Exception e) {
-        return Futures.exceptionalFuture(e);
-      }
-    }
-    return Futures.exceptionalFuture(new UnsupportedOperationException());
   }
 
   /**

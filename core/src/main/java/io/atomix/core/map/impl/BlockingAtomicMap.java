@@ -15,6 +15,19 @@
  */
 package io.atomix.core.map.impl;
 
+import java.time.Duration;
+import java.util.Map;
+import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executor;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.function.BiFunction;
+import java.util.function.Consumer;
+import java.util.function.Function;
+import java.util.function.Predicate;
+
 import com.google.common.base.Throwables;
 import io.atomix.core.collection.DistributedCollection;
 import io.atomix.core.collection.impl.BlockingDistributedCollection;
@@ -28,19 +41,6 @@ import io.atomix.primitive.PrimitiveState;
 import io.atomix.primitive.Synchronous;
 import io.atomix.utils.concurrent.Retries;
 import io.atomix.utils.time.Versioned;
-
-import java.time.Duration;
-import java.util.Map;
-import java.util.Objects;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Executor;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
-import java.util.function.BiFunction;
-import java.util.function.Consumer;
-import java.util.function.Function;
-import java.util.function.Predicate;
 
 /**
  * Default implementation of {@code ConsistentMap}.
@@ -86,11 +86,6 @@ public class BlockingAtomicMap<K, V> extends Synchronous<AsyncAtomicMap<K, V>> i
   }
 
   @Override
-  public Map<K, Versioned<V>> getAllPresent(Iterable<K> keys) {
-    return complete(asyncMap.getAllPresent(keys));
-  }
-
-  @Override
   public Versioned<V> getOrDefault(K key, V defaultValue) {
     return complete(asyncMap.getOrDefault(key, defaultValue));
   }
@@ -126,11 +121,6 @@ public class BlockingAtomicMap<K, V> extends Synchronous<AsyncAtomicMap<K, V>> i
   @Override
   public Versioned<V> put(K key, V value, Duration ttl) {
     return complete(asyncMap.put(key, value, ttl));
-  }
-
-  @Override
-  public Versioned<V> putAndGet(K key, V value, Duration ttl) {
-    return complete(asyncMap.putAndGet(key, value, ttl));
   }
 
   @Override

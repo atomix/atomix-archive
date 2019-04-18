@@ -16,13 +16,13 @@
 
 package io.atomix.core.map.impl;
 
-import io.atomix.core.map.AsyncAtomicMap;
-import io.atomix.utils.concurrent.Futures;
-import io.atomix.utils.time.Versioned;
-
 import java.util.concurrent.CompletableFuture;
 import java.util.function.BiFunction;
 import java.util.function.Predicate;
+
+import io.atomix.core.map.AsyncAtomicMap;
+import io.atomix.utils.concurrent.Futures;
+import io.atomix.utils.time.Versioned;
 
 /**
  * An unmodifiable {@link AsyncAtomicMap}.
@@ -50,11 +50,6 @@ public class UnmodifiableAsyncAtomicMap<K, V> extends DelegatingAsyncAtomicMap<K
 
   @Override
   public CompletableFuture<Versioned<V>> put(K key, V value) {
-    return Futures.exceptionalFuture(new UnsupportedOperationException(ERROR_MSG));
-  }
-
-  @Override
-  public CompletableFuture<Versioned<V>> putAndGet(K key, V value) {
     return Futures.exceptionalFuture(new UnsupportedOperationException(ERROR_MSG));
   }
 

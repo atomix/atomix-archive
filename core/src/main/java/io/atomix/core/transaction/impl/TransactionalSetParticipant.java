@@ -15,6 +15,9 @@
  */
 package io.atomix.core.transaction.impl;
 
+import java.time.Duration;
+import java.util.concurrent.CompletableFuture;
+
 import io.atomix.core.set.AsyncDistributedSet;
 import io.atomix.core.set.impl.SetUpdate;
 import io.atomix.core.transaction.AsyncTransactionalSet;
@@ -22,9 +25,7 @@ import io.atomix.core.transaction.TransactionId;
 import io.atomix.core.transaction.TransactionParticipant;
 import io.atomix.core.transaction.TransactionalSet;
 import io.atomix.primitive.PrimitiveType;
-
-import java.time.Duration;
-import java.util.concurrent.CompletableFuture;
+import io.atomix.primitive.protocol.ProxyProtocol;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -34,10 +35,12 @@ import static com.google.common.base.Preconditions.checkNotNull;
  */
 public abstract class TransactionalSetParticipant<E> implements AsyncTransactionalSet<E>, TransactionParticipant<SetUpdate<E>> {
   protected final TransactionId transactionId;
+  protected final ProxyProtocol protocol;
   protected final AsyncDistributedSet<E> set;
 
-  protected TransactionalSetParticipant(TransactionId transactionId, AsyncDistributedSet<E> set) {
+  protected TransactionalSetParticipant(TransactionId transactionId, ProxyProtocol protocol, AsyncDistributedSet<E> set) {
     this.transactionId = checkNotNull(transactionId);
+    this.protocol = checkNotNull(protocol);
     this.set = checkNotNull(set);
   }
 
@@ -49,6 +52,11 @@ public abstract class TransactionalSetParticipant<E> implements AsyncTransaction
   @Override
   public PrimitiveType type() {
     return set.type();
+  }
+
+  @Override
+  public ProxyProtocol protocol() {
+    return protocol;
   }
 
   @Override

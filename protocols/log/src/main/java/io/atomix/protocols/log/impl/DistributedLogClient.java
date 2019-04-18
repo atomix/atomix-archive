@@ -15,23 +15,16 @@
  */
 package io.atomix.protocols.log.impl;
 
+import java.util.Collection;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.CopyOnWriteArrayList;
+
 import com.google.common.collect.Maps;
-import com.google.common.collect.Sets;
-import io.atomix.primitive.PrimitiveState;
 import io.atomix.primitive.log.LogClient;
 import io.atomix.primitive.log.LogSession;
 import io.atomix.primitive.partition.PartitionId;
 import io.atomix.primitive.partition.Partitioner;
-import io.atomix.primitive.protocol.LogProtocol;
-import io.atomix.utils.concurrent.Futures;
-
-import java.util.Collection;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.function.Consumer;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -39,38 +32,20 @@ import static com.google.common.base.Preconditions.checkNotNull;
  * Partitioned log client.
  */
 public class DistributedLogClient implements LogClient {
-  private final LogProtocol protocol;
   private final List<PartitionId> partitionIds = new CopyOnWriteArrayList<>();
   private final Map<PartitionId, LogSession> partitions = Maps.newConcurrentMap();
   private final List<LogSession> sortedPartitions = new CopyOnWriteArrayList<>();
   private final Partitioner<String> partitioner;
-  private final Set<Consumer<PrimitiveState>> stateChangeListeners = Sets.newCopyOnWriteArraySet();
-  private final Map<PartitionId, PrimitiveState> states = Maps.newHashMap();
-  private volatile PrimitiveState state = PrimitiveState.CLOSED;
 
   public DistributedLogClient(
-      LogProtocol protocol,
-      Collection<LogSession> partitions,
+      Map<PartitionId, LogSession> partitions,
       Partitioner<String> partitioner) {
-    this.protocol = checkNotNull(protocol, "protocol cannot be null");
     this.partitioner = checkNotNull(partitioner, "partitioner cannot be null");
-    partitions.forEach(partition -> {
-      this.partitionIds.add(partition.partitionId());
-      this.partitions.put(partition.partitionId(), partition);
+    partitions.forEach((partitionId, partition) -> {
+      this.partitionIds.add(partitionId);
+      this.partitions.put(partitionId, partition);
       this.sortedPartitions.add(partition);
-      states.put(partition.partitionId(), PrimitiveState.CLOSED);
-      partition.addStateChangeListener(state -> onStateChange(partition.partitionId(), state));
     });
-  }
-
-  @Override
-  public LogProtocol protocol() {
-    return protocol;
-  }
-
-  @Override
-  public PrimitiveState state() {
-    return state;
   }
 
   @Override
@@ -91,54 +66,5 @@ public class DistributedLogClient implements LogClient {
   @Override
   public PartitionId getPartitionId(String key) {
     return partitioner.partition(key, partitionIds);
-  }
-
-  @Override
-  public void addStateChangeListener(Consumer<PrimitiveState> listener) {
-    stateChangeListeners.add(listener);
-  }
-
-  @Override
-  public void removeStateChangeListener(Consumer<PrimitiveState> listener) {
-    stateChangeListeners.remove(listener);
-  }
-
-  private synchronized void onStateChange(PartitionId partitionId, PrimitiveState state) {
-    states.put(partitionId, state);
-    switch (state) {
-      case CONNECTED:
-        if (!states.containsValue(PrimitiveState.SUSPENDED) && !states.containsValue(PrimitiveState.CLOSED)) {
-          changeState(PrimitiveState.CONNECTED);
-        }
-        break;
-      case SUSPENDED:
-        changeState(PrimitiveState.SUSPENDED);
-        break;
-      case CLOSED:
-        changeState(PrimitiveState.CLOSED);
-        break;
-    }
-  }
-
-  private synchronized void changeState(PrimitiveState state) {
-    if (this.state != state) {
-      this.state = state;
-      stateChangeListeners.forEach(l -> l.accept(state));
-    }
-  }
-
-  @Override
-  public CompletableFuture<LogClient> connect() {
-    return Futures.allOf(partitions.values().stream().map(LogSession::connect)).thenApply(v -> {
-      changeState(PrimitiveState.CONNECTED);
-      return this;
-    });
-  }
-
-  @Override
-  public CompletableFuture<Void> close() {
-    return Futures.allOf(partitions.values().stream().map(LogSession::connect)).thenRun(() -> {
-      changeState(PrimitiveState.CLOSED);
-    });
   }
 }

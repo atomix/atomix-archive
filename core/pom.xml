@@ -55,9 +55,25 @@
       <version>${project.version}</version>
     </dependency>
     <dependency>
+      <groupId>io.atomix</groupId>
+      <artifactId>atomix-protoc-codegen</artifactId>
+      <version>${project.version}</version>
+      <optional>true</optional>
+    </dependency>
+    <dependency>
       <groupId>com.google.protobuf</groupId>
       <artifactId>protobuf-java</artifactId>
       <version>${protobuf.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>io.grpc</groupId>
+      <artifactId>grpc-protobuf</artifactId>
+      <version>${grpc.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>io.grpc</groupId>
+      <artifactId>grpc-stub</artifactId>
+      <version>${grpc.version}</version>
     </dependency>
   </dependencies>
 
@@ -97,6 +113,15 @@
           <protocArtifact>com.google.protobuf:protoc:${protobuf.version}:exe:${os.detected.classifier}</protocArtifact>
           <pluginId>grpc-java</pluginId>
           <pluginArtifact>io.grpc:protoc-gen-grpc-java:${grpc.version}:exe:${os.detected.classifier}</pluginArtifact>
+          <protocPlugins>
+            <protocPlugin>
+              <id>atomix</id>
+              <groupId>io.atomix</groupId>
+              <artifactId>atomix-protoc-codegen</artifactId>
+              <version>${project.version}</version>
+              <mainClass>io.atomix.primitive.codegen.PrimitiveServiceGeneratorMain</mainClass>
+            </protocPlugin>
+          </protocPlugins>
         </configuration>
         <executions>
           <execution>

@@ -15,18 +15,28 @@
  */
 package io.atomix.protocols.log.partition;
 
+import java.time.Duration;
 import java.util.Collection;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
 import io.atomix.cluster.MemberId;
+import io.atomix.primitive.PrimitiveManagementService;
+import io.atomix.primitive.PrimitiveType;
+import io.atomix.primitive.log.LogSession;
 import io.atomix.primitive.partition.GroupMember;
 import io.atomix.primitive.partition.Partition;
 import io.atomix.primitive.partition.PartitionId;
 import io.atomix.primitive.partition.PartitionManagementService;
 import io.atomix.primitive.partition.PrimaryElection;
+import io.atomix.primitive.service.StateMachine;
+import io.atomix.primitive.service.impl.PrimitiveStateMachine;
+import io.atomix.primitive.session.SessionClient;
+import io.atomix.primitive.session.impl.PrimitiveSessionClient;
+import io.atomix.protocols.log.DistributedLogProtocolConfig;
 import io.atomix.protocols.log.partition.impl.LogPartitionClient;
 import io.atomix.protocols.log.partition.impl.LogPartitionServer;
+import io.atomix.protocols.log.partition.impl.LogPrimitiveClient;
 import io.atomix.utils.concurrent.Futures;
 import io.atomix.utils.concurrent.ThreadContextFactory;
 
@@ -38,15 +48,18 @@ import static com.google.common.base.MoreObjects.toStringHelper;
 public class LogPartition implements Partition {
   private final PartitionId partitionId;
   private final LogPartitionGroupConfig config;
+  private final ThreadContextFactory threadContextFactory;
   private PrimaryElection election;
   private LogPartitionServer server;
   private LogPartitionClient client;
 
   public LogPartition(
       PartitionId partitionId,
-      LogPartitionGroupConfig config) {
+      LogPartitionGroupConfig config,
+      ThreadContextFactory threadContextFactory) {
     this.partitionId = partitionId;
     this.config = config;
+    this.threadContextFactory = threadContextFactory;
   }
 
   @Override
@@ -100,34 +113,60 @@ public class LogPartition implements Partition {
    *
    * @return the log partition client
    */
-  public LogPartitionClient getClient() {
+  public LogSession getClient() {
     return client;
+  }
+
+  /**
+   * Creates a new primitive client.
+   *
+   * @param name              the primitive name
+   * @param type              the primitive type
+   * @param managementService the partition management service
+   * @param config            the Raft protocol configuration
+   * @return the primitive client
+   */
+  public SessionClient newClient(
+      String name,
+      PrimitiveType type,
+      PrimitiveManagementService managementService,
+      DistributedLogProtocolConfig config) {
+    StateMachine stateMachine = new PrimitiveStateMachine(
+        managementService.getPrimitiveTypeRegistry(),
+        managementService.getMembershipService(),
+        managementService.getCommunicationService(),
+        threadContextFactory.createContext(),
+        threadContextFactory);
+    return new PrimitiveSessionClient(
+        name,
+        type,
+        Duration.ofSeconds(30),
+        new LogPrimitiveClient(client, stateMachine, threadContextFactory.createContext(), threadContextFactory.createContext()),
+        managementService.getMembershipService(),
+        managementService.getCommunicationService(),
+        threadContextFactory.createContext());
   }
 
   /**
    * Joins the log partition.
    */
-  CompletableFuture<Partition> join(
-      PartitionManagementService managementService,
-      ThreadContextFactory threadFactory) {
+  CompletableFuture<Partition> join(PartitionManagementService managementService) {
     election = managementService.getElectionService().getElectionFor(partitionId);
     server = new LogPartitionServer(
         this,
         managementService,
         config,
-        threadFactory);
-    client = new LogPartitionClient(this, managementService, config, threadFactory);
+        threadContextFactory);
+    client = new LogPartitionClient(this, managementService, config, threadContextFactory);
     return server.start().thenCompose(v -> client.start()).thenApply(v -> this);
   }
 
   /**
    * Connects to the log partition.
    */
-  CompletableFuture<Partition> connect(
-      PartitionManagementService managementService,
-      ThreadContextFactory threadFactory) {
+  CompletableFuture<Partition> connect(PartitionManagementService managementService) {
     election = managementService.getElectionService().getElectionFor(partitionId);
-    client = new LogPartitionClient(this, managementService, config, threadFactory);
+    client = new LogPartitionClient(this, managementService, config, threadContextFactory);
     return client.start().thenApply(v -> this);
   }
 

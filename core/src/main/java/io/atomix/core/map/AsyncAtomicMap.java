@@ -16,17 +16,7 @@
 
 package io.atomix.core.map;
 
-import com.google.common.util.concurrent.MoreExecutors;
-import io.atomix.core.collection.AsyncDistributedCollection;
-import io.atomix.core.set.AsyncDistributedSet;
-import io.atomix.core.map.impl.MapUpdate;
-import io.atomix.core.transaction.Transactional;
-import io.atomix.primitive.AsyncPrimitive;
-import io.atomix.primitive.DistributedPrimitive;
-import io.atomix.utils.time.Versioned;
-
 import java.time.Duration;
-import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
@@ -34,6 +24,15 @@ import java.util.concurrent.Executor;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.Predicate;
+
+import com.google.common.util.concurrent.MoreExecutors;
+import io.atomix.core.collection.AsyncDistributedCollection;
+import io.atomix.core.map.impl.MapUpdate;
+import io.atomix.core.set.AsyncDistributedSet;
+import io.atomix.core.transaction.Transactional;
+import io.atomix.primitive.AsyncPrimitive;
+import io.atomix.primitive.DistributedPrimitive;
+import io.atomix.utils.time.Versioned;
 
 /**
  * A distributed, strongly consistent map whose methods are all executed asynchronously.
@@ -107,18 +106,6 @@ public interface AsyncAtomicMap<K, V> extends AsyncPrimitive, Transactional<MapU
    * this map contains no mapping for the key
    */
   CompletableFuture<Versioned<V>> get(K key);
-
-  /**
-   * Returns a map of the values associated with the {@code keys} in this map. The returned map
-   * will only contain entries which already exist in the map.
-   * <p>
-   * Note that duplicate elements in {@code keys}, as determined by {@link Object#equals}, will be
-   * ignored.
-   *
-   * @param keys the keys whose associated values are to be returned
-   * @return the unmodifiable mapping of keys to values for the specified keys found in the map
-   */
-  CompletableFuture<Map<K, Versioned<V>>> getAllPresent(Iterable<K> keys);
 
   /**
    * Returns the value (and version) to which the specified key is mapped, or the provided
@@ -221,31 +208,6 @@ public interface AsyncAtomicMap<K, V> extends AsyncPrimitive, Transactional<MapU
    * no mapping for key.
    */
   CompletableFuture<Versioned<V>> put(K key, V value, Duration ttl);
-
-  /**
-   * Associates the specified value with the specified key in this map (optional operation).
-   * If the map previously contained a mapping for the key, the old value is replaced by the
-   * specified value.
-   *
-   * @param key   key with which the specified value is to be associated
-   * @param value value to be associated with the specified key
-   * @return new value.
-   */
-  default CompletableFuture<Versioned<V>> putAndGet(K key, V value) {
-    return putAndGet(key, value, Duration.ZERO);
-  }
-
-  /**
-   * Associates the specified value with the specified key in this map (optional operation).
-   * If the map previously contained a mapping for the key, the old value is replaced by the
-   * specified value.
-   *
-   * @param key   key with which the specified value is to be associated
-   * @param value value to be associated with the specified key
-   * @param ttl   the time to live after which to remove the value
-   * @return new value.
-   */
-  CompletableFuture<Versioned<V>> putAndGet(K key, V value, Duration ttl);
 
   /**
    * Removes the mapping for a key from this map if it is present (optional operation).

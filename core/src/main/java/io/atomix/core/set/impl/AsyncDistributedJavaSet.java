@@ -15,24 +15,23 @@
  */
 package io.atomix.core.set.impl;
 
+import java.time.Duration;
+import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+
 import io.atomix.core.collection.impl.AsyncDistributedJavaCollection;
 import io.atomix.core.set.AsyncDistributedSet;
 import io.atomix.core.set.DistributedSet;
 import io.atomix.core.transaction.TransactionId;
 import io.atomix.core.transaction.TransactionLog;
-import io.atomix.primitive.protocol.PrimitiveProtocol;
 import io.atomix.utils.concurrent.Futures;
-
-import java.time.Duration;
-import java.util.Set;
-import java.util.concurrent.CompletableFuture;
 
 /**
  * Asynchronous distributed Java set.
  */
 public class AsyncDistributedJavaSet<E> extends AsyncDistributedJavaCollection<E> implements AsyncDistributedSet<E> {
-  public AsyncDistributedJavaSet(String name, PrimitiveProtocol protocol, Set<E> set) {
-    super(name, protocol, set);
+  public AsyncDistributedJavaSet(String name, Set<E> set) {
+    super(name, set);
   }
 
   @Override

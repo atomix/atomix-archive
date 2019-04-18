@@ -15,6 +15,14 @@
  */
 package io.atomix.core.map.impl;
 
+import java.time.Duration;
+import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
+import java.util.function.BiFunction;
+import java.util.function.Function;
+import java.util.function.Supplier;
+
 import io.atomix.core.collection.AsyncDistributedCollection;
 import io.atomix.core.collection.impl.AsyncDistributedJavaCollection;
 import io.atomix.core.map.AsyncDistributedMap;
@@ -26,14 +34,6 @@ import io.atomix.core.set.impl.AsyncDistributedJavaSet;
 import io.atomix.primitive.PrimitiveType;
 import io.atomix.primitive.protocol.PrimitiveProtocol;
 import io.atomix.utils.concurrent.Futures;
-
-import java.time.Duration;
-import java.util.Map;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Executor;
-import java.util.function.BiFunction;
-import java.util.function.Function;
-import java.util.function.Supplier;
 
 /**
  * Asynchronous distributed Java map.
@@ -57,11 +57,6 @@ public class AsyncDistributedJavaMap<K, V> implements AsyncDistributedMap<K, V> 
   @Override
   public PrimitiveType type() {
     return DistributedMapType.instance();
-  }
-
-  @Override
-  public PrimitiveProtocol protocol() {
-    return protocol;
   }
 
   @Override
@@ -111,17 +106,17 @@ public class AsyncDistributedJavaMap<K, V> implements AsyncDistributedMap<K, V> 
 
   @Override
   public AsyncDistributedSet<K> keySet() {
-    return new AsyncDistributedJavaSet<>(name(), protocol(), map.keySet());
+    return new AsyncDistributedJavaSet<>(name(), map.keySet());
   }
 
   @Override
   public AsyncDistributedCollection<V> values() {
-    return new AsyncDistributedJavaCollection<>(name(), protocol(), map.values());
+    return new AsyncDistributedJavaCollection<>(name(), map.values());
   }
 
   @Override
   public AsyncDistributedSet<Map.Entry<K, V>> entrySet() {
-    return new AsyncDistributedJavaSet<>(name(), protocol(), map.entrySet());
+    return new AsyncDistributedJavaSet<>(name(), map.entrySet());
   }
 
   @Override

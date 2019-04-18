@@ -1,0 +1,88 @@
+syntax = "proto3";
+
+package atomix.lock.service;
+
+import "atomix/metadata.proto";
+import "atomix/primitive/service.proto";
+
+option java_package = "io.atomix.core.lock.impl";
+option java_outer_classname = "AtomicLockProto";
+option java_multiple_files = true;
+
+// Lock snapshot
+message AtomicLockSnapshot {
+    LockCall lock = 1;
+    repeated LockCall queue = 2;
+}
+
+// Lock call
+message LockCall {
+    int32 id = 1;
+    int64 index = 2;
+    int64 session_id = 3;
+    int64 expire = 4;
+}
+
+message LockRequest {
+    int32 id = 1;
+    int64 timeout = 2;
+}
+
+message LockResponse {
+    atomix.metadata.Metadata metadata = 1;
+}
+
+message UnlockRequest {
+    int32 id = 1;
+    int64 index = 2;
+}
+
+message UnlockResponse {
+    atomix.metadata.Metadata metadata = 1;
+}
+
+message IsLockedRequest {
+    int32 id = 1;
+    int64 index = 2;
+}
+
+message IsLockedResponse {
+    atomix.metadata.Metadata metadata = 1;
+    bool locked = 2;
+}
+
+message LockEvent {
+    int32 id = 1;
+    atomix.metadata.Metadata metadata = 2;
+    bool acquired = 3;
+}
+
+// Lock service
+service LockService {
+    rpc Lock(LockRequest) returns (LockResponse) {
+        option (atomix.primitive.service.operation) = {
+            name: "lock"
+            type: COMMAND
+        };
+    }
+
+    rpc OnLock(atomix.primitive.service.EventListener) returns (stream LockEvent) {
+        option (atomix.primitive.service.event) = {
+            name: "lock"
+        };
+    }
+
+    rpc Unlock(UnlockRequest) returns (UnlockResponse) {
+        option (atomix.primitive.service.operation) = {
+            name: "unlock"
+            type: COMMAND
+        };
+    }
+
+    rpc IsLocked(IsLockedRequest) returns (IsLockedResponse) {
+        option (atomix.primitive.service.operation) = {
+            name: "islocked"
+            type: QUERY
+        };
+    }
+}
