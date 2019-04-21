@@ -208,7 +208,7 @@ public class PrimitiveServiceGenerator {
       DescriptorProtos.ServiceDescriptorProto serviceDescriptor,
       DescriptorProtos.FileDescriptorProto fileDescriptor) {
     ClassDescriptor serviceClass = new ClassDescriptor();
-    serviceClass.setJavaPackage(getPackageName(fileDescriptor));
+    serviceClass.setPackageName(getPackageName(fileDescriptor));
     serviceClass.setFileName(getAbstractFilePath(serviceDescriptor, fileDescriptor));
     serviceClass.setClassName(getPrefixedClassName(ABSTRACT_PREFIX, serviceDescriptor));
     return serviceClass;
@@ -225,7 +225,7 @@ public class PrimitiveServiceGenerator {
       DescriptorProtos.ServiceDescriptorProto serviceDescriptor,
       DescriptorProtos.FileDescriptorProto fileDescriptor) {
     ClassDescriptor proxyClass = new ClassDescriptor();
-    proxyClass.setJavaPackage(getPackageName(fileDescriptor));
+    proxyClass.setPackageName(getPackageName(fileDescriptor));
     proxyClass.setFileName(getFilePath(PROXY_SUFFIX, serviceDescriptor, fileDescriptor));
     proxyClass.setClassName(getSuffixedClassName(PROXY_SUFFIX, serviceDescriptor));
     return proxyClass;
@@ -242,7 +242,7 @@ public class PrimitiveServiceGenerator {
       DescriptorProtos.ServiceDescriptorProto serviceDescriptor,
       DescriptorProtos.FileDescriptorProto fileDescriptor) {
     ClassDescriptor operationsClass = new ClassDescriptor();
-    operationsClass.setJavaPackage(getPackageName(fileDescriptor));
+    operationsClass.setPackageName(getPackageName(fileDescriptor));
     operationsClass.setFileName(getFilePath(OPERATIONS_SUFFIX, serviceDescriptor, fileDescriptor));
     operationsClass.setClassName(getSuffixedClassName(OPERATIONS_SUFFIX, serviceDescriptor));
     return operationsClass;
@@ -259,7 +259,7 @@ public class PrimitiveServiceGenerator {
       DescriptorProtos.ServiceDescriptorProto serviceDescriptor,
       DescriptorProtos.FileDescriptorProto fileDescriptor) {
     ClassDescriptor eventsClass = new ClassDescriptor();
-    eventsClass.setJavaPackage(getPackageName(fileDescriptor));
+    eventsClass.setPackageName(getPackageName(fileDescriptor));
     eventsClass.setFileName(getFilePath(EVENTS_SUFFIX, serviceDescriptor, fileDescriptor));
     eventsClass.setClassName(getSuffixedClassName(EVENTS_SUFFIX, serviceDescriptor));
     return eventsClass;
@@ -276,7 +276,7 @@ public class PrimitiveServiceGenerator {
       DescriptorProtos.DescriptorProto messageDescriptor,
       DescriptorProtos.FileDescriptorProto fileDescriptor) {
     ClassDescriptor messageClass = new ClassDescriptor();
-    messageClass.setJavaPackage(getPackageName(fileDescriptor));
+    messageClass.setPackageName(getPackageName(fileDescriptor));
     messageClass.setFileName(getFilePath(messageDescriptor, fileDescriptor));
     messageClass.setClassName(getClassName(messageDescriptor));
     return messageClass;
@@ -670,7 +670,7 @@ public class PrimitiveServiceGenerator {
 
   public static class ClassDescriptor {
     private String fileName;
-    private String javaPackage;
+    private String packageName;
     private String className;
 
     ClassDescriptor() {
@@ -684,12 +684,12 @@ public class PrimitiveServiceGenerator {
       this.fileName = fileName;
     }
 
-    public String getJavaPackage() {
-      return javaPackage;
+    public String getPackageName() {
+      return packageName;
     }
 
-    public void setJavaPackage(String javaPackage) {
-      this.javaPackage = javaPackage;
+    public void setPackageName(String packageName) {
+      this.packageName = packageName;
     }
 
     public String getClassName() {
@@ -701,7 +701,7 @@ public class PrimitiveServiceGenerator {
     }
 
     public String getQualifiedName() {
-      return getJavaPackage() + "." + getClassName();
+      return getPackageName() + "." + getClassName();
     }
   }
 

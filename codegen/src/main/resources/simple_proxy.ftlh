@@ -13,17 +13,37 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package ${proxyClass.javaPackage};
+package ${proxyClass.packageName};
 
+import io.atomix.primitive.PrimitiveManagementService;
+import io.atomix.primitive.service.impl.ServiceId;
+import io.atomix.primitive.partition.PartitionId;
+import io.atomix.primitive.proxy.SimplePrimitiveProxy;
+import io.atomix.utils.concurrent.ThreadContext;
+
+import java.util.concurrent.CompletableFuture;
+
+<#list operations as operation>
+<#if operation.operationsClass.packageName != proxyClass.packageName>
+import ${operation.operationsClass.packageName}.${operation.operationsClass.className}
+</#if>
+<#if operation.requestClass.packageName != proxyClass.packageName>
+import ${operation.requestClass.packageName}.${operation.requestClass.className}
+</#if>
+<#if operation.responseClass.packageName != proxyClass.packageName>
+import ${operation.responseClass.packageName}.${operation.responseClass.className}
+</#if>
+</#list>
 /**
  * Atomix generated proxy ${proxyClass.className}.
  */
-public class ${proxyClass.className} extends io.atomix.primitive.proxy.SimplePrimitiveProxy {
+public class ${proxyClass.className} extends SimplePrimitiveProxy {
     public ${proxyClass.className}(
-            io.atomix.primitive.service.impl.ServiceId serviceId,
-            io.atomix.primitive.partition.PartitionId partitionId,
-            io.atomix.primitive.PrimitiveManagementService managementService) {
-        super(serviceId, partitionId, managementService);
+            ServiceId serviceId,
+            PartitionId partitionId,
+            PrimitiveManagementService managementService,
+            ThreadContext threadContext) {
+        super(serviceId, partitionId, managementService, threadContext);
     }
 
     <#list operations as operation>
@@ -33,12 +53,12 @@ public class ${proxyClass.className} extends io.atomix.primitive.proxy.SimplePri
      * @param request the request object
      * @return the response object
      */
-    public java.util.concurrent.CompletableFuture<${operation.responseClass.qualifiedName}> ${operation.methodName}(${operation.requestClass.qualifiedName} request) {
+    public CompletableFuture<${operation.responseClass.className}> ${operation.methodName}(${operation.requestClass.className} request) {
         return getClient().execute(
-            ${operation.operationsClass.qualifiedName}.${operation.enumValue},
+            ${operation.operationsClass.className}.${operation.enumValue},
             request,
-            ${operation.requestClass.qualifiedName}::toByteString,
-            ${operation.responseClass.qualifiedName}::parseFrom);
+            ${operation.requestClass.className}::toByteString,
+            ${operation.responseClass.className}::parseFrom);
     }
 
     </#list>

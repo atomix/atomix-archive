@@ -13,33 +13,49 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package ${serviceClass.javaPackage};
+package ${serviceClass.packageName};
 
+import io.atomix.primitive.partition.PartitionId;
+import io.atomix.primitive.partition.PartitionManagementService;
+import io.atomix.primitive.session.SessionId;
+import io.atomix.primitive.service.ServiceExecutor;
+import io.atomix.primitive.service.SessionManagedPrimitiveService;
+
+<#list operations as operation>
+<#if operation.operationsClass.packageName != proxyClass.packageName>
+import ${operation.operationsClass.packageName}.${operation.operationsClass.className}
+</#if>
+<#if operation.requestClass.packageName != proxyClass.packageName>
+import ${operation.requestClass.packageName}.${operation.requestClass.className}
+</#if>
+<#if operation.responseClass.packageName != proxyClass.packageName>
+import ${operation.responseClass.packageName}.${operation.responseClass.className}
+</#if>
+</#list>
+<#list events as event>
+<#if event.eventsClass.packageName != proxyClass.packageName>
+import ${event.eventsClass.packageName}.${operation.eventsClass.className}
+</#if>
+<#if event.valueClass.packageName != proxyClass.packageName>
+import ${event.valueClass.packageName}.${operation.valueClass.className}
+</#if>
+</#list>
 /**
  * Atomix generated service interface ${serviceClass.className}.
  */
-public abstract class ${serviceClass.className} extends io.atomix.primitive.service.SessionManagedPrimitiveService {
-    protected ${serviceClass.className}(
-            io.atomix.primitive.partition.PartitionId partitionId,
-            io.atomix.primitive.partition.PartitionManagementService managementService) {
+public abstract class ${serviceClass.className} extends SessionManagedPrimitiveService {
+    protected ${serviceClass.className}(PartitionId partitionId, PartitionManagementService managementService) {
         super(partitionId, managementService);
     }
 
     @Override
-    protected void configure(io.atomix.primitive.service.ServiceExecutor executor) {
+    protected void configure(ServiceExecutor executor) {
         <#list operations as operation>
-        <#if operation.responseClass??>
         executor.register(
-            ${operation.operationsClass.qualifiedName}.${operation.enumValue},
+            ${operation.operationsClass.className}.${operation.enumValue},
             this::${operation.methodName},
-            ${operation.requestClass.qualifiedName}::parseFrom,
-            ${operation.responseClass.qualifiedName}::toByteArray);
-        <#else>
-        executor.register(
-            ${operation.operationsClass.qualifiedName}.${operation.enumValue},
-            this::${operation.methodName},
-            ${operation.requestClass.qualifiedName}::parseFrom);
-         </#if>
+            ${operation.requestClass.className}::parseFrom,
+            ${operation.responseClass.className}::toByteArray);
          </#list>
     }
 
@@ -50,11 +66,7 @@ public abstract class ${serviceClass.className} extends io.atomix.primitive.serv
      * @param request the request object
      * @return the response object
      */
-    <#if operation.responseClass??>
-    public abstract ${operation.responseClass.qualifiedName} ${operation.methodName}(${operation.requestClass.qualifiedName} request);
-    <#else>
-    public abstract void ${operation.methodName}(${operation.requestClass.qualifiedName} request);
-    </#if>
+    public abstract ${operation.responseClass.className} ${operation.methodName}(${operation.requestClass.className} request);
 
     </#list>
 
@@ -64,8 +76,8 @@ public abstract class ${serviceClass.className} extends io.atomix.primitive.serv
      *
      * @param event the event to produce
      */
-    protected void ${event.methodName}(io.atomix.primitive.session.SessionId sessionId, ${event.valueClass.qualifiedName} event) {
-        getSession(sessionId).publish(${event.eventsClass.qualifiedName}.${event.enumValue}, event, ${event.valueClass.qualifiedName}::toByteArray);
+    protected void ${event.methodName}(SessionId sessionId, ${event.valueClass.className} event) {
+        getSession(sessionId).publish(${event.eventsClass.className}.${event.enumValue}, event, ${event.valueClass.className}::toByteArray);
     }
 
     </#list>

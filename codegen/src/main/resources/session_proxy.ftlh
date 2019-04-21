@@ -13,17 +13,51 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package ${proxyClass.javaPackage};
+package ${proxyClass.packageName};
 
+import io.atomix.primitive.PrimitiveManagementService;
+import io.atomix.primitive.partition.PartitionId;
+import io.atomix.primitive.proxy.SessionEnabledPrimitiveProxy;
+import io.atomix.primitive.session.impl.EventContext;
+import io.atomix.primitive.service.impl.ServiceId;
+import io.atomix.primitive.session.impl.SessionContext;
+import io.atomix.primitive.session.impl.SessionMetadata;
+import io.atomix.utils.concurrent.ThreadContext;
+
+import java.util.concurrent.CompletableFuture;
+import java.util.function.BiConsumer;
+
+import org.apache.commons.lang3.tuple.Pair;
+
+<#list operations as operation>
+<#if operation.operationsClass.packageName != proxyClass.packageName>
+import ${operation.operationsClass.packageName}.${operation.operationsClass.className}
+</#if>
+<#if operation.requestClass.packageName != proxyClass.packageName>
+import ${operation.requestClass.packageName}.${operation.requestClass.className}
+</#if>
+<#if operation.responseClass.packageName != proxyClass.packageName>
+import ${operation.responseClass.packageName}.${operation.responseClass.className}
+</#if>
+</#list>
+<#list events as event>
+<#if event.eventsClass.packageName != proxyClass.packageName>
+import ${event.eventsClass.packageName}.${operation.eventsClass.className}
+</#if>
+<#if event.valueClass.packageName != proxyClass.packageName>
+import ${event.valueClass.packageName}.${operation.valueClass.className}
+</#if>
+</#list>
 /**
  * Atomix generated proxy ${proxyClass.className}.
  */
-public class ${proxyClass.className} extends io.atomix.primitive.proxy.SessionEnabledPrimitiveProxy {
+public class ${proxyClass.className} extends SessionEnabledPrimitiveProxy {
     public ${proxyClass.className}(
             io.atomix.primitive.service.impl.ServiceId serviceId,
             io.atomix.primitive.partition.PartitionId partitionId,
-            io.atomix.primitive.PrimitiveManagementService managementService) {
-        super(serviceId, partitionId, managementService);
+            io.atomix.primitive.PrimitiveManagementService managementService,
+            io.atomix.utils.concurrent.ThreadContext threadContext) {
+        super(serviceId, partitionId, managementService, threadContext);
     }
 
     <#list operations as operation>
@@ -33,14 +67,15 @@ public class ${proxyClass.className} extends io.atomix.primitive.proxy.SessionEn
      * @param request the request object
      * @return the response object
      */
-    public java.util.concurrent.CompletableFuture<${operation.responseClass.qualifiedName}> ${operation.methodName}(
-            io.atomix.primitive.session.impl.SessionMetadata session, ${operation.requestClass.qualifiedName} request) {
+    public CompletableFuture<Pair<SessionContext, ${operation.responseClass.className}>> ${operation.methodName}(
+            SessionMetadata session,
+            ${operation.requestClass.className} request) {
         return getClient().execute(
-            ${operation.operationsClass.qualifiedName}.${operation.enumValue},
+            ${operation.operationsClass.className}.${operation.enumValue},
             session,
             request,
-            ${operation.requestClass.qualifiedName}::toByteString,
-            ${operation.responseClass.qualifiedName}::parseFrom);
+            ${operation.requestClass.className}::toByteString,
+            ${operation.responseClass.className}::parseFrom);
     }
 
     </#list>
@@ -50,11 +85,14 @@ public class ${proxyClass.className} extends io.atomix.primitive.proxy.SessionEn
      *
      * @param listener the event listener
      */
-    public void ${event.methodName}(java.util.function.Consumer<${event.valueClass.qualifiedName}> listener) {
+    public void ${event.methodName}(
+            SessionMetadata session,
+            BiConsumer<EventContext, ${event.valueClass.className}> listener) {
         getClient().addEventListener(
-            ${event.eventsClass.qualifiedName}.${event.enumValue},
+            ${event.eventsClass.className}.${event.enumValue},
+            session,
             listener,
-            ${event.valueClass.qualifiedName}::parseFrom);
+            ${event.valueClass.className}::parseFrom);
     }
 
     </#list>

@@ -13,31 +13,40 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package ${serviceClass.javaPackage};
+package ${serviceClass.packageName};
 
+import io.atomix.primitive.partition.PartitionId;
+import io.atomix.primitive.session.SessionId;
+import io.atomix.primitive.service.ServiceExecutor;
+import io.atomix.primitive.service.SimplePrimitiveService;
+
+<#list operations as operation>
+<#if operation.operationsClass.packageName != proxyClass.packageName>
+import ${operation.operationsClass.packageName}.${operation.operationsClass.className}
+</#if>
+<#if operation.requestClass.packageName != proxyClass.packageName>
+import ${operation.requestClass.packageName}.${operation.requestClass.className}
+</#if>
+<#if operation.responseClass.packageName != proxyClass.packageName>
+import ${operation.responseClass.packageName}.${operation.responseClass.className}
+</#if>
+</#list>
 /**
  * Atomix generated service interface ${serviceClass.className}.
  */
-public abstract class ${serviceClass.className} extends io.atomix.primitive.service.SimplePrimitiveService {
-    protected ${serviceClass.className}(io.atomix.primitive.partition.PartitionId partitionId) {
+public abstract class ${serviceClass.className} extends SimplePrimitiveService {
+    protected ${serviceClass.className}(PartitionId partitionId) {
         super(partitionId);
     }
 
     @Override
-    protected void configure(io.atomix.primitive.service.ServiceExecutor executor) {
+    protected void configure(ServiceExecutor executor) {
         <#list operations as operation>
-        <#if operation.responseClass??>
         executor.register(
-            ${operation.operationsClass.qualifiedName}.${operation.enumValue},
+            ${operation.operationsClass.className}.${operation.enumValue},
             this::${operation.methodName},
-            ${operation.requestClass.qualifiedName}::parseFrom,
-            ${operation.responseClass.qualifiedName}::toByteArray);
-        <#else>
-        executor.register(
-            ${operation.operationsClass.qualifiedName}.${operation.enumValue},
-            this::${operation.methodName},
-            ${operation.requestClass.qualifiedName}::parseFrom);
-         </#if>
+            ${operation.requestClass.className}::parseFrom,
+            ${operation.responseClass.className}::toByteArray);
          </#list>
     }
 
@@ -48,11 +57,7 @@ public abstract class ${serviceClass.className} extends io.atomix.primitive.serv
      * @param request the request object
      * @return the response object
      */
-    <#if operation.responseClass??>
-    public abstract ${operation.responseClass.qualifiedName} ${operation.methodName}(${operation.requestClass.qualifiedName} request);
-    <#else>
-    public abstract void ${operation.methodName}(${operation.requestClass.qualifiedName} request);
-    </#if>
+    public abstract ${operation.responseClass.className} ${operation.methodName}(${operation.requestClass.className} request);
 
     </#list>
 }

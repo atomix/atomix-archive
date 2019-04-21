@@ -13,12 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package ${eventsClass.javaPackage};
+package ${eventsClass.packageName};
+
+import io.atomix.primitive.event.EventType;
 
 /**
  * Atomix generated operations ${operationsClass.className}.
  */
-public enum ${eventsClass.className} implements io.atomix.primitive.event.EventType {
+public enum ${eventsClass.className} implements EventType {
 
     <#list events as event>
     <#if event?is_last>
