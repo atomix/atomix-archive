@@ -28,25 +28,21 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 
 import io.atomix.primitive.PrimitiveException;
-import io.atomix.primitive.operation.OperationDecoder;
-import io.atomix.primitive.operation.OperationEncoder;
+import io.atomix.primitive.util.ByteArrayDecoder;
+import io.atomix.primitive.util.ByteArrayEncoder;
 import io.atomix.primitive.operation.OperationId;
 import io.atomix.primitive.operation.OperationType;
-import io.atomix.primitive.service.Commit;
-import io.atomix.primitive.service.PrimitiveService;
-import io.atomix.primitive.service.ServiceContext;
+import io.atomix.primitive.service.Command;
+import io.atomix.primitive.service.Query;
 import io.atomix.primitive.service.ServiceExecutor;
 import io.atomix.utils.concurrent.Scheduled;
-import io.atomix.utils.logging.ContextualLoggerFactory;
-import io.atomix.utils.logging.LoggerContext;
-import io.atomix.utils.time.WallClockTimestamp;
 import org.slf4j.Logger;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
-import static io.atomix.primitive.operation.OperationDecoder.decode;
-import static io.atomix.primitive.operation.OperationEncoder.encode;
+import static io.atomix.primitive.util.ByteArrayDecoder.decode;
+import static io.atomix.primitive.util.ByteArrayEncoder.encode;
 
 /**
  * Default operation executor.
@@ -60,17 +56,97 @@ public class DefaultServiceExecutor implements ServiceExecutor {
   private OperationType operationType;
   private long timestamp;
 
-  public DefaultServiceExecutor(ServiceContext context) {
-    this.log = ContextualLoggerFactory.getLogger(getClass(), LoggerContext.builder(PrimitiveService.class)
-        .addValue(context.serviceId())
-        .add("type", context.serviceType())
-        .add("name", context.serviceName())
-        .build());
+  public DefaultServiceExecutor(Logger log) {
+    this.log = log;
   }
 
   @Override
-  public void tick(WallClockTimestamp timestamp) {
-    long unixTimestamp = timestamp.unixTimestamp();
+  public void handle(OperationId operationId, Function<byte[], byte[]> callback) {
+    checkNotNull(operationId, "operationId cannot be null");
+    checkNotNull(callback, "callback cannot be null");
+    operations.put(operationId.id(), callback);
+    log.trace("Registered operation callback {}", operationId);
+  }
+
+  @Override
+  public <R> void register(OperationId operationId, Supplier<R> callback, ByteArrayEncoder<R> encoder) {
+    checkNotNull(operationId, "operationId cannot be null");
+    checkNotNull(callback, "callback cannot be null");
+    handle(operationId, commit -> encode(callback.get(), encoder));
+  }
+
+  @Override
+  public <T> void register(OperationId operationId, Consumer<T> callback, ByteArrayDecoder<T> decoder) {
+    checkNotNull(operationId, "operationId cannot be null");
+    checkNotNull(callback, "callback cannot be null");
+    handle(operationId, bytes -> {
+      callback.accept(decode(bytes, decoder));
+      return null;
+    });
+  }
+
+  @Override
+  public <T, R> void register(OperationId operationId, Function<T, R> callback, ByteArrayDecoder<T> decoder, ByteArrayEncoder<R> encoder) {
+    checkNotNull(operationId, "operationId cannot be null");
+    checkNotNull(callback, "callback cannot be null");
+    handle(operationId, bytes -> encode(callback.apply(decode(bytes, decoder)), encoder));
+  }
+
+  @Override
+  public byte[] apply(OperationId operationId, Command<byte[]> command) {
+    log.trace("Executing {}", command);
+
+    tick(command.timestamp());
+
+    this.operationType = OperationType.COMMAND;
+    this.timestamp = command.timestamp();
+
+    try {
+      return apply(operationId, command.value());
+    } finally {
+      runTasks();
+    }
+  }
+
+  @Override
+  public byte[] apply(OperationId operationId, Query<byte[]> query) {
+    log.trace("Executing {}", query);
+    this.operationType = OperationType.QUERY;
+    return apply(operationId, query.value());
+  }
+
+  /**
+   * Applies the given value to the given operation.
+   *
+   * @param operationId the operation ID
+   * @param value       the operation value
+   * @return the operation result
+   */
+  private byte[] apply(OperationId operationId, byte[] value) {
+    // Look up the registered callback for the operation.
+    Function<byte[], byte[]> operation = operations.get(operationId.id());
+
+    if (operation == null) {
+      throw new IllegalStateException("Unknown state machine operation: " + operationId);
+    } else {
+      // Execute the operation. If the operation return value is a Future, await the result,
+      // otherwise immediately complete the execution future.
+      try {
+        return operation.apply(value);
+      } catch (Exception e) {
+        log.warn("State machine operation failed: {}", e.getMessage());
+        throw new PrimitiveException.ServiceException(e);
+      }
+    }
+  }
+
+  /**
+   * Advances the scheduler's clock.
+   *
+   * @param timestamp the updated timestamp
+   */
+  private void tick(long timestamp) {
+    this.timestamp = timestamp;
     this.operationType = OperationType.COMMAND;
     if (!scheduledTasks.isEmpty()) {
       // Iterate through scheduled tasks until we reach a task that has not met its scheduled time.
@@ -78,7 +154,7 @@ public class DefaultServiceExecutor implements ServiceExecutor {
       Iterator<ScheduledTask> iterator = scheduledTasks.iterator();
       while (iterator.hasNext()) {
         ScheduledTask task = iterator.next();
-        if (task.isRunnable(unixTimestamp)) {
+        if (task.isRunnable(timestamp)) {
           this.timestamp = task.time;
           this.operationType = OperationType.COMMAND;
           log.trace("Executing scheduled task {}", task);
@@ -106,64 +182,6 @@ public class DefaultServiceExecutor implements ServiceExecutor {
    */
   private void checkOperation(OperationType type, String message) {
     checkState(operationType == type, message);
-  }
-
-  @Override
-  public void handle(OperationId operationId, Function<byte[], byte[]> callback) {
-    checkNotNull(operationId, "operationId cannot be null");
-    checkNotNull(callback, "callback cannot be null");
-    operations.put(operationId.id(), callback);
-    log.trace("Registered operation callback {}", operationId);
-  }
-
-  @Override
-  public <R> void register(OperationId operationId, Supplier<R> callback, OperationEncoder<R> encoder) {
-    checkNotNull(operationId, "operationId cannot be null");
-    checkNotNull(callback, "callback cannot be null");
-    handle(operationId, commit -> encode(callback.get(), encoder));
-  }
-
-  @Override
-  public <T> void register(OperationId operationId, Consumer<T> callback, OperationDecoder<T> decoder) {
-    checkNotNull(operationId, "operationId cannot be null");
-    checkNotNull(callback, "callback cannot be null");
-    handle(operationId, bytes -> {
-      callback.accept(decode(bytes, decoder));
-      return null;
-    });
-  }
-
-  @Override
-  public <T, R> void register(OperationId operationId, Function<T, R> callback, OperationDecoder<T> decoder, OperationEncoder<R> encoder) {
-    checkNotNull(operationId, "operationId cannot be null");
-    checkNotNull(callback, "callback cannot be null");
-    handle(operationId, bytes -> encode(callback.apply(decode(bytes, decoder)), encoder));
-  }
-
-  @Override
-  public byte[] apply(Commit<byte[]> commit) {
-    log.trace("Executing {}", commit);
-
-    this.operationType = commit.operation().type();
-    this.timestamp = commit.wallClockTime().unixTimestamp();
-
-    // Look up the registered callback for the operation.
-    Function<byte[], byte[]> operation = operations.get(commit.operation().id());
-
-    if (operation == null) {
-      throw new IllegalStateException("Unknown state machine operation: " + commit.operation());
-    } else {
-      // Execute the operation. If the operation return value is a Future, await the result,
-      // otherwise immediately complete the execution future.
-      try {
-        return operation.apply(commit.value());
-      } catch (Exception e) {
-        log.warn("State machine operation failed: {}", e.getMessage());
-        throw new PrimitiveException.ServiceException(e);
-      } finally {
-        runTasks();
-      }
-    }
   }
 
   /**

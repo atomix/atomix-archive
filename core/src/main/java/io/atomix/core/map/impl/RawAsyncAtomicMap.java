@@ -18,7 +18,7 @@ import io.atomix.core.map.AtomicMapEventListener;
 import io.atomix.core.set.AsyncDistributedSet;
 import io.atomix.core.transaction.TransactionId;
 import io.atomix.core.transaction.TransactionLog;
-import io.atomix.primitive.AbstractAsyncPrimitive;
+import io.atomix.primitive.impl.ManagedAsyncPrimitive;
 import io.atomix.primitive.PrimitiveException;
 import io.atomix.utils.concurrent.Futures;
 import io.atomix.utils.time.Versioned;
@@ -26,7 +26,7 @@ import io.atomix.utils.time.Versioned;
 /**
  * Raw asynchronous atomic map.
  */
-public class RawAsyncAtomicMap extends AbstractAsyncPrimitive<MapProxy> implements AsyncAtomicMap<String, byte[]> {
+public class RawAsyncAtomicMap extends ManagedAsyncPrimitive<MapProxy> implements AsyncAtomicMap<String, byte[]> {
   private final Map<AtomicMapEventListener<String, byte[]>, Executor> eventListeners = new ConcurrentHashMap<>();
 
   public RawAsyncAtomicMap(MapProxy proxy) {

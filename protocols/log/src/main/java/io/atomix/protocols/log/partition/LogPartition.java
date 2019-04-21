@@ -15,28 +15,20 @@
  */
 package io.atomix.protocols.log.partition;
 
-import java.time.Duration;
 import java.util.Collection;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
 import io.atomix.cluster.MemberId;
-import io.atomix.primitive.PrimitiveManagementService;
-import io.atomix.primitive.PrimitiveType;
 import io.atomix.primitive.log.LogSession;
 import io.atomix.primitive.partition.GroupMember;
 import io.atomix.primitive.partition.Partition;
+import io.atomix.primitive.partition.PartitionClient;
 import io.atomix.primitive.partition.PartitionId;
 import io.atomix.primitive.partition.PartitionManagementService;
 import io.atomix.primitive.partition.PrimaryElection;
-import io.atomix.primitive.service.StateMachine;
-import io.atomix.primitive.service.impl.PrimitiveStateMachine;
-import io.atomix.primitive.session.SessionClient;
-import io.atomix.primitive.session.impl.PrimitiveSessionClient;
-import io.atomix.protocols.log.DistributedLogProtocolConfig;
 import io.atomix.protocols.log.partition.impl.LogPartitionClient;
 import io.atomix.protocols.log.partition.impl.LogPartitionServer;
-import io.atomix.protocols.log.partition.impl.LogPrimitiveClient;
 import io.atomix.utils.concurrent.Futures;
 import io.atomix.utils.concurrent.ThreadContextFactory;
 
@@ -108,43 +100,18 @@ public class LogPartition implements Partition {
     return String.format("%s-partition-%d", partitionId.getGroup(), partitionId.getPartition());
   }
 
+  @Override
+  public PartitionClient getClient() {
+    throw new UnsupportedOperationException();
+  }
+
   /**
    * Returns the log partition client.
    *
    * @return the log partition client
    */
-  public LogSession getClient() {
+  public LogSession getSession() {
     return client;
-  }
-
-  /**
-   * Creates a new primitive client.
-   *
-   * @param name              the primitive name
-   * @param type              the primitive type
-   * @param managementService the partition management service
-   * @param config            the Raft protocol configuration
-   * @return the primitive client
-   */
-  public SessionClient newClient(
-      String name,
-      PrimitiveType type,
-      PrimitiveManagementService managementService,
-      DistributedLogProtocolConfig config) {
-    StateMachine stateMachine = new PrimitiveStateMachine(
-        managementService.getPrimitiveTypeRegistry(),
-        managementService.getMembershipService(),
-        managementService.getCommunicationService(),
-        threadContextFactory.createContext(),
-        threadContextFactory);
-    return new PrimitiveSessionClient(
-        name,
-        type,
-        Duration.ofSeconds(30),
-        new LogPrimitiveClient(client, stateMachine, threadContextFactory.createContext(), threadContextFactory.createContext()),
-        managementService.getMembershipService(),
-        managementService.getCommunicationService(),
-        threadContextFactory.createContext());
   }
 
   /**

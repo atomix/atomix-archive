@@ -25,6 +25,7 @@ import java.util.concurrent.CompletableFuture;
 import com.google.common.collect.Maps;
 import io.atomix.raft.RaftCommand;
 import io.atomix.raft.RaftException;
+import io.atomix.raft.RaftOperation;
 import io.atomix.raft.RaftQuery;
 import io.atomix.raft.RaftServer;
 import io.atomix.raft.RaftStateMachine;
@@ -62,6 +63,7 @@ public class RaftStateMachineManager implements RaftStateMachine.Context, AutoCl
   private final RaftLogReader reader;
   private final Map<Long, CompletableFuture> futures = Maps.newHashMap();
   private volatile CompletableFuture<Void> compactFuture;
+  private RaftOperation.Type operationType;
   private long lastIndex;
   private long lastTimestamp;
   private long lastEnqueued;
@@ -92,8 +94,18 @@ public class RaftStateMachineManager implements RaftStateMachine.Context, AutoCl
   }
 
   @Override
+  public RaftOperation.Type getOperationType() {
+    return operationType;
+  }
+
+  @Override
   public RaftServer.Role getRole() {
     return raft.getRole();
+  }
+
+  @Override
+  public Logger getLogger() {
+    return logger;
   }
 
   /**
@@ -485,6 +497,7 @@ public class RaftStateMachineManager implements RaftStateMachine.Context, AutoCl
    */
   private CompletableFuture<OperationResult> applyCommand(Indexed<RaftLogEntry> entry) {
     raft.getLoadMonitor().recordEvent();
+    operationType = RaftOperation.Type.COMMAND;
     lastIndex = entry.index();
     lastTimestamp = Math.max(lastTimestamp, entry.entry().getTimestamp());
     RaftCommand command = new RaftCommand(
@@ -500,6 +513,7 @@ public class RaftStateMachineManager implements RaftStateMachine.Context, AutoCl
    * Applies a query entry to the state machine.
    */
   private CompletableFuture<OperationResult> applyQuery(Indexed<RaftLogEntry> entry) {
+    operationType = RaftOperation.Type.QUERY;
     RaftQuery query = new RaftQuery(
         lastIndex,
         lastTimestamp,

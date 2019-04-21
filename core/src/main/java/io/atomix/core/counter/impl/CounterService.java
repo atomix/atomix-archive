@@ -93,7 +93,7 @@ public class CounterService extends AbstractCounterService {
   }
 
   @Override
-  public void backup(OutputStream output) throws IOException {
+  public void snapshot(OutputStream output) throws IOException {
     AtomicCounterSnapshot.newBuilder()
         .setCounter(counter.get())
         .build()
@@ -101,7 +101,7 @@ public class CounterService extends AbstractCounterService {
   }
 
   @Override
-  public void restore(InputStream input) throws IOException {
+  public void install(InputStream input) throws IOException {
     AtomicCounterSnapshot snapshot = AtomicCounterSnapshot.parseFrom(input);
     counter.set(snapshot.getCounter());
   }

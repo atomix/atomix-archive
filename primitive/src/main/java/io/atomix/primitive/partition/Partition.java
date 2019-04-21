@@ -59,4 +59,11 @@ public interface Partition {
    */
   Collection<MemberId> backups();
 
+  /**
+   * Returns the partition client.
+   *
+   * @return the partition client
+   */
+  PartitionClient getClient();
+
 }

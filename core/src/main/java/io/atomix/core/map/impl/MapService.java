@@ -661,7 +661,7 @@ public class MapService extends AbstractMapService {
   }
 
   @Override
-  public void backup(OutputStream output) throws IOException {
+  public void snapshot(OutputStream output) throws IOException {
     AtomicMapSnapshot.newBuilder()
         .addAllListeners(listeners.stream()
             .map(SessionId::id)
@@ -675,7 +675,7 @@ public class MapService extends AbstractMapService {
   }
 
   @Override
-  public void restore(InputStream input) throws IOException {
+  public void install(InputStream input) throws IOException {
     AtomicMapSnapshot snapshot = AtomicMapSnapshot.parseFrom(input);
     listeners = snapshot.getListenersList().stream()
         .map(SessionId::from)

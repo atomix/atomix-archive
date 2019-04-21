@@ -18,12 +18,12 @@ public class TestPartitionClient implements PartitionClient {
   }
 
   @Override
-  public CompletableFuture<byte[]> write(byte[] value) {
+  public CompletableFuture<byte[]> command(byte[] value) {
     return stateMachine.apply(context.command(value));
   }
 
   @Override
-  public CompletableFuture<byte[]> read(byte[] value) {
+  public CompletableFuture<byte[]> query(byte[] value) {
     return stateMachine.apply(context.query(value));
   }
 }

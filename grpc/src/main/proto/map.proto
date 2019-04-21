@@ -1,8 +1,9 @@
 syntax = "proto3";
 
-import "protocol.proto";
-
 package atomix.map;
+
+import "protocol.proto";
+import "google/protobuf/duration.proto";
 
 option java_package = "io.atomix.grpc.map";
 option java_multiple_files = true;
@@ -17,8 +18,34 @@ message MapId {
     }
 }
 
-message SizeRequest {
+message CreateRequest {
     MapId id = 1;
+    google.protobuf.Duration timeout = 2;
+}
+
+message CreateResponse {
+    uint64 session_id = 1;
+}
+
+message KeepAliveRequest {
+    uint64 session_id = 1;
+    uint64 event_index = 2;
+    uint64 command_sequence = 3;
+}
+
+message KeepAliveResponse {
+}
+
+message CloseRequest {
+    uint64 session_id = 1;
+    bool delete = 2;
+}
+
+message CloseResponse {
+}
+
+message SizeRequest {
+    uint64 session_id = 1;
 }
 
 message SizeResponse {
@@ -26,7 +53,7 @@ message SizeResponse {
 }
 
 message PutRequest {
-    MapId id = 1;
+    uint64 session_id = 1;
     string key = 2;
     bytes value = 3;
 }
@@ -36,7 +63,7 @@ message PutResponse {
 }
 
 message ReplaceRequest {
-    MapId id = 1;
+    uint64 session_id = 1;
     string key = 2;
     bytes value = 3;
     uint64 version = 4;
@@ -47,7 +74,7 @@ message ReplaceResponse {
 }
 
 message GetRequest {
-    MapId id = 1;
+    uint64 session_id = 1;
     string key = 2;
 }
 
@@ -57,7 +84,7 @@ message GetResponse {
 }
 
 message RemoveRequest {
-    MapId id = 1;
+    uint64 session_id = 1;
     string key = 2;
     bytes value = 3;
     uint64 version = 4;
@@ -68,15 +95,19 @@ message RemoveResponse {
 }
 
 message ClearRequest {
-    MapId id = 1;
+    uint64 session_id = 1;
 }
 
 message ClearResponse {
 }
 
+message ListenRequest {
+    uint64 session_id = 1;
+}
+
 // Map event
 message MapEvent {
-    MapId id = 1;
+    uint64 session_id = 1;
     Type type = 2;
     string key = 3;
     bytes value = 4;
@@ -92,18 +123,24 @@ message MapEvent {
 // Map service
 service MapService {
 
-    rpc Size(SizeRequest) returns (SizeResponse) {}
+    rpc Create (CreateRequest) returns (CreateResponse) {}
 
-    rpc Put(PutRequest) returns (PutResponse) {}
+    rpc KeepAlive (KeepAliveRequest) returns (KeepAliveResponse) {}
 
-    rpc Replace(ReplaceRequest) returns (ReplaceResponse) {}
+    rpc Close (CloseRequest) returns (CloseResponse) {}
 
-    rpc Get(GetRequest) returns (GetResponse) {}
+    rpc Size (SizeRequest) returns (SizeResponse) {}
 
-    rpc Remove(RemoveRequest) returns (RemoveResponse) {}
+    rpc Put (PutRequest) returns (PutResponse) {}
 
-    rpc Clear(ClearRequest) returns (ClearResponse) {}
+    rpc Replace (ReplaceRequest) returns (ReplaceResponse) {}
 
-    rpc Listen(stream MapId) returns (stream MapEvent) {}
+    rpc Get (GetRequest) returns (GetResponse) {}
+
+    rpc Remove (RemoveRequest) returns (RemoveResponse) {}
+
+    rpc Clear (ClearRequest) returns (ClearResponse) {}
+
+    rpc Listen (ListenRequest) returns (stream MapEvent) {}
 
 }

@@ -63,8 +63,6 @@ message CheckAndSetResponse {
 }
 
 service CounterService {
-    option (atomix.primitive.service.base_name) = "Counter";
-
     rpc Set(SetRequest) returns (SetResponse) {
         option (atomix.primitive.service.operation) = {
             name: "set"

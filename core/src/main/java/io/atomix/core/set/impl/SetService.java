@@ -388,7 +388,7 @@ public class SetService extends AbstractSetService {
   }
 
   @Override
-  public void backup(OutputStream output) throws IOException {
+  public void snapshot(OutputStream output) throws IOException {
     DistributedSetSnapshot.newBuilder()
         .addAllValues(set)
         .addAllListeners(listeners.stream()
@@ -401,7 +401,7 @@ public class SetService extends AbstractSetService {
   }
 
   @Override
-  public void restore(InputStream input) throws IOException {
+  public void install(InputStream input) throws IOException {
     DistributedSetSnapshot snapshot = DistributedSetSnapshot.parseFrom(input);
     set = Sets.newConcurrentHashSet(snapshot.getValuesList());
     listeners = snapshot.getListenersList().stream()

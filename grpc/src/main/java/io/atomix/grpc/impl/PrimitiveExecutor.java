@@ -15,6 +15,7 @@
  */
 package io.atomix.grpc.impl;
 
+import java.util.Collection;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -22,15 +23,14 @@ import java.util.function.Supplier;
 import com.google.protobuf.Descriptors;
 import com.google.protobuf.Message;
 import io.atomix.core.Atomix;
-import io.atomix.primitive.AsyncPrimitive;
 import io.atomix.primitive.PrimitiveBuilder;
 import io.atomix.primitive.PrimitiveType;
-import io.atomix.primitive.SyncPrimitive;
 import io.atomix.primitive.protocol.LogCompatibleBuilder;
 import io.atomix.primitive.protocol.LogProtocol;
 import io.atomix.primitive.protocol.PrimitiveProtocol;
 import io.atomix.primitive.protocol.ProxyCompatibleBuilder;
 import io.atomix.primitive.protocol.ProxyProtocol;
+import io.atomix.primitive.proxy.SimplePrimitiveProxy;
 import io.atomix.protocols.log.DistributedLogProtocol;
 import io.atomix.protocols.raft.MultiRaftProtocol;
 import io.grpc.Metadata;
@@ -41,7 +41,7 @@ import io.grpc.stub.StreamObserver;
 /**
  * Primitive helpers.
  */
-public class PrimitiveExecutor<S extends SyncPrimitive, A extends AsyncPrimitive> {
+public class PrimitiveExecutor<P extends SimplePrimitiveProxy> {
   private static final String ID_FIELD = "id";
   private static final String NAME_FIELD = "name";
   private static final String RAFT_PROTOCOL = "raft";
@@ -50,12 +50,22 @@ public class PrimitiveExecutor<S extends SyncPrimitive, A extends AsyncPrimitive
 
   private final Atomix atomix;
   private final PrimitiveType<?, ?, ?> type;
-  private final Function<S, A> converter;
 
   public PrimitiveExecutor(Atomix atomix, PrimitiveType<?, ?, ?> type, Function<S, A> converter) {
     this.atomix = atomix;
     this.type = type;
-    this.converter = converter;
+  }
+
+  public <T extends Message, U extends Message> void executeAll(
+      Message id,
+      T request,
+      Supplier<U> responseSupplier,
+      StreamObserver<U> responseObserver,
+      Function<P, CompletableFuture<U>> function,
+      Supplier<U> responseBuilder) {
+    if (isValidRequest(request, responseSupplier, responseObserver)) {
+
+    }
   }
 
   /**
@@ -161,6 +171,28 @@ public class PrimitiveExecutor<S extends SyncPrimitive, A extends AsyncPrimitive
       }
     }
     return false;
+  }
+
+  /**
+   * Returns a collection of all proxies for the given ID.
+   *
+   * @param id the primitive ID
+   * @return a collection of all proxies for the given ID
+   */
+  private Collection<P> getProxies(Message id) {
+    String name = getName(id);
+    ProxyProtocol protocol = (ProxyProtocol) toProtocol(id);
+    return atomix.getPartitionService()
+        .getPartitionGroup(protocol)
+        .getPartitions()
+        .stream()
+        .map(partition -> protocol.)
+
+    // If the primitive name is null, set the name to the partition group name if a log protocol is configured.
+    // Distributed log primitives are unnamed, but a name is required to create the primitive.
+    if (protocol instanceof LogProtocol && name == null) {
+      name = ((LogProtocol) protocol).group();
+    }
   }
 
   /**

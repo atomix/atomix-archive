@@ -11,13 +11,13 @@ import io.atomix.core.value.AsyncAtomicValue;
 import io.atomix.core.value.AtomicValue;
 import io.atomix.core.value.AtomicValueEvent;
 import io.atomix.core.value.AtomicValueEventListener;
-import io.atomix.primitive.AbstractAsyncPrimitive;
+import io.atomix.primitive.impl.ManagedAsyncPrimitive;
 import io.atomix.utils.time.Versioned;
 
 /**
  * Raw asynchronous atomic value.
  */
-public class RawAsyncAtomicValue extends AbstractAsyncPrimitive<ValueProxy> implements AsyncAtomicValue<byte[]> {
+public class RawAsyncAtomicValue extends ManagedAsyncPrimitive<ValueProxy> implements AsyncAtomicValue<byte[]> {
   private final Set<AtomicValueEventListener<byte[]>> eventListeners = new CopyOnWriteArraySet<>();
 
   public RawAsyncAtomicValue(ValueProxy proxy) {

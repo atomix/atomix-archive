@@ -15,11 +15,11 @@
  */
 package io.atomix.primitive.session;
 
+import com.google.protobuf.ByteString;
 import io.atomix.cluster.MemberId;
-import io.atomix.primitive.PrimitiveType;
 import io.atomix.primitive.event.EventType;
-import io.atomix.primitive.event.PrimitiveEvent;
-import io.atomix.primitive.operation.OperationEncoder;
+import io.atomix.primitive.session.impl.PrimitiveEvent;
+import io.atomix.primitive.util.ByteArrayEncoder;
 
 /**
  * Provides an interface to communicating with a client via session events.
@@ -54,20 +54,6 @@ public interface Session {
   SessionId sessionId();
 
   /**
-   * Returns the session's service name.
-   *
-   * @return The session's service name.
-   */
-  String primitiveName();
-
-  /**
-   * Returns the session's service type.
-   *
-   * @return The session's service type.
-   */
-  PrimitiveType primitiveType();
-
-  /**
    * Returns the member identifier to which the session belongs.
    *
    * @return The member to which the session belongs.
@@ -98,7 +84,12 @@ public interface Session {
    * @param encoder   the event encoder
    * @param <T>       the event type
    */
-  <T> void publish(EventType eventType, T event, OperationEncoder<T> encoder);
+  default <T> void publish(EventType eventType, T event, ByteArrayEncoder<T> encoder) {
+    publish(PrimitiveEvent.newBuilder()
+        .setType(eventType.id())
+        .setValue(ByteString.copyFrom(ByteArrayEncoder.encode(event, encoder)))
+        .build());
+  }
 
   /**
    * Publishes an event to the session.

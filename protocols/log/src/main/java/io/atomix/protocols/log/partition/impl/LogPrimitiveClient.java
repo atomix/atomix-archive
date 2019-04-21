@@ -38,14 +38,14 @@ public class LogPrimitiveClient implements PartitionClient {
   }
 
   @Override
-  public CompletableFuture<byte[]> write(byte[] value) {
+  public CompletableFuture<byte[]> command(byte[] value) {
     CompletableFuture<byte[]> future = new CompletableFuture<>();
     client.producer().append(value).thenAccept(index -> futures.put(index, future));
     return future;
   }
 
   @Override
-  public CompletableFuture<byte[]> read(byte[] value) {
+  public CompletableFuture<byte[]> query(byte[] value) {
     CompletableFuture<byte[]> future = new CompletableFuture<>();
     stateContext.execute(() -> stateMachine.apply(new Query<>(currentIndex.get(), currentTimestamp.get(), value))
         .whenComplete((result, error) -> {

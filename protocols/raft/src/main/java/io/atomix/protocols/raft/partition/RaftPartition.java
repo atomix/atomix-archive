@@ -22,16 +22,12 @@ import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
 import io.atomix.cluster.MemberId;
-import io.atomix.primitive.PrimitiveManagementService;
-import io.atomix.primitive.PrimitiveType;
 import io.atomix.primitive.partition.Partition;
+import io.atomix.primitive.partition.PartitionClient;
 import io.atomix.primitive.partition.PartitionId;
 import io.atomix.primitive.partition.PartitionManagementService;
 import io.atomix.primitive.partition.PartitionMetadata;
-import io.atomix.primitive.service.impl.PrimitiveStateMachine;
-import io.atomix.primitive.session.SessionClient;
-import io.atomix.primitive.session.impl.PrimitiveSessionClient;
-import io.atomix.protocols.raft.MultiRaftProtocolConfig;
+import io.atomix.primitive.service.impl.ServiceManagerStateMachine;
 import io.atomix.protocols.raft.partition.impl.RaftClientCommunicator;
 import io.atomix.protocols.raft.partition.impl.RaftPartitionClient;
 import io.atomix.protocols.raft.partition.impl.RaftPartitionServer;
@@ -124,28 +120,9 @@ public class RaftPartition implements Partition {
     return CompletableFuture.completedFuture(null);
   }
 
-  /**
-   * Creates a new primitive client.
-   *
-   * @param name              the primitive name
-   * @param type              the primitive type
-   * @param managementService the partition management service
-   * @param config            the Raft protocol configuration
-   * @return the primitive client
-   */
-  public SessionClient newClient(
-      String name,
-      PrimitiveType type,
-      PrimitiveManagementService managementService,
-      MultiRaftProtocolConfig config) {
-    return new PrimitiveSessionClient(
-        name,
-        type,
-        config.getTimeout(),
-        client,
-        managementService.getMembershipService(),
-        managementService.getCommunicationService(),
-        threadContextFactory.createContext());
+  @Override
+  public PartitionClient getClient() {
+    return client;
   }
 
   /**
@@ -156,12 +133,7 @@ public class RaftPartition implements Partition {
     this.client = createClient(managementService);
     if (partition.members().contains(managementService.getMembershipService().getLocalMember().id())) {
       server = createServer(managementService);
-      return server.start(new PrimitiveStateMachine(
-          managementService.getPrimitiveTypes(),
-          managementService.getMembershipService(),
-          managementService.getMessagingService(),
-          threadContextFactory.createContext(),
-          threadContextFactory))
+      return server.start(new ServiceManagerStateMachine(metadata.id(), managementService))
           .thenCompose(v -> client.start())
           .thenApply(v -> null);
     }

@@ -19,16 +19,12 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 import com.google.common.collect.Maps;
-import io.atomix.primitive.PrimitiveManagementService;
-import io.atomix.primitive.PrimitiveType;
 import io.atomix.primitive.log.LogClient;
 import io.atomix.primitive.log.LogSession;
-import io.atomix.primitive.partition.Partition;
 import io.atomix.primitive.partition.PartitionId;
 import io.atomix.primitive.partition.PartitionService;
 import io.atomix.primitive.protocol.LogProtocol;
 import io.atomix.primitive.protocol.PrimitiveProtocol;
-import io.atomix.primitive.session.SessionClient;
 import io.atomix.protocols.log.impl.DistributedLogClient;
 import io.atomix.protocols.log.partition.LogPartition;
 
@@ -111,17 +107,8 @@ public class DistributedLogProtocol implements LogProtocol {
     Map<PartitionId, LogSession> partitions = partitionService.getPartitionGroup(this)
         .getPartitions()
         .stream()
-        .map(partition -> Maps.immutableEntry(partition.id(), ((LogPartition) partition).getClient()))
+        .map(partition -> Maps.immutableEntry(partition.id(), ((LogPartition) partition).getSession()))
         .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
     return new DistributedLogClient(partitions, config.getPartitioner());
-  }
-
-  @Override
-  public SessionClient newClient(
-      String name,
-      PrimitiveType type,
-      Partition partition,
-      PrimitiveManagementService managementService) {
-    return ((LogPartition) partition).newClient(name, type, managementService, config);
   }
 }

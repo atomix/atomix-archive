@@ -180,7 +180,7 @@ public class ValueService extends AbstractValueService {
   }
 
   @Override
-  public void backup(OutputStream output) throws IOException {
+  public void snapshot(OutputStream output) throws IOException {
     AtomicValueSnapshot.newBuilder()
         .setValue(ByteString.copyFrom(value))
         .setVersion(version.get())
@@ -190,7 +190,7 @@ public class ValueService extends AbstractValueService {
   }
 
   @Override
-  public void restore(InputStream input) throws IOException {
+  public void install(InputStream input) throws IOException {
     AtomicValueSnapshot snapshot = AtomicValueSnapshot.parseFrom(input);
     value = snapshot.getValue().toByteArray();
     version.set(snapshot.getVersion());

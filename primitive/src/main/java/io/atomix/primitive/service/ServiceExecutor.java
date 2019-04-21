@@ -22,13 +22,12 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 
 import io.atomix.primitive.Consistency;
-import io.atomix.primitive.operation.OperationDecoder;
-import io.atomix.primitive.operation.OperationEncoder;
+import io.atomix.primitive.util.ByteArrayDecoder;
+import io.atomix.primitive.util.ByteArrayEncoder;
 import io.atomix.primitive.operation.OperationId;
 import io.atomix.primitive.operation.OperationType;
 import io.atomix.primitive.operation.PrimitiveOperation;
 import io.atomix.utils.concurrent.Scheduler;
-import io.atomix.utils.time.WallClockTimestamp;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -72,19 +71,22 @@ import static com.google.common.base.Preconditions.checkNotNull;
 public interface ServiceExecutor extends Executor, Scheduler {
 
   /**
-   * Increments the service clock.
+   * Applies the given command to the executor.
    *
-   * @param timestamp the wall clock timestamp
+   * @param operationId the operation ID
+   * @param command     the command to apply
+   * @return the command result
    */
-  void tick(WallClockTimestamp timestamp);
+  byte[] apply(OperationId operationId, Command<byte[]> command);
 
   /**
-   * Applies the given commit to the executor.
+   * Applies the given query to the executor.
    *
-   * @param commit the commit to apply
-   * @return the commit result
+   * @param operationId the operation ID
+   * @param query       the query to apply
+   * @return the command result
    */
-  byte[] apply(Commit<byte[]> commit);
+  byte[] apply(OperationId operationId, Query<byte[]> query);
 
   /**
    * Registers a operation callback.
@@ -119,7 +121,7 @@ public interface ServiceExecutor extends Executor, Scheduler {
    * @param encoder     the response encoder
    * @throws NullPointerException if the {@code operationId} or {@code callback} is null
    */
-  <R> void register(OperationId operationId, Supplier<R> callback, OperationEncoder<R> encoder);
+  <R> void register(OperationId operationId, Supplier<R> callback, ByteArrayEncoder<R> encoder);
 
   /**
    * Registers a operation callback.
@@ -129,7 +131,7 @@ public interface ServiceExecutor extends Executor, Scheduler {
    * @param decoder     the operation decoder
    * @throws NullPointerException if the {@code operationId} or {@code callback} is null
    */
-  <T> void register(OperationId operationId, Consumer<T> callback, OperationDecoder<T> decoder);
+  <T> void register(OperationId operationId, Consumer<T> callback, ByteArrayDecoder<T> decoder);
 
   /**
    * Registers an operation callback.
@@ -140,6 +142,6 @@ public interface ServiceExecutor extends Executor, Scheduler {
    * @param encoder     the response encoder
    * @throws NullPointerException if the {@code operationId} or {@code callback} is null
    */
-  <T, R> void register(OperationId operationId, Function<T, R> callback, OperationDecoder<T> decoder, OperationEncoder<R> encoder);
+  <T, R> void register(OperationId operationId, Function<T, R> callback, ByteArrayDecoder<T> decoder, ByteArrayEncoder<R> encoder);
 
 }

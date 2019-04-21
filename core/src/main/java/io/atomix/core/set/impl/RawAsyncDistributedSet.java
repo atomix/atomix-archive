@@ -31,13 +31,13 @@ import io.atomix.core.set.AsyncDistributedSet;
 import io.atomix.core.set.DistributedSet;
 import io.atomix.core.transaction.TransactionId;
 import io.atomix.core.transaction.TransactionLog;
-import io.atomix.primitive.AbstractAsyncPrimitive;
+import io.atomix.primitive.impl.ManagedAsyncPrimitive;
 import io.atomix.utils.concurrent.Futures;
 
 /**
  * Raw async distributed set.
  */
-public class RawAsyncDistributedSet extends AbstractAsyncPrimitive<SetProxy> implements AsyncDistributedSet<String> {
+public class RawAsyncDistributedSet extends ManagedAsyncPrimitive<SetProxy> implements AsyncDistributedSet<String> {
   private final Map<Long, DefaultAsyncIterator<String>> iterators = Maps.newConcurrentMap();
   private final Map<CollectionEventListener<String>, Executor> eventListeners = Maps.newConcurrentMap();
 

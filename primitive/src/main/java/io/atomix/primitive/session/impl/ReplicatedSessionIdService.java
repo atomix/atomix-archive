@@ -18,18 +18,16 @@ package io.atomix.primitive.session.impl;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import io.atomix.primitive.operation.OperationMetadata;
-import io.atomix.primitive.operation.OperationType;
-import io.atomix.primitive.operation.PrimitiveOperation;
+import io.atomix.primitive.client.PrimitiveClient;
+import io.atomix.primitive.client.impl.DefaultPrimitiveClient;
 import io.atomix.primitive.partition.PartitionGroup;
+import io.atomix.primitive.service.impl.ServiceId;
 import io.atomix.primitive.session.ManagedSessionIdService;
-import io.atomix.primitive.session.SessionClient;
 import io.atomix.primitive.session.SessionId;
 import io.atomix.primitive.session.SessionIdService;
 import io.atomix.primitive.session.impl.proto.NextRequest;
 import io.atomix.primitive.session.impl.proto.NextResponse;
-
-import static io.atomix.utils.concurrent.Futures.uncheck;
+import io.atomix.utils.concurrent.SingleThreadContext;
 
 /**
  * Replicated ID generator service.
@@ -38,7 +36,7 @@ public class ReplicatedSessionIdService implements ManagedSessionIdService {
   private static final String PRIMITIVE_NAME = "session-id";
 
   private final PartitionGroup systemPartitionGroup;
-  private SessionClient proxy;
+  private PrimitiveClient client;
   private final AtomicBoolean started = new AtomicBoolean();
 
   public ReplicatedSessionIdService(PartitionGroup systemPartitionGroup) {
@@ -47,20 +45,23 @@ public class ReplicatedSessionIdService implements ManagedSessionIdService {
 
   @Override
   public CompletableFuture<SessionId> nextSessionId() {
-    return proxy.execute(PrimitiveOperation.newBuilder()
-        .setMetadata(OperationMetadata.newBuilder()
-            .setName(SessionIdGeneratorOperations.NEXT.id())
-            .setType(OperationType.COMMAND)
-            .build())
-        .setValue(NextRequest.newBuilder().build().toByteString())
-        .build())
-        .thenApply(uncheck(NextResponse::parseFrom))
+    return client.execute(
+        SessionIdGeneratorOperations.NEXT,
+        NextRequest.newBuilder().build(),
+        NextRequest::toByteString,
+        NextResponse::parseFrom)
         .thenApply(response -> SessionId.from(response.getSessionId()));
   }
 
   @Override
   public CompletableFuture<SessionIdService> start() {
-    // TODO Open the proxy session
+    this.client = new DefaultPrimitiveClient(
+        ServiceId.newBuilder()
+            .setType(SessionIdGeneratorType.instance().name())
+            .setName(PRIMITIVE_NAME)
+            .build(),
+        systemPartitionGroup.getPartitions().iterator().next().getClient(),
+        new SingleThreadContext("session-id-service"));
     return CompletableFuture.completedFuture(this);
   }
 
@@ -71,8 +72,7 @@ public class ReplicatedSessionIdService implements ManagedSessionIdService {
 
   @Override
   public CompletableFuture<Void> stop() {
-    return proxy.close()
-        .exceptionally(v -> null)
+    return CompletableFuture.completedFuture(null)
         .thenRun(() -> started.set(false));
   }
 }

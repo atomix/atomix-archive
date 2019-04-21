@@ -57,7 +57,6 @@ import io.atomix.primitive.config.PrimitiveConfig;
 import io.atomix.primitive.config.impl.DefaultConfigService;
 import io.atomix.primitive.impl.DefaultPrimitiveTypeRegistry;
 import io.atomix.primitive.partition.ManagedPartitionGroup;
-import io.atomix.primitive.partition.ManagedPartitionService;
 import io.atomix.primitive.partition.PartitionGroup;
 import io.atomix.primitive.partition.PartitionGroupConfig;
 import io.atomix.primitive.partition.PartitionService;
@@ -66,6 +65,7 @@ import io.atomix.primitive.partition.impl.DefaultPartitionService;
 import io.atomix.primitive.protocol.PrimitiveProtocol;
 import io.atomix.primitive.protocol.PrimitiveProtocolConfig;
 import io.atomix.primitive.serialization.SerializationService;
+import io.atomix.primitive.session.SessionIdService;
 import io.atomix.utils.Version;
 import io.atomix.utils.concurrent.Futures;
 import io.atomix.utils.concurrent.SingleThreadContext;
@@ -427,7 +427,7 @@ public class Atomix extends AtomixCluster implements PrimitivesService {
   private final AtomixRegistry registry;
   private final ConfigService config;
   private final SerializationService serializationService;
-  private final ManagedPartitionService partitions;
+  private final DefaultPartitionService partitions;
   private final CorePrimitivesService primitives;
   private final boolean enableShutdownHook;
   private final ThreadContext threadContext = new SingleThreadContext("atomix-%d");
@@ -561,6 +561,17 @@ public class Atomix extends AtomixCluster implements PrimitivesService {
     return primitives.transactionService();
   }
 
+  /**
+   * Returns the session ID service.
+   * <p>
+   * The session ID service is responsible for generating globally unique session identifiers.
+   *
+   * @return the session ID service
+   */
+  public SessionIdService getSessionIdService() {
+    return partitions.getSessionIdService();
+  }
+
   @Override
   public TransactionBuilder transactionBuilder(String name) {
     checkRunning();
@@ -688,7 +699,7 @@ public class Atomix extends AtomixCluster implements PrimitivesService {
    * Builds a partition service.
    */
   @SuppressWarnings("unchecked")
-  private static ManagedPartitionService buildPartitionService(
+  private static DefaultPartitionService buildPartitionService(
       AtomixConfig config,
       ClusterMembershipService clusterMembershipService,
       ClusterCommunicationService messagingService,

@@ -37,10 +37,11 @@ import com.google.common.collect.Lists;
 import io.atomix.primitive.partition.GroupMember;
 import io.atomix.primitive.partition.MemberGroupId;
 import io.atomix.primitive.partition.PartitionId;
+import io.atomix.primitive.partition.PartitionManagementService;
 import io.atomix.primitive.partition.PrimaryElectionEvent;
 import io.atomix.primitive.partition.PrimaryTerm;
-import io.atomix.primitive.service.AbstractPrimitiveService;
 import io.atomix.primitive.service.ServiceExecutor;
+import io.atomix.primitive.service.SessionManagedPrimitiveService;
 import io.atomix.primitive.session.Session;
 import io.atomix.utils.concurrent.Scheduled;
 
@@ -52,13 +53,16 @@ import static com.google.common.base.Throwables.throwIfUnchecked;
  * This state machine orders candidates and assigns primaries based on the distribution of primaries in the cluster
  * such that primaries are evenly distributed across the cluster.
  */
-public class PrimaryElectorService extends AbstractPrimitiveService {
-
+public class PrimaryElectorService extends SessionManagedPrimitiveService {
   private static final Duration REBALANCE_DURATION = Duration.ofSeconds(15);
 
   private Map<PartitionId, ElectionState> elections = new HashMap<>();
   private Map<Long, Session> listeners = new LinkedHashMap<>();
   private Scheduled rebalanceTimer;
+
+  public PrimaryElectorService(PartitionId partitionId, PartitionManagementService managementService) {
+    super(partitionId, managementService);
+  }
 
   @Override
   public void backup(OutputStream output) throws IOException {

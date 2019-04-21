@@ -15,9 +15,12 @@
  */
 package io.atomix.raft;
 
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.concurrent.CompletableFuture;
+
+import org.slf4j.Logger;
 
 /**
  * Raft state machine.
@@ -44,11 +47,25 @@ public interface RaftStateMachine {
     long getTimestamp();
 
     /**
+     * Returns the Raft operation type.
+     *
+     * @return the Raft operation type
+     */
+    RaftOperation.Type getOperationType();
+
+    /**
      * Returns the current role of the state machine.
      *
      * @return the current role of the state machine
      */
     RaftServer.Role getRole();
+
+    /**
+     * Returns the state machine logger.
+     *
+     * @return the state machine logger
+     */
+    Logger getLogger();
 
   }
 
@@ -64,14 +81,14 @@ public interface RaftStateMachine {
    *
    * @param output the output
    */
-  void snapshot(OutputStream output);
+  void snapshot(OutputStream output) throws IOException;
 
   /**
    * Installs a snapshot of the state machine.
    *
    * @param input the input
    */
-  void install(InputStream input);
+  void install(InputStream input) throws IOException;
 
   /**
    * Returns whether the given index can be deleted.

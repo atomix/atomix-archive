@@ -55,25 +55,25 @@ public class LockServiceTest {
     service.tick(new WallClockTimestamp());
 
     ByteArrayOutputStream os = new ByteArrayOutputStream();
-    service.backup(os);
+    service.snapshot(os);
 
     service = new LockService();
     service.init(context);
     service.register(session);
     service.tick(new WallClockTimestamp());
-    service.restore(new ByteArrayInputStream(os.toByteArray()));
+    service.install(new ByteArrayInputStream(os.toByteArray()));
 
     service.lock(LockRequest.newBuilder().setId(1).build());
     service.lock(LockRequest.newBuilder().setId(2).setTimeout(1000).build());
 
     os = new ByteArrayOutputStream();
-    service.backup(os);
+    service.snapshot(os);
 
     service = new LockService();
     service.init(context);
     service.register(session);
     service.tick(new WallClockTimestamp());
-    service.restore(new ByteArrayInputStream(os.toByteArray()));
+    service.install(new ByteArrayInputStream(os.toByteArray()));
 
     assertTrue(service.isLocked(IsLockedRequest.newBuilder().setIndex(service.lock.index).build()).getLocked());
     assertTrue(!service.queue.isEmpty());

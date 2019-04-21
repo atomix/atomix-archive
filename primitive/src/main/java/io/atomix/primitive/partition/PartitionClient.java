@@ -23,19 +23,19 @@ import java.util.concurrent.CompletableFuture;
 public interface PartitionClient {
 
   /**
-   * Sends a write to the partition.
+   * Sends a command to the partition.
    *
-   * @param value the value to write
+   * @param value the command to send
    * @return a future to be completed with the result
    */
-  CompletableFuture<byte[]> write(byte[] value);
+  CompletableFuture<byte[]> command(byte[] value);
 
   /**
-   * Sets a read to the partition.
+   * Sets a query to the partition.
    *
-   * @param value the read parameter
+   * @param value the query parameter
    * @return a future to be completed with the result
    */
-  CompletableFuture<byte[]> read(byte[] value);
+  CompletableFuture<byte[]> query(byte[] value);
 
 }

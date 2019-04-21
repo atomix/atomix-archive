@@ -15,15 +15,13 @@
  */
 package io.atomix.primitive.partition.impl;
 
+import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
 import com.google.common.collect.Sets;
-import io.atomix.primitive.operation.OperationMetadata;
-import io.atomix.primitive.operation.OperationType;
-import io.atomix.primitive.operation.PrimitiveOperation;
 import io.atomix.primitive.partition.GroupMember;
 import io.atomix.primitive.partition.ManagedPrimaryElection;
 import io.atomix.primitive.partition.PartitionId;
@@ -32,15 +30,16 @@ import io.atomix.primitive.partition.PrimaryElectionEvent;
 import io.atomix.primitive.partition.PrimaryElectionService;
 import io.atomix.primitive.partition.PrimaryTerm;
 import io.atomix.primitive.session.SessionClient;
+import io.atomix.primitive.session.impl.SessionMetadata;
 
 import static com.google.common.base.Preconditions.checkNotNull;
-import static io.atomix.utils.concurrent.Futures.uncheck;
 
 /**
  * Leader elector based primary election.
  */
 public class DefaultPrimaryElection implements ManagedPrimaryElection {
   private final PartitionId partitionId;
+  private final long sessionId = new Random(System.currentTimeMillis()).nextLong();
   private final SessionClient proxy;
   private final PrimaryElectionService service;
   private final Set<Consumer<PrimaryElectionEvent>> listeners = Sets.newCopyOnWriteArraySet();
@@ -61,35 +60,33 @@ public class DefaultPrimaryElection implements ManagedPrimaryElection {
 
   @Override
   public CompletableFuture<PrimaryTerm> enter(GroupMember member) {
-    return proxy.execute(PrimitiveOperation.newBuilder()
-        .setMetadata(OperationMetadata.newBuilder()
-            .setType(OperationType.COMMAND)
-            .setName(PrimaryElectorOperations.ENTER.id())
-            .build())
-        .setValue(EnterRequest.newBuilder()
+    return proxy.execute(
+        PrimaryElectorOperations.ENTER,
+        SessionMetadata.newBuilder()
+            .setSessionId(sessionId)
+            .build(),
+        EnterRequest.newBuilder()
             .setPartitionId(partitionId)
             .setMember(member)
-            .build()
-            .toByteString())
-        .build())
-        .thenApply(uncheck(EnterResponse::parseFrom))
-        .thenApply(EnterResponse::getTerm);
+            .build(),
+        EnterRequest::toByteString,
+        EnterResponse::parseFrom)
+        .thenApply(response -> response.getRight().getTerm());
   }
 
   @Override
   public CompletableFuture<PrimaryTerm> getTerm() {
-    return proxy.execute(PrimitiveOperation.newBuilder()
-        .setMetadata(OperationMetadata.newBuilder()
-            .setType(OperationType.QUERY)
-            .setName(PrimaryElectorOperations.GET_TERM.id())
-            .build())
-        .setValue(GetTermRequest.newBuilder()
+    return proxy.execute(
+        PrimaryElectorOperations.GET_TERM,
+        SessionMetadata.newBuilder()
+            .setSessionId(sessionId)
+            .build(),
+        GetTermRequest.newBuilder()
             .setPartitionId(partitionId)
-            .build()
-            .toByteString())
-        .build())
-        .thenApply(uncheck(GetTermResponse::parseFrom))
-        .thenApply(GetTermResponse::getTerm);
+            .build(),
+        GetTermRequest::toByteString,
+        GetTermResponse::parseFrom)
+        .thenApply(response -> response.getRight().getTerm());
   }
 
   @Override

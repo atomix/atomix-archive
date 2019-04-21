@@ -19,8 +19,9 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 
-import io.atomix.primitive.service.AbstractPrimitiveService;
+import io.atomix.primitive.partition.PartitionId;
 import io.atomix.primitive.service.ServiceExecutor;
+import io.atomix.primitive.service.SimplePrimitiveService;
 import io.atomix.primitive.session.impl.proto.NextRequest;
 import io.atomix.primitive.session.impl.proto.NextResponse;
 import io.atomix.primitive.session.impl.proto.SessionIdGeneratorSnapshot;
@@ -28,8 +29,12 @@ import io.atomix.primitive.session.impl.proto.SessionIdGeneratorSnapshot;
 /**
  * ID generator service.
  */
-public class SessionIdGeneratorService extends AbstractPrimitiveService {
+public class SessionIdGeneratorService extends SimplePrimitiveService {
   private long id;
+
+  public SessionIdGeneratorService(PartitionId partitionId) {
+    super(partitionId);
+  }
 
   @Override
   public void backup(OutputStream output) throws IOException {

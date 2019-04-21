@@ -10,7 +10,7 @@ import com.google.common.io.ByteStreams;
 import com.google.protobuf.Descriptors;
 import com.google.protobuf.ExtensionRegistryLite;
 import com.google.protobuf.compiler.PluginProtos;
-import io.atomix.primitive.service.PrimitiveServiceProto;
+import io.atomix.primitive.service.impl.PrimitiveServiceProto;
 
 /**
  * Primitive service compiler main.

@@ -15,6 +15,8 @@
  */
 package io.atomix.primitive;
 
+import java.util.concurrent.ScheduledExecutorService;
+
 import io.atomix.cluster.ClusterMembershipService;
 import io.atomix.cluster.messaging.ClusterCommunicationService;
 import io.atomix.cluster.messaging.ClusterEventService;
@@ -22,8 +24,8 @@ import io.atomix.primitive.partition.PartitionGroupTypeRegistry;
 import io.atomix.primitive.partition.PartitionService;
 import io.atomix.primitive.protocol.PrimitiveProtocolTypeRegistry;
 import io.atomix.primitive.serialization.SerializationService;
-
-import java.util.concurrent.ScheduledExecutorService;
+import io.atomix.primitive.session.SessionIdService;
+import io.atomix.primitive.session.SessionProtocolService;
 
 /**
  * Primitive management service.
@@ -106,5 +108,19 @@ public interface PrimitiveManagementService {
    * @return the partition group type registry
    */
   PartitionGroupTypeRegistry getPartitionGroupTypeRegistry();
+
+  /**
+   * Returns the session ID service.
+   *
+   * @return the session ID service
+   */
+  SessionIdService getSessionIdService();
+
+  /**
+   * Returns the session protocol service.
+   *
+   * @return the session protocol service
+   */
+  SessionProtocolService getSessionProtocolService();
 
 }

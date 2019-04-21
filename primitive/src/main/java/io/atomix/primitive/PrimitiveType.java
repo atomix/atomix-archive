@@ -16,6 +16,8 @@
 package io.atomix.primitive;
 
 import io.atomix.primitive.config.PrimitiveConfig;
+import io.atomix.primitive.partition.PartitionId;
+import io.atomix.primitive.partition.PartitionManagementService;
 import io.atomix.primitive.service.PrimitiveService;
 import io.atomix.utils.ConfiguredType;
 
@@ -45,7 +47,9 @@ public interface PrimitiveType<B extends PrimitiveBuilder, C extends PrimitiveCo
   /**
    * Creates a new service instance from the given configuration.
    *
+   * @param partitionId       the partition in which the service is being created
+   * @param managementService the primitive management service
    * @return the service instance
    */
-  PrimitiveService newService();
+  PrimitiveService newService(PartitionId partitionId, PartitionManagementService managementService);
 }

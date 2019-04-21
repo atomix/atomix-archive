@@ -15,84 +15,8 @@
  */
 package io.atomix.primitive.service;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
-
-import io.atomix.primitive.session.Session;
-import io.atomix.primitive.session.SessionId;
-import io.atomix.utils.time.WallClockTimestamp;
-
 /**
  * Base class for user-provided services.
- *
- * @see Commit
- * @see ServiceContext
- * @see ServiceExecutor
  */
-public interface PrimitiveService {
-
-  /**
-   * Initializes the state machine.
-   *
-   * @param context The state machine context.
-   * @throws NullPointerException if {@code context} is null
-   */
-  void init(ServiceContext context);
-
-  /**
-   * Increments the Raft service time to the given timestamp.
-   *
-   * @param timestamp the service timestamp
-   */
-  void tick(WallClockTimestamp timestamp);
-
-  /**
-   * Backs up the service state to the given output stream.
-   *
-   * @param output the output stream
-   */
-  void backup(OutputStream output) throws IOException;
-
-  /**
-   * Restores the service state from the given input stream.
-   *
-   * @param input the input stream
-   */
-  void restore(InputStream input) throws IOException;
-
-  /**
-   * Applies a commit to the state machine.
-   *
-   * @param commit the commit to apply
-   * @return the commit result
-   */
-  byte[] apply(Commit<byte[]> commit);
-
-  /**
-   * Registers a primitive session.
-   *
-   * @param session the session to register
-   */
-  void register(Session session);
-
-  /**
-   * Expires the session with the given identifier.
-   *
-   * @param sessionId the session identifier
-   */
-  void expire(SessionId sessionId);
-
-  /**
-   * Closes the session with the given identifier.
-   *
-   * @param sessionId the session identifier
-   */
-  void close(SessionId sessionId);
-
-  /**
-   * Closes the state machine.
-   */
-  default void close() {
-  }
+public interface PrimitiveService extends StateMachine {
 }

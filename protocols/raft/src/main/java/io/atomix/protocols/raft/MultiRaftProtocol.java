@@ -15,13 +15,8 @@
  */
 package io.atomix.protocols.raft;
 
-import io.atomix.primitive.PrimitiveManagementService;
-import io.atomix.primitive.PrimitiveType;
-import io.atomix.primitive.partition.Partition;
 import io.atomix.primitive.protocol.PrimitiveProtocol;
 import io.atomix.primitive.protocol.ProxyProtocol;
-import io.atomix.primitive.session.SessionClient;
-import io.atomix.protocols.raft.partition.RaftPartition;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -95,10 +90,5 @@ public class MultiRaftProtocol implements ProxyProtocol {
   @Override
   public String group() {
     return config.getGroup();
-  }
-
-  @Override
-  public SessionClient newClient(String name, PrimitiveType type, Partition partition, PrimitiveManagementService managementService) {
-    return ((RaftPartition) partition).newClient(name, type, managementService, config);
   }
 }

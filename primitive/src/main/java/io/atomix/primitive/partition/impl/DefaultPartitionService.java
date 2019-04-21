@@ -39,7 +39,9 @@ import io.atomix.primitive.partition.PartitionGroupTypeRegistry;
 import io.atomix.primitive.partition.PartitionManagementService;
 import io.atomix.primitive.partition.PartitionService;
 import io.atomix.primitive.session.ManagedSessionIdService;
+import io.atomix.primitive.session.SessionIdService;
 import io.atomix.primitive.session.impl.DefaultSessionIdService;
+import io.atomix.primitive.session.impl.DefaultSessionProtocolService;
 import io.atomix.primitive.session.impl.ReplicatedSessionIdService;
 import io.atomix.utils.concurrent.Futures;
 import io.atomix.utils.config.ConfigurationException;
@@ -80,6 +82,15 @@ public class DefaultPartitionService implements ManagedPartitionService {
         membershipService, messagingService, systemGroup, groups, groupTypeRegistry);
     this.systemGroup = systemGroup;
     groups.forEach(group -> this.groups.put(group.name(), group));
+  }
+
+  /**
+   * Returns the system session ID service.
+   *
+   * @return the system session ID service
+   */
+  public SessionIdService getSessionIdService() {
+    return systemSessionIdService;
   }
 
   @Override
@@ -153,7 +164,8 @@ public class DefaultPartitionService implements ManagedPartitionService {
                       communicationService,
                       primitiveTypeRegistry,
                       electionService,
-                      new DefaultSessionIdService());
+                      new DefaultSessionIdService(),
+                      new DefaultSessionProtocolService(communicationService));
                   if (systemGroupMembership.members().contains(clusterMembershipService.getLocalMember().id())) {
                     return systemGroup.join(managementService);
                   } else {
@@ -171,7 +183,8 @@ public class DefaultPartitionService implements ManagedPartitionService {
                 communicationService,
                 primitiveTypeRegistry,
                 systemElectionService,
-                systemSessionIdService)))
+                systemSessionIdService,
+                new DefaultSessionProtocolService(communicationService))))
         .thenCompose(managementService -> {
           this.partitionManagementService = (PartitionManagementService) managementService;
           List<CompletableFuture> futures = groupMembershipService.getMemberships().stream()

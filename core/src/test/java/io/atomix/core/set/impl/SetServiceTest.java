@@ -52,10 +52,10 @@ public class SetServiceTest {
     service.add(AddRequest.newBuilder().addValues("foo").build());
 
     ByteArrayOutputStream os = new ByteArrayOutputStream();
-    service.backup(os);
+    service.snapshot(os);
 
     service = new SetService();
-    service.restore(new ByteArrayInputStream(os.toByteArray()));
+    service.install(new ByteArrayInputStream(os.toByteArray()));
 
     assertTrue(service.contains(ContainsRequest.newBuilder().addValues("foo").build()).getContains());
   }

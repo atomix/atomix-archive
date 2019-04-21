@@ -1,8 +1,9 @@
 syntax = "proto3";
 
-import "protocol.proto";
-
 package atomix.set;
+
+import "protocol.proto";
+import "google/protobuf/duration.proto";
 
 option java_package = "io.atomix.grpc.set";
 option java_multiple_files = true;
@@ -17,8 +18,34 @@ message SetId {
     }
 }
 
-message AddRequest {
+message CreateRequest {
     SetId id = 1;
+    google.protobuf.Duration timeout = 2;
+}
+
+message CreateResponse {
+    uint64 session_id = 1;
+}
+
+message KeepAliveRequest {
+    uint64 session_id = 1;
+    uint64 event_index = 2;
+    uint64 command_sequence = 3;
+}
+
+message KeepAliveResponse {
+}
+
+message CloseRequest {
+    uint64 session_id = 1;
+    bool delete = 2;
+}
+
+message CloseResponse {
+}
+
+message AddRequest {
+    uint64 session_id = 1;
     repeated bytes values = 2;
 }
 
@@ -27,7 +54,7 @@ message AddResponse {
 }
 
 message RemoveRequest {
-    SetId id = 1;
+    uint64 session_id = 1;
     repeated bytes values = 2;
 }
 
@@ -36,7 +63,7 @@ message RemoveResponse {
 }
 
 message ContainsRequest {
-    SetId id = 1;
+    uint64 session_id = 1;
     repeated bytes values = 2;
 }
 
@@ -45,7 +72,7 @@ message ContainsResponse {
 }
 
 message SizeRequest {
-    SetId id = 1;
+    uint64 session_id = 1;
 }
 
 message SizeResponse {
@@ -53,7 +80,7 @@ message SizeResponse {
 }
 
 message ClearRequest {
-    SetId id = 1;
+    uint64 session_id = 1;
 }
 
 message ClearResponse {
@@ -61,7 +88,7 @@ message ClearResponse {
 
 // Set event
 message SetEvent {
-    SetId id = 1;
+    uint64 session_id = 1;
     Type type = 2;
     bytes value = 3;
 
@@ -75,16 +102,22 @@ message SetEvent {
 // Set service
 service SetService {
 
-    rpc Add(AddRequest) returns (AddResponse) {}
+    rpc Create (CreateRequest) returns (CreateResponse) {}
 
-    rpc Remove(RemoveRequest) returns (RemoveResponse) {}
+    rpc KeepAlive (KeepAliveRequest) returns (KeepAliveResponse) {}
 
-    rpc Contains(ContainsRequest) returns (ContainsResponse) {}
+    rpc Close (CloseRequest) returns (CloseResponse) {}
 
-    rpc Size(SizeRequest) returns (SizeResponse) {}
+    rpc Add (AddRequest) returns (AddResponse) {}
 
-    rpc Clear(ClearRequest) returns (ClearResponse) {}
+    rpc Remove (RemoveRequest) returns (RemoveResponse) {}
 
-    rpc Listen(stream SetId) returns (stream SetEvent) {}
+    rpc Contains (ContainsRequest) returns (ContainsResponse) {}
+
+    rpc Size (SizeRequest) returns (SizeResponse) {}
+
+    rpc Clear (ClearRequest) returns (ClearResponse) {}
+
+    rpc Listen (stream SetId) returns (stream SetEvent) {}
 
 }

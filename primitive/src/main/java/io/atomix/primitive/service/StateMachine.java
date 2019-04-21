@@ -15,9 +15,13 @@
  */
 package io.atomix.primitive.service;
 
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.concurrent.CompletableFuture;
+
+import io.atomix.primitive.operation.OperationType;
+import org.slf4j.Logger;
 
 /**
  * State machine.
@@ -44,11 +48,25 @@ public interface StateMachine {
     long getTimestamp();
 
     /**
+     * Returns the current operation type.
+     *
+     * @return the current operation type
+     */
+    OperationType getOperationType();
+
+    /**
      * Returns the current role of the state machine.
      *
      * @return the current role of the state machine
      */
     Role getRole();
+
+    /**
+     * Returns the state machine logger.
+     *
+     * @return the state machine logger
+     */
+    Logger getLogger();
 
   }
 
@@ -60,18 +78,18 @@ public interface StateMachine {
   void init(Context context);
 
   /**
-   * Backs up the state machine.
+   * Takes a snapshot of the state machine.
    *
    * @param output the output
    */
-  void backup(OutputStream output);
+  void snapshot(OutputStream output) throws IOException;
 
   /**
-   * Restores the state machine state.
+   * Installs a snapshot of the state machine state.
    *
    * @param input the input
    */
-  void restore(InputStream input);
+  void install(InputStream input) throws IOException;
 
   /**
    * Returns whether the given index can be deleted.

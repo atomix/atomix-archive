@@ -31,7 +31,8 @@ import com.google.protobuf.compiler.PluginProtos;
 import freemarker.template.Configuration;
 import freemarker.template.Template;
 import freemarker.template.TemplateException;
-import io.atomix.primitive.service.PrimitiveServiceProto;
+import io.atomix.primitive.service.impl.PrimitiveServiceProto;
+import io.atomix.primitive.service.impl.ServiceType;
 import org.apache.commons.lang3.tuple.Pair;
 
 /**
@@ -41,8 +42,10 @@ public class PrimitiveServiceGenerator {
 
   private static final String OPERATIONS_TEMPLATE = "operations.ftlh";
   private static final String EVENTS_TEMPLATE = "events.ftlh";
-  private static final String SERVICE_TEMPLATE = "service.ftlh";
-  private static final String PROXY_TEMPLATE = "proxy.ftlh";
+  private static final String SIMPLE_SERVICE_TEMPLATE = "simple_service.ftlh";
+  private static final String SESSION_SERVICE_TEMPLATE = "session_service.ftlh";
+  private static final String SIMPLE_PROXY_TEMPLATE = "simple_proxy.ftlh";
+  private static final String SESSION_PROXY_TEMPLATE = "session_proxy.ftlh";
 
   private static final String OPERATIONS_SUFFIX = "Operations";
   private static final String EVENTS_SUFFIX = "Events";
@@ -101,19 +104,35 @@ public class PrimitiveServiceGenerator {
       }
 
       if (!serviceContext.getOperations().isEmpty()) {
-        // Compile the primitive service base class.
-        compile(
-            SERVICE_TEMPLATE,
-            serviceContext.getServiceClass(),
-            serviceContext,
-            response);
+        if (serviceContext.isSession()) {
+          // Compile the primitive service base class.
+          compile(
+              SESSION_SERVICE_TEMPLATE,
+              serviceContext.getServiceClass(),
+              serviceContext,
+              response);
 
-        // Compile the proxy class.
-        compile(
-            PROXY_TEMPLATE,
-            serviceContext.getProxyClass(),
-            serviceContext,
-            response);
+          // Compile the proxy class.
+          compile(
+              SESSION_PROXY_TEMPLATE,
+              serviceContext.getProxyClass(),
+              serviceContext,
+              response);
+        } else {
+          // Compile the primitive service base class.
+          compile(
+              SIMPLE_SERVICE_TEMPLATE,
+              serviceContext.getServiceClass(),
+              serviceContext,
+              response);
+
+          // Compile the proxy class.
+          compile(
+              SIMPLE_PROXY_TEMPLATE,
+              serviceContext.getProxyClass(),
+              serviceContext,
+              response);
+        }
       }
     }
   }
@@ -167,6 +186,7 @@ public class PrimitiveServiceGenerator {
     context.setProxyClass(buildProxyClassDescriptor(serviceDescriptor, fileDescriptor));
     context.setOperationsClass(buildOperationsClassDescriptor(serviceDescriptor, fileDescriptor));
     context.setEventsClass(buildEventsClassDescriptor(serviceDescriptor, fileDescriptor));
+    context.setSession(isSessionService(serviceDescriptor));
     for (DescriptorProtos.MethodDescriptorProto methodDescriptor : serviceDescriptor.getMethodList()) {
       if (isOperationMethod(methodDescriptor)) {
         context.addOperation(buildOperationDescriptor(methodDescriptor, serviceDescriptor, fileDescriptor, messages));
@@ -313,6 +333,17 @@ public class PrimitiveServiceGenerator {
   }
 
   /**
+   * Returns a boolean indicating whether the given service is a session enabled service.
+   *
+   * @param serviceDescriptor the service descriptor
+   * @return indicates whether the given service is a session enabled service
+   */
+  private boolean isSessionService(DescriptorProtos.ServiceDescriptorProto serviceDescriptor) {
+    return serviceDescriptor.getOptions().hasExtension(PrimitiveServiceProto.type)
+        && serviceDescriptor.getOptions().getExtension(PrimitiveServiceProto.type) == ServiceType.SESSION;
+  }
+
+  /**
    * Returns a boolean indicating whether the given descriptor is for a primitive operation.
    *
    * @param methodDescriptor the method descriptor
@@ -379,10 +410,6 @@ public class PrimitiveServiceGenerator {
    * @return the service base name
    */
   private static String getBaseName(DescriptorProtos.ServiceDescriptorProto serviceDescriptor) {
-    if (serviceDescriptor.getOptions().hasExtension(PrimitiveServiceProto.baseName)) {
-      return serviceDescriptor.getOptions().getExtension(PrimitiveServiceProto.baseName);
-    }
-
     String className = getClassName(serviceDescriptor);
     if (className.endsWith(SERVICE_SUFFIX)) {
       return className.substring(0, className.lastIndexOf(SERVICE_SUFFIX));
@@ -574,6 +601,7 @@ public class PrimitiveServiceGenerator {
     private ClassDescriptor eventsClass;
     private List<OperationDescriptor> operations = new ArrayList<>();
     private List<EventDescriptor> events = new ArrayList<>();
+    private boolean session;
 
     public ClassDescriptor getServiceClass() {
       return serviceClass;
@@ -629,6 +657,14 @@ public class PrimitiveServiceGenerator {
 
     public void addEvent(EventDescriptor event) {
       events.add(event);
+    }
+
+    public boolean isSession() {
+      return session || !getEvents().isEmpty();
+    }
+
+    public void setSession(boolean session) {
+      this.session = session;
     }
   }
 

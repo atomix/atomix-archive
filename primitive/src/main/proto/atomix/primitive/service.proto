@@ -5,12 +5,17 @@ package atomix.primitive.service;
 import "google/protobuf/descriptor.proto";
 import "atomix/primitive/operation.proto";
 
-option java_package = "io.atomix.primitive.service";
+option java_package = "io.atomix.primitive.service.impl";
 option java_outer_classname = "PrimitiveServiceProto";
 option java_multiple_files = true;
 
 extend google.protobuf.ServiceOptions {
-    string base_name = 50001;
+    ServiceType type = 50001;
+}
+
+enum ServiceType {
+    SIMPLE = 0;
+    SESSION = 1;
 }
 
 message ServiceOperation {
@@ -30,11 +35,24 @@ extend google.protobuf.MethodOptions {
     ServiceEvent event = 50003;
 }
 
-// Service snapshot
+message ServiceId {
+    string type = 1;
+    string name = 2;
+}
+
 message ServiceSnapshot {
-    int64 id = 1;
-    string type = 2;
-    string name = 3;
+    uint64 index = 1;
+    bytes snapshot = 2;
+}
+
+// Simple service snapshot
+message SimpleServiceSnapshot {
+    int64 index = 4;
+    int64 timestamp = 5;
+}
+
+// Service snapshot
+message SessionManagedServiceSnapshot {
     int64 index = 4;
     int64 timestamp = 5;
     int64 delta = 6;
@@ -55,74 +73,27 @@ message ServiceSession {
     int64 last_applied = 9;
 }
 
-message EventRequest {
-    string server_id = 1;
-    int64 session_id = 2;
-    int64 event_index = 3;
-    int64 previous_index = 4;
-    repeated PrimitiveEvent events = 5;
-}
-
-message PrimitiveEvent {
-    string type = 1;
-    bytes value = 2;
-}
-
-message PrimitiveRequest {
-    oneof type {
-        OpenSessionRequest open_session = 1;
-        KeepAliveRequest keep_alive = 2;
-        CloseSessionRequest close_session = 3;
-        OperationRequest operation = 4;
-    }
-}
-
-message PrimitiveResponse {
-    oneof type {
-        OpenSessionResponse open_session = 1;
-        KeepAliveResponse keep_alive = 2;
-        CloseSessionResponse close_session = 3;
-        OperationResponse operation = 4;
-    }
-}
-
-message OpenSessionRequest {
-    string member_id = 1;
-    string primitive_name = 2;
-    string primitive_type = 3;
-    int64 timeout = 4;
-}
-
-message OpenSessionResponse {
-    int64 session_id = 3;
-    int64 timeout = 4;
-}
-
-message KeepAliveRequest {
+message ListenRequest {
     int64 session_id = 1;
-    int64 command_sequence = 2;
-    int64 event_index = 3;
 }
 
-message KeepAliveResponse {
-}
-
-message CloseSessionRequest {
+message UnlistenRequest {
     int64 session_id = 1;
-    bool delete = 2;
 }
 
-message CloseSessionResponse {
-
+message ServiceRequest {
+    ServiceId id = 1;
+    bytes request = 2;
 }
 
-message OperationRequest {
-    int64 session_id = 1;
-    int64 sequence_number = 2;
-    oneof operation {
-        CommandRequest command = 3;
-        QueryRequest query = 4;
-    }
+message ServiceResponse {
+    bytes response = 1;
+}
+
+message SessionMetadata {
+    uint64 session_id = 1;
+    uint64 sequence_number = 2;
+    uint64 index = 3;
 }
 
 message OperationResponse {
@@ -136,10 +107,20 @@ message CommandRequest {
     bytes command = 2;
 }
 
+message CommandResponse {
+    uint64 index = 1;
+    bytes output = 2;
+}
+
 message QueryRequest {
     int64 index = 1;
     string name = 2;
     bytes query = 3;
+}
+
+message QueryResponse {
+    uint64 index = 1;
+    bytes output = 2;
 }
 
 message ResetRequest {

@@ -1,16 +1,20 @@
 package io.atomix.protocols.raft.partition.impl;
 
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.concurrent.CompletableFuture;
 
+import io.atomix.primitive.operation.OperationType;
 import io.atomix.primitive.service.Command;
 import io.atomix.primitive.service.Query;
 import io.atomix.primitive.service.Role;
 import io.atomix.primitive.service.StateMachine;
 import io.atomix.raft.RaftCommand;
+import io.atomix.raft.RaftOperation;
 import io.atomix.raft.RaftQuery;
 import io.atomix.raft.RaftStateMachine;
+import org.slf4j.Logger;
 
 /**
  * Raft partition state machine.
@@ -28,13 +32,13 @@ public class RaftPartitionStateMachine implements RaftStateMachine {
   }
 
   @Override
-  public void snapshot(OutputStream output) {
-    stateMachine.backup(output);
+  public void snapshot(OutputStream output) throws IOException {
+    stateMachine.snapshot(output);
   }
 
   @Override
-  public void install(InputStream input) {
-    stateMachine.restore(input);
+  public void install(InputStream input) throws IOException {
+    stateMachine.install(input);
   }
 
   @Override
@@ -67,6 +71,18 @@ public class RaftPartitionStateMachine implements RaftStateMachine {
     @Override
     public long getTimestamp() {
       return context.getTimestamp();
+    }
+
+    @Override
+    public OperationType getOperationType() {
+      return context.getOperationType() == RaftOperation.Type.COMMAND
+          ? OperationType.COMMAND
+          : OperationType.QUERY;
+    }
+
+    @Override
+    public Logger getLogger() {
+      return context.getLogger();
     }
 
     @Override

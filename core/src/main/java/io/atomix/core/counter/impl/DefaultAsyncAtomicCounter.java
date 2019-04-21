@@ -20,12 +20,12 @@ import java.util.concurrent.CompletableFuture;
 
 import io.atomix.core.counter.AsyncAtomicCounter;
 import io.atomix.core.counter.AtomicCounter;
-import io.atomix.primitive.AbstractAsyncPrimitive;
+import io.atomix.primitive.impl.ManagedAsyncPrimitive;
 
 /**
  * Atomix counter implementation.
  */
-public class DefaultAsyncAtomicCounter extends AbstractAsyncPrimitive<CounterProxy> implements AsyncAtomicCounter {
+public class DefaultAsyncAtomicCounter extends ManagedAsyncPrimitive<CounterProxy> implements AsyncAtomicCounter {
   public DefaultAsyncAtomicCounter(CounterProxy proxy) {
     super(proxy);
   }

@@ -32,10 +32,10 @@ public class CounterServiceTest {
     service.set(SetRequest.newBuilder().setValue(1).build());
 
     ByteArrayOutputStream os = new ByteArrayOutputStream();
-    service.backup(os);
+    service.snapshot(os);
 
     service = new CounterService();
-    service.restore(new ByteArrayInputStream(os.toByteArray()));
+    service.install(new ByteArrayInputStream(os.toByteArray()));
 
     long value = service.get(GetRequest.newBuilder().build()).getValue();
     assertEquals(1, value);

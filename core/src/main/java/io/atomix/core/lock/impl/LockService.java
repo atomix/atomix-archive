@@ -180,7 +180,7 @@ public class LockService extends AbstractLockService {
   }
 
   @Override
-  public void backup(OutputStream output) throws IOException {
+  public void snapshot(OutputStream output) throws IOException {
     AtomicLockSnapshot.Builder builder = AtomicLockSnapshot.newBuilder();
     if (lock != null) {
       builder.setLock(LockCall.newBuilder()
@@ -204,7 +204,7 @@ public class LockService extends AbstractLockService {
   }
 
   @Override
-  public void restore(InputStream input) throws IOException {
+  public void install(InputStream input) throws IOException {
     AtomicLockSnapshot snapshot = AtomicLockSnapshot.parseFrom(input);
     if (snapshot.hasLock()) {
       lock = new LockHolder(

@@ -56,13 +56,13 @@ public class ValueServiceTest {
     assertTrue(service.get(GetRequest.newBuilder().build()).getValue().isEmpty());
 
     ByteArrayOutputStream os = new ByteArrayOutputStream();
-    service.backup(os);
+    service.snapshot(os);
 
     assertTrue(service.get(GetRequest.newBuilder().build()).getValue().isEmpty());
 
     service = new ValueService();
     service.init(context);
-    service.restore(new ByteArrayInputStream(os.toByteArray()));
+    service.install(new ByteArrayInputStream(os.toByteArray()));
 
     assertTrue(service.get(GetRequest.newBuilder().build()).getValue().isEmpty());
 
@@ -70,13 +70,13 @@ public class ValueServiceTest {
     assertArrayEquals("Hello world!".getBytes(), service.get(GetRequest.newBuilder().build()).getValue().toByteArray());
 
     os = new ByteArrayOutputStream();
-    service.backup(os);
+    service.snapshot(os);
 
     assertArrayEquals("Hello world!".getBytes(), service.get(GetRequest.newBuilder().build()).getValue().toByteArray());
 
     service = new ValueService();
     service.init(context);
-    service.restore(new ByteArrayInputStream(os.toByteArray()));
+    service.install(new ByteArrayInputStream(os.toByteArray()));
 
     assertArrayEquals("Hello world!".getBytes(), service.get(GetRequest.newBuilder().build()).getValue().toByteArray());
 

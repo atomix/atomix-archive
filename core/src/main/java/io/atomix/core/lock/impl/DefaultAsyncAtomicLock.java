@@ -25,7 +25,7 @@ import java.util.function.Consumer;
 import com.google.common.collect.Maps;
 import io.atomix.core.lock.AsyncAtomicLock;
 import io.atomix.core.lock.AtomicLock;
-import io.atomix.primitive.AbstractAsyncPrimitive;
+import io.atomix.primitive.impl.ManagedAsyncPrimitive;
 import io.atomix.primitive.PrimitiveException;
 import io.atomix.primitive.PrimitiveState;
 import io.atomix.utils.concurrent.Scheduled;
@@ -34,7 +34,7 @@ import io.atomix.utils.time.Version;
 /**
  * Raft lock.
  */
-public class DefaultAsyncAtomicLock extends AbstractAsyncPrimitive<LockProxy> implements AsyncAtomicLock {
+public class DefaultAsyncAtomicLock extends ManagedAsyncPrimitive<LockProxy> implements AsyncAtomicLock {
   private final Map<Integer, LockAttempt> attempts = Maps.newConcurrentMap();
   private final AtomicInteger id = new AtomicInteger();
   private final AtomicInteger lock = new AtomicInteger();

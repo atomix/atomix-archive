@@ -23,8 +23,6 @@ import java.util.function.Consumer;
 
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
-import com.google.protobuf.InvalidProtocolBufferException;
-import io.atomix.primitive.event.PrimitiveEvent;
 import io.atomix.primitive.partition.ManagedPrimaryElection;
 import io.atomix.primitive.partition.ManagedPrimaryElectionService;
 import io.atomix.primitive.partition.PartitionGroup;
@@ -47,16 +45,9 @@ public class DefaultPrimaryElectionService implements ManagedPrimaryElectionServ
 
   private final PartitionGroup partitions;
   private final Set<Consumer<PrimaryElectionEvent>> listeners = Sets.newCopyOnWriteArraySet();
-  private final Consumer<PrimitiveEvent> eventListener = event -> {
-    try {
-      PrimaryElectionEvent electionEvent = PrimaryElectionEvent.parseFrom(event.value());
-      listeners.forEach(l -> l.accept(electionEvent));
-    } catch (InvalidProtocolBufferException e) {
-    }
-  };
   private final Map<PartitionId, ManagedPrimaryElection> elections = Maps.newConcurrentMap();
   private final AtomicBoolean started = new AtomicBoolean();
-  private SessionClient proxy;
+  private SessionClient client;
 
   public DefaultPrimaryElectionService(PartitionGroup partitionGroup) {
     this.partitions = checkNotNull(partitionGroup);
@@ -65,7 +56,7 @@ public class DefaultPrimaryElectionService implements ManagedPrimaryElectionServ
   @Override
   @SuppressWarnings("unchecked")
   public PrimaryElection getElectionFor(PartitionId partitionId) {
-    return elections.computeIfAbsent(partitionId, id -> new DefaultPrimaryElection(partitionId, proxy, this));
+    return elections.computeIfAbsent(partitionId, id -> new DefaultPrimaryElection(partitionId, client, this));
   }
 
   @Override
@@ -92,13 +83,6 @@ public class DefaultPrimaryElectionService implements ManagedPrimaryElectionServ
 
   @Override
   public CompletableFuture<Void> stop() {
-    SessionClient proxy = this.proxy;
-    if (proxy != null) {
-      return proxy.close()
-          .whenComplete((result, error) -> {
-            started.set(false);
-          });
-    }
     started.set(false);
     return CompletableFuture.completedFuture(null);
   }

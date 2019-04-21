@@ -24,10 +24,23 @@ import io.atomix.core.map.AsyncAtomicMap;
 import io.atomix.core.map.AtomicMap;
 import io.atomix.core.map.AtomicMapEventListener;
 import io.atomix.core.map.AtomicMapType;
+import io.atomix.core.map.impl.MapProxy;
 import io.atomix.grpc.map.ClearRequest;
 import io.atomix.grpc.map.ClearResponse;
+import io.atomix.grpc.map.CloseMapRequest;
+import io.atomix.grpc.map.CloseMapResponse;
+import io.atomix.grpc.map.CloseRequest;
+import io.atomix.grpc.map.CloseResponse;
+import io.atomix.grpc.map.CreateMapRequest;
+import io.atomix.grpc.map.CreateMapResponse;
+import io.atomix.grpc.map.CreateRequest;
+import io.atomix.grpc.map.CreateResponse;
 import io.atomix.grpc.map.GetRequest;
 import io.atomix.grpc.map.GetResponse;
+import io.atomix.grpc.map.KeepAliveMapRequest;
+import io.atomix.grpc.map.KeepAliveMapResponse;
+import io.atomix.grpc.map.KeepAliveRequest;
+import io.atomix.grpc.map.KeepAliveResponse;
 import io.atomix.grpc.map.MapEvent;
 import io.atomix.grpc.map.MapId;
 import io.atomix.grpc.map.MapServiceGrpc;
@@ -45,10 +58,45 @@ import io.grpc.stub.StreamObserver;
  * Map service implementation.
  */
 public class MapServiceImpl extends MapServiceGrpc.MapServiceImplBase {
-  private final PrimitiveExecutor<AtomicMap<String, byte[]>, AsyncAtomicMap<String, byte[]>> executor;
+  private final PrimitiveExecutor<MapProxy> executor;
 
   public MapServiceImpl(Atomix atomix) {
     this.executor = new PrimitiveExecutor<>(atomix, AtomicMapType.instance(), AtomicMap::async);
+  }
+
+  @Override
+  public void create(CreateRequest request, StreamObserver<CreateResponse> responseObserver) {
+    return executor.executeAll(
+        request.getId(),
+        request,
+        CreateResponse::getDefaultInstance,
+        responseObserver,
+        proxy -> proxy.);
+  }
+
+  @Override
+  public void keepAlive(KeepAliveRequest request, StreamObserver<KeepAliveResponse> responseObserver) {
+    super.keepAlive(request, responseObserver);
+  }
+
+  @Override
+  public void close(CloseRequest request, StreamObserver<CloseResponse> responseObserver) {
+    super.close(request, responseObserver);
+  }
+
+  @Override
+  public void create(CreateMapRequest request, StreamObserver<CreateMapResponse> responseObserver) {
+    executor.execute(request, CreateMapResponse::getDefaultInstance);
+  }
+
+  @Override
+  public void keepAlive(KeepAliveMapRequest request, StreamObserver<KeepAliveMapResponse> responseObserver) {
+    super.keepAlive(request, responseObserver);
+  }
+
+  @Override
+  public void close(CloseMapRequest request, StreamObserver<CloseMapResponse> responseObserver) {
+    super.close(request, responseObserver);
   }
 
   @Override

@@ -69,12 +69,12 @@ public class RaftPartitionClient implements PartitionClient, Managed<RaftPartiti
   }
 
   @Override
-  public CompletableFuture<byte[]> write(byte[] value) {
+  public CompletableFuture<byte[]> command(byte[] value) {
     return client.write(value);
   }
 
   @Override
-  public CompletableFuture<byte[]> read(byte[] value) {
+  public CompletableFuture<byte[]> query(byte[] value) {
     return client.read(value);
   }
 

@@ -57,10 +57,10 @@ public class MapServiceTest {
     service.put(PutRequest.newBuilder().setKey("foo").setValue(ByteString.copyFrom("Hello world!".getBytes())).build());
 
     ByteArrayOutputStream os = new ByteArrayOutputStream();
-    service.backup(os);
+    service.snapshot(os);
 
     service = new TestAtomicMapService();
-    service.restore(new ByteArrayInputStream(os.toByteArray()));
+    service.install(new ByteArrayInputStream(os.toByteArray()));
 
     byte[] value = service.get(GetRequest.newBuilder().setKey("foo").build()).getValue().toByteArray();
     assertArrayEquals("Hello world!".getBytes(), value);
