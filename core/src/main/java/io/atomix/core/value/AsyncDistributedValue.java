@@ -15,11 +15,12 @@
  */
 package io.atomix.core.value;
 
-import io.atomix.primitive.AsyncPrimitive;
-import io.atomix.primitive.DistributedPrimitive;
-
 import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
+
+import io.atomix.primitive.AsyncPrimitive;
+import io.atomix.primitive.DistributedPrimitive;
+import io.atomix.primitive.PrimitiveType;
 
 /**
  * Distributed version of java.util.concurrent.atomic.AtomicReference.
@@ -32,6 +33,10 @@ import java.util.concurrent.CompletableFuture;
  * @param <V> value type
  */
 public interface AsyncDistributedValue<V> extends AsyncPrimitive {
+  @Override
+  default PrimitiveType type() {
+    return DistributedValueType.instance();
+  }
 
   /**
    * Gets the current value.

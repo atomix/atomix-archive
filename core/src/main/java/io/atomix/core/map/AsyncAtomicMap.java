@@ -32,6 +32,7 @@ import io.atomix.core.set.AsyncDistributedSet;
 import io.atomix.core.transaction.Transactional;
 import io.atomix.primitive.AsyncPrimitive;
 import io.atomix.primitive.DistributedPrimitive;
+import io.atomix.primitive.PrimitiveType;
 import io.atomix.utils.time.Versioned;
 
 /**
@@ -59,6 +60,10 @@ import io.atomix.utils.time.Versioned;
  * operation finishes.
  */
 public interface AsyncAtomicMap<K, V> extends AsyncPrimitive, Transactional<MapUpdate<K, V>> {
+  @Override
+  default PrimitiveType type() {
+    return AtomicMapType.instance();
+  }
 
   @Override
   default CompletableFuture<Void> delete() {

@@ -15,15 +15,20 @@
  */
 package io.atomix.core.counter;
 
-import io.atomix.primitive.AsyncPrimitive;
-
 import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
+
+import io.atomix.primitive.AsyncPrimitive;
+import io.atomix.primitive.PrimitiveType;
 
 /**
  * Distributed version of java.util.concurrent.atomic.AtomicLong.
  */
 public interface AsyncDistributedCounter extends AsyncPrimitive {
+  @Override
+  default PrimitiveType type() {
+    return DistributedCounterType.instance();
+  }
 
   /**
    * Atomically increment by one and return the updated value.

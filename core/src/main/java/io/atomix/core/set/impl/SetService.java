@@ -28,6 +28,10 @@ import java.util.stream.Collectors;
 
 import com.google.common.collect.Sets;
 import io.atomix.core.impl.Metadata;
+import io.atomix.primitive.partition.PartitionId;
+import io.atomix.primitive.partition.PartitionManagementService;
+import io.atomix.primitive.service.PrimitiveService;
+import io.atomix.primitive.service.ServiceType;
 import io.atomix.primitive.session.Session;
 import io.atomix.primitive.session.SessionId;
 
@@ -35,10 +39,33 @@ import io.atomix.primitive.session.SessionId;
  * Set service.
  */
 public class SetService extends AbstractSetService {
+  public static final Type TYPE = new Type();
+
+  /**
+   * Set service type.
+   */
+  public static class Type implements ServiceType {
+    private static final String NAME = "set";
+
+    @Override
+    public String name() {
+      return NAME;
+    }
+
+    @Override
+    public PrimitiveService newService(PartitionId partitionId, PartitionManagementService managementService) {
+      return new SetService(partitionId, managementService);
+    }
+  }
+
   private Set<String> set = Sets.newConcurrentHashSet();
   private Set<SessionId> listeners = new CopyOnWriteArraySet<>();
   private Set<String> lockedElements = new ConcurrentSkipListSet<>();
   private Map<String, DistributedSetTransaction> transactions = new HashMap<>();
+
+  public SetService(PartitionId partitionId, PartitionManagementService managementService) {
+    super(partitionId, managementService);
+  }
 
   private void onEvent(SetEvent event) {
     listeners.forEach(sessionId -> onEvent(sessionId, event));
@@ -388,7 +415,7 @@ public class SetService extends AbstractSetService {
   }
 
   @Override
-  public void snapshot(OutputStream output) throws IOException {
+  public void backup(OutputStream output) throws IOException {
     DistributedSetSnapshot.newBuilder()
         .addAllValues(set)
         .addAllListeners(listeners.stream()
@@ -401,7 +428,7 @@ public class SetService extends AbstractSetService {
   }
 
   @Override
-  public void install(InputStream input) throws IOException {
+  public void restore(InputStream input) throws IOException {
     DistributedSetSnapshot snapshot = DistributedSetSnapshot.parseFrom(input);
     set = Sets.newConcurrentHashSet(snapshot.getValuesList());
     listeners = snapshot.getListenersList().stream()

@@ -17,10 +17,9 @@ package io.atomix.primitive.partition.impl;
 
 import io.atomix.cluster.ClusterMembershipService;
 import io.atomix.cluster.messaging.ClusterCommunicationService;
-import io.atomix.primitive.PrimitiveTypeRegistry;
 import io.atomix.primitive.partition.PartitionManagementService;
 import io.atomix.primitive.partition.PrimaryElectionService;
-import io.atomix.primitive.session.SessionIdService;
+import io.atomix.primitive.service.ServiceTypeRegistry;
 import io.atomix.primitive.session.SessionProtocolService;
 
 /**
@@ -29,23 +28,20 @@ import io.atomix.primitive.session.SessionProtocolService;
 public class DefaultPartitionManagementService implements PartitionManagementService {
   private final ClusterMembershipService membershipService;
   private final ClusterCommunicationService communicationService;
-  private final PrimitiveTypeRegistry primitiveTypes;
+  private final ServiceTypeRegistry serviceTypes;
   private final PrimaryElectionService electionService;
-  private final SessionIdService sessionIdService;
   private final SessionProtocolService protocolService;
 
   public DefaultPartitionManagementService(
       ClusterMembershipService membershipService,
       ClusterCommunicationService communicationService,
-      PrimitiveTypeRegistry primitiveTypes,
+      ServiceTypeRegistry serviceTypes,
       PrimaryElectionService electionService,
-      SessionIdService sessionIdService,
       SessionProtocolService protocolService) {
     this.membershipService = membershipService;
     this.communicationService = communicationService;
-    this.primitiveTypes = primitiveTypes;
+    this.serviceTypes = serviceTypes;
     this.electionService = electionService;
-    this.sessionIdService = sessionIdService;
     this.protocolService = protocolService;
   }
 
@@ -60,18 +56,13 @@ public class DefaultPartitionManagementService implements PartitionManagementSer
   }
 
   @Override
-  public PrimitiveTypeRegistry getPrimitiveTypes() {
-    return primitiveTypes;
+  public ServiceTypeRegistry getServiceTypes() {
+    return serviceTypes;
   }
 
   @Override
   public PrimaryElectionService getElectionService() {
     return electionService;
-  }
-
-  @Override
-  public SessionIdService getSessionIdService() {
-    return sessionIdService;
   }
 
   @Override

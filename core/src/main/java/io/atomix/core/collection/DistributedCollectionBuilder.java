@@ -16,7 +16,7 @@
 package io.atomix.core.collection;
 
 import com.google.common.collect.Lists;
-import io.atomix.primitive.PrimitiveBuilder;
+import io.atomix.primitive.ManagedPrimitiveBuilder;
 import io.atomix.primitive.PrimitiveManagementService;
 import io.atomix.primitive.PrimitiveType;
 import io.atomix.utils.serializer.Namespace;
@@ -31,7 +31,7 @@ public abstract class DistributedCollectionBuilder<
     B extends DistributedCollectionBuilder<B, C, P, E>,
     C extends DistributedCollectionConfig<C>,
     P extends DistributedCollection<E>, E>
-    extends PrimitiveBuilder<B, C, P> {
+    extends ManagedPrimitiveBuilder<B, C, P> {
   protected DistributedCollectionBuilder(PrimitiveType type, String name, C config, PrimitiveManagementService managementService) {
     super(type, name, config, managementService);
   }

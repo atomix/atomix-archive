@@ -15,13 +15,14 @@
  */
 package io.atomix.core.set;
 
+import java.time.Duration;
+import java.util.concurrent.CompletableFuture;
+
 import io.atomix.core.collection.AsyncDistributedCollection;
 import io.atomix.core.set.impl.SetUpdate;
 import io.atomix.core.transaction.Transactional;
 import io.atomix.primitive.DistributedPrimitive;
-
-import java.time.Duration;
-import java.util.concurrent.CompletableFuture;
+import io.atomix.primitive.PrimitiveType;
 
 /**
  * A distributed collection designed for holding unique elements.
@@ -33,6 +34,11 @@ import java.util.concurrent.CompletableFuture;
  * @param <E> set entry type
  */
 public interface AsyncDistributedSet<E> extends AsyncDistributedCollection<E>, Transactional<SetUpdate<E>> {
+  @Override
+  default PrimitiveType type() {
+    return DistributedSetType.instance();
+  }
+
   @Override
   default DistributedSet<E> sync() {
     return sync(Duration.ofMillis(DistributedPrimitive.DEFAULT_OPERATION_TIMEOUT_MILLIS));

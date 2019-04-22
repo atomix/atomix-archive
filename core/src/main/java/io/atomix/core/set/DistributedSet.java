@@ -15,9 +15,10 @@
  */
 package io.atomix.core.set;
 
-import io.atomix.core.collection.DistributedCollection;
-
 import java.util.Set;
+
+import io.atomix.core.collection.DistributedCollection;
+import io.atomix.primitive.PrimitiveType;
 
 /**
  * A distributed collection designed for holding unique elements.
@@ -25,6 +26,11 @@ import java.util.Set;
  * @param <E> set entry type
  */
 public interface DistributedSet<E> extends DistributedCollection<E>, Set<E> {
+  @Override
+  default PrimitiveType type() {
+    return DistributedSetType.instance();
+  }
+
   @Override
   AsyncDistributedSet<E> async();
 }

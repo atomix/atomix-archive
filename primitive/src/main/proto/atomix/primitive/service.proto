@@ -10,20 +10,21 @@ option java_outer_classname = "PrimitiveServiceProto";
 option java_multiple_files = true;
 
 extend google.protobuf.ServiceOptions {
-    ServiceType type = 50001;
+    string name = 50001;
+    ServiceTypeInfo type = 50002;
 }
 
-enum ServiceType {
+enum ServiceTypeInfo {
     SIMPLE = 0;
     SESSION = 1;
 }
 
-message ServiceOperation {
+message ServiceOperationInfo {
     string name = 1;
-    atomix.primitive.operation.OperationType type = 2;
+    atomix.primitive.operation.OperationTypeInfo type = 2;
 }
 
-message ServiceEvent {
+message ServiceEventInfo {
     string name = 1;
 }
 
@@ -31,8 +32,8 @@ message EventListener {
 }
 
 extend google.protobuf.MethodOptions {
-    ServiceOperation operation = 50002;
-    ServiceEvent event = 50003;
+    ServiceOperationInfo operation = 50003;
+    ServiceEventInfo event = 50004;
 }
 
 message ServiceId {

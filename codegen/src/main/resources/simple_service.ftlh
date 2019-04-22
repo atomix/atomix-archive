@@ -15,8 +15,6 @@
  */
 package ${serviceClass.packageName};
 
-import io.atomix.primitive.partition.PartitionId;
-import io.atomix.primitive.session.SessionId;
 import io.atomix.primitive.service.ServiceExecutor;
 import io.atomix.primitive.service.SimplePrimitiveService;
 
@@ -35,9 +33,6 @@ import ${operation.responseClass.packageName}.${operation.responseClass.classNam
  * Atomix generated service interface ${serviceClass.className}.
  */
 public abstract class ${serviceClass.className} extends SimplePrimitiveService {
-    protected ${serviceClass.className}(PartitionId partitionId) {
-        super(partitionId);
-    }
 
     @Override
     protected void configure(ServiceExecutor executor) {

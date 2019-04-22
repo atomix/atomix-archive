@@ -17,6 +17,7 @@ package io.atomix.core.value;
 
 import java.util.Optional;
 
+import io.atomix.primitive.PrimitiveType;
 import io.atomix.primitive.SyncPrimitive;
 import io.atomix.utils.time.Versioned;
 
@@ -26,6 +27,10 @@ import io.atomix.utils.time.Versioned;
  * @param <V> value type
  */
 public interface AtomicValue<V> extends SyncPrimitive {
+  @Override
+  default PrimitiveType type() {
+    return AtomicValueType.instance();
+  }
 
   /**
    * Atomically sets the value to the given updated value if the current value is equal to the expected value.

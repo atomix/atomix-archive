@@ -16,10 +16,8 @@
 package io.atomix.core.set;
 
 import io.atomix.core.set.impl.DefaultDistributedSetBuilder;
-import io.atomix.core.set.impl.SetService;
 import io.atomix.primitive.PrimitiveManagementService;
 import io.atomix.primitive.PrimitiveType;
-import io.atomix.primitive.service.PrimitiveService;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
 
@@ -44,11 +42,6 @@ public class DistributedSetType<E> implements PrimitiveType<DistributedSetBuilde
   @Override
   public String name() {
     return NAME;
-  }
-
-  @Override
-  public PrimitiveService newService() {
-    return new SetService();
   }
 
   @Override

@@ -44,12 +44,4 @@ public interface PrimitiveType<B extends PrimitiveBuilder, C extends PrimitiveCo
    */
   B newBuilder(String primitiveName, C config, PrimitiveManagementService managementService);
 
-  /**
-   * Creates a new service instance from the given configuration.
-   *
-   * @param partitionId       the partition in which the service is being created
-   * @param managementService the primitive management service
-   * @return the service instance
-   */
-  PrimitiveService newService(PartitionId partitionId, PartitionManagementService managementService);
 }

@@ -17,7 +17,6 @@ package io.atomix.core.collection;
 
 import io.atomix.primitive.PrimitiveManagementService;
 import io.atomix.primitive.PrimitiveType;
-import io.atomix.primitive.service.PrimitiveService;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
 
@@ -42,11 +41,6 @@ public class DistributedCollectionType<E> implements PrimitiveType<DistributedCo
   @Override
   public String name() {
     return NAME;
-  }
-
-  @Override
-  public PrimitiveService newService() {
-    throw new UnsupportedOperationException();
   }
 
   @Override

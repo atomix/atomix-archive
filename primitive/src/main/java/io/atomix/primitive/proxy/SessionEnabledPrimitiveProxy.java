@@ -17,9 +17,6 @@ package io.atomix.primitive.proxy;
 
 import java.util.concurrent.CompletableFuture;
 
-import io.atomix.primitive.PrimitiveManagementService;
-import io.atomix.primitive.partition.PartitionId;
-import io.atomix.primitive.service.impl.ServiceId;
 import io.atomix.primitive.session.SessionClient;
 import io.atomix.primitive.session.impl.CloseSessionRequest;
 import io.atomix.primitive.session.impl.CloseSessionResponse;
@@ -28,33 +25,24 @@ import io.atomix.primitive.session.impl.KeepAliveRequest;
 import io.atomix.primitive.session.impl.KeepAliveResponse;
 import io.atomix.primitive.session.impl.OpenSessionRequest;
 import io.atomix.primitive.session.impl.OpenSessionResponse;
-import io.atomix.utils.concurrent.ThreadContext;
+import io.atomix.primitive.session.impl.SessionClientCommunicator;
 
 /**
  * Interface for session aware primitive proxies.
  */
-public abstract class SessionEnabledPrimitiveProxy extends SimplePrimitiveProxy {
-  private final SessionClient client;
+public abstract class SessionEnabledPrimitiveProxy extends AbstractPrimitiveProxy<SessionClient> {
 
-  public SessionEnabledPrimitiveProxy(
-      ServiceId serviceId,
-      PartitionId partitionId,
-      PrimitiveManagementService managementService,
-      ThreadContext context) {
-    super(serviceId, partitionId, managementService, context);
-    this.client = new DefaultSessionClient(
-        serviceId,
-        managementService.getPartitionService()
-            .getPartitionGroup(partitionId.getGroup())
-            .getPartition(partitionId)
-            .getClient(),
-        managementService.getSessionProtocolService().getClientProtocol(partitionId),
-        context);
+  public SessionEnabledPrimitiveProxy(Context context) {
+    super(context);
   }
 
   @Override
-  protected SessionClient getClient() {
-    return client;
+  protected SessionClient createClient() {
+    return new DefaultSessionClient(
+        serviceId(),
+        getPartitionClient(),
+        new SessionClientCommunicator(getManagementService().getCommunicationService(), partitionId()),
+        context());
   }
 
   /**

@@ -30,7 +30,7 @@ import java.util.function.Predicate;
 
 import io.atomix.primitive.PrimitiveException;
 import io.atomix.primitive.PrimitiveState;
-import io.atomix.primitive.proxy.SimplePrimitiveProxy;
+import io.atomix.primitive.proxy.SessionEnabledPrimitiveProxy;
 import io.atomix.primitive.session.impl.SessionContext;
 import io.atomix.primitive.session.impl.SessionMetadata;
 import org.apache.commons.lang3.tuple.Pair;
@@ -40,7 +40,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
 /**
  * Session operation submitter.
  */
-final class PrimitiveSessionInvoker<P extends SimplePrimitiveProxy> {
+final class PrimitiveSessionInvoker<P extends SessionEnabledPrimitiveProxy> {
   private static final int[] FIBONACCI = new int[]{1, 1, 2, 3, 5};
   private static final Predicate<Throwable> EXCEPTION_PREDICATE = e ->
       e instanceof ConnectException

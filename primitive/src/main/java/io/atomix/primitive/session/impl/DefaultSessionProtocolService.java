@@ -18,11 +18,11 @@ public class DefaultSessionProtocolService implements SessionProtocolService {
 
   @Override
   public SessionClientProtocol getClientProtocol(PartitionId partitionId) {
-    return new SessionClientCommunicator(communicationService, new PrimitiveMessageContext(partitionId));
+    return new SessionClientCommunicator(communicationService, partitionId);
   }
 
   @Override
   public SessionServerProtocol getServerProtocol(PartitionId partitionId) {
-    return new SessionServerCommunicator(communicationService, new PrimitiveMessageContext(partitionId));
+    return new SessionServerCommunicator(communicationService, partitionId);
   }
 }

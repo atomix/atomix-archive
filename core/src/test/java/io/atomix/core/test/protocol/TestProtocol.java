@@ -15,17 +15,8 @@
  */
 package io.atomix.core.test.protocol;
 
-import io.atomix.core.test.partition.TestPartition;
-import io.atomix.primitive.PrimitiveManagementService;
-import io.atomix.primitive.PrimitiveType;
-import io.atomix.primitive.partition.Partition;
 import io.atomix.primitive.protocol.PrimitiveProtocol;
 import io.atomix.primitive.protocol.ProxyProtocol;
-import io.atomix.primitive.service.StateMachine;
-import io.atomix.primitive.service.impl.PrimitiveStateMachine;
-import io.atomix.primitive.session.SessionClient;
-import io.atomix.utils.concurrent.BlockingAwareThreadPoolContextFactory;
-import io.atomix.utils.concurrent.ThreadContextFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -68,11 +59,7 @@ public class TestProtocol implements ProxyProtocol {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(TestProtocol.class);
 
-  private final ThreadContextFactory threadContextFactory = new BlockingAwareThreadPoolContextFactory(
-      "test-protocol", 4, LOGGER);
   private final TestProtocolConfig config;
-  private final TestStateMachineContext context = new TestStateMachineContext();
-  private StateMachine stateMachine;
 
   TestProtocol(TestProtocolConfig config) {
     this.config = config;
@@ -86,20 +73,5 @@ public class TestProtocol implements ProxyProtocol {
   @Override
   public String group() {
     return config.getGroup();
-  }
-
-  @Override
-  public synchronized SessionClient newClient(
-      String name, PrimitiveType type, Partition partition, PrimitiveManagementService managementService) {
-    if (stateMachine == null) {
-      stateMachine = new PrimitiveStateMachine(
-          managementService.getPrimitiveTypeRegistry(),
-          managementService.getMembershipService(),
-          managementService.getCommunicationService(),
-          threadContextFactory.createContext(),
-          threadContextFactory);
-      stateMachine.init(context);
-    }
-    return ((TestPartition) partition).newClient(name, type, managementService, stateMachine, context);
   }
 }

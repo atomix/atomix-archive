@@ -15,13 +15,14 @@
  */
 package io.atomix.core.value;
 
-import io.atomix.primitive.AsyncPrimitive;
-import io.atomix.primitive.DistributedPrimitive;
-import io.atomix.utils.time.Versioned;
-
 import java.time.Duration;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+
+import io.atomix.primitive.AsyncPrimitive;
+import io.atomix.primitive.DistributedPrimitive;
+import io.atomix.primitive.PrimitiveType;
+import io.atomix.utils.time.Versioned;
 
 /**
  * Distributed version of java.util.concurrent.atomic.AtomicReference.
@@ -34,6 +35,10 @@ import java.util.concurrent.CompletableFuture;
  * @param <V> value type
  */
 public interface AsyncAtomicValue<V> extends AsyncPrimitive {
+  @Override
+  default PrimitiveType type() {
+    return AtomicValueType.instance();
+  }
 
   /**
    * Atomically sets the value to the given updated value if the current value is equal to the expected value.

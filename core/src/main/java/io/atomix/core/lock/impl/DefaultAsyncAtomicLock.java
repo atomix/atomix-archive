@@ -25,9 +25,10 @@ import java.util.function.Consumer;
 import com.google.common.collect.Maps;
 import io.atomix.core.lock.AsyncAtomicLock;
 import io.atomix.core.lock.AtomicLock;
-import io.atomix.primitive.impl.ManagedAsyncPrimitive;
 import io.atomix.primitive.PrimitiveException;
+import io.atomix.primitive.PrimitiveManagementService;
 import io.atomix.primitive.PrimitiveState;
+import io.atomix.primitive.impl.ManagedAsyncPrimitive;
 import io.atomix.utils.concurrent.Scheduled;
 import io.atomix.utils.time.Version;
 
@@ -39,18 +40,18 @@ public class DefaultAsyncAtomicLock extends ManagedAsyncPrimitive<LockProxy> imp
   private final AtomicInteger id = new AtomicInteger();
   private final AtomicInteger lock = new AtomicInteger();
 
-  public DefaultAsyncAtomicLock(LockProxy proxy) {
-    super(proxy);
-    proxy.onStateChange(this::onStateChange);
-    proxy.onLock(this::onLock);
+  public DefaultAsyncAtomicLock(LockProxy proxy, Duration timeout, PrimitiveManagementService managementService) {
+    super(proxy, timeout, managementService);
+    event((p, s) -> p.onLock(s, listener(this::onLock)));
+    state(this::onStateChange);
   }
 
   private void onStateChange(PrimitiveState state) {
     if (state != PrimitiveState.CONNECTED) {
       for (LockAttempt attempt : attempts.values()) {
-        getProxy().unlock(UnlockRequest.newBuilder()
+        command((proxy, session) -> proxy.unlock(session, UnlockRequest.newBuilder()
             .setId(attempt.id())
-            .build());
+            .build()));
         attempt.completeExceptionally(new PrimitiveException.Unavailable());
       }
     }
@@ -64,9 +65,9 @@ public class DefaultAsyncAtomicLock extends ManagedAsyncPrimitive<LockProxy> imp
       if (attempt != null) {
         attempt.complete(new Version(event.getMetadata().getIndex()));
       } else {
-        getProxy().unlock(UnlockRequest.newBuilder()
+        command((proxy, session) -> proxy.unlock(session, UnlockRequest.newBuilder()
             .setId(event.getId())
-            .build());
+            .build()));
       }
     } else if (!lock.compareAndSet(event.getId(), 0)) {
       // Remove the LockAttempt from the attempts map and complete it with a null value if it exists.
@@ -82,10 +83,10 @@ public class DefaultAsyncAtomicLock extends ManagedAsyncPrimitive<LockProxy> imp
   public CompletableFuture<Version> lock() {
     // Create and register a new attempt and invoke the LOCK operation on the replicated state machine.
     LockAttempt attempt = new LockAttempt();
-    getProxy().lock(LockRequest.newBuilder()
+    command((proxy, session) -> proxy.lock(session, LockRequest.newBuilder()
         .setId(attempt.id())
         .setTimeout(-1)
-        .build()).whenComplete((response, error) -> {
+        .build())).whenComplete((response, error) -> {
       if (error != null) {
         attempt.completeExceptionally(error);
       }
@@ -96,7 +97,7 @@ public class DefaultAsyncAtomicLock extends ManagedAsyncPrimitive<LockProxy> imp
   @Override
   public CompletableFuture<Optional<Version>> tryLock() {
     // If the proxy is currently disconnected from the cluster, we can just fail the lock attempt here.
-    PrimitiveState state = getProxy().getState();
+    PrimitiveState state = getState();
     if (state != PrimitiveState.CONNECTED) {
       return CompletableFuture.completedFuture(Optional.empty());
     }
@@ -105,10 +106,10 @@ public class DefaultAsyncAtomicLock extends ManagedAsyncPrimitive<LockProxy> imp
     // a 0 timeout. The timeout will cause the state machine to immediately reject the request if the lock is
     // already owned by another process.
     LockAttempt attempt = new LockAttempt();
-    getProxy().lock(LockRequest.newBuilder()
+    command((proxy, session) -> proxy.lock(session, LockRequest.newBuilder()
         .setId(attempt.id())
         .setTimeout(0)
-        .build()).whenComplete((response, error) -> {
+        .build())).whenComplete((response, error) -> {
       if (error != null) {
         attempt.completeExceptionally(error);
       }
@@ -128,19 +129,19 @@ public class DefaultAsyncAtomicLock extends ManagedAsyncPrimitive<LockProxy> imp
     // lock call also granted to this process.
     LockAttempt attempt = new LockAttempt(timeout, a -> {
       a.complete(null);
-      getProxy().unlock(UnlockRequest.newBuilder()
+      command((proxy, session) -> proxy.unlock(session, UnlockRequest.newBuilder()
           .setId(a.id())
-          .build());
+          .build()));
     });
 
     // Invoke the LOCK operation on the replicated state machine with the given timeout. If the lock is currently
     // held by another process, the state machine will add the attempt to a queue and publish a FAILED event if
     // the timer expires before this process can be granted the lock. If the client cannot reach the Raft cluster,
     // the client-side timer will expire the attempt.
-    getProxy().lock(LockRequest.newBuilder()
+    command((proxy, session) -> proxy.lock(session, LockRequest.newBuilder()
         .setId(attempt.id())
         .setTimeout(timeout.toMillis())
-        .build())
+        .build()))
         .whenComplete((response, error) -> {
           if (error != null) {
             attempt.completeExceptionally(error);
@@ -154,9 +155,9 @@ public class DefaultAsyncAtomicLock extends ManagedAsyncPrimitive<LockProxy> imp
     // Use the current lock ID to ensure we only unlock the lock currently held by this process.
     int lock = this.lock.getAndSet(0);
     if (lock != 0) {
-      return getProxy().unlock(UnlockRequest.newBuilder()
+      return command((proxy, session) -> proxy.unlock(session, UnlockRequest.newBuilder()
           .setId(lock)
-          .build())
+          .build()))
           .thenApply(response -> null);
     }
     return CompletableFuture.completedFuture(null);
@@ -164,9 +165,9 @@ public class DefaultAsyncAtomicLock extends ManagedAsyncPrimitive<LockProxy> imp
 
   @Override
   public CompletableFuture<Boolean> unlock(Version version) {
-    return getProxy().unlock(UnlockRequest.newBuilder()
+    return command((proxy, session) -> proxy.unlock(session, UnlockRequest.newBuilder()
         .setIndex(version.value())
-        .build())
+        .build()))
         .thenApply(response -> null);
   }
 
@@ -177,9 +178,9 @@ public class DefaultAsyncAtomicLock extends ManagedAsyncPrimitive<LockProxy> imp
 
   @Override
   public CompletableFuture<Boolean> isLocked(Version version) {
-    return getProxy().isLocked(IsLockedRequest.newBuilder()
+    return query((proxy, session) -> proxy.isLocked(session, IsLockedRequest.newBuilder()
         .setIndex(version.value())
-        .build())
+        .build()))
         .thenApply(response -> response.getLocked());
   }
 

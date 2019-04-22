@@ -15,8 +15,6 @@
  */
 package io.atomix.primitive;
 
-import java.util.concurrent.ScheduledExecutorService;
-
 import io.atomix.cluster.ClusterMembershipService;
 import io.atomix.cluster.messaging.ClusterCommunicationService;
 import io.atomix.cluster.messaging.ClusterEventService;
@@ -26,18 +24,12 @@ import io.atomix.primitive.protocol.PrimitiveProtocolTypeRegistry;
 import io.atomix.primitive.serialization.SerializationService;
 import io.atomix.primitive.session.SessionIdService;
 import io.atomix.primitive.session.SessionProtocolService;
+import io.atomix.utils.concurrent.ThreadContextFactory;
 
 /**
  * Primitive management service.
  */
 public interface PrimitiveManagementService {
-
-  /**
-   * Returns the primitive thread pool.
-   *
-   * @return the primitive thread pool
-   */
-  ScheduledExecutorService getExecutorService();
 
   /**
    * Returns the cluster service.
@@ -122,5 +114,12 @@ public interface PrimitiveManagementService {
    * @return the session protocol service
    */
   SessionProtocolService getSessionProtocolService();
+
+  /**
+   * Returns the thread context factory.
+   *
+   * @return the thread context factory
+   */
+  ThreadContextFactory getThreadFactory();
 
 }

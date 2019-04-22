@@ -22,7 +22,7 @@ import java.util.function.BiFunction;
 import java.util.function.Consumer;
 
 import io.atomix.primitive.PrimitiveManagementService;
-import io.atomix.primitive.PrimitiveType;
+import io.atomix.primitive.PrimitiveState;
 import io.atomix.primitive.proxy.SessionEnabledPrimitiveProxy;
 import io.atomix.primitive.session.impl.CloseSessionRequest;
 import io.atomix.primitive.session.impl.EventContext;
@@ -44,12 +44,10 @@ public abstract class ManagedAsyncPrimitive<P extends SessionEnabledPrimitivePro
   private PrimitiveSessionListener<P> listener;
 
   public ManagedAsyncPrimitive(
-      String name,
-      PrimitiveType type,
       P proxy,
       Duration timeout,
       PrimitiveManagementService managementService) {
-    super(name, type, proxy);
+    super(proxy);
     this.timeout = timeout;
     this.managementService = managementService;
   }
@@ -68,6 +66,14 @@ public abstract class ManagedAsyncPrimitive<P extends SessionEnabledPrimitivePro
 
   protected <T> BiConsumer<EventContext, T> listener(Consumer<T> consumer) {
     return listener.listener(consumer);
+  }
+
+  protected void state(Consumer<PrimitiveState> consumer) {
+    state.addStateChangeListener(consumer);
+  }
+
+  protected PrimitiveState getState() {
+    return state.getState();
   }
 
   /**

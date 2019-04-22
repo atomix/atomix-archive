@@ -15,11 +15,9 @@
  */
 package io.atomix.core.counter;
 
-import io.atomix.core.counter.impl.CounterService;
 import io.atomix.core.counter.impl.DefaultAtomicCounterBuilder;
 import io.atomix.primitive.PrimitiveManagementService;
 import io.atomix.primitive.PrimitiveType;
-import io.atomix.primitive.service.PrimitiveService;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
 
@@ -42,11 +40,6 @@ public class AtomicCounterType implements PrimitiveType<AtomicCounterBuilder, At
   @Override
   public String name() {
     return NAME;
-  }
-
-  @Override
-  public PrimitiveService newService() {
-    return new CounterService();
   }
 
   @Override

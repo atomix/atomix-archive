@@ -14,6 +14,10 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 import io.atomix.core.impl.Metadata;
+import io.atomix.primitive.partition.PartitionId;
+import io.atomix.primitive.partition.PartitionManagementService;
+import io.atomix.primitive.service.PrimitiveService;
+import io.atomix.primitive.service.ServiceType;
 import io.atomix.primitive.session.Session;
 import io.atomix.primitive.session.SessionId;
 import io.atomix.utils.concurrent.Scheduled;
@@ -22,12 +26,35 @@ import io.atomix.utils.concurrent.Scheduled;
  * Map service.
  */
 public class MapService extends AbstractMapService {
+  public static final Type TYPE = new Type();
+
+  /**
+   * Map service type.
+   */
+  public static class Type implements ServiceType {
+    private static final String NAME = "map";
+
+    @Override
+    public String name() {
+      return NAME;
+    }
+
+    @Override
+    public PrimitiveService newService(PartitionId partitionId, PartitionManagementService managementService) {
+      return new MapService(partitionId, managementService);
+    }
+  }
+
   private Map<String, AtomicMapEntryValue> map = new ConcurrentHashMap<>();
   private Set<String> preparedKeys = new HashSet<>();
   private Map<String, AtomicMapTransaction> activeTransactions = new HashMap<>();
   private Set<SessionId> listeners = new LinkedHashSet<>();
   private long currentVersion;
   private Map<String, Scheduled> timers = new HashMap<>();
+
+  public MapService(PartitionId partitionId, PartitionManagementService managementService) {
+    super(partitionId, managementService);
+  }
 
   @Override
   public SizeResponse size(SizeRequest request) {
@@ -92,7 +119,7 @@ public class MapService extends AbstractMapService {
           .setValue(request.getValue())
           .setVersion(getCurrentIndex())
           .setTtl(request.getTtl())
-          .setCreated(getWallClock().getTime().unixTimestamp())
+          .setCreated(getCurrentTimestamp())
           .build();
       map.put(request.getKey(), newValue);
 
@@ -128,7 +155,7 @@ public class MapService extends AbstractMapService {
           .setValue(request.getValue())
           .setVersion(getCurrentIndex())
           .setTtl(request.getTtl())
-          .setCreated(getWallClock().getTime().unixTimestamp())
+          .setCreated(getCurrentTimestamp())
           .build();
       map.put(request.getKey(), newValue);
 
@@ -173,7 +200,7 @@ public class MapService extends AbstractMapService {
             .setValue(request.getNewValue())
             .setVersion(getCurrentIndex())
             .setTtl(request.getTtl())
-            .setCreated(getWallClock().getTime().unixTimestamp())
+            .setCreated(getCurrentTimestamp())
             .build();
         map.put(request.getKey(), newValue);
 
@@ -208,7 +235,7 @@ public class MapService extends AbstractMapService {
             .setValue(request.getNewValue())
             .setVersion(getCurrentIndex())
             .setTtl(request.getTtl())
-            .setCreated(getWallClock().getTime().unixTimestamp())
+            .setCreated(getCurrentTimestamp())
             .build();
         map.put(request.getKey(), newValue);
 
@@ -626,7 +653,7 @@ public class MapService extends AbstractMapService {
   protected void scheduleTtl(String key, AtomicMapEntryValue value) {
     cancelTtl(key);
     if (value.getTtl() > 0) {
-      timers.put(key, getScheduler().schedule(Duration.ofMillis(value.getTtl() - (getWallClock().getTime().unixTimestamp() - value.getCreated())), () -> {
+      timers.put(key, getScheduler().schedule(Duration.ofMillis(value.getTtl() - (getCurrentTimestamp() - value.getCreated())), () -> {
         map.remove(key, value);
         onEvent(MapEvent.newBuilder()
             .setType(MapEvent.Type.REMOVED)
@@ -661,7 +688,7 @@ public class MapService extends AbstractMapService {
   }
 
   @Override
-  public void snapshot(OutputStream output) throws IOException {
+  public void backup(OutputStream output) throws IOException {
     AtomicMapSnapshot.newBuilder()
         .addAllListeners(listeners.stream()
             .map(SessionId::id)
@@ -675,7 +702,7 @@ public class MapService extends AbstractMapService {
   }
 
   @Override
-  public void install(InputStream input) throws IOException {
+  public void restore(InputStream input) throws IOException {
     AtomicMapSnapshot snapshot = AtomicMapSnapshot.parseFrom(input);
     listeners = snapshot.getListenersList().stream()
         .map(SessionId::from)

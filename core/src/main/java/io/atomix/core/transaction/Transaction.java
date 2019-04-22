@@ -15,12 +15,17 @@
  */
 package io.atomix.core.transaction;
 
+import io.atomix.primitive.PrimitiveType;
 import io.atomix.primitive.SyncPrimitive;
 
 /**
  * Transaction primitive.
  */
 public interface Transaction extends SyncPrimitive {
+  @Override
+  default PrimitiveType type() {
+    return TransactionType.instance();
+  }
 
   /**
    * Returns the transaction identifier.

@@ -15,18 +15,23 @@
  */
 package io.atomix.core.map;
 
+import java.util.Map;
+import java.util.concurrent.Executor;
+
 import com.google.common.util.concurrent.MoreExecutors;
 import io.atomix.core.collection.DistributedCollection;
 import io.atomix.core.set.DistributedSet;
+import io.atomix.primitive.PrimitiveType;
 import io.atomix.primitive.SyncPrimitive;
-
-import java.util.Map;
-import java.util.concurrent.Executor;
 
 /**
  * Distributed map.
  */
 public interface DistributedMap<K, V> extends SyncPrimitive, Map<K, V> {
+  @Override
+  default PrimitiveType type() {
+    return DistributedMapType.instance();
+  }
 
   /**
    * Registers the specified listener to be notified whenever the map is updated.

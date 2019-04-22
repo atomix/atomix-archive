@@ -15,54 +15,19 @@
  */
 package io.atomix.primitive.proxy;
 
-import io.atomix.primitive.PrimitiveManagementService;
 import io.atomix.primitive.client.PrimitiveClient;
 import io.atomix.primitive.client.impl.DefaultPrimitiveClient;
-import io.atomix.primitive.partition.PartitionId;
-import io.atomix.primitive.service.impl.ServiceId;
-import io.atomix.utils.concurrent.ThreadContext;
 
 /**
  * Base class for primitive proxies.
  */
-public abstract class SimplePrimitiveProxy implements PrimitiveProxy {
-  private final ServiceId serviceId;
-  private final PrimitiveClient client;
-  private final ThreadContext context;
-
-  protected SimplePrimitiveProxy(
-      ServiceId serviceId,
-      PartitionId partitionId,
-      PrimitiveManagementService managementService,
-      ThreadContext context) {
-    this.serviceId = serviceId;
-    this.client = new DefaultPrimitiveClient(serviceId, managementService.getPartitionService()
-        .getPartitionGroup(partitionId.getGroup())
-        .getPartition(partitionId)
-        .getClient(), context);
-    this.context = context;
+public abstract class SimplePrimitiveProxy extends AbstractPrimitiveProxy<PrimitiveClient> {
+  protected SimplePrimitiveProxy(Context context) {
+    super(context);
   }
 
   @Override
-  public ThreadContext context() {
-    return context;
-  }
-
-  /**
-   * Returns the primitive client.
-   *
-   * @return the primitive client
-   */
-  protected PrimitiveClient getClient() {
-    return client;
-  }
-
-  /**
-   * Returns the service ID.
-   *
-   * @return the service ID
-   */
-  protected ServiceId getServiceId() {
-    return serviceId;
+  protected PrimitiveClient createClient() {
+    return new DefaultPrimitiveClient(serviceId(), getPartitionClient(), context());
   }
 }

@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -13,27 +13,28 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.atomix.core.idgenerator;
+package io.atomix.primitive.service;
 
-import io.atomix.primitive.PrimitiveType;
-import io.atomix.primitive.SyncPrimitive;
+import java.util.Collection;
 
 /**
- * Generator for globally unique numeric identifiers.
+ * Service type registry.
  */
-public interface AtomicIdGenerator extends SyncPrimitive {
-  @Override
-  default PrimitiveType type() {
-    return AtomicIdGeneratorType.instance();
-  }
+public interface ServiceTypeRegistry {
 
   /**
-   * Gets the next globally unique numeric identifier.
+   * Returns the collection of registered service types.
    *
-   * @return the next globally unique numeric identifier
+   * @return the collection of registered service types
    */
-  long nextId();
+  Collection<ServiceType> getServiceTypes();
 
-  @Override
-  AsyncAtomicIdGenerator async();
+  /**
+   * Returns the service type for the given name.
+   *
+   * @param typeName the service type name
+   * @return the service type
+   */
+  ServiceType getServiceType(String typeName);
+
 }

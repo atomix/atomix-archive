@@ -22,9 +22,6 @@ import io.atomix.core.counter.DistributedCounter;
 import io.atomix.core.counter.DistributedCounterBuilder;
 import io.atomix.core.counter.DistributedCounterConfig;
 import io.atomix.primitive.PrimitiveManagementService;
-import io.atomix.primitive.partition.Partition;
-import io.atomix.primitive.protocol.PrimitiveProtocol;
-import io.atomix.primitive.protocol.ProxyProtocol;
 
 /**
  * Default distributed counter builder.
@@ -36,15 +33,8 @@ public class DefaultDistributedCounterBuilder extends DistributedCounterBuilder 
 
   @Override
   public CompletableFuture<DistributedCounter> buildAsync() {
-    PrimitiveProtocol protocol = protocol();
     return managementService.getPrimitiveRegistry().createPrimitive(name, type)
-        .thenCompose(v -> {
-          Partition partition = managementService.getPartitionService()
-              .getPartitionGroup((ProxyProtocol) protocol)
-              .getPartition(name);
-          return ((ProxyProtocol) protocol).newClient(name, type, partition, managementService).connect();
-        })
-        .thenApply(CounterProxy::new)
+        .thenApply(v -> newSingletonProxy(CounterService.TYPE, CounterProxy::new))
         .thenApply(DefaultAsyncAtomicCounter::new)
         .thenApply(DelegatingDistributedCounter::new)
         .thenApply(AsyncDistributedCounter::sync);

@@ -15,15 +15,20 @@
  */
 package io.atomix.core.log;
 
-import io.atomix.primitive.SyncPrimitive;
-
 import java.util.List;
 import java.util.function.Consumer;
+
+import io.atomix.primitive.PrimitiveType;
+import io.atomix.primitive.SyncPrimitive;
 
 /**
  * Distributed log primitive.
  */
 public interface DistributedLog<E> extends SyncPrimitive {
+  @Override
+  default PrimitiveType type() {
+    return DistributedLogType.instance();
+  }
 
   /**
    * Returns the distributed log partitions.

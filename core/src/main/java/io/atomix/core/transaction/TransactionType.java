@@ -19,7 +19,6 @@ import io.atomix.core.impl.CoreTransactionService;
 import io.atomix.core.transaction.impl.DefaultTransactionBuilder;
 import io.atomix.primitive.PrimitiveManagementService;
 import io.atomix.primitive.PrimitiveType;
-import io.atomix.primitive.service.PrimitiveService;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
 
@@ -42,11 +41,6 @@ public class TransactionType implements PrimitiveType<TransactionBuilder, Transa
   @Override
   public String name() {
     return NAME;
-  }
-
-  @Override
-  public PrimitiveService newService() {
-    throw new UnsupportedOperationException();
   }
 
   @Override

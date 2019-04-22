@@ -16,10 +16,8 @@
 package io.atomix.core.lock;
 
 import io.atomix.core.lock.impl.DefaultDistributedLockBuilder;
-import io.atomix.core.lock.impl.LockService;
 import io.atomix.primitive.PrimitiveManagementService;
 import io.atomix.primitive.PrimitiveType;
-import io.atomix.primitive.service.PrimitiveService;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
 
@@ -42,11 +40,6 @@ public class DistributedLockType implements PrimitiveType<DistributedLockBuilder
   @Override
   public String name() {
     return NAME;
-  }
-
-  @Override
-  public PrimitiveService newService() {
-    return new LockService();
   }
 
   @Override

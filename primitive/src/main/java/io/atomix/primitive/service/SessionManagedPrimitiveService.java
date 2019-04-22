@@ -49,7 +49,6 @@ public abstract class SessionManagedPrimitiveService extends SimplePrimitiveServ
   private Context context;
 
   protected SessionManagedPrimitiveService(PartitionId partitionId, PartitionManagementService managementService) {
-    super(partitionId);
     this.protocol = managementService.getSessionProtocolService().getServerProtocol(partitionId);
   }
 

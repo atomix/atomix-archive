@@ -15,7 +15,7 @@
  */
 package io.atomix.core.cache;
 
-import io.atomix.primitive.PrimitiveBuilder;
+import io.atomix.primitive.ManagedPrimitiveBuilder;
 import io.atomix.primitive.PrimitiveManagementService;
 import io.atomix.primitive.PrimitiveType;
 import io.atomix.primitive.SyncPrimitive;
@@ -24,7 +24,7 @@ import io.atomix.primitive.SyncPrimitive;
  * Cached distributed primitive builder.
  */
 public abstract class CachedPrimitiveBuilder<B extends CachedPrimitiveBuilder<B, C, P>, C extends CachedPrimitiveConfig<C>, P extends SyncPrimitive>
-    extends PrimitiveBuilder<B, C, P> {
+    extends ManagedPrimitiveBuilder<B, C, P> {
   protected CachedPrimitiveBuilder(PrimitiveType type, String name, C config, PrimitiveManagementService managementService) {
     super(type, name, config, managementService);
   }

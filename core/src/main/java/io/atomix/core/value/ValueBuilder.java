@@ -16,7 +16,7 @@
 package io.atomix.core.value;
 
 import com.google.common.collect.Lists;
-import io.atomix.primitive.PrimitiveBuilder;
+import io.atomix.primitive.ManagedPrimitiveBuilder;
 import io.atomix.primitive.PrimitiveManagementService;
 import io.atomix.primitive.PrimitiveType;
 import io.atomix.primitive.SyncPrimitive;
@@ -31,7 +31,7 @@ import io.atomix.utils.serializer.SerializerBuilder;
  * @param <V> value type
  */
 public abstract class ValueBuilder<B extends ValueBuilder<B, C, P, V>, C extends ValueConfig<C>, P extends SyncPrimitive, V>
-    extends PrimitiveBuilder<B, C, P> {
+    extends ManagedPrimitiveBuilder<B, C, P> {
 
   protected ValueBuilder(PrimitiveType primitiveType, String name, C config, PrimitiveManagementService managementService) {
     super(primitiveType, name, config, managementService);

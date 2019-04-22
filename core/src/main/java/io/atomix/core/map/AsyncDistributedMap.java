@@ -15,11 +15,6 @@
  */
 package io.atomix.core.map;
 
-import com.google.common.util.concurrent.MoreExecutors;
-import io.atomix.core.collection.AsyncDistributedCollection;
-import io.atomix.core.set.AsyncDistributedSet;
-import io.atomix.primitive.AsyncPrimitive;
-
 import java.time.Duration;
 import java.util.Collection;
 import java.util.Map;
@@ -29,10 +24,20 @@ import java.util.concurrent.Executor;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 
+import com.google.common.util.concurrent.MoreExecutors;
+import io.atomix.core.collection.AsyncDistributedCollection;
+import io.atomix.core.set.AsyncDistributedSet;
+import io.atomix.primitive.AsyncPrimitive;
+import io.atomix.primitive.PrimitiveType;
+
 /**
  * Asynchronous distributed map.
  */
 public interface AsyncDistributedMap<K, V> extends AsyncPrimitive {
+  @Override
+  default PrimitiveType type() {
+    return DistributedMapType.instance();
+  }
 
   /**
    * Returns the number of key-value mappings in this map.  If the map contains more than <code>Integer.MAX_VALUE</code>

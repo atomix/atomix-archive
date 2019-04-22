@@ -16,10 +16,8 @@
 package io.atomix.core.value;
 
 import io.atomix.core.value.impl.DefaultAtomicValueBuilder;
-import io.atomix.core.value.impl.ValueService;
 import io.atomix.primitive.PrimitiveManagementService;
 import io.atomix.primitive.PrimitiveType;
-import io.atomix.primitive.service.PrimitiveService;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
 
@@ -44,11 +42,6 @@ public class AtomicValueType<V> implements PrimitiveType<AtomicValueBuilder<V>, 
   @Override
   public String name() {
     return NAME;
-  }
-
-  @Override
-  public PrimitiveService newService() {
-    return new ValueService();
   }
 
   @Override

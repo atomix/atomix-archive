@@ -16,12 +16,12 @@
 package io.atomix.core.lock;
 
 import io.atomix.primitive.PrimitiveType;
-import io.atomix.primitive.config.PrimitiveConfig;
+import io.atomix.primitive.config.ManagedPrimitiveConfig;
 
 /**
  * Distributed lock configuration.
  */
-public class AtomicLockConfig extends PrimitiveConfig<AtomicLockConfig> {
+public class AtomicLockConfig extends ManagedPrimitiveConfig<AtomicLockConfig> {
   @Override
   public PrimitiveType getType() {
     return AtomicLockType.instance();

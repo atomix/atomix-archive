@@ -26,7 +26,6 @@ import java.util.stream.Stream;
 import com.google.common.collect.Maps;
 import io.atomix.cluster.ClusterMembershipService;
 import io.atomix.cluster.messaging.ClusterCommunicationService;
-import io.atomix.primitive.PrimitiveTypeRegistry;
 import io.atomix.primitive.partition.ManagedPartitionGroup;
 import io.atomix.primitive.partition.ManagedPartitionGroupMembershipService;
 import io.atomix.primitive.partition.ManagedPartitionService;
@@ -38,11 +37,8 @@ import io.atomix.primitive.partition.PartitionGroupMembershipEventListener;
 import io.atomix.primitive.partition.PartitionGroupTypeRegistry;
 import io.atomix.primitive.partition.PartitionManagementService;
 import io.atomix.primitive.partition.PartitionService;
-import io.atomix.primitive.session.ManagedSessionIdService;
-import io.atomix.primitive.session.SessionIdService;
-import io.atomix.primitive.session.impl.DefaultSessionIdService;
+import io.atomix.primitive.service.ServiceTypeRegistry;
 import io.atomix.primitive.session.impl.DefaultSessionProtocolService;
-import io.atomix.primitive.session.impl.ReplicatedSessionIdService;
 import io.atomix.utils.concurrent.Futures;
 import io.atomix.utils.config.ConfigurationException;
 import org.slf4j.Logger;
@@ -56,11 +52,10 @@ public class DefaultPartitionService implements ManagedPartitionService {
 
   private final ClusterMembershipService clusterMembershipService;
   private final ClusterCommunicationService communicationService;
-  private final PrimitiveTypeRegistry primitiveTypeRegistry;
+  private final ServiceTypeRegistry serviceTypeRegistry;
   private final ManagedPartitionGroupMembershipService groupMembershipService;
   private ManagedPartitionGroup systemGroup;
   private volatile ManagedPrimaryElectionService systemElectionService;
-  private volatile ManagedSessionIdService systemSessionIdService;
   private volatile ManagedPrimaryElectionService electionService;
   private volatile PartitionManagementService partitionManagementService;
   private final Map<String, ManagedPartitionGroup> groups = Maps.newConcurrentMap();
@@ -71,26 +66,17 @@ public class DefaultPartitionService implements ManagedPartitionService {
   public DefaultPartitionService(
       ClusterMembershipService membershipService,
       ClusterCommunicationService messagingService,
-      PrimitiveTypeRegistry primitiveTypeRegistry,
+      ServiceTypeRegistry serviceTypeRegistry,
       ManagedPartitionGroup systemGroup,
       Collection<ManagedPartitionGroup> groups,
       PartitionGroupTypeRegistry groupTypeRegistry) {
     this.clusterMembershipService = membershipService;
     this.communicationService = messagingService;
-    this.primitiveTypeRegistry = primitiveTypeRegistry;
+    this.serviceTypeRegistry = serviceTypeRegistry;
     this.groupMembershipService = new DefaultPartitionGroupMembershipService(
         membershipService, messagingService, systemGroup, groups, groupTypeRegistry);
     this.systemGroup = systemGroup;
     groups.forEach(group -> this.groups.put(group.name(), group));
-  }
-
-  /**
-   * Returns the system session ID service.
-   *
-   * @return the system session ID service
-   */
-  public SessionIdService getSessionIdService() {
-    return systemSessionIdService;
   }
 
   @Override
@@ -155,16 +141,14 @@ public class DefaultPartitionService implements ManagedPartitionService {
             }
 
             systemElectionService = new DefaultPrimaryElectionService(systemGroup);
-            systemSessionIdService = new ReplicatedSessionIdService(systemGroup);
             electionService = new HashBasedPrimaryElectionService(clusterMembershipService, groupMembershipService, communicationService);
             return electionService.start()
                 .thenCompose(s -> {
                   PartitionManagementService managementService = new DefaultPartitionManagementService(
                       clusterMembershipService,
                       communicationService,
-                      primitiveTypeRegistry,
+                      serviceTypeRegistry,
                       electionService,
-                      new DefaultSessionIdService(),
                       new DefaultSessionProtocolService(communicationService));
                   if (systemGroupMembership.members().contains(clusterMembershipService.getLocalMember().id())) {
                     return systemGroup.join(managementService);
@@ -177,13 +161,11 @@ public class DefaultPartitionService implements ManagedPartitionService {
           }
         })
         .thenCompose(v -> systemElectionService.start()
-            .thenCompose(v2 -> systemSessionIdService.start())
             .thenApply(v2 -> new DefaultPartitionManagementService(
                 clusterMembershipService,
                 communicationService,
-                primitiveTypeRegistry,
+                serviceTypeRegistry,
                 systemElectionService,
-                systemSessionIdService,
                 new DefaultSessionProtocolService(communicationService))))
         .thenCompose(managementService -> {
           this.partitionManagementService = (PartitionManagementService) managementService;

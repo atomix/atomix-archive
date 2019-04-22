@@ -19,9 +19,6 @@ import io.atomix.primitive.PrimitiveBuilder;
 import io.atomix.primitive.PrimitiveManagementService;
 import io.atomix.primitive.PrimitiveType;
 import io.atomix.primitive.config.PrimitiveConfig;
-import io.atomix.primitive.partition.PartitionId;
-import io.atomix.primitive.partition.PartitionManagementService;
-import io.atomix.primitive.service.PrimitiveService;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
 
@@ -44,11 +41,6 @@ public class SessionIdGeneratorType implements PrimitiveType {
   @Override
   public String name() {
     return NAME;
-  }
-
-  @Override
-  public PrimitiveService newService(PartitionId partitionId, PartitionManagementService managementService) {
-    return new SessionIdGeneratorService(partitionId);
   }
 
   @Override

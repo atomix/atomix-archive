@@ -17,7 +17,6 @@ package io.atomix.core.impl;
 
 import java.util.Collection;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import io.atomix.cluster.ClusterMembershipService;
@@ -47,6 +46,9 @@ import io.atomix.primitive.partition.impl.DefaultPartitionGroupTypeRegistry;
 import io.atomix.primitive.protocol.PrimitiveProtocol;
 import io.atomix.primitive.protocol.impl.DefaultPrimitiveProtocolTypeRegistry;
 import io.atomix.primitive.serialization.SerializationService;
+import io.atomix.primitive.session.impl.DefaultSessionProtocolService;
+import io.atomix.primitive.session.impl.ReplicatedSessionIdService;
+import io.atomix.utils.concurrent.ThreadContextFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -58,45 +60,53 @@ import static com.google.common.base.Preconditions.checkNotNull;
 public class CorePrimitivesService implements ManagedPrimitivesService {
   private static final Logger LOGGER = LoggerFactory.getLogger(CorePrimitivesService.class);
 
-  private final PrimitiveManagementService managementService;
+  private final ClusterMembershipService membershipService;
+  private final ClusterCommunicationService communicationService;
+  private final ClusterEventService eventService;
+  private final SerializationService serializationService;
+  private final PartitionService partitionService;
+  private final PrimitiveCache primitiveCache;
+  private final ThreadContextFactory threadContextFactory;
   private final ManagedPrimitiveRegistry primitiveRegistry;
-  private final ManagedTransactionService transactionService;
   private final ConfigService configService;
-  private final PrimitiveCache cache;
   private final AtomixRegistry registry;
+  private PrimitiveManagementService managementService;
+  private ManagedTransactionService transactionService;
   private final AtomicBoolean started = new AtomicBoolean();
 
   public CorePrimitivesService(
-      ScheduledExecutorService executorService,
       ClusterMembershipService membershipService,
       ClusterCommunicationService communicationService,
       ClusterEventService eventService,
       SerializationService serializationService,
       PartitionService partitionService,
       PrimitiveCache primitiveCache,
+      ThreadContextFactory threadContextFactory,
       AtomixRegistry registry,
       ConfigService configService) {
-    this.cache = checkNotNull(primitiveCache);
+    this.membershipService = checkNotNull(membershipService);
+    this.communicationService = checkNotNull(communicationService);
+    this.eventService = checkNotNull(eventService);
+    this.serializationService = checkNotNull(serializationService);
+    this.partitionService = checkNotNull(partitionService);
+    this.primitiveCache = checkNotNull(primitiveCache);
+    this.threadContextFactory = checkNotNull(threadContextFactory);
     this.registry = checkNotNull(registry);
     this.primitiveRegistry = new CorePrimitiveRegistry(
         partitionService,
         membershipService,
         communicationService,
         new DefaultPrimitiveTypeRegistry(registry.getTypes(PrimitiveType.class)));
-    this.managementService = new CorePrimitiveManagementService(
-        executorService,
-        membershipService,
-        communicationService,
-        eventService,
-        serializationService,
-        partitionService,
-        primitiveCache,
-        primitiveRegistry,
-        new DefaultPrimitiveTypeRegistry(registry.getTypes(PrimitiveType.class)),
-        new DefaultPrimitiveProtocolTypeRegistry(registry.getTypes(PrimitiveProtocol.Type.class)),
-        new DefaultPartitionGroupTypeRegistry(registry.getTypes(PartitionGroup.Type.class)));
-    this.transactionService = new CoreTransactionService(managementService);
     this.configService = checkNotNull(configService);
+  }
+
+  /**
+   * Returns the primitive management service.
+   *
+   * @return the primitive management service
+   */
+  public PrimitiveManagementService getManagementService() {
+    return managementService;
   }
 
   /**
@@ -138,6 +148,23 @@ public class CorePrimitivesService implements ManagedPrimitivesService {
   public CompletableFuture<PrimitivesService> start() {
     return primitiveRegistry.start()
         .thenCompose(v -> transactionService.start())
+        .thenRun(() -> {
+          this.managementService = new CorePrimitiveManagementService(
+              membershipService,
+              communicationService,
+              eventService,
+              serializationService,
+              partitionService,
+              primitiveCache,
+              primitiveRegistry,
+              new DefaultPrimitiveTypeRegistry(registry.getTypes(PrimitiveType.class)),
+              new DefaultPrimitiveProtocolTypeRegistry(registry.getTypes(PrimitiveProtocol.Type.class)),
+              new DefaultPartitionGroupTypeRegistry(registry.getTypes(PartitionGroup.Type.class)),
+              new ReplicatedSessionIdService(partitionService.getSystemPartitionGroup()),
+              new DefaultSessionProtocolService(communicationService),
+              threadContextFactory);
+          this.transactionService = new CoreTransactionService(managementService);
+        })
         .thenRun(() -> {
           LOGGER.info("Started");
           started.set(true);

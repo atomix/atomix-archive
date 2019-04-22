@@ -16,10 +16,8 @@
 package io.atomix.core.map;
 
 import io.atomix.core.map.impl.DefaultAtomicMapBuilder;
-import io.atomix.core.map.impl.MapService;
 import io.atomix.primitive.PrimitiveManagementService;
 import io.atomix.primitive.PrimitiveType;
-import io.atomix.primitive.service.PrimitiveService;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
 
@@ -46,11 +44,6 @@ public class AtomicMapType<K, V> implements PrimitiveType<AtomicMapBuilder<K, V>
   @Override
   public String name() {
     return NAME;
-  }
-
-  @Override
-  public PrimitiveService newService() {
-    return new MapService();
   }
 
   @Override

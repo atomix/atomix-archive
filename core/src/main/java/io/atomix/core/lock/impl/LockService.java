@@ -27,6 +27,10 @@ import java.util.Queue;
 import java.util.stream.Collectors;
 
 import io.atomix.core.impl.Metadata;
+import io.atomix.primitive.partition.PartitionId;
+import io.atomix.primitive.partition.PartitionManagementService;
+import io.atomix.primitive.service.PrimitiveService;
+import io.atomix.primitive.service.ServiceType;
 import io.atomix.primitive.session.Session;
 import io.atomix.primitive.session.SessionId;
 import io.atomix.utils.concurrent.Scheduled;
@@ -37,9 +41,32 @@ import static com.google.common.base.MoreObjects.toStringHelper;
  * Lock service.
  */
 public class LockService extends AbstractLockService {
+  public static final Type TYPE = new Type();
+
+  /**
+   * Lock service type.
+   */
+  public static class Type implements ServiceType {
+    private static final String NAME = "lock";
+
+    @Override
+    public String name() {
+      return NAME;
+    }
+
+    @Override
+    public PrimitiveService newService(PartitionId partitionId, PartitionManagementService managementService) {
+      return new LockService(partitionId, managementService);
+    }
+  }
+
   LockHolder lock;
   Queue<LockHolder> queue = new ArrayDeque<>();
   final Map<Long, Scheduled> timers = new HashMap<>();
+
+  public LockService(PartitionId partitionId, PartitionManagementService managementService) {
+    super(partitionId, managementService);
+  }
 
   @Override
   public LockResponse lock(LockRequest request) {
@@ -76,7 +103,7 @@ public class LockService extends AbstractLockService {
           request.getId(),
           getCurrentIndex(),
           session.sessionId(),
-          getWallClock().getTime().unixTimestamp() + request.getTimeout());
+          getCurrentTimestamp() + request.getTimeout());
       queue.add(holder);
       timers.put(getCurrentIndex(), getScheduler().schedule(Duration.ofMillis(request.getTimeout()), () -> {
         // When the lock request timer expires, remove the request from the queue and publish a FAILED
@@ -180,7 +207,7 @@ public class LockService extends AbstractLockService {
   }
 
   @Override
-  public void snapshot(OutputStream output) throws IOException {
+  public void backup(OutputStream output) throws IOException {
     AtomicLockSnapshot.Builder builder = AtomicLockSnapshot.newBuilder();
     if (lock != null) {
       builder.setLock(LockCall.newBuilder()
@@ -204,7 +231,7 @@ public class LockService extends AbstractLockService {
   }
 
   @Override
-  public void install(InputStream input) throws IOException {
+  public void restore(InputStream input) throws IOException {
     AtomicLockSnapshot snapshot = AtomicLockSnapshot.parseFrom(input);
     if (snapshot.hasLock()) {
       lock = new LockHolder(
@@ -228,7 +255,7 @@ public class LockService extends AbstractLockService {
     timers.clear();
     for (LockHolder holder : queue) {
       if (holder.expire > 0) {
-        timers.put(holder.index, getScheduler().schedule(Duration.ofMillis(holder.expire - getWallClock().getTime().unixTimestamp()), () -> {
+        timers.put(holder.index, getScheduler().schedule(Duration.ofMillis(holder.expire - getCurrentTimestamp()), () -> {
           timers.remove(holder.index);
           queue.remove(holder);
           Session session = getSession(holder.session);

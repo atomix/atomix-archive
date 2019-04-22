@@ -15,14 +15,14 @@
  */
 package io.atomix.core.cache;
 
-import io.atomix.primitive.config.PrimitiveConfig;
+import io.atomix.primitive.config.ManagedPrimitiveConfig;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
 /**
  * Cached primitive configuration.
  */
-public abstract class CachedPrimitiveConfig<C extends CachedPrimitiveConfig<C>> extends PrimitiveConfig<C> {
+public abstract class CachedPrimitiveConfig<C extends CachedPrimitiveConfig<C>> extends ManagedPrimitiveConfig<C> {
   private CacheConfig cacheConfig = new CacheConfig();
 
   /**

@@ -15,19 +15,24 @@
  */
 package io.atomix.core.collection;
 
-import com.google.common.util.concurrent.MoreExecutors;
-import io.atomix.core.iterator.AsyncIterable;
-import io.atomix.primitive.AsyncPrimitive;
-
 import java.time.Duration;
 import java.util.Collection;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 
+import com.google.common.util.concurrent.MoreExecutors;
+import io.atomix.core.iterator.AsyncIterable;
+import io.atomix.primitive.AsyncPrimitive;
+import io.atomix.primitive.PrimitiveType;
+
 /**
  * Asynchronous distributed collection.
  */
 public interface AsyncDistributedCollection<E> extends AsyncPrimitive, AsyncIterable<E> {
+  @Override
+  default PrimitiveType type() {
+    return DistributedCollectionType.instance();
+  }
 
   /**
    * Adds the specified element to this collection if it is not already present (optional operation).

@@ -13,7 +13,7 @@ import com.google.protobuf.compiler.PluginProtos;
 import io.atomix.primitive.service.impl.PrimitiveServiceProto;
 
 /**
- * Primitive service compiler main.
+ * Primitive service generator main.
  */
 public class PrimitiveServiceGeneratorMain {
   public static void main(String[] args) throws IOException, Descriptors.DescriptorValidationException {
@@ -34,7 +34,7 @@ public class PrimitiveServiceGeneratorMain {
 
     PrimitiveServiceGenerator compiler = new PrimitiveServiceGenerator();
     PluginProtos.CodeGeneratorRequest request = PluginProtos.CodeGeneratorRequest.parseFrom(is, registryLite);
-    PluginProtos.CodeGeneratorResponse response = compiler.compile(request);
+    PluginProtos.CodeGeneratorResponse response = compiler.generate(request);
 
     response.writeTo(System.out);
   }

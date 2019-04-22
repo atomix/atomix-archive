@@ -15,18 +15,23 @@
  */
 package io.atomix.core.lock;
 
-import io.atomix.primitive.AsyncPrimitive;
-import io.atomix.primitive.DistributedPrimitive;
-import io.atomix.utils.time.Version;
-
 import java.time.Duration;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+
+import io.atomix.primitive.AsyncPrimitive;
+import io.atomix.primitive.DistributedPrimitive;
+import io.atomix.primitive.PrimitiveType;
+import io.atomix.utils.time.Version;
 
 /**
  * Asynchronous lock primitive.
  */
 public interface AsyncAtomicLock extends AsyncPrimitive {
+  @Override
+  default PrimitiveType type() {
+    return AtomicLockType.instance();
+  }
 
   /**
    * Acquires the lock, blocking until it's available.

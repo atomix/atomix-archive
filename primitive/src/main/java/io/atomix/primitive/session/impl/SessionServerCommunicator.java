@@ -2,6 +2,7 @@ package io.atomix.primitive.session.impl;
 
 import io.atomix.cluster.MemberId;
 import io.atomix.cluster.messaging.ClusterCommunicationService;
+import io.atomix.primitive.partition.PartitionId;
 import io.atomix.primitive.session.SessionServerProtocol;
 
 /**
@@ -11,9 +12,9 @@ public class SessionServerCommunicator implements SessionServerProtocol {
   private final ClusterCommunicationService communicationService;
   private final PrimitiveMessageContext context;
 
-  public SessionServerCommunicator(ClusterCommunicationService communicationService, PrimitiveMessageContext context) {
+  public SessionServerCommunicator(ClusterCommunicationService communicationService, PartitionId partitionId) {
     this.communicationService = communicationService;
-    this.context = context;
+    this.context = new PrimitiveMessageContext(partitionId);
   }
 
   @Override

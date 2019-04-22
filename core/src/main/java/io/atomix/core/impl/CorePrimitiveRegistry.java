@@ -18,7 +18,6 @@ package io.atomix.core.impl;
 import java.util.Collection;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -43,15 +42,14 @@ import io.atomix.primitive.partition.PartitionGroupTypeRegistry;
 import io.atomix.primitive.partition.PartitionService;
 import io.atomix.primitive.protocol.PrimitiveProtocolTypeRegistry;
 import io.atomix.primitive.serialization.SerializationService;
-import io.atomix.utils.serializer.Namespaces;
-import io.atomix.utils.serializer.Serializer;
+import io.atomix.primitive.session.SessionIdService;
+import io.atomix.primitive.session.SessionProtocolService;
+import io.atomix.utils.concurrent.ThreadContextFactory;
 
 /**
  * Core primitive registry.
  */
 public class CorePrimitiveRegistry implements ManagedPrimitiveRegistry {
-  private static final Serializer SERIALIZER = Serializer.using(Namespaces.BASIC);
-
   private final PartitionService partitionService;
   private final ClusterMembershipService membershipService;
   private final ClusterCommunicationService communicationService;
@@ -150,11 +148,6 @@ public class CorePrimitiveRegistry implements ManagedPrimitiveRegistry {
 
   private class PartialPrimitiveManagementService implements PrimitiveManagementService {
     @Override
-    public ScheduledExecutorService getExecutorService() {
-      throw new UnsupportedOperationException();
-    }
-
-    @Override
     public ClusterMembershipService getMembershipService() {
       return membershipService;
     }
@@ -201,6 +194,21 @@ public class CorePrimitiveRegistry implements ManagedPrimitiveRegistry {
 
     @Override
     public PartitionGroupTypeRegistry getPartitionGroupTypeRegistry() {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public SessionIdService getSessionIdService() {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public SessionProtocolService getSessionProtocolService() {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public ThreadContextFactory getThreadFactory() {
       throw new UnsupportedOperationException();
     }
   }

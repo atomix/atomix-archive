@@ -15,12 +15,17 @@
  */
 package io.atomix.core.counter;
 
+import io.atomix.primitive.PrimitiveType;
 import io.atomix.primitive.SyncPrimitive;
 
 /**
  * Distributed version of java.util.concurrent.atomic.AtomicLong.
  */
 public interface AtomicCounter extends SyncPrimitive {
+  @Override
+  default PrimitiveType type() {
+    return AtomicCounterType.instance();
+  }
 
   /**
    * Atomically increment by one and return the updated value.

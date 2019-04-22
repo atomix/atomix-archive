@@ -9,11 +9,11 @@ import java.util.concurrent.CompletableFuture;
 
 import com.google.protobuf.ByteString;
 import io.atomix.primitive.PrimitiveException;
-import io.atomix.primitive.PrimitiveType;
 import io.atomix.primitive.partition.PartitionId;
 import io.atomix.primitive.partition.PartitionManagementService;
 import io.atomix.primitive.service.Command;
 import io.atomix.primitive.service.Query;
+import io.atomix.primitive.service.ServiceType;
 import io.atomix.primitive.service.StateMachine;
 import io.atomix.primitive.util.ByteArrayDecoder;
 import io.atomix.utils.concurrent.Futures;
@@ -59,9 +59,9 @@ public class ServiceManagerStateMachine implements StateMachine {
   }
 
   private ServiceStateMachine newService(String name, String type) {
-    PrimitiveType primitiveType = managementService.getPrimitiveTypes().getPrimitiveType(type);
+    ServiceType serviceType = managementService.getServiceTypes().getServiceType(type);
     ServiceStateMachine service = new ServiceStateMachine(
-        name, type, primitiveType.newService(partitionId, managementService));
+        name, type, serviceType.newService(partitionId, managementService));
     service.init(context);
     return service;
   }

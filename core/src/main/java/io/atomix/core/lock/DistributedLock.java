@@ -15,16 +15,21 @@
  */
 package io.atomix.core.lock;
 
-import io.atomix.primitive.SyncPrimitive;
-
 import java.time.Duration;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
+
+import io.atomix.primitive.PrimitiveType;
+import io.atomix.primitive.SyncPrimitive;
 
 /**
  * Distributed lock primitive.
  */
 public interface DistributedLock extends SyncPrimitive, Lock {
+  @Override
+  default PrimitiveType type() {
+    return DistributedLockType.instance();
+  }
 
   @Override
   default boolean tryLock(long time, TimeUnit unit) throws InterruptedException {

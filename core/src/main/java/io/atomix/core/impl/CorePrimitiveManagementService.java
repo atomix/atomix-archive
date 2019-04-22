@@ -26,14 +26,14 @@ import io.atomix.primitive.partition.PartitionGroupTypeRegistry;
 import io.atomix.primitive.partition.PartitionService;
 import io.atomix.primitive.protocol.PrimitiveProtocolTypeRegistry;
 import io.atomix.primitive.serialization.SerializationService;
-
-import java.util.concurrent.ScheduledExecutorService;
+import io.atomix.primitive.session.SessionIdService;
+import io.atomix.primitive.session.SessionProtocolService;
+import io.atomix.utils.concurrent.ThreadContextFactory;
 
 /**
  * Default primitive management service.
  */
 public class CorePrimitiveManagementService implements PrimitiveManagementService {
-  private final ScheduledExecutorService executorService;
   private final ClusterMembershipService membershipService;
   private final ClusterCommunicationService communicationService;
   private final ClusterEventService eventService;
@@ -44,9 +44,11 @@ public class CorePrimitiveManagementService implements PrimitiveManagementServic
   private final PrimitiveTypeRegistry primitiveTypeRegistry;
   private final PrimitiveProtocolTypeRegistry protocolTypeRegistry;
   private final PartitionGroupTypeRegistry partitionGroupTypeRegistry;
+  private final SessionIdService sessionIdService;
+  private final SessionProtocolService sessionProtocolService;
+  private final ThreadContextFactory threadFactory;
 
   public CorePrimitiveManagementService(
-      ScheduledExecutorService executorService,
       ClusterMembershipService membershipService,
       ClusterCommunicationService communicationService,
       ClusterEventService eventService,
@@ -56,8 +58,10 @@ public class CorePrimitiveManagementService implements PrimitiveManagementServic
       PrimitiveRegistry primitiveRegistry,
       PrimitiveTypeRegistry primitiveTypeRegistry,
       PrimitiveProtocolTypeRegistry protocolTypeRegistry,
-      PartitionGroupTypeRegistry partitionGroupTypeRegistry) {
-    this.executorService = executorService;
+      PartitionGroupTypeRegistry partitionGroupTypeRegistry,
+      SessionIdService sessionIdService,
+      SessionProtocolService sessionProtocolService,
+      ThreadContextFactory threadFactory) {
     this.membershipService = membershipService;
     this.communicationService = communicationService;
     this.eventService = eventService;
@@ -68,11 +72,9 @@ public class CorePrimitiveManagementService implements PrimitiveManagementServic
     this.primitiveTypeRegistry = primitiveTypeRegistry;
     this.protocolTypeRegistry = protocolTypeRegistry;
     this.partitionGroupTypeRegistry = partitionGroupTypeRegistry;
-  }
-
-  @Override
-  public ScheduledExecutorService getExecutorService() {
-    return executorService;
+    this.sessionIdService = sessionIdService;
+    this.sessionProtocolService = sessionProtocolService;
+    this.threadFactory = threadFactory;
   }
 
   @Override
@@ -123,5 +125,20 @@ public class CorePrimitiveManagementService implements PrimitiveManagementServic
   @Override
   public PartitionGroupTypeRegistry getPartitionGroupTypeRegistry() {
     return partitionGroupTypeRegistry;
+  }
+
+  @Override
+  public SessionIdService getSessionIdService() {
+    return sessionIdService;
+  }
+
+  @Override
+  public SessionProtocolService getSessionProtocolService() {
+    return sessionProtocolService;
+  }
+
+  @Override
+  public ThreadContextFactory getThreadFactory() {
+    return threadFactory;
   }
 }

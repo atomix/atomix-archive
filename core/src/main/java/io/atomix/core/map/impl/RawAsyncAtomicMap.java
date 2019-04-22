@@ -18,8 +18,9 @@ import io.atomix.core.map.AtomicMapEventListener;
 import io.atomix.core.set.AsyncDistributedSet;
 import io.atomix.core.transaction.TransactionId;
 import io.atomix.core.transaction.TransactionLog;
-import io.atomix.primitive.impl.ManagedAsyncPrimitive;
 import io.atomix.primitive.PrimitiveException;
+import io.atomix.primitive.PrimitiveManagementService;
+import io.atomix.primitive.impl.ManagedAsyncPrimitive;
 import io.atomix.utils.concurrent.Futures;
 import io.atomix.utils.time.Versioned;
 
@@ -29,20 +30,20 @@ import io.atomix.utils.time.Versioned;
 public class RawAsyncAtomicMap extends ManagedAsyncPrimitive<MapProxy> implements AsyncAtomicMap<String, byte[]> {
   private final Map<AtomicMapEventListener<String, byte[]>, Executor> eventListeners = new ConcurrentHashMap<>();
 
-  public RawAsyncAtomicMap(MapProxy proxy) {
-    super(proxy);
-    proxy.onEvent(this::onEvent);
+  public RawAsyncAtomicMap(MapProxy proxy, Duration timeout, PrimitiveManagementService managementService) {
+    super(proxy, timeout, managementService);
+    event((p, s) -> p.onEvent(s, listener(this::onEvent)));
   }
 
   @Override
   public CompletableFuture<Integer> size() {
-    return getProxy().size(SizeRequest.newBuilder().build())
+    return query((proxy, session) -> proxy.size(session, SizeRequest.newBuilder().build()))
         .thenApply(response -> response.getSize());
   }
 
   @Override
   public CompletableFuture<Boolean> containsKey(String key) {
-    return getProxy().containsKey(ContainsKeyRequest.newBuilder().addKeys(key).build())
+    return query((proxy, session) -> proxy.containsKey(session, ContainsKeyRequest.newBuilder().addKeys(key).build()))
         .thenApply(response -> response.getContainsKey());
   }
 
@@ -53,7 +54,7 @@ public class RawAsyncAtomicMap extends ManagedAsyncPrimitive<MapProxy> implement
 
   @Override
   public CompletableFuture<Versioned<byte[]>> get(String key) {
-    return getProxy().get(GetRequest.newBuilder().setKey(key).build())
+    return query((proxy, session) -> proxy.get(session, GetRequest.newBuilder().setKey(key).build()))
         .thenApply(response -> {
           if (!response.getValue().isEmpty()) {
             return new Versioned<>(response.getValue().toByteArray(), response.getVersion());
@@ -78,11 +79,11 @@ public class RawAsyncAtomicMap extends ManagedAsyncPrimitive<MapProxy> implement
 
   @Override
   public CompletableFuture<Versioned<byte[]>> put(String key, byte[] value, Duration ttl) {
-    return getProxy().put(PutRequest.newBuilder()
+    return command((proxy, session) -> proxy.put(session, PutRequest.newBuilder()
         .setKey(key)
         .setValue(ByteString.copyFrom(value))
         .setTtl(ttl.toMillis())
-        .build())
+        .build()))
         .thenApply(response -> {
           if (response.getStatus() == UpdateStatus.WRITE_LOCK) {
             throw new PrimitiveException.ConcurrentModification();
@@ -96,7 +97,7 @@ public class RawAsyncAtomicMap extends ManagedAsyncPrimitive<MapProxy> implement
 
   @Override
   public CompletableFuture<Versioned<byte[]>> remove(String key) {
-    return getProxy().remove(RemoveRequest.newBuilder().setKey(key).build())
+    return command((proxy, session) -> proxy.remove(session, RemoveRequest.newBuilder().setKey(key).build()))
         .thenApply(response -> {
           if (response.getStatus() == UpdateStatus.WRITE_LOCK) {
             throw new PrimitiveException.ConcurrentModification();
@@ -110,7 +111,7 @@ public class RawAsyncAtomicMap extends ManagedAsyncPrimitive<MapProxy> implement
 
   @Override
   public CompletableFuture<Void> clear() {
-    return getProxy().clear(ClearRequest.newBuilder().build())
+    return command((proxy, session) -> proxy.clear(session, ClearRequest.newBuilder().build()))
         .thenApply(response -> null);
   }
 
@@ -139,7 +140,7 @@ public class RawAsyncAtomicMap extends ManagedAsyncPrimitive<MapProxy> implement
 
   @Override
   public CompletableFuture<Boolean> remove(String key, byte[] value) {
-    return getProxy().remove(RemoveRequest.newBuilder().setKey(key).setValue(ByteString.copyFrom(value)).build())
+    return command((proxy, session) -> proxy.remove(session, RemoveRequest.newBuilder().setKey(key).setValue(ByteString.copyFrom(value)).build()))
         .thenApply(response -> {
           if (response.getStatus() == UpdateStatus.WRITE_LOCK) {
             throw new PrimitiveException.ConcurrentModification();
@@ -150,7 +151,7 @@ public class RawAsyncAtomicMap extends ManagedAsyncPrimitive<MapProxy> implement
 
   @Override
   public CompletableFuture<Boolean> remove(String key, long version) {
-    return getProxy().remove(RemoveRequest.newBuilder().setKey(key).setVersion(version).build())
+    return command((proxy, session) -> proxy.remove(session, RemoveRequest.newBuilder().setKey(key).setVersion(version).build()))
         .thenApply(response -> {
           if (response.getStatus() == UpdateStatus.WRITE_LOCK) {
             throw new PrimitiveException.ConcurrentModification();
@@ -161,10 +162,10 @@ public class RawAsyncAtomicMap extends ManagedAsyncPrimitive<MapProxy> implement
 
   @Override
   public CompletableFuture<Versioned<byte[]>> replace(String key, byte[] value) {
-    return getProxy().replace(ReplaceRequest.newBuilder()
+    return command((proxy, session) -> proxy.replace(session, ReplaceRequest.newBuilder()
         .setKey(key)
         .setNewValue(ByteString.copyFrom(value))
-        .build())
+        .build()))
         .thenApply(response -> {
           if (response.getStatus() == UpdateStatus.WRITE_LOCK) {
             throw new PrimitiveException.ConcurrentModification();
@@ -177,11 +178,11 @@ public class RawAsyncAtomicMap extends ManagedAsyncPrimitive<MapProxy> implement
 
   @Override
   public CompletableFuture<Boolean> replace(String key, byte[] oldValue, byte[] newValue) {
-    return getProxy().replace(ReplaceRequest.newBuilder()
+    return command((proxy, session) -> proxy.replace(session, ReplaceRequest.newBuilder()
         .setKey(key)
         .setPreviousValue(ByteString.copyFrom(oldValue))
         .setNewValue(ByteString.copyFrom(newValue))
-        .build())
+        .build()))
         .thenApply(response -> {
           if (response.getStatus() == UpdateStatus.WRITE_LOCK) {
             throw new PrimitiveException.ConcurrentModification();
@@ -192,11 +193,11 @@ public class RawAsyncAtomicMap extends ManagedAsyncPrimitive<MapProxy> implement
 
   @Override
   public CompletableFuture<Boolean> replace(String key, long oldVersion, byte[] newValue) {
-    return getProxy().replace(ReplaceRequest.newBuilder()
+    return command((proxy, session) -> proxy.replace(session, ReplaceRequest.newBuilder()
         .setKey(key)
         .setPreviousVersion(oldVersion)
         .setNewValue(ByteString.copyFrom(newValue))
-        .build())
+        .build()))
         .thenApply(response -> {
           if (response.getStatus() == UpdateStatus.WRITE_LOCK) {
             throw new PrimitiveException.ConcurrentModification();
@@ -209,7 +210,7 @@ public class RawAsyncAtomicMap extends ManagedAsyncPrimitive<MapProxy> implement
   public synchronized CompletableFuture<Void> addListener(AtomicMapEventListener<String, byte[]> listener, Executor executor) {
     if (eventListeners.isEmpty()) {
       eventListeners.put(listener, executor);
-      return getProxy().listen(ListenRequest.newBuilder().build())
+      return command((proxy, session) -> proxy.listen(session, ListenRequest.newBuilder().build()))
           .thenApply(response -> null);
     } else {
       eventListeners.put(listener, executor);
@@ -221,7 +222,7 @@ public class RawAsyncAtomicMap extends ManagedAsyncPrimitive<MapProxy> implement
   public synchronized CompletableFuture<Void> removeListener(AtomicMapEventListener<String, byte[]> listener) {
     eventListeners.remove(listener);
     if (eventListeners.isEmpty()) {
-      return getProxy().unlisten(UnlistenRequest.newBuilder().build())
+      return command((proxy, session) -> proxy.unlisten(session, UnlistenRequest.newBuilder().build()))
           .thenApply(response -> null);
     } else {
       return CompletableFuture.completedFuture(null);
@@ -230,7 +231,7 @@ public class RawAsyncAtomicMap extends ManagedAsyncPrimitive<MapProxy> implement
 
   @Override
   public CompletableFuture<Boolean> prepare(TransactionLog<MapUpdate<String, byte[]>> transactionLog) {
-    return getProxy().prepare(PrepareRequest.newBuilder()
+    return command((proxy, session) -> proxy.prepare(session, PrepareRequest.newBuilder()
         .setTransactionId(transactionLog.transactionId().id())
         .setTransaction(AtomicMapTransaction.newBuilder()
             .setVersion(transactionLog.version())
@@ -243,23 +244,23 @@ public class RawAsyncAtomicMap extends ManagedAsyncPrimitive<MapProxy> implement
                     .build())
                 .collect(Collectors.toList()))
             .build())
-        .build())
+        .build()))
         .thenApply(response -> response.getStatus() == PrepareResponse.Status.OK);
   }
 
   @Override
   public CompletableFuture<Void> commit(TransactionId transactionId) {
-    return getProxy().commit(CommitRequest.newBuilder()
+    return command((proxy, session) -> proxy.commit(session, CommitRequest.newBuilder()
         .setTransactionId(transactionId.id())
-        .build())
+        .build()))
         .thenApply(response -> null);
   }
 
   @Override
   public CompletableFuture<Void> rollback(TransactionId transactionId) {
-    return getProxy().rollback(RollbackRequest.newBuilder()
+    return command((proxy, session) -> proxy.rollback(session, RollbackRequest.newBuilder()
         .setTransactionId(transactionId.id())
-        .build())
+        .build()))
         .thenApply(response -> null);
   }
 

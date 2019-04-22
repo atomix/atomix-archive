@@ -6,13 +6,13 @@ option java_package = "io.atomix.primitive.operation";
 option java_outer_classname = "OperationProto";
 option java_multiple_files = true;
 
-enum OperationType {
+enum OperationTypeInfo {
     COMMAND = 0;
     QUERY = 1;
 }
 
 message OperationMetadata {
-    OperationType type = 1;
+    OperationTypeInfo type = 1;
     string name = 2;
 }
 

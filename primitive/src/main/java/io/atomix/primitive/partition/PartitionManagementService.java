@@ -17,8 +17,7 @@ package io.atomix.primitive.partition;
 
 import io.atomix.cluster.ClusterMembershipService;
 import io.atomix.cluster.messaging.ClusterCommunicationService;
-import io.atomix.primitive.PrimitiveTypeRegistry;
-import io.atomix.primitive.session.SessionIdService;
+import io.atomix.primitive.service.ServiceTypeRegistry;
 import io.atomix.primitive.session.SessionProtocolService;
 
 /**
@@ -41,11 +40,11 @@ public interface PartitionManagementService {
   ClusterCommunicationService getMessagingService();
 
   /**
-   * Returns the primitive type registry.
+   * Returns the service type registry.
    *
-   * @return the primitive type registry
+   * @return the service type registry
    */
-  PrimitiveTypeRegistry getPrimitiveTypes();
+  ServiceTypeRegistry getServiceTypes();
 
   /**
    * Returns the primary election service.
@@ -53,13 +52,6 @@ public interface PartitionManagementService {
    * @return the primary election service
    */
   PrimaryElectionService getElectionService();
-
-  /**
-   * Returns the session ID generator service.
-   *
-   * @return the session ID generator service
-   */
-  SessionIdService getSessionIdService();
 
   /**
    * Returns the session protocol service.

@@ -11,16 +11,15 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 
 import com.google.protobuf.ByteString;
-import io.atomix.primitive.util.ByteArrayDecoder;
 import io.atomix.primitive.operation.OperationId;
 import io.atomix.primitive.operation.OperationType;
 import io.atomix.primitive.operation.impl.DefaultOperationId;
-import io.atomix.primitive.partition.PartitionId;
 import io.atomix.primitive.service.impl.CommandRequest;
 import io.atomix.primitive.service.impl.CommandResponse;
 import io.atomix.primitive.service.impl.DefaultServiceExecutor;
 import io.atomix.primitive.service.impl.QueryRequest;
 import io.atomix.primitive.service.impl.QueryResponse;
+import io.atomix.primitive.util.ByteArrayDecoder;
 import io.atomix.utils.concurrent.Scheduler;
 import org.slf4j.Logger;
 
@@ -31,9 +30,6 @@ public abstract class SimplePrimitiveService implements PrimitiveService {
   private Context context;
   private ServiceExecutor executor;
   private final Map<Long, List<Runnable>> indexQueries = new HashMap<>();
-
-  protected SimplePrimitiveService(PartitionId partitionId) {
-  }
 
   @Override
   public void init(Context context) {

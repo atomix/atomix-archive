@@ -18,7 +18,7 @@ package ${eventsClass.packageName};
 import io.atomix.primitive.event.EventType;
 
 /**
- * Atomix generated operations ${operationsClass.className}.
+ * Atomix generated events ${eventsClass.className}.
  */
 public enum ${eventsClass.className} implements EventType {
 

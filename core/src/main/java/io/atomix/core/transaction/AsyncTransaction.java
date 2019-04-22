@@ -15,17 +15,22 @@
  */
 package io.atomix.core.transaction;
 
-import io.atomix.primitive.AsyncPrimitive;
-import io.atomix.primitive.DistributedPrimitive;
-import io.atomix.primitive.protocol.ProxyProtocol;
-
 import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
+
+import io.atomix.primitive.AsyncPrimitive;
+import io.atomix.primitive.DistributedPrimitive;
+import io.atomix.primitive.PrimitiveType;
+import io.atomix.primitive.protocol.ProxyProtocol;
 
 /**
  * Asynchronous transaction.
  */
 public interface AsyncTransaction extends AsyncPrimitive {
+  @Override
+  default PrimitiveType type() {
+    return TransactionType.instance();
+  }
 
   /**
    * Returns the transaction identifier.

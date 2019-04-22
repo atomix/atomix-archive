@@ -15,7 +15,6 @@
  */
 package io.atomix.core.test.partition;
 
-import java.time.Duration;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.stream.Collectors;
@@ -23,13 +22,10 @@ import java.util.stream.Collectors;
 import io.atomix.cluster.MemberId;
 import io.atomix.core.test.protocol.TestPartitionClient;
 import io.atomix.core.test.protocol.TestStateMachineContext;
-import io.atomix.primitive.PrimitiveManagementService;
-import io.atomix.primitive.PrimitiveType;
 import io.atomix.primitive.partition.Partition;
+import io.atomix.primitive.partition.PartitionClient;
 import io.atomix.primitive.partition.PartitionId;
-import io.atomix.primitive.service.StateMachine;
-import io.atomix.primitive.session.SessionClient;
-import io.atomix.primitive.session.impl.PrimitiveSessionClient;
+import io.atomix.primitive.service.impl.ServiceManagerStateMachine;
 import io.atomix.utils.concurrent.ThreadContextFactory;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
@@ -40,12 +36,22 @@ import static com.google.common.base.MoreObjects.toStringHelper;
 public class TestPartition implements Partition {
   private final PartitionId partitionId;
   private final ThreadContextFactory threadContextFactory;
+  private final PartitionClient client;
 
   public TestPartition(
       PartitionId partitionId,
       ThreadContextFactory threadContextFactory) {
     this.partitionId = partitionId;
     this.threadContextFactory = threadContextFactory;
+    ServiceManagerStateMachine stateMachine = new ServiceManagerStateMachine(
+        PartitionId.newBuilder()
+            .setGroup("test")
+            .setPartition(1)
+            .build(),
+        null);
+    TestStateMachineContext context = new TestStateMachineContext();
+    stateMachine.init(context);
+    this.client = new TestPartitionClient(stateMachine, context);
   }
 
   @Override
@@ -79,30 +85,9 @@ public class TestPartition implements Partition {
     return Collections.emptyList();
   }
 
-  /**
-   * Creates a new primitive client.
-   *
-   * @param name              the primitive name
-   * @param type              the primitive type
-   * @param managementService the partition management service
-   * @param stateMachine      the test state machine
-   * @param context           the test state machine context
-   * @return the primitive client
-   */
-  public SessionClient newClient(
-      String name,
-      PrimitiveType type,
-      PrimitiveManagementService managementService,
-      StateMachine stateMachine,
-      TestStateMachineContext context) {
-    return new PrimitiveSessionClient(
-        name,
-        type,
-        Duration.ofSeconds(5),
-        new TestPartitionClient(stateMachine, context),
-        managementService.getMembershipService(),
-        managementService.getCommunicationService(),
-        threadContextFactory.createContext());
+  @Override
+  public PartitionClient getClient() {
+    return client;
   }
 
   @Override

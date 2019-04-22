@@ -11,6 +11,10 @@ import java.util.stream.Collectors;
 
 import com.google.protobuf.ByteString;
 import io.atomix.core.impl.Metadata;
+import io.atomix.primitive.partition.PartitionId;
+import io.atomix.primitive.partition.PartitionManagementService;
+import io.atomix.primitive.service.PrimitiveService;
+import io.atomix.primitive.service.ServiceType;
 import io.atomix.primitive.session.Session;
 import io.atomix.primitive.session.SessionId;
 
@@ -18,9 +22,32 @@ import io.atomix.primitive.session.SessionId;
  * Value service.
  */
 public class ValueService extends AbstractValueService {
+  public static final Type TYPE = new Type();
+
+  /**
+   * Value service type.
+   */
+  public static class Type implements ServiceType {
+    private static final String NAME = "value";
+
+    @Override
+    public String name() {
+      return NAME;
+    }
+
+    @Override
+    public PrimitiveService newService(PartitionId partitionId, PartitionManagementService managementService) {
+      return new ValueService(partitionId, managementService);
+    }
+  }
+
   private AtomicLong version = new AtomicLong();
   private byte[] value = new byte[0];
   private Set<SessionId> listeners = new LinkedHashSet<>();
+
+  public ValueService(PartitionId partitionId, PartitionManagementService managementService) {
+    super(partitionId, managementService);
+  }
 
   @Override
   public SetResponse set(SetRequest request) {
@@ -180,7 +207,7 @@ public class ValueService extends AbstractValueService {
   }
 
   @Override
-  public void snapshot(OutputStream output) throws IOException {
+  public void backup(OutputStream output) throws IOException {
     AtomicValueSnapshot.newBuilder()
         .setValue(ByteString.copyFrom(value))
         .setVersion(version.get())
@@ -190,7 +217,7 @@ public class ValueService extends AbstractValueService {
   }
 
   @Override
-  public void install(InputStream input) throws IOException {
+  public void restore(InputStream input) throws IOException {
     AtomicValueSnapshot snapshot = AtomicValueSnapshot.parseFrom(input);
     value = snapshot.getValue().toByteArray();
     version.set(snapshot.getVersion());

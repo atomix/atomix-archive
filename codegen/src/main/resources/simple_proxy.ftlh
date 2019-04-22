@@ -38,12 +38,8 @@ import ${operation.responseClass.packageName}.${operation.responseClass.classNam
  * Atomix generated proxy ${proxyClass.className}.
  */
 public class ${proxyClass.className} extends SimplePrimitiveProxy {
-    public ${proxyClass.className}(
-            ServiceId serviceId,
-            PartitionId partitionId,
-            PrimitiveManagementService managementService,
-            ThreadContext threadContext) {
-        super(serviceId, partitionId, managementService, threadContext);
+    public ${proxyClass.className}(Context context) {
+        super(context);
     }
 
     <#list operations as operation>

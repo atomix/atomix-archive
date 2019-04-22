@@ -15,16 +15,22 @@
  */
 package io.atomix.core.collection;
 
+import java.util.Collection;
+
 import io.atomix.core.iterator.SyncIterable;
 import io.atomix.core.iterator.SyncIterator;
+import io.atomix.primitive.PrimitiveType;
 import io.atomix.primitive.SyncPrimitive;
-
-import java.util.Collection;
 
 /**
  * Distributed collection.
  */
 public interface DistributedCollection<E> extends SyncPrimitive, SyncIterable<E>, Collection<E> {
+  @Override
+  default PrimitiveType type() {
+    return DistributedCollectionType.instance();
+  }
+
   @Override
   SyncIterator<E> iterator();
 

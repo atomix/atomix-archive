@@ -18,15 +18,13 @@ package io.atomix.core.idgenerator.impl;
 import java.util.concurrent.CompletableFuture;
 
 import io.atomix.core.counter.impl.CounterProxy;
+import io.atomix.core.counter.impl.CounterService;
 import io.atomix.core.counter.impl.DefaultAsyncAtomicCounter;
 import io.atomix.core.idgenerator.AsyncAtomicIdGenerator;
 import io.atomix.core.idgenerator.AtomicIdGenerator;
 import io.atomix.core.idgenerator.AtomicIdGeneratorBuilder;
 import io.atomix.core.idgenerator.AtomicIdGeneratorConfig;
 import io.atomix.primitive.PrimitiveManagementService;
-import io.atomix.primitive.partition.Partition;
-import io.atomix.primitive.protocol.PrimitiveProtocol;
-import io.atomix.primitive.protocol.ProxyProtocol;
 
 /**
  * Default implementation of AtomicIdGeneratorBuilder.
@@ -38,15 +36,8 @@ public class DelegatingAtomicIdGeneratorBuilder extends AtomicIdGeneratorBuilder
 
   @Override
   public CompletableFuture<AtomicIdGenerator> buildAsync() {
-    PrimitiveProtocol protocol = protocol();
     return managementService.getPrimitiveRegistry().createPrimitive(name, type)
-        .thenCompose(v -> {
-          Partition partition = managementService.getPartitionService()
-              .getPartitionGroup((ProxyProtocol) protocol)
-              .getPartition(name);
-          return ((ProxyProtocol) protocol).newClient(name, type, partition, managementService).connect();
-        })
-        .thenApply(CounterProxy::new)
+        .thenApply(v -> newSingletonProxy(CounterService.TYPE, CounterProxy::new))
         .thenApply(DefaultAsyncAtomicCounter::new)
         .thenApply(DelegatingAtomicIdGenerator::new)
         .thenApply(AsyncAtomicIdGenerator::sync);

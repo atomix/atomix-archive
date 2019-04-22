@@ -15,15 +15,15 @@
  */
 package io.atomix.core.value;
 
-import io.atomix.primitive.config.PrimitiveConfig;
-
 import java.util.ArrayList;
 import java.util.List;
+
+import io.atomix.primitive.config.ManagedPrimitiveConfig;
 
 /**
  * Value primitive configuration.
  */
-public abstract class ValueConfig<C extends ValueConfig<C>> extends PrimitiveConfig<C> {
+public abstract class ValueConfig<C extends ValueConfig<C>> extends ManagedPrimitiveConfig<C> {
   private Class<?> valueType;
   private List<Class<?>> extraTypes = new ArrayList<>();
   private boolean registrationRequired = false;

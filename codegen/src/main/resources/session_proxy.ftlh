@@ -52,12 +52,8 @@ import ${event.valueClass.packageName}.${operation.valueClass.className}
  * Atomix generated proxy ${proxyClass.className}.
  */
 public class ${proxyClass.className} extends SessionEnabledPrimitiveProxy {
-    public ${proxyClass.className}(
-            io.atomix.primitive.service.impl.ServiceId serviceId,
-            io.atomix.primitive.partition.PartitionId partitionId,
-            io.atomix.primitive.PrimitiveManagementService managementService,
-            io.atomix.utils.concurrent.ThreadContext threadContext) {
-        super(serviceId, partitionId, managementService, threadContext);
+    public ${proxyClass.className}(Context context) {
+        super(context);
     }
 
     <#list operations as operation>

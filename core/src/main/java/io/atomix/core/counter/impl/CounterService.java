@@ -21,11 +21,34 @@ import java.io.OutputStream;
 import java.util.concurrent.atomic.AtomicLong;
 
 import io.atomix.core.impl.Metadata;
+import io.atomix.primitive.partition.PartitionId;
+import io.atomix.primitive.partition.PartitionManagementService;
+import io.atomix.primitive.service.PrimitiveService;
+import io.atomix.primitive.service.ServiceType;
 
 /**
  * Counter service.
  */
 public class CounterService extends AbstractCounterService {
+  public static final Type TYPE = new Type();
+
+  /**
+   * Counter service type.
+   */
+  public static class Type implements ServiceType {
+    private static final String NAME = "counter";
+
+    @Override
+    public String name() {
+      return NAME;
+    }
+
+    @Override
+    public PrimitiveService newService(PartitionId partitionId, PartitionManagementService managementService) {
+      return new CounterService();
+    }
+  }
+
   private final AtomicLong counter = new AtomicLong();
 
   @Override
@@ -93,7 +116,7 @@ public class CounterService extends AbstractCounterService {
   }
 
   @Override
-  public void snapshot(OutputStream output) throws IOException {
+  public void backup(OutputStream output) throws IOException {
     AtomicCounterSnapshot.newBuilder()
         .setCounter(counter.get())
         .build()
@@ -101,7 +124,7 @@ public class CounterService extends AbstractCounterService {
   }
 
   @Override
-  public void install(InputStream input) throws IOException {
+  public void restore(InputStream input) throws IOException {
     AtomicCounterSnapshot snapshot = AtomicCounterSnapshot.parseFrom(input);
     counter.set(snapshot.getCounter());
   }
