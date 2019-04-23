@@ -15,29 +15,16 @@
  */
 package io.atomix.primitive.partition.impl;
 
-import io.atomix.primitive.operation.OperationId;
-import io.atomix.primitive.operation.OperationType;
+import io.atomix.primitive.operation.CommandId;
+import io.atomix.primitive.operation.QueryId;
 
 /**
  * Primary elector operations.
  */
-public enum PrimaryElectorOperations implements OperationId {
-  ENTER(OperationType.COMMAND),
-  GET_TERM(OperationType.QUERY);
+public final class PrimaryElectorOperations {
+  public static final CommandId<EnterRequest, EnterResponse> ENTER = new CommandId<>("enter");
+  public static final QueryId<GetTermRequest, GetTermResponse> GET_TERM = new QueryId<>("getTerm");
 
-  private final OperationType type;
-
-  PrimaryElectorOperations(OperationType type) {
-    this.type = type;
-  }
-
-  @Override
-  public String id() {
-    return name();
-  }
-
-  @Override
-  public OperationType type() {
-    return type;
+  private PrimaryElectorOperations() {
   }
 }

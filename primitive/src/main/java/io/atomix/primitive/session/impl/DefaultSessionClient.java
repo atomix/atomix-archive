@@ -7,13 +7,11 @@ import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
 import com.google.protobuf.Message;
-import io.atomix.primitive.client.impl.DefaultPrimitiveClient;
 import io.atomix.primitive.event.EventType;
-import io.atomix.primitive.operation.OperationId;
+import io.atomix.primitive.operation.CommandId;
+import io.atomix.primitive.operation.QueryId;
 import io.atomix.primitive.partition.PartitionClient;
-import io.atomix.primitive.service.impl.CommandRequest;
 import io.atomix.primitive.service.impl.ListenRequest;
-import io.atomix.primitive.service.impl.QueryRequest;
 import io.atomix.primitive.service.impl.ServiceId;
 import io.atomix.primitive.service.impl.ServiceRequest;
 import io.atomix.primitive.service.impl.ServiceResponse;
@@ -22,14 +20,16 @@ import io.atomix.primitive.session.SessionClientProtocol;
 import io.atomix.primitive.util.ByteArrayDecoder;
 import io.atomix.primitive.util.ByteBufferDecoder;
 import io.atomix.primitive.util.ByteStringEncoder;
-import io.atomix.utils.concurrent.Futures;
 import io.atomix.utils.concurrent.ThreadContext;
 import org.apache.commons.lang3.tuple.Pair;
 
 /**
  * Default session client.
  */
-public class DefaultSessionClient extends DefaultPrimitiveClient implements SessionClient {
+public class DefaultSessionClient implements SessionClient {
+  private final ServiceId serviceId;
+  private final PartitionClient client;
+  private final ThreadContext context;
   private final SessionClientProtocol protocol;
   private final Map<Long, SessionEventListener> eventListeners = new ConcurrentHashMap<>();
 
@@ -38,8 +38,10 @@ public class DefaultSessionClient extends DefaultPrimitiveClient implements Sess
       PartitionClient client,
       SessionClientProtocol protocol,
       ThreadContext context) {
-    super(serviceId, client, context);
+    this.serviceId = serviceId;
+    this.client = client;
     this.protocol = protocol;
+    this.context = context;
   }
 
   @Override
@@ -68,48 +70,30 @@ public class DefaultSessionClient extends DefaultPrimitiveClient implements Sess
 
   @Override
   public <T extends Message, U extends Message> CompletableFuture<Pair<SessionContext, U>> execute(
-      OperationId operation, SessionMetadata session, T request, ByteStringEncoder<T> encoder, ByteBufferDecoder<U> decoder) {
-    switch (operation.type()) {
-      case COMMAND:
-        return command(operation, session, request, encoder, decoder);
-      case QUERY:
-        return query(operation, session, request, encoder, decoder);
-      default:
-        return Futures.exceptionalFuture(new UnsupportedOperationException());
-    }
-  }
-
-  private <T extends Message, U extends Message> CompletableFuture<Pair<SessionContext, U>> command(
-      OperationId operation, SessionMetadata session, T request, ByteStringEncoder<T> encoder, ByteBufferDecoder<U> decoder) {
+      CommandId<T, U> command, SessionCommandContext context, T request, ByteStringEncoder<T> encoder, ByteBufferDecoder<U> decoder) {
     return command(SessionRequest.newBuilder()
         .setCommand(SessionCommandRequest.newBuilder()
-            .setSession(session)
-            .setRequest(CommandRequest.newBuilder()
-                .setName(operation.id())
-                .setCommand(ByteStringEncoder.encode(request, encoder))
-                .build())
+            .setContext(context)
+            .setName(command.id())
+            .setInput(ByteStringEncoder.encode(request, encoder))
             .build())
         .build())
         .thenApply(response -> response.getCommand())
-        .thenApply(response -> Pair.of(response.getSession(), recordIndex(response.getResponse())))
-        .thenApply(response -> Pair.of(response.getLeft(), ByteBufferDecoder.decode(response.getRight().getOutput().asReadOnlyByteBuffer(), decoder)));
+        .thenApply(response -> Pair.of(response.getSession(), ByteBufferDecoder.decode(response.getOutput().asReadOnlyByteBuffer(), decoder)));
   }
 
-  private <T extends Message, U extends Message> CompletableFuture<Pair<SessionContext, U>> query(
-      OperationId operation, SessionMetadata session, T request, ByteStringEncoder<T> encoder, ByteBufferDecoder<U> decoder) {
+  @Override
+  public <T extends Message, U extends Message> CompletableFuture<Pair<SessionContext, U>> execute(
+      QueryId<T, U> query, SessionQueryContext context, T request, ByteStringEncoder<T> encoder, ByteBufferDecoder<U> decoder) {
     return query(SessionRequest.newBuilder()
         .setQuery(SessionQueryRequest.newBuilder()
-            .setSession(session)
-            .setRequest(QueryRequest.newBuilder()
-                .setName(operation.id())
-                .setQuery(ByteStringEncoder.encode(request, encoder))
-                .setIndex(getIndex())
-                .build())
+            .setContext(context)
+            .setName(query.id())
+            .setInput(ByteStringEncoder.encode(request, encoder))
             .build())
         .build())
         .thenApply(response -> response.getQuery())
-        .thenApply(response -> Pair.of(response.getSession(), response.getResponse()))
-        .thenApply(response -> Pair.of(response.getLeft(), ByteBufferDecoder.decode(response.getRight().getOutput().asReadOnlyByteBuffer(), decoder)));
+        .thenApply(response -> Pair.of(response.getSession(), ByteBufferDecoder.decode(response.getOutput().asReadOnlyByteBuffer(), decoder)));
   }
 
   private CompletableFuture<SessionResponse> command(SessionRequest request) {
@@ -133,14 +117,14 @@ public class DefaultSessionClient extends DefaultPrimitiveClient implements Sess
   }
 
   @Override
-  public synchronized <T> void addEventListener(EventType eventType, SessionMetadata session, BiConsumer<EventContext, T> listener, ByteBufferDecoder<T> decoder) {
-    SessionEventListener eventListener = eventListeners.computeIfAbsent(session.getSessionId(), SessionEventListener::new);
+  public synchronized <T> void addEventListener(EventType eventType, SessionEventContext context, BiConsumer<EventContext, T> listener, ByteBufferDecoder<T> decoder) {
+    SessionEventListener eventListener = eventListeners.computeIfAbsent(context.getSessionId(), SessionEventListener::new);
     eventListener.addListener(eventType, listener, decoder);
   }
 
   @Override
-  public synchronized void removeEventListener(EventType eventType, SessionMetadata session) {
-    SessionEventListener eventListener = eventListeners.get(session.getSessionId());
+  public synchronized void removeEventListener(EventType eventType, SessionEventContext context) {
+    SessionEventListener eventListener = eventListeners.get(context.getSessionId());
     if (eventListener != null) {
       eventListener.removeListener(eventType);
     }

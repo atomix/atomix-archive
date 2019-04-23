@@ -52,7 +52,7 @@ public abstract class ${serviceClass.className} extends SessionManagedPrimitiveS
     protected void configure(ServiceExecutor executor) {
         <#list operations as operation>
         executor.register(
-            ${operation.operationsClass.className}.${operation.enumValue},
+            ${operation.operationsClass.className}.${operation.constantName},
             this::${operation.methodName},
             ${operation.requestClass.className}::parseFrom,
             ${operation.responseClass.className}::toByteArray);
@@ -77,7 +77,7 @@ public abstract class ${serviceClass.className} extends SessionManagedPrimitiveS
      * @param event the event to produce
      */
     protected void ${event.methodName}(SessionId sessionId, ${event.valueClass.className} event) {
-        getSession(sessionId).publish(${event.eventsClass.className}.${event.enumValue}, event, ${event.valueClass.className}::toByteArray);
+        getSession(sessionId).publish(${event.eventsClass.className}.${event.constantName}, event, ${event.valueClass.className}::toByteArray);
     }
 
     </#list>

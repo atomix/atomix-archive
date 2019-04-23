@@ -18,21 +18,18 @@ import io.atomix.primitive.util.ByteArrayDecoder;
 import io.atomix.primitive.util.ByteBufferDecoder;
 import io.atomix.primitive.util.ByteStringEncoder;
 import io.atomix.utils.concurrent.Futures;
-import io.atomix.utils.concurrent.ThreadContext;
 
 /**
  * Default primitive client.
  */
 public class DefaultPrimitiveClient implements PrimitiveClient {
-  protected final ServiceId serviceId;
-  protected final PartitionClient client;
-  protected final ThreadContext context;
+  private final ServiceId serviceId;
+  private final PartitionClient client;
   private final AtomicLong lastIndex = new AtomicLong();
 
-  public DefaultPrimitiveClient(ServiceId serviceId, PartitionClient client, ThreadContext context) {
+  public DefaultPrimitiveClient(ServiceId serviceId, PartitionClient client) {
     this.serviceId = serviceId;
     this.client = client;
-    this.context = context;
   }
 
   protected CommandResponse recordIndex(CommandResponse response) {

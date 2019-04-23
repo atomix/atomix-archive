@@ -20,5 +20,15 @@ import io.atomix.utils.Identifier;
 /**
  * Raft event identifier.
  */
-public interface EventType extends Identifier<String> {
+public class EventType<T> implements Identifier<String> {
+  private final String id;
+
+  public EventType(String id) {
+    this.id = id;
+  }
+
+  @Override
+  public String id() {
+    return id;
+  }
 }

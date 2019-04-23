@@ -18,7 +18,7 @@ package io.atomix.primitive.operation;
 /**
  * Operation ID.
  */
-public interface OperationId {
+public interface OperationId<T, U> {
 
   /**
    * Returns the operation ID.

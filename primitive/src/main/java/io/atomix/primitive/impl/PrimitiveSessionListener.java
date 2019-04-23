@@ -20,7 +20,7 @@ import java.util.function.Consumer;
 
 import io.atomix.primitive.proxy.PrimitiveProxy;
 import io.atomix.primitive.session.impl.EventContext;
-import io.atomix.primitive.session.impl.SessionMetadata;
+import io.atomix.primitive.session.impl.SessionEventContext;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -41,10 +41,9 @@ final class PrimitiveSessionListener<P extends PrimitiveProxy> {
     this.sequencer = checkNotNull(sequencer, "sequencer cannot be null");
   }
 
-  public void event(BiConsumer<P, SessionMetadata> consumer) {
-    consumer.accept(proxy, SessionMetadata.newBuilder()
+  public void event(BiConsumer<P, SessionEventContext> consumer) {
+    consumer.accept(proxy, SessionEventContext.newBuilder()
         .setSessionId(state.getSessionId().id())
-        .setSequenceNumber(state.getCommandRequest())
         .build());
   }
 

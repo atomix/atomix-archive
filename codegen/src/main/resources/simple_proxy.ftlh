@@ -51,7 +51,7 @@ public class ${proxyClass.className} extends SimplePrimitiveProxy {
      */
     public CompletableFuture<${operation.responseClass.className}> ${operation.methodName}(${operation.requestClass.className} request) {
         return getClient().execute(
-            ${operation.operationsClass.className}.${operation.enumValue},
+            ${operation.operationsClass.className}.${operation.constantName},
             request,
             ${operation.requestClass.className}::toByteString,
             ${operation.responseClass.className}::parseFrom);

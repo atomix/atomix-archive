@@ -1,21 +1,14 @@
 package io.atomix.primitive.partition.impl;
 
 import io.atomix.primitive.event.EventType;
+import io.atomix.primitive.partition.PrimaryElectionEvent;
 
 /**
  * Primary elector events.
  */
-public enum PrimaryElectorEvents implements EventType {
-  CHANGE("change");
+public final class PrimaryElectorEvents {
+  public static final EventType<PrimaryElectionEvent> CHANGE = new EventType<>("change");
 
-  private final String id;
-
-  PrimaryElectorEvents(String id) {
-    this.id = id;
-  }
-
-  @Override
-  public String id() {
-    return id;
+  private PrimaryElectorEvents() {
   }
 }

@@ -24,12 +24,14 @@ import java.util.Queue;
 import java.util.concurrent.CompletableFuture;
 
 import io.atomix.cluster.MemberId;
+import io.atomix.primitive.PrimitiveException;
 import io.atomix.primitive.operation.OperationType;
 import io.atomix.primitive.service.PrimitiveService;
 import io.atomix.primitive.service.Role;
 import io.atomix.primitive.session.Session;
 import io.atomix.primitive.session.SessionId;
 import io.atomix.primitive.session.SessionServerProtocol;
+import io.atomix.utils.concurrent.Futures;
 import io.atomix.utils.misc.TimestampPrinter;
 import org.slf4j.Logger;
 
@@ -52,7 +54,9 @@ public class PrimitiveSession implements Session {
   private volatile long commandLowWaterMark;
   private volatile long eventIndex;
   private volatile long completeIndex;
+  private volatile long lastApplied;
   private final Map<Long, Runnable> sequenceCommands = new HashMap<>();
+  private final Map<Long, List<Runnable>> indexQueries = new HashMap<>();
   private final Map<Long, List<Runnable>> sequenceQueries = new HashMap<>();
   private final Map<Long, CompletableFuture<SessionCommandResponse>> results = new HashMap<>();
   private final Queue<EventHolder> events = new LinkedList<>();
@@ -183,6 +187,47 @@ public class PrimitiveSession implements Session {
   }
 
   /**
+   * Returns the session index.
+   *
+   * @return The session index.
+   */
+  public long getLastApplied() {
+    return lastApplied;
+  }
+
+  /**
+   * Sets the session index.
+   *
+   * @param index The session index.
+   */
+  public void setLastApplied(long index) {
+    // Query callbacks for this session are added to the indexQueries map to be executed once the required index
+    // for the query is reached. For each increment of the index, trigger query callbacks that are dependent
+    // on the specific index.
+    for (long i = lastApplied + 1; i <= index; i++) {
+      lastApplied = i;
+      List<Runnable> queries = this.indexQueries.remove(lastApplied);
+      if (queries != null) {
+        for (Runnable query : queries) {
+          query.run();
+        }
+      }
+    }
+  }
+
+  /**
+   * Registers a session index query.
+   *
+   * @param index The state machine index at which to execute the query.
+   * @param query The query to execute.
+   */
+  public void registerIndexQuery(long index, Runnable query) {
+    // Add a query to be run once the session's index reaches the given index.
+    List<Runnable> queries = this.indexQueries.computeIfAbsent(index, v -> new LinkedList<>());
+    queries.add(query);
+  }
+
+  /**
    * Registers a causal session query.
    *
    * @param sequence The session sequence number at which to execute the query.
@@ -243,7 +288,8 @@ public class PrimitiveSession implements Session {
    * @return The response.
    */
   public CompletableFuture<SessionCommandResponse> getResultFuture(long sequence) {
-    return results.get(sequence);
+    CompletableFuture<SessionCommandResponse> future = results.get(sequence);
+    return future != null ? future : Futures.exceptionalFuture(new PrimitiveException.CommandFailure());
   }
 
   /**

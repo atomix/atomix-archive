@@ -15,28 +15,16 @@
  */
 package io.atomix.primitive.session.impl;
 
-import io.atomix.primitive.operation.OperationId;
-import io.atomix.primitive.operation.OperationType;
+import io.atomix.primitive.operation.CommandId;
+import io.atomix.primitive.session.impl.proto.NextRequest;
+import io.atomix.primitive.session.impl.proto.NextResponse;
 
 /**
  * Session ID generator operations.
  */
-public enum SessionIdGeneratorOperations implements OperationId {
-  NEXT(OperationType.COMMAND);
+public final class SessionIdGeneratorOperations {
+  public static final CommandId<NextRequest, NextResponse> NEXT = new CommandId<>("next");
 
-  private final OperationType type;
-
-  SessionIdGeneratorOperations(OperationType type) {
-    this.type = type;
-  }
-
-  @Override
-  public String id() {
-    return name();
-  }
-
-  @Override
-  public OperationType type() {
-    return type;
+  private SessionIdGeneratorOperations() {
   }
 }

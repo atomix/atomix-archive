@@ -21,11 +21,21 @@ import io.atomix.primitive.proxy.SessionEnabledPrimitiveProxy;
 import io.atomix.primitive.session.impl.EventContext;
 import io.atomix.primitive.service.impl.ServiceId;
 import io.atomix.primitive.session.impl.SessionContext;
-import io.atomix.primitive.session.impl.SessionMetadata;
+<#if hasCommands>
+import io.atomix.primitive.session.impl.SessionCommandContext;
+</#if>
+<#if hasQueries>
+import io.atomix.primitive.session.impl.SessionQueryContext;
+</#if>
+<#if hasEvents>
+import io.atomix.primitive.session.impl.SessionEventContext;
+</#if>
 import io.atomix.utils.concurrent.ThreadContext;
 
 import java.util.concurrent.CompletableFuture;
+<#if hasEvents>
 import java.util.function.BiConsumer;
+</#if>
 
 import org.apache.commons.lang3.tuple.Pair;
 
@@ -64,11 +74,15 @@ public class ${proxyClass.className} extends SessionEnabledPrimitiveProxy {
      * @return the response object
      */
     public CompletableFuture<Pair<SessionContext, ${operation.responseClass.className}>> ${operation.methodName}(
-            SessionMetadata session,
+            <#if operation.type == "QUERY">
+            SessionQueryContext context,
+            <#else>
+            SessionCommandContext context,
+            </#if>
             ${operation.requestClass.className} request) {
         return getClient().execute(
-            ${operation.operationsClass.className}.${operation.enumValue},
-            session,
+            ${operation.operationsClass.className}.${operation.constantName},
+            context,
             request,
             ${operation.requestClass.className}::toByteString,
             ${operation.responseClass.className}::parseFrom);
@@ -82,11 +96,11 @@ public class ${proxyClass.className} extends SessionEnabledPrimitiveProxy {
      * @param listener the event listener
      */
     public void ${event.methodName}(
-            SessionMetadata session,
+            SessionEventContext context,
             BiConsumer<EventContext, ${event.valueClass.className}> listener) {
         getClient().addEventListener(
-            ${event.eventsClass.className}.${event.enumValue},
-            session,
+            ${event.eventsClass.className}.${event.constantName},
+            context,
             listener,
             ${event.valueClass.className}::parseFrom);
     }

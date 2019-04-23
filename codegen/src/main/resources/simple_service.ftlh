@@ -38,7 +38,7 @@ public abstract class ${serviceClass.className} extends SimplePrimitiveService {
     protected void configure(ServiceExecutor executor) {
         <#list operations as operation>
         executor.register(
-            ${operation.operationsClass.className}.${operation.enumValue},
+            ${operation.operationsClass.className}.${operation.constantName},
             this::${operation.methodName},
             ${operation.requestClass.className}::parseFrom,
             ${operation.responseClass.className}::toByteArray);

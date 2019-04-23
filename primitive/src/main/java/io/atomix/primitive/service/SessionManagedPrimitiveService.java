@@ -15,6 +15,9 @@ import java.util.stream.Collectors;
 import com.google.protobuf.ByteString;
 import io.atomix.cluster.MemberId;
 import io.atomix.primitive.PrimitiveException;
+import io.atomix.primitive.operation.OperationId;
+import io.atomix.primitive.operation.OperationType;
+import io.atomix.primitive.operation.impl.DefaultOperationId;
 import io.atomix.primitive.partition.PartitionId;
 import io.atomix.primitive.partition.PartitionManagementService;
 import io.atomix.primitive.session.Session;
@@ -42,7 +45,7 @@ import io.atomix.utils.concurrent.Futures;
 /**
  * Session managed primitive service.
  */
-public abstract class SessionManagedPrimitiveService extends SimplePrimitiveService {
+public abstract class SessionManagedPrimitiveService extends AbstractPrimitiveService implements PrimitiveService {
   private final SessionServerProtocol protocol;
   private final Map<SessionId, PrimitiveSession> sessions = new ConcurrentHashMap<>();
   private PrimitiveSession currentSession;
@@ -54,7 +57,6 @@ public abstract class SessionManagedPrimitiveService extends SimplePrimitiveServ
 
   @Override
   public void init(Context context) {
-    super.init(context);
     this.context = context;
   }
 
@@ -297,59 +299,56 @@ public abstract class SessionManagedPrimitiveService extends SimplePrimitiveServ
   }
 
   private CompletableFuture<SessionCommandResponse> applySessionCommand(Command<SessionCommandRequest> command) {
-    PrimitiveSession session = sessions.get(SessionId.from(command.value().getSession().getSessionId()));
+    PrimitiveSession session = sessions.get(SessionId.from(command.value().getContext().getSessionId()));
     if (session == null) {
       return Futures.exceptionalFuture(new PrimitiveException.UnknownSession());
     }
 
-    long sequenceNumber = command.value().getSession().getSequenceNumber();
+    // If the sequence number is specified and is less than the current command sequence number for the session,
+    // that indicates the command has already been executed and we can return a cached result.
+    long sequenceNumber = command.value().getContext().getSequenceNumber();
+    if (sequenceNumber != 0 && sequenceNumber <= session.getCommandSequence()) {
+      return session.getResultFuture(sequenceNumber);
+    }
+
+    // If we've made it this far, apply the command in sequential order.
+    CompletableFuture<SessionCommandResponse> future = new CompletableFuture<>();
+    applySequenceCommand(command, session, future);
+    return future;
+  }
+
+  private void applySequenceCommand(Command<SessionCommandRequest> command, PrimitiveSession session, CompletableFuture<SessionCommandResponse> future) {
+    long sequenceNumber = command.value().getContext().getSequenceNumber();
 
     // If the sequence number aligns with the next command sequence number, immediately execute the command.
     // Otherwise, enqueue the command for later.
-    if (sequenceNumber == 0 || sequenceNumber == session.nextCommandSequence()) {
-      CompletableFuture<SessionCommandResponse> future = new CompletableFuture<>();
-      applySessionCommand(command, future);
-      return future;
-    } else if (sequenceNumber > session.nextCommandSequence()) {
-      CompletableFuture<SessionCommandResponse> future = new CompletableFuture<>();
-      session.registerSequenceCommand(sequenceNumber, () -> applySessionCommand(command, future));
-      return future;
+    if (sequenceNumber > session.nextCommandSequence()) {
+      session.registerSequenceCommand(sequenceNumber, () -> applySessionCommand(command, session, future));
     } else {
-      CompletableFuture<SessionCommandResponse> future = session.getResultFuture(sequenceNumber);
-      if (future == null) {
-        return Futures.exceptionalFuture(new PrimitiveException.CommandFailure());
-      }
-      return future;
+      applySessionCommand(command, session, future);
     }
   }
 
-  private void applySessionCommand(Command<SessionCommandRequest> command, CompletableFuture<SessionCommandResponse> future) {
-    PrimitiveSession session = sessions.get(SessionId.from(command.value().getSession().getSessionId()));
-    if (session == null) {
-      future.completeExceptionally(new PrimitiveException.UnknownSession());
-      return;
-    }
-
+  private void applySessionCommand(Command<SessionCommandRequest> command, PrimitiveSession session, CompletableFuture<SessionCommandResponse> future) {
+    // Set the current session for usage in the service.
     setCurrentSession(session);
 
-    applyCommand(command.map(SessionCommandRequest::getRequest))
-        .thenApply(response -> SessionCommandResponse.newBuilder()
-            .setSession(SessionContext.newBuilder()
-                .setIndex(getCurrentIndex())
-                .setEventIndex(session.getEventIndex())
-                .build())
-            .setResponse(response)
+    // Create the operation and apply it.
+    OperationId operationId = new DefaultOperationId(command.value().getName(), OperationType.COMMAND);
+    byte[] output = apply(operationId, command.map(r -> r.getInput().toByteArray()));
+
+    long sequenceNumber = command.value().getContext().getSequenceNumber();
+    session.registerResultFuture(sequenceNumber, future);
+    session.setCommandSequence(sequenceNumber);
+    session.setLastApplied(getCurrentIndex());
+
+    future.complete(SessionCommandResponse.newBuilder()
+        .setSession(SessionContext.newBuilder()
+            .setIndex(getCurrentIndex())
+            .setEventIndex(session.getEventIndex())
             .build())
-        .whenComplete((response, error) -> {
-          long sequenceNumber = command.value().getSession().getSequenceNumber();
-          session.registerResultFuture(sequenceNumber, future);
-          session.setCommandSequence(sequenceNumber);
-          if (error == null) {
-            future.complete(response);
-          } else {
-            future.completeExceptionally(error);
-          }
-        });
+        .setOutput(ByteString.copyFrom(output))
+        .build());
   }
 
   @Override
@@ -366,42 +365,44 @@ public abstract class SessionManagedPrimitiveService extends SimplePrimitiveServ
   }
 
   private CompletableFuture<SessionQueryResponse> applySessionQuery(Query<SessionQueryRequest> query) {
-    PrimitiveSession session = sessions.get(SessionId.from(query.value().getSession().getSessionId()));
+    PrimitiveSession session = sessions.get(SessionId.from(query.value().getContext().getSessionId()));
     if (session == null) {
       return Futures.exceptionalFuture(new PrimitiveException.UnknownSession());
     }
 
     CompletableFuture<SessionQueryResponse> future = new CompletableFuture<>();
-    long sequenceNumber = query.value().getSession().getSequenceNumber();
-    if (sequenceNumber > session.getCommandSequence()) {
-      session.registerSequenceQuery(sequenceNumber, () -> applySessionQuery(query, future));
-    } else {
-      applySessionQuery(query, future);
-    }
+    applyIndexQuery(query, session, future);
     return future;
   }
 
-  private void applySessionQuery(Query<SessionQueryRequest> query, CompletableFuture<SessionQueryResponse> future) {
-    PrimitiveSession session = sessions.get(SessionId.from(query.value().getSession().getSessionId()));
-    if (session == null) {
-      future.completeExceptionally(new PrimitiveException.UnknownSession());
-      return;
+  private void applyIndexQuery(Query<SessionQueryRequest> query, PrimitiveSession session, CompletableFuture<SessionQueryResponse> future) {
+    long lastIndex = query.value().getContext().getLastIndex();
+    if (lastIndex > getCurrentIndex()) {
+      session.registerIndexQuery(lastIndex, () -> applySequenceQuery(query, session, future));
+    } else {
+      applySequenceQuery(query, session, future);
     }
+  }
 
+  private void applySequenceQuery(Query<SessionQueryRequest> query, PrimitiveSession session, CompletableFuture<SessionQueryResponse> future) {
+    long lastSequenceNumber = query.value().getContext().getLastSequenceNumber();
+    if (lastSequenceNumber > session.getCommandSequence()) {
+      session.registerSequenceQuery(lastSequenceNumber, () -> applySessionQuery(query, session, future));
+    } else {
+      applySessionQuery(query, session, future);
+    }
+  }
+
+  private void applySessionQuery(Query<SessionQueryRequest> query, PrimitiveSession session, CompletableFuture<SessionQueryResponse> future) {
     setCurrentSession(session);
-    applyQuery(query.map(SessionQueryRequest::getRequest))
-        .thenApply(response -> SessionQueryResponse.newBuilder()
-            .setSession(SessionContext.newBuilder()
-                .setEventIndex(session.getEventIndex())
-                .build())
-            .setResponse(response)
+
+    OperationId operationId = new DefaultOperationId(query.value().getName(), OperationType.QUERY);
+    byte[] output = apply(operationId, query.map(r -> r.getInput().toByteArray()));
+    future.complete(SessionQueryResponse.newBuilder()
+        .setSession(SessionContext.newBuilder()
+            .setEventIndex(session.getEventIndex())
             .build())
-        .whenComplete((response, error) -> {
-          if (error == null) {
-            future.complete(response);
-          } else {
-            future.completeExceptionally(error);
-          }
-        });
+        .setOutput(ByteString.copyFrom(output))
+        .build());
   }
 }

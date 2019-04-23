@@ -27,8 +27,10 @@ import io.atomix.primitive.proxy.SessionEnabledPrimitiveProxy;
 import io.atomix.primitive.session.impl.CloseSessionRequest;
 import io.atomix.primitive.session.impl.EventContext;
 import io.atomix.primitive.session.impl.OpenSessionRequest;
+import io.atomix.primitive.session.impl.SessionCommandContext;
 import io.atomix.primitive.session.impl.SessionContext;
-import io.atomix.primitive.session.impl.SessionMetadata;
+import io.atomix.primitive.session.impl.SessionEventContext;
+import io.atomix.primitive.session.impl.SessionQueryContext;
 import io.atomix.utils.concurrent.Futures;
 import org.apache.commons.lang3.tuple.Pair;
 
@@ -52,15 +54,15 @@ public abstract class ManagedAsyncPrimitive<P extends SessionEnabledPrimitivePro
     this.managementService = managementService;
   }
 
-  protected <T> CompletableFuture<T> command(BiFunction<P, SessionMetadata, CompletableFuture<Pair<SessionContext, T>>> function) {
+  protected <T> CompletableFuture<T> command(BiFunction<P, SessionCommandContext, CompletableFuture<Pair<SessionContext, T>>> function) {
     return invoker.command(function);
   }
 
-  protected <T> CompletableFuture<T> query(BiFunction<P, SessionMetadata, CompletableFuture<Pair<SessionContext, T>>> function) {
+  protected <T> CompletableFuture<T> query(BiFunction<P, SessionQueryContext, CompletableFuture<Pair<SessionContext, T>>> function) {
     return invoker.query(function);
   }
 
-  protected void event(BiConsumer<P, SessionMetadata> consumer) {
+  protected void event(BiConsumer<P, SessionEventContext> consumer) {
     listener.event(consumer);
   }
 

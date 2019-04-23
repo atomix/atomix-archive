@@ -31,8 +31,9 @@ import java.util.function.Predicate;
 import io.atomix.primitive.PrimitiveException;
 import io.atomix.primitive.PrimitiveState;
 import io.atomix.primitive.proxy.SessionEnabledPrimitiveProxy;
+import io.atomix.primitive.session.impl.SessionCommandContext;
 import io.atomix.primitive.session.impl.SessionContext;
-import io.atomix.primitive.session.impl.SessionMetadata;
+import io.atomix.primitive.session.impl.SessionQueryContext;
 import org.apache.commons.lang3.tuple.Pair;
 
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -70,13 +71,13 @@ final class PrimitiveSessionInvoker<P extends SessionEnabledPrimitiveProxy> {
     this.sequencer = checkNotNull(sequencer, "sequencer");
   }
 
-  public <T> CompletableFuture<T> command(BiFunction<P, SessionMetadata, CompletableFuture<Pair<SessionContext, T>>> function) {
+  public <T> CompletableFuture<T> command(BiFunction<P, SessionCommandContext, CompletableFuture<Pair<SessionContext, T>>> function) {
     CompletableFuture<T> future = new CompletableFuture<>();
     proxy.context().execute(() -> invokeCommand(function, future));
     return future;
   }
 
-  public <T> CompletableFuture<T> query(BiFunction<P, SessionMetadata, CompletableFuture<Pair<SessionContext, T>>> function) {
+  public <T> CompletableFuture<T> query(BiFunction<P, SessionQueryContext, CompletableFuture<Pair<SessionContext, T>>> function) {
     CompletableFuture<T> future = new CompletableFuture<>();
     proxy.context().execute(() -> invokeQuery(function, future));
     return future;
@@ -85,15 +86,23 @@ final class PrimitiveSessionInvoker<P extends SessionEnabledPrimitiveProxy> {
   /**
    * Submits a command request to the cluster.
    */
-  private <T> void invokeCommand(BiFunction<P, SessionMetadata, CompletableFuture<Pair<SessionContext, T>>> command, CompletableFuture<T> future) {
-    invoke(new CommandAttempt<>(sequencer.nextRequest(), command, future));
+  private <T> void invokeCommand(BiFunction<P, SessionCommandContext, CompletableFuture<Pair<SessionContext, T>>> command, CompletableFuture<T> future) {
+    SessionCommandContext context = SessionCommandContext.newBuilder()
+        .setSessionId(state.getSessionId().id())
+        .setSequenceNumber(state.nextCommandRequest())
+        .build();
+    invoke(new CommandAttempt<>(sequencer.nextRequest(), context, command, future));
   }
 
   /**
    * Submits a query request to the cluster.
    */
-  private <T> void invokeQuery(BiFunction<P, SessionMetadata, CompletableFuture<Pair<SessionContext, T>>> query, CompletableFuture<T> future) {
-    invoke(new QueryAttempt<>(sequencer.nextRequest(), query, future));
+  private <T> void invokeQuery(BiFunction<P, SessionQueryContext, CompletableFuture<Pair<SessionContext, T>>> query, CompletableFuture<T> future) {
+    SessionQueryContext context = SessionQueryContext.newBuilder()
+        .setSessionId(state.getSessionId().id())
+        .setLastSequenceNumber(state.getCommandRequest())
+        .build();
+    invoke(new QueryAttempt<>(sequencer.nextRequest(), context, query, future));
   }
 
   /**
@@ -101,13 +110,13 @@ final class PrimitiveSessionInvoker<P extends SessionEnabledPrimitiveProxy> {
    *
    * @param attempt The attempt to submit.
    */
-  private <T> void invoke(OperationAttempt<T> attempt) {
+  private <T> void invoke(OperationAttempt<?, T> attempt) {
     if (state.getState() == PrimitiveState.CLOSED) {
       attempt.fail(new PrimitiveException.ClosedSession("session closed"));
     } else {
-      attempts.put(attempt.sequence, attempt);
+      attempts.put(attempt.id, attempt);
       attempt.send();
-      attempt.future.whenComplete((r, e) -> attempts.remove(attempt.sequence));
+      attempt.future.whenComplete((r, e) -> attempts.remove(attempt.id));
     }
   }
 
@@ -124,7 +133,7 @@ final class PrimitiveSessionInvoker<P extends SessionEnabledPrimitiveProxy> {
     for (Map.Entry<Long, OperationAttempt> entry : attempts.entrySet()) {
       OperationAttempt operation = entry.getValue();
       if (operation instanceof CommandAttempt
-          && operation.sequence > commandSequence
+          && operation.id > commandSequence
           && operation.attempt <= attempt.attempt) {
         operation.retry();
       }
@@ -158,14 +167,16 @@ final class PrimitiveSessionInvoker<P extends SessionEnabledPrimitiveProxy> {
   /**
    * Operation attempt.
    */
-  private abstract class OperationAttempt<T> implements BiConsumer<Pair<SessionContext, T>, Throwable> {
-    protected final long sequence;
+  private abstract class OperationAttempt<T, U> implements BiConsumer<Pair<SessionContext, U>, Throwable> {
+    protected final long id;
+    protected final T context;
     protected final int attempt;
-    protected final BiFunction<P, SessionMetadata, CompletableFuture<Pair<SessionContext, T>>> operation;
-    protected final CompletableFuture<T> future;
+    protected final BiFunction<P, T, CompletableFuture<Pair<SessionContext, U>>> operation;
+    protected final CompletableFuture<U> future;
 
-    protected OperationAttempt(long sequence, int attempt, BiFunction<P, SessionMetadata, CompletableFuture<Pair<SessionContext, T>>> operation, CompletableFuture<T> future) {
-      this.sequence = sequence;
+    protected OperationAttempt(long id, T context, int attempt, BiFunction<P, T, CompletableFuture<Pair<SessionContext, U>>> operation, CompletableFuture<U> future) {
+      this.id = id;
+      this.context = context;
       this.attempt = attempt;
       this.operation = operation;
       this.future = future;
@@ -175,10 +186,7 @@ final class PrimitiveSessionInvoker<P extends SessionEnabledPrimitiveProxy> {
      * Sends the attempt.
      */
     protected void send() {
-      operation.apply(proxy, SessionMetadata.newBuilder()
-          .setSessionId(state.getSessionId().id())
-          .setSequenceNumber(sequence)
-          .build());
+      operation.apply(proxy, context);
     }
 
     /**
@@ -186,7 +194,7 @@ final class PrimitiveSessionInvoker<P extends SessionEnabledPrimitiveProxy> {
      *
      * @return The next instance of the attempt.
      */
-    protected abstract OperationAttempt<T> next();
+    protected abstract OperationAttempt<T, U> next();
 
     /**
      * Returns a new instance of the default exception for the operation.
@@ -200,7 +208,7 @@ final class PrimitiveSessionInvoker<P extends SessionEnabledPrimitiveProxy> {
      *
      * @param response The operation response.
      */
-    protected abstract void complete(Pair<SessionContext, T> response);
+    protected abstract void complete(Pair<SessionContext, U> response);
 
     /**
      * Completes the operation with an exception.
@@ -217,8 +225,8 @@ final class PrimitiveSessionInvoker<P extends SessionEnabledPrimitiveProxy> {
      * @param response The operation response.
      * @param callback The callback to run in sequence.
      */
-    protected final void sequence(Pair<SessionContext, T> response, Runnable callback) {
-      sequencer.sequenceResponse(sequence, response.getLeft(), callback);
+    protected final void sequence(Pair<SessionContext, U> response, Runnable callback) {
+      sequencer.sequenceResponse(id, response.getLeft(), callback);
     }
 
     /**
@@ -235,7 +243,7 @@ final class PrimitiveSessionInvoker<P extends SessionEnabledPrimitiveProxy> {
      */
     public void fail(Throwable t) {
       sequence(null, () -> {
-        state.setCommandResponse(sequence);
+        state.setCommandResponse(id);
         future.completeExceptionally(t);
       });
 
@@ -267,18 +275,27 @@ final class PrimitiveSessionInvoker<P extends SessionEnabledPrimitiveProxy> {
   /**
    * Command operation attempt.
    */
-  private final class CommandAttempt<T> extends OperationAttempt<T> {
-    CommandAttempt(long sequence, BiFunction<P, SessionMetadata, CompletableFuture<Pair<SessionContext, T>>> command, CompletableFuture<T> future) {
-      super(sequence, 1, command, future);
+  private final class CommandAttempt<T> extends OperationAttempt<SessionCommandContext, T> {
+    CommandAttempt(
+        long id,
+        SessionCommandContext context,
+        BiFunction<P, SessionCommandContext, CompletableFuture<Pair<SessionContext, T>>> command,
+        CompletableFuture<T> future) {
+      super(id, context, 1, command, future);
     }
 
-    CommandAttempt(long sequence, int attempt, BiFunction<P, SessionMetadata, CompletableFuture<Pair<SessionContext, T>>> command, CompletableFuture<T> future) {
-      super(sequence, attempt, command, future);
+    CommandAttempt(
+        long id,
+        SessionCommandContext context,
+        int attempt,
+        BiFunction<P, SessionCommandContext, CompletableFuture<Pair<SessionContext, T>>> command,
+        CompletableFuture<T> future) {
+      super(id, context, attempt, command, future);
     }
 
     @Override
-    protected OperationAttempt next() {
-      return new CommandAttempt<>(sequence, this.attempt + 1, operation, future);
+    protected CommandAttempt<T> next() {
+      return new CommandAttempt<>(id, context, this.attempt + 1, operation, future);
     }
 
     @Override
@@ -307,7 +324,7 @@ final class PrimitiveSessionInvoker<P extends SessionEnabledPrimitiveProxy> {
     @SuppressWarnings("unchecked")
     protected void complete(Pair<SessionContext, T> response) {
       sequence(response, () -> {
-        state.setCommandResponse(sequence);
+        state.setCommandResponse(id);
         state.setResponseIndex(response.getLeft().getIndex());
         future.complete(response.getRight());
       });
@@ -317,18 +334,27 @@ final class PrimitiveSessionInvoker<P extends SessionEnabledPrimitiveProxy> {
   /**
    * Query operation attempt.
    */
-  private final class QueryAttempt<T> extends OperationAttempt<T> {
-    QueryAttempt(long sequence, BiFunction<P, SessionMetadata, CompletableFuture<Pair<SessionContext, T>>> query, CompletableFuture<T> future) {
-      super(sequence, 1, query, future);
+  private final class QueryAttempt<T> extends OperationAttempt<SessionQueryContext, T> {
+    QueryAttempt(
+        long id,
+        SessionQueryContext context,
+        BiFunction<P, SessionQueryContext, CompletableFuture<Pair<SessionContext, T>>> query,
+        CompletableFuture<T> future) {
+      super(id, context, 1, query, future);
     }
 
-    QueryAttempt(long sequence, int attempt, BiFunction<P, SessionMetadata, CompletableFuture<Pair<SessionContext, T>>> query, CompletableFuture<T> future) {
-      super(sequence, attempt, query, future);
+    QueryAttempt(
+        long id,
+        SessionQueryContext context,
+        int attempt,
+        BiFunction<P, SessionQueryContext, CompletableFuture<Pair<SessionContext, T>>> query,
+        CompletableFuture<T> future) {
+      super(id, context, attempt, query, future);
     }
 
     @Override
-    protected OperationAttempt<T> next() {
-      return new QueryAttempt<>(sequence, this.attempt + 1, operation, future);
+    protected QueryAttempt<T> next() {
+      return new QueryAttempt<>(id, context, this.attempt + 1, operation, future);
     }
 
     @Override

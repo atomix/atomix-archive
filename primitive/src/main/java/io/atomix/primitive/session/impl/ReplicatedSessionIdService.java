@@ -27,7 +27,6 @@ import io.atomix.primitive.session.SessionId;
 import io.atomix.primitive.session.SessionIdService;
 import io.atomix.primitive.session.impl.proto.NextRequest;
 import io.atomix.primitive.session.impl.proto.NextResponse;
-import io.atomix.utils.concurrent.SingleThreadContext;
 
 /**
  * Replicated ID generator service.
@@ -60,8 +59,7 @@ public class ReplicatedSessionIdService implements ManagedSessionIdService {
             .setType(SessionIdGeneratorType.instance().name())
             .setName(PRIMITIVE_NAME)
             .build(),
-        systemPartitionGroup.getPartitions().iterator().next().getClient(),
-        new SingleThreadContext("session-id-service"));
+        systemPartitionGroup.getPartitions().iterator().next().getClient());
     return CompletableFuture.completedFuture(this);
   }
 

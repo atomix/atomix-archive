@@ -28,6 +28,6 @@ public abstract class SimplePrimitiveProxy extends AbstractPrimitiveProxy<Primit
 
   @Override
   protected PrimitiveClient createClient() {
-    return new DefaultPrimitiveClient(serviceId(), getPartitionClient(), context());
+    return new DefaultPrimitiveClient(serviceId(), getPartitionClient());
   }
 }

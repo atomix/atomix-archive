@@ -15,37 +15,36 @@
  */
 package ${operationsClass.packageName};
 
-import io.atomix.primitive.operation.OperationId;
-import io.atomix.primitive.operation.OperationType;
+import io.atomix.primitive.operation.CommandId;
+import io.atomix.primitive.operation.QueryId;
+<#list operations as operation>
+<#if operation.operationsClass.packageName != proxyClass.packageName>
+import ${operation.operationsClass.packageName}.${operation.operationsClass.className}
+</#if>
+<#if operation.requestClass.packageName != proxyClass.packageName>
+import ${operation.requestClass.packageName}.${operation.requestClass.className}
+</#if>
+<#if operation.responseClass.packageName != proxyClass.packageName>
+import ${operation.responseClass.packageName}.${operation.responseClass.className}
+</#if>
+</#list>
 
 /**
  * Atomix generated operations ${operationsClass.className}.
  */
-public enum ${operationsClass.className} implements OperationId {
+public final class ${operationsClass.className} {
 
     <#list operations as operation>
-    <#if operation?is_last>
-    ${operation.enumValue}("${operation.name}", OperationType.${operation.type});
-    <#else>
-    ${operation.enumValue}("${operation.name}", OperationType.${operation.type}),
+    <#if operation.type == "COMMAND">
+    public static final CommandId<${operation.requestClass.className}, ${operation.responseClass.className}> ${operation.constantName} = new CommandId<>("${operation.name}");
     </#if>
-
     </#list>
-    private final String id;
-    private final OperationType type;
+    <#list operations as operation>
+    <#if operation.type == "QUERY">
+    public static final QueryId<${operation.requestClass.className}, ${operation.responseClass.className}> ${operation.constantName} = new QueryId<>("${operation.name}");
+    </#if>
+    </#list>
 
-    ${operationsClass.className}(String id, OperationType type) {
-        this.id = id;
-        this.type = type;
-    }
-
-    @Override
-    public String id() {
-        return id;
-    }
-
-    @Override
-    public OperationType type() {
-        return type;
+    private ${operationsClass.className}() {
     }
 }

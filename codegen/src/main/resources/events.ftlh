@@ -16,28 +16,24 @@
 package ${eventsClass.packageName};
 
 import io.atomix.primitive.event.EventType;
+<#list events as event>
+<#if event.eventsClass.packageName != proxyClass.packageName>
+import ${event.eventsClass.packageName}.${operation.eventsClass.className}
+</#if>
+<#if event.valueClass.packageName != proxyClass.packageName>
+import ${event.valueClass.packageName}.${operation.valueClass.className}
+</#if>
+</#list>
 
 /**
  * Atomix generated events ${eventsClass.className}.
  */
-public enum ${eventsClass.className} implements EventType {
+public final class ${eventsClass.className} {
 
     <#list events as event>
-    <#if event?is_last>
-    ${event.enumValue}("${event.name}");
-    <#else>
-    ${event.enumValue}("${event.name}"),
-    </#if>
-
+    public static final EventType<${event.valueClass.className}> ${event.constantName} = new EventType<>("${event.name}");
     </#list>
-    private final String name;
 
-    ${eventsClass.className}(String name) {
-        this.name = name;
-    }
-
-    @Override
-    public String id() {
-        return name;
+    private ${eventsClass.className}() {
     }
 }

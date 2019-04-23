@@ -30,7 +30,8 @@ import io.atomix.primitive.partition.PrimaryElectionEvent;
 import io.atomix.primitive.partition.PrimaryElectionService;
 import io.atomix.primitive.partition.PrimaryTerm;
 import io.atomix.primitive.session.SessionClient;
-import io.atomix.primitive.session.impl.SessionMetadata;
+import io.atomix.primitive.session.impl.SessionCommandContext;
+import io.atomix.primitive.session.impl.SessionQueryContext;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -40,15 +41,15 @@ import static com.google.common.base.Preconditions.checkNotNull;
 public class DefaultPrimaryElection implements ManagedPrimaryElection {
   private final PartitionId partitionId;
   private final long sessionId = new Random(System.currentTimeMillis()).nextLong();
-  private final SessionClient proxy;
+  private final SessionClient client;
   private final PrimaryElectionService service;
   private final Set<Consumer<PrimaryElectionEvent>> listeners = Sets.newCopyOnWriteArraySet();
   private final Consumer<PrimaryElectionEvent> eventListener;
   private final AtomicBoolean started = new AtomicBoolean();
 
-  public DefaultPrimaryElection(PartitionId partitionId, SessionClient proxy, PrimaryElectionService service) {
+  public DefaultPrimaryElection(PartitionId partitionId, SessionClient client, PrimaryElectionService service) {
     this.partitionId = checkNotNull(partitionId);
-    this.proxy = proxy;
+    this.client = client;
     this.service = service;
     this.eventListener = event -> {
       if (event.getPartitionId().equals(partitionId)) {
@@ -60,9 +61,9 @@ public class DefaultPrimaryElection implements ManagedPrimaryElection {
 
   @Override
   public CompletableFuture<PrimaryTerm> enter(GroupMember member) {
-    return proxy.execute(
+    return client.execute(
         PrimaryElectorOperations.ENTER,
-        SessionMetadata.newBuilder()
+        SessionCommandContext.newBuilder()
             .setSessionId(sessionId)
             .build(),
         EnterRequest.newBuilder()
@@ -76,9 +77,9 @@ public class DefaultPrimaryElection implements ManagedPrimaryElection {
 
   @Override
   public CompletableFuture<PrimaryTerm> getTerm() {
-    return proxy.execute(
+    return client.execute(
         PrimaryElectorOperations.GET_TERM,
-        SessionMetadata.newBuilder()
+        SessionQueryContext.newBuilder()
             .setSessionId(sessionId)
             .build(),
         GetTermRequest.newBuilder()

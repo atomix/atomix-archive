@@ -31,6 +31,7 @@ import com.google.protobuf.compiler.PluginProtos;
 import freemarker.template.Configuration;
 import freemarker.template.Template;
 import freemarker.template.TemplateException;
+import io.atomix.primitive.operation.OperationType;
 import io.atomix.primitive.service.impl.PrimitiveServiceProto;
 import io.atomix.primitive.service.impl.ServiceTypeInfo;
 import org.apache.commons.lang3.tuple.Pair;
@@ -306,7 +307,7 @@ public class PrimitiveServiceGenerator {
     operation.setOperationsClass(buildOperationsClassDescriptor(serviceDescriptor, fileDescriptor));
     operation.setType(getOperationType(methodDescriptor));
     operation.setName(getOperationName(methodDescriptor));
-    operation.setEnumValue(getOperationEnumValue(methodDescriptor));
+    operation.setConstantName(getOperationConstant(methodDescriptor));
     return operation;
   }
 
@@ -329,7 +330,7 @@ public class PrimitiveServiceGenerator {
     event.setEventsClass(buildEventsClassDescriptor(serviceDescriptor, fileDescriptor));
     event.setType(getOperationType(methodDescriptor));
     event.setName(getOperationName(methodDescriptor));
-    event.setEnumValue(getOperationEnumValue(methodDescriptor));
+    event.setConstantName(getOperationConstant(methodDescriptor));
     return event;
   }
 
@@ -524,18 +525,18 @@ public class PrimitiveServiceGenerator {
   private static String getOperationName(DescriptorProtos.MethodDescriptorProto methodDescriptor) {
     String name = methodDescriptor.getOptions().getExtension(PrimitiveServiceProto.operation).getName();
     return Strings.isNullOrEmpty(name)
-        ? CaseFormat.UPPER_CAMEL.to(CaseFormat.UPPER_UNDERSCORE, methodDescriptor.getName())
+        ? getMethodName(methodDescriptor)
         : name;
   }
 
   /**
-   * Returns the operation enum value.
+   * Returns the operation constant name.
    *
    * @param methodDescriptor the method descriptor
-   * @return the operation name
+   * @return the operation constant name
    */
-  private static String getOperationEnumValue(DescriptorProtos.MethodDescriptorProto methodDescriptor) {
-    return getOperationName(methodDescriptor).toUpperCase().replace('-', '_');
+  private static String getOperationConstant(DescriptorProtos.MethodDescriptorProto methodDescriptor) {
+    return CaseFormat.UPPER_CAMEL.to(CaseFormat.UPPER_UNDERSCORE, methodDescriptor.getName());
   }
 
   /**
@@ -660,6 +661,14 @@ public class PrimitiveServiceGenerator {
       operations.add(operation);
     }
 
+    public boolean isHasCommands() {
+      return operations.stream().anyMatch(operation -> operation.getType().equals(OperationType.COMMAND.name()));
+    }
+
+    public boolean isHasQueries() {
+      return operations.stream().anyMatch(operation -> operation.getType().equals(OperationType.QUERY.name()));
+    }
+
     public List<EventDescriptor> getEvents() {
       return events;
     }
@@ -670,6 +679,10 @@ public class PrimitiveServiceGenerator {
 
     public void addEvent(EventDescriptor event) {
       events.add(event);
+    }
+
+    public boolean isHasEvents() {
+      return !events.isEmpty();
     }
 
     public boolean isSession() {
@@ -725,7 +738,7 @@ public class PrimitiveServiceGenerator {
     private ClassDescriptor operationsClass;
     private String type;
     private String name;
-    private String enumValue;
+    private String constantName;
 
     public String getMethodName() {
       return methodName;
@@ -775,23 +788,22 @@ public class PrimitiveServiceGenerator {
       this.name = name;
     }
 
-    public String getEnumValue() {
-      return enumValue;
+    public String getConstantName() {
+      return constantName;
     }
 
-    public void setEnumValue(String enumValue) {
-      this.enumValue = enumValue;
+    public void setConstantName(String constantName) {
+      this.constantName = constantName;
     }
   }
 
   public static class EventDescriptor {
     private String methodName;
-    private String producerMethodName;
     private ClassDescriptor valueClass;
     private ClassDescriptor eventsClass;
     private String type;
     private String name;
-    private String enumValue;
+    private String constantName;
 
     public String getMethodName() {
       return methodName;
@@ -833,12 +845,12 @@ public class PrimitiveServiceGenerator {
       this.name = name;
     }
 
-    public String getEnumValue() {
-      return enumValue;
+    public String getConstantName() {
+      return constantName;
     }
 
-    public void setEnumValue(String enumValue) {
-      this.enumValue = enumValue;
+    public void setConstantName(String constantName) {
+      this.constantName = constantName;
     }
   }
 }
