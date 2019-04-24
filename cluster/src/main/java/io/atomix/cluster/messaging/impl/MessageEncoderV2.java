@@ -21,7 +21,7 @@ import io.netty.buffer.ByteBuf;
 /**
  * V2 message encoder.
  */
-class MessageEncoderV2 extends MessageEncoderV1 {
+class MessageEncoderV2 extends AbstractMessageEncoder {
   MessageEncoderV2(Address address) {
     super(address);
   }
@@ -30,5 +30,48 @@ class MessageEncoderV2 extends MessageEncoderV1 {
   protected void encodeAddress(ProtocolMessage message, ByteBuf buffer) {
     writeString(buffer, address.host());
     buffer.writeInt(address.port());
+  }
+
+  @Override
+  protected void encodeMessage(ProtocolMessage message, ByteBuf buffer) {
+    buffer.writeByte(message.type().id());
+    writeLong(buffer, message.id());
+  }
+
+  @Override
+  protected void encodeRequest(ProtocolRequest message, ByteBuf buffer) {
+    writeString(buffer, message.subject());
+    final byte[] payload = message.payload();
+    writeInt(buffer, payload.length);
+    buffer.writeBytes(payload);
+  }
+
+  @Override
+  protected void encodeReply(ProtocolReply message, ByteBuf buffer) {
+    buffer.writeByte(message.status().id());
+    final byte[] payload = message.payload();
+    writeInt(buffer, payload.length);
+    buffer.writeBytes(payload);
+  }
+
+  @Override
+  protected void encodeStreamRequest(ProtocolStreamRequest message, ByteBuf buffer) {
+    writeString(buffer, message.subject());
+  }
+
+  @Override
+  protected void encodeStreamReply(ProtocolStreamReply message, ByteBuf out) {
+  }
+
+  @Override
+  protected void encodeStream(ProtocolStream message, ByteBuf buffer) {
+    final byte[] payload = message.payload();
+    writeInt(buffer, payload.length);
+    buffer.writeBytes(payload);
+  }
+
+  @Override
+  protected void encodeStreamEnd(ProtocolStreamEnd message, ByteBuf buffer) {
+    buffer.writeByte(message.status().id());
   }
 }

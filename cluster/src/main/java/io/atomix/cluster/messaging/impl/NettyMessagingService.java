@@ -28,7 +28,6 @@ import java.time.Duration;
 import java.util.Enumeration;
 import java.util.Iterator;
 import java.util.Map;
-import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.StringJoiner;
 import java.util.concurrent.CompletableFuture;
@@ -51,6 +50,9 @@ import io.atomix.cluster.messaging.ManagedMessagingService;
 import io.atomix.cluster.messaging.MessagingConfig;
 import io.atomix.cluster.messaging.MessagingException;
 import io.atomix.cluster.messaging.MessagingService;
+import io.atomix.cluster.messaging.StreamFunction;
+import io.atomix.cluster.messaging.StreamHandler;
+import io.atomix.cluster.messaging.TriConsumer;
 import io.atomix.utils.AtomixRuntimeException;
 import io.atomix.utils.concurrent.Futures;
 import io.atomix.utils.concurrent.OrderedFuture;
@@ -96,7 +98,7 @@ public class NettyMessagingService implements ManagedMessagingService {
   private final MessagingConfig config;
   private final ProtocolVersion protocolVersion;
   private final AtomicBoolean started = new AtomicBoolean(false);
-  private final HandlerRegistry handlers = new HandlerRegistry();
+  private final HandlerRegistry<String, BiConsumer<ProtocolMessage, ServerConnection>> handlers = new HandlerRegistry<>();
   private volatile LocalClientConnection localConnection;
   private final Map<Channel, RemoteClientConnection> connections = Maps.newConcurrentMap();
   private final AtomicLong messageIdGenerator = new AtomicLong(0);
@@ -198,7 +200,7 @@ public class NettyMessagingService implements ManagedMessagingService {
     if (log.isInfoEnabled()) {
       log.info("Loaded cluster key store from: {}", ksLocation);
       try {
-        for (Enumeration<String> e = ks.aliases(); e.hasMoreElements();) {
+        for (Enumeration<String> e = ks.aliases(); e.hasMoreElements(); ) {
           String alias = e.nextElement();
           Key key = ks.getKey(alias, ksPwd);
           Certificate[] certs = ks.getCertificateChain(alias);
@@ -243,6 +245,10 @@ public class NettyMessagingService implements ManagedMessagingService {
     clientChannelClass = NioSocketChannel.class;
   }
 
+  private long nextMessageId() {
+    return messageIdGenerator.incrementAndGet();
+  }
+
   @Override
   public CompletableFuture<Void> sendAsync(Address address, String type, byte[] payload, boolean keepAlive) {
     long messageId = messageIdGenerator.incrementAndGet();
@@ -252,6 +258,29 @@ public class NettyMessagingService implements ManagedMessagingService {
         type,
         payload);
     return executeOnPooledConnection(address, type, c -> c.sendAsync(message), MoreExecutors.directExecutor());
+  }
+
+  @Override
+  public CompletableFuture<StreamHandler<byte[]>> sendStreamAsync(Address address, String type) {
+    long messageId = messageIdGenerator.incrementAndGet();
+    return getConnection(address, type)
+        .thenCompose(connection -> connection.sendAsync(new ProtocolStreamRequest(messageId, returnAddress, type))
+            .thenApply(v -> new StreamHandler<byte[]>() {
+              @Override
+              public void next(byte[] value) {
+                connection.sendAsync(new ProtocolStream(messageId, value));
+              }
+
+              @Override
+              public void complete() {
+                connection.sendAsync(new ProtocolStreamEnd(messageId, ProtocolStatus.OK));
+              }
+
+              @Override
+              public void error(Throwable error) {
+                connection.sendAsync(new ProtocolStreamEnd(messageId, ProtocolStatus.ERROR_HANDLER_EXCEPTION));
+              }
+            }));
   }
 
   @Override
@@ -271,17 +300,156 @@ public class NettyMessagingService implements ManagedMessagingService {
 
   @Override
   public CompletableFuture<byte[]> sendAndReceive(Address address, String type, byte[] payload, boolean keepAlive, Duration timeout, Executor executor) {
-    long messageId = messageIdGenerator.incrementAndGet();
+    long messageId = nextMessageId();
     ProtocolRequest message = new ProtocolRequest(
         messageId,
         returnAddress,
         type,
         payload);
     if (keepAlive) {
-      return executeOnPooledConnection(address, type, c -> c.sendAndReceive(message, timeout), executor);
+      return executeOnPooledConnection(address, type, c -> c.sendAndReceive(type, message, timeout).thenApply(ProtocolReply::payload), executor);
     } else {
-      return executeOnTransientConnection(address, c -> c.sendAndReceive(message, timeout), executor);
+      return executeOnTransientConnection(address, c -> c.sendAndReceive(type, message, timeout).thenApply(ProtocolReply::payload), executor);
     }
+  }
+
+  @Override
+  public CompletableFuture<StreamFunction<byte[], CompletableFuture<byte[]>>> sendStreamAndReceive(
+      Address address,
+      String type,
+      Duration timeout,
+      Executor executor) {
+    long messageId = nextMessageId();
+    return getConnection(address, type)
+        .thenCompose(connection -> connection.sendAsync(new ProtocolStreamRequest(messageId, returnAddress, type))
+            .thenApply(v -> new StreamFunction<byte[], CompletableFuture<byte[]>>() {
+              @Override
+              public void next(byte[] value) {
+                connection.sendAsync(new ProtocolStream(messageId, value));
+              }
+
+              @Override
+              public CompletableFuture<byte[]> complete() {
+                CompletableFuture<byte[]> future = new CompletableFuture<>();
+                connection.sendAndReceive(type, new ProtocolStreamEnd(messageId, ProtocolStatus.OK), timeout)
+                    .thenApply(reply -> reply.payload())
+                    .whenComplete((result, error) -> {
+                      if (error == null) {
+                        future.complete(result);
+                      } else {
+                        future.completeExceptionally(error);
+                      }
+                    });
+                return future;
+              }
+
+              @Override
+              public CompletableFuture<byte[]> error(Throwable e) {
+                CompletableFuture<byte[]> future = new CompletableFuture<>();
+                connection.sendAndReceive(type, new ProtocolStreamEnd(messageId, ProtocolStatus.ERROR_HANDLER_EXCEPTION), timeout)
+                    .thenApply(reply -> reply.payload())
+                    .whenComplete((result, error) -> {
+                      if (error == null) {
+                        future.complete(result);
+                      } else {
+                        future.completeExceptionally(error);
+                      }
+                    });
+                return future;
+              }
+            }));
+  }
+
+  @Override
+  public CompletableFuture<Void> sendAndReceiveStream(
+      Address address,
+      String type,
+      byte[] payload,
+      StreamHandler<byte[]> handler,
+      Duration timeout,
+      Executor executor) {
+    long messageId = nextMessageId();
+    return getConnection(address, type)
+        .thenCompose(connection -> {
+          connection.registerStreamHandler(messageId, new StreamHandler<byte[]>() {
+            @Override
+            public void next(byte[] value) {
+              executor.execute(() -> handler.next(value));
+            }
+
+            @Override
+            public void complete() {
+              executor.execute(() -> handler.complete());
+            }
+
+            @Override
+            public void error(Throwable error) {
+              executor.execute(() -> handler.error(error));
+            }
+          });
+          CompletableFuture<Void> future = new CompletableFuture<>();
+          connection.sendAsync(new ProtocolRequest(messageId, returnAddress, type, payload))
+              .whenComplete((result, error) -> {
+                if (error != null) {
+                  connection.unregisterStreamHandler(messageId);
+                  future.completeExceptionally(error);
+                } else {
+                  future.complete(null);
+                }
+              });
+          return future;
+        });
+  }
+
+  @Override
+  public CompletableFuture<StreamHandler<byte[]>> sendStreamAndReceiveStream(
+      Address address,
+      String type,
+      StreamHandler<byte[]> handler,
+      Duration timeout,
+      Executor executor) {
+    long messageId = nextMessageId();
+    return getConnection(address, type)
+        .thenCompose(connection -> {
+          connection.registerStreamHandler(messageId, new StreamHandler<byte[]>() {
+            @Override
+            public void next(byte[] value) {
+              executor.execute(() -> handler.next(value));
+            }
+
+            @Override
+            public void complete() {
+              executor.execute(() -> handler.complete());
+            }
+
+            @Override
+            public void error(Throwable error) {
+              executor.execute(() -> handler.error(error));
+            }
+          });
+          return connection.sendAsync(new ProtocolStreamRequest(messageId, returnAddress, type))
+              .whenComplete((result, error) -> {
+                if (error != null) {
+                  connection.unregisterStreamHandler(messageId);
+                }
+              })
+              .thenApplyAsync(v -> new StreamHandler<byte[]>() {
+                @Override
+                public void next(byte[] value) {
+                  connection.sendAsync(new ProtocolStream(messageId, value));
+                }
+
+                @Override
+                public void complete() {
+                  connection.sendAsync(new ProtocolStreamEnd(messageId, ProtocolStatus.OK));
+                }
+
+                @Override
+                public void error(Throwable error) {
+                  connection.sendAsync(new ProtocolStreamEnd(messageId, ProtocolStatus.ERROR_HANDLER_EXCEPTION));
+                }
+              }, executor);
+        });
   }
 
   /**
@@ -356,6 +524,26 @@ public class NettyMessagingService implements ManagedMessagingService {
   }
 
   /**
+   * Returns the connection for the given address and type.
+   *
+   * @param address the connection address
+   * @param type    the messsage type
+   * @return the connection
+   */
+  private CompletableFuture<ClientConnection> getConnection(Address address, String type) {
+    CompletableFuture<ClientConnection> future = new CompletableFuture<>();
+    channelPool.getChannel(address, type).whenComplete((channel, channelError) -> {
+      if (channelError == null) {
+        final ClientConnection connection = getOrCreateClientConnection(channel);
+        future.complete(connection);
+      } else {
+        future.completeExceptionally(channelError);
+      }
+    });
+    return future;
+  }
+
+  /**
    * Executes the given callback on a transient connection.
    *
    * @param address  the connection address
@@ -411,39 +599,126 @@ public class NettyMessagingService implements ManagedMessagingService {
   }
 
   @Override
+  @SuppressWarnings("unchecked")
   public void registerHandler(String type, BiConsumer<Address, byte[]> handler, Executor executor) {
-    handlers.register(type, (message, connection) -> executor.execute(() ->
+    handlers.register(type, (BiConsumer) (BiConsumer<ProtocolRequest, ServerConnection>) (message, connection) -> executor.execute(() ->
         handler.accept(message.sender(), message.payload())));
   }
 
   @Override
+  @SuppressWarnings("unchecked")
   public void registerHandler(String type, BiFunction<Address, byte[], byte[]> handler, Executor executor) {
-    handlers.register(type, (message, connection) -> executor.execute(() -> {
-      byte[] responsePayload = null;
-      ProtocolReply.Status status = ProtocolReply.Status.OK;
+    handlers.register(type, (BiConsumer) (BiConsumer<ProtocolRequest, ServerConnection>) (message, connection) -> executor.execute(() -> {
       try {
-        responsePayload = handler.apply(message.sender(), message.payload());
+        byte[] responsePayload = handler.apply(message.sender(), message.payload());
+        connection.reply(new ProtocolReply(message.id(), ProtocolStatus.OK, responsePayload));
       } catch (Exception e) {
         log.warn("An error occurred in a message handler: {}", e);
-        status = ProtocolReply.Status.ERROR_HANDLER_EXCEPTION;
+        connection.reply(new ProtocolReply(message.id(), ProtocolStatus.ERROR_HANDLER_EXCEPTION));
       }
-      connection.reply(message, status, Optional.ofNullable(responsePayload));
     }));
   }
 
   @Override
+  @SuppressWarnings("unchecked")
   public void registerHandler(String type, BiFunction<Address, byte[], CompletableFuture<byte[]>> handler) {
-    handlers.register(type, (message, connection) -> {
+    handlers.register(type, (BiConsumer) (BiConsumer<ProtocolRequest, ServerConnection>) (message, connection) -> {
       handler.apply(message.sender(), message.payload()).whenComplete((result, error) -> {
-        ProtocolReply.Status status;
         if (error == null) {
-          status = ProtocolReply.Status.OK;
+          connection.reply(new ProtocolReply(message.id(), ProtocolStatus.OK, result));
         } else {
           log.warn("An error occurred in a message handler: {}", error);
-          status = ProtocolReply.Status.ERROR_HANDLER_EXCEPTION;
+          connection.reply(new ProtocolReply(message.id(), ProtocolStatus.ERROR_HANDLER_EXCEPTION));
         }
-        connection.reply(message, status, Optional.ofNullable(result));
       });
+    });
+  }
+
+  @Override
+  @SuppressWarnings("unchecked")
+  public void registerStreamHandler(String type, Function<Address, StreamFunction<byte[], CompletableFuture<byte[]>>> handler) {
+    handlers.register(type, (BiConsumer) (BiConsumer<ProtocolStreamRequest, ServerConnection>) (message, connection) -> {
+      StreamFunction<byte[], CompletableFuture<byte[]>> function = handler.apply(message.sender());
+      connection.registerStreamHandler(message.id(), new StreamHandler<byte[]>() {
+        @Override
+        public void next(byte[] value) {
+          function.next(value);
+        }
+
+        @Override
+        public void complete() {
+          function.complete().whenComplete((result, error) -> {
+            if (error == null) {
+              connection.reply(new ProtocolReply(message.id(), ProtocolStatus.OK, result));
+            } else {
+              log.warn("An error occurred in a message handler: {}", error);
+              connection.reply(new ProtocolReply(message.id(), ProtocolStatus.ERROR_HANDLER_EXCEPTION));
+            }
+          });
+        }
+
+        @Override
+        public void error(Throwable e) {
+          function.error(e).whenComplete((result, error) -> {
+            if (error == null) {
+              connection.reply(new ProtocolReply(message.id(), ProtocolStatus.OK, result));
+            } else {
+              log.warn("An error occurred in a message handler: {}", error);
+              connection.reply(new ProtocolReply(message.id(), ProtocolStatus.ERROR_HANDLER_EXCEPTION));
+            }
+          });
+        }
+      });
+    });
+  }
+
+  @Override
+  @SuppressWarnings("unchecked")
+  public void registerStreamingHandler(String type, TriConsumer<Address, byte[], StreamHandler<byte[]>> handler) {
+    handlers.register(type, (BiConsumer) (BiConsumer<ProtocolRequest, ServerConnection>) (message, connection) -> {
+      connection.reply(new ProtocolStreamReply(message.id()));
+      handler.accept(message.sender(), message.payload(), new StreamHandler<byte[]>() {
+        @Override
+        public void next(byte[] value) {
+          connection.reply(new ProtocolStream(message.id(), value));
+        }
+
+        @Override
+        public void complete() {
+          connection.reply(new ProtocolStreamEnd(message.id(), ProtocolStatus.OK));
+        }
+
+        @Override
+        public void error(Throwable error) {
+          log.warn("An error occurred in a message handler: {}", error);
+          connection.reply(new ProtocolStreamEnd(message.id(), ProtocolStatus.ERROR_HANDLER_EXCEPTION));
+        }
+      });
+    });
+  }
+
+  @Override
+  @SuppressWarnings("unchecked")
+  public void registerStreamingStreamHandler(String type, BiFunction<Address, StreamHandler<byte[]>, StreamHandler<byte[]>> handler) {
+    handlers.register(type, (BiConsumer) (BiConsumer<ProtocolStreamRequest, ServerConnection>) (message, connection) -> {
+      connection.reply(new ProtocolStreamReply(message.id()));
+      connection.registerStreamHandler(message.id(), handler.apply(message.sender(), new StreamHandler<byte[]>() {
+        @Override
+        public void next(byte[] value) {
+          connection.reply(new ProtocolStream(message.id(), value));
+        }
+
+        @Override
+        public void complete() {
+          connection.reply(new ProtocolStreamEnd(message.id(), ProtocolStatus.OK));
+        }
+
+        @Override
+        public void error(Throwable error) {
+          log.warn("An error occurred in a message handler: {}", error);
+          connection.reply(new ProtocolStreamEnd(message.id(), ProtocolStatus.ERROR_HANDLER_EXCEPTION));
+        }
+      }));
     });
   }
 
@@ -678,7 +953,7 @@ public class NettyMessagingService implements ManagedMessagingService {
   /**
    * Base class for handshake handlers.
    */
-  private abstract class HandshakeHandlerAdapter<M extends ProtocolMessage> extends ChannelInboundHandlerAdapter {
+  private abstract class HandshakeHandlerAdapter extends ChannelInboundHandlerAdapter {
 
     /**
      * Writes the protocol version to the given context.
@@ -721,19 +996,19 @@ public class NettyMessagingService implements ManagedMessagingService {
      * @param connection      the client or server connection for which to activate the protocol version
      * @param protocolVersion the protocol version to activate
      */
-    void activateProtocolVersion(ChannelHandlerContext context, Connection<M> connection, ProtocolVersion protocolVersion) {
+    void activateProtocolVersion(ChannelHandlerContext context, Connection connection, ProtocolVersion protocolVersion) {
       MessagingProtocol protocol = protocolVersion.createProtocol(returnAddress);
       context.pipeline().remove(this);
       context.pipeline().addLast("encoder", protocol.newEncoder());
       context.pipeline().addLast("decoder", protocol.newDecoder());
-      context.pipeline().addLast("handler", new MessageDispatcher<>(connection));
+      context.pipeline().addLast("handler", new MessageDispatcher(connection));
     }
   }
 
   /**
    * Client handshake handler.
    */
-  private class ClientHandshakeHandlerAdapter extends HandshakeHandlerAdapter<ProtocolReply> {
+  private class ClientHandshakeHandlerAdapter extends HandshakeHandlerAdapter {
     private final CompletableFuture<Channel> future;
 
     ClientHandshakeHandlerAdapter(CompletableFuture<Channel> future) {
@@ -769,7 +1044,7 @@ public class NettyMessagingService implements ManagedMessagingService {
     }
 
     @Override
-    void activateProtocolVersion(ChannelHandlerContext context, Connection<ProtocolReply> connection, ProtocolVersion protocolVersion) {
+    void activateProtocolVersion(ChannelHandlerContext context, Connection connection, ProtocolVersion protocolVersion) {
       log.debug("Activating client protocol version {} for connection to {}", protocolVersion, context.channel().remoteAddress());
       super.activateProtocolVersion(context, connection, protocolVersion);
       future.complete(context.channel());
@@ -779,7 +1054,7 @@ public class NettyMessagingService implements ManagedMessagingService {
   /**
    * Server handshake handler.
    */
-  private class ServerHandshakeHandlerAdapter extends HandshakeHandlerAdapter<ProtocolRequest> {
+  private class ServerHandshakeHandlerAdapter extends HandshakeHandlerAdapter {
     @Override
     public void channelRead(ChannelHandlerContext context, Object message) throws Exception {
       // Read the protocol version from the client handshake. If the client's protocol version is unknown
@@ -796,7 +1071,7 @@ public class NettyMessagingService implements ManagedMessagingService {
     }
 
     @Override
-    void activateProtocolVersion(ChannelHandlerContext context, Connection<ProtocolRequest> connection, ProtocolVersion protocolVersion) {
+    void activateProtocolVersion(ChannelHandlerContext context, Connection connection, ProtocolVersion protocolVersion) {
       log.debug("Activating server protocol version {} for connection to {}", protocolVersion, context.channel().remoteAddress());
       super.activateProtocolVersion(context, connection, protocolVersion);
     }
@@ -805,10 +1080,10 @@ public class NettyMessagingService implements ManagedMessagingService {
   /**
    * Connection message dispatcher.
    */
-  private class MessageDispatcher<M extends ProtocolMessage> extends SimpleChannelInboundHandler<Object> {
-    private final Connection<M> connection;
+  private class MessageDispatcher extends SimpleChannelInboundHandler<Object> {
+    private final Connection connection;
 
-    MessageDispatcher(Connection<M> connection) {
+    MessageDispatcher(Connection connection) {
       this.connection = connection;
     }
 
@@ -816,7 +1091,7 @@ public class NettyMessagingService implements ManagedMessagingService {
     @SuppressWarnings("unchecked")
     protected void channelRead0(ChannelHandlerContext ctx, Object message) throws Exception {
       try {
-        connection.dispatch((M) message);
+        connection.dispatch((ProtocolMessage) message);
       } catch (RejectedExecutionException e) {
         log.warn("Unable to dispatch message due to {}", e.getMessage());
       }

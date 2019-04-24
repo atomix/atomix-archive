@@ -15,13 +15,15 @@
  */
 package io.atomix.cluster.messaging;
 
-import io.atomix.utils.net.Address;
-
 import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
+import java.util.function.Function;
+
+import com.google.common.util.concurrent.MoreExecutors;
+import io.atomix.utils.net.Address;
 
 /**
  * Interface for low level messaging primitives.
@@ -59,6 +61,16 @@ public interface MessagingService {
    * @return future that is completed when the message is sent
    */
   CompletableFuture<Void> sendAsync(Address address, String type, byte[] payload, boolean keepAlive);
+
+  /**
+   * Sends a message asynchronously to the specified communication address.
+   * The message is specified using the type and payload.
+   *
+   * @param address address to send the message to.
+   * @param type    type of message.
+   * @return future that is completed when the message is sent
+   */
+  CompletableFuture<StreamHandler<byte[]>> sendStreamAsync(Address address, String type);
 
   /**
    * Sends a message asynchronously and expects a response.
@@ -160,6 +172,48 @@ public interface MessagingService {
    */
   CompletableFuture<byte[]> sendAndReceive(Address address, String type, byte[] payload, boolean keepAlive, Duration timeout, Executor executor);
 
+  default CompletableFuture<StreamFunction<byte[], CompletableFuture<byte[]>>> sendStreamAndReceive(Address address, String type) {
+    return sendStreamAndReceive(address, type, null, MoreExecutors.directExecutor());
+  }
+
+  default CompletableFuture<StreamFunction<byte[], CompletableFuture<byte[]>>> sendStreamAndReceive(Address address, String type, Duration timeout) {
+    return sendStreamAndReceive(address, type, timeout, MoreExecutors.directExecutor());
+  }
+
+  default CompletableFuture<StreamFunction<byte[], CompletableFuture<byte[]>>> sendStreamAndReceive(Address address, String type, Executor executor) {
+    return sendStreamAndReceive(address, type, null, executor);
+  }
+
+  CompletableFuture<StreamFunction<byte[], CompletableFuture<byte[]>>> sendStreamAndReceive(Address address, String type, Duration timeout, Executor executor);
+
+  default CompletableFuture<Void> sendAndReceiveStream(Address address, String type, byte[] payload, StreamHandler<byte[]> handler) {
+    return sendAndReceiveStream(address, type, payload, handler, null, MoreExecutors.directExecutor());
+  }
+
+  default CompletableFuture<Void> sendAndReceiveStream(Address address, String type, byte[] payload, StreamHandler<byte[]> handler, Duration timeout) {
+    return sendAndReceiveStream(address, type, payload, handler, timeout, MoreExecutors.directExecutor());
+  }
+
+  default CompletableFuture<Void> sendAndReceiveStream(Address address, String type, byte[] payload, StreamHandler<byte[]> handler, Executor executor) {
+    return sendAndReceiveStream(address, type, payload, handler, null, executor);
+  }
+
+  CompletableFuture<Void> sendAndReceiveStream(Address address, String type, byte[] payload, StreamHandler<byte[]> handler, Duration timeout, Executor executor);
+
+  default CompletableFuture<StreamHandler<byte[]>> sendStreamAndReceiveStream(Address address, String type, StreamHandler<byte[]> handler) {
+    return sendStreamAndReceiveStream(address, type, handler, null, MoreExecutors.directExecutor());
+  }
+
+  default CompletableFuture<StreamHandler<byte[]>> sendStreamAndReceiveStream(Address address, String type, StreamHandler<byte[]> handler, Duration timeout) {
+    return sendStreamAndReceiveStream(address, type, handler, timeout, MoreExecutors.directExecutor());
+  }
+
+  default CompletableFuture<StreamHandler<byte[]>> sendStreamAndReceiveStream(Address address, String type, StreamHandler<byte[]> handler, Executor executor) {
+    return sendStreamAndReceiveStream(address, type, handler, null, executor);
+  }
+
+  CompletableFuture<StreamHandler<byte[]>> sendStreamAndReceiveStream(Address address, String type, StreamHandler<byte[]> handler, Duration timeout, Executor executor);
+
   /**
    * Registers a new message handler for message type.
    *
@@ -185,6 +239,12 @@ public interface MessagingService {
    * @param handler message handler
    */
   void registerHandler(String type, BiFunction<Address, byte[], CompletableFuture<byte[]>> handler);
+
+  void registerStreamHandler(String type, Function<Address, StreamFunction<byte[], CompletableFuture<byte[]>>> handler);
+
+  void registerStreamingHandler(String type, TriConsumer<Address, byte[], StreamHandler<byte[]>> handler);
+
+  void registerStreamingStreamHandler(String type, BiFunction<Address, StreamHandler<byte[]>, StreamHandler<byte[]>> handler);
 
   /**
    * Unregister current handler, if one exists for message type.

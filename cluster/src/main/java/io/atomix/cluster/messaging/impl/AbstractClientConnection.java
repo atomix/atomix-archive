@@ -15,13 +15,6 @@
  */
 package io.atomix.cluster.messaging.impl;
 
-import com.google.common.collect.Maps;
-import io.atomix.cluster.messaging.MessagingException;
-import org.apache.commons.math3.stat.descriptive.DescriptiveStatistics;
-import org.apache.commons.math3.stat.descriptive.SynchronizedDescriptiveStatistics;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.net.ConnectException;
 import java.time.Duration;
 import java.util.Map;
@@ -33,10 +26,18 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import com.google.common.collect.Maps;
+import io.atomix.cluster.messaging.MessagingException;
+import io.atomix.cluster.messaging.StreamHandler;
+import org.apache.commons.math3.stat.descriptive.DescriptiveStatistics;
+import org.apache.commons.math3.stat.descriptive.SynchronizedDescriptiveStatistics;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 /**
  * Base class for client-side connections. Manages request futures and timeouts.
  */
-abstract class AbstractClientConnection implements ClientConnection {
+abstract class AbstractClientConnection extends AbstractConnection implements ClientConnection {
   private static final int WINDOW_SIZE = 10;
   private static final int MIN_SAMPLES = 50;
   private static final int TIMEOUT_FACTOR = 5;
@@ -57,20 +58,59 @@ abstract class AbstractClientConnection implements ClientConnection {
   }
 
   @Override
-  public void dispatch(ProtocolReply message) {
+  public void dispatch(ProtocolMessage message) {
+    switch (message.type()) {
+      case REPLY:
+        dispatch((ProtocolReply) message);
+        break;
+      case STREAM:
+        dispatch((ProtocolStream) message);
+        break;
+      case STREAM_REPLY:
+        dispatch((ProtocolStreamReply) message);
+        break;
+      case STREAM_END:
+        dispatch((ProtocolStreamEnd) message);
+        break;
+    }
+  }
+
+  protected void dispatch(ProtocolStreamReply message) {
+    // Do nothing for stream initialization.
+  }
+
+  /**
+   * Handles a reply message.
+   *
+   * @param message the reply message
+   */
+  private void dispatch(ProtocolReply message) {
     Callback callback = callbacks.remove(message.id());
     if (callback != null) {
-      if (message.status() == ProtocolReply.Status.OK) {
-        callback.complete(message.payload());
-      } else if (message.status() == ProtocolReply.Status.ERROR_NO_HANDLER) {
+      if (message.status() == ProtocolStatus.OK) {
+        callback.complete(message);
+      } else if (message.status() == ProtocolStatus.ERROR_NO_HANDLER) {
         callback.completeExceptionally(new MessagingException.NoRemoteHandler());
-      } else if (message.status() == ProtocolReply.Status.ERROR_HANDLER_EXCEPTION) {
+      } else if (message.status() == ProtocolStatus.ERROR_HANDLER_EXCEPTION) {
         callback.completeExceptionally(new MessagingException.RemoteHandlerFailure());
-      } else if (message.status() == ProtocolReply.Status.PROTOCOL_EXCEPTION) {
+      } else if (message.status() == ProtocolStatus.PROTOCOL_EXCEPTION) {
         callback.completeExceptionally(new MessagingException.ProtocolException());
       }
     } else {
-      log.debug("Received a reply for message id:[{}] but was unable to locate the request handle", message.id());
+      StreamHandler<byte[]> handler = unregisterStreamHandler(message.id());
+      if (handler != null) {
+        if (message.status() == ProtocolStatus.OK) {
+          handler.complete();
+        } else if (message.status() == ProtocolStatus.ERROR_NO_HANDLER) {
+          handler.error(new MessagingException.NoRemoteHandler());
+        } else if (message.status() == ProtocolStatus.ERROR_HANDLER_EXCEPTION) {
+          handler.error(new MessagingException.RemoteHandlerFailure());
+        } else if (message.status() == ProtocolStatus.PROTOCOL_EXCEPTION) {
+          handler.error(new MessagingException.ProtocolException());
+        }
+      } else {
+        log.debug("Received a reply for message id:[{}] but was unable to locate the request handle", message.id());
+      }
     }
   }
 
@@ -131,9 +171,9 @@ abstract class AbstractClientConnection implements ClientConnection {
     private final long time = System.currentTimeMillis();
     private final long timeout;
     private final ScheduledFuture<?> scheduledFuture;
-    private final CompletableFuture<byte[]> replyFuture;
+    private final CompletableFuture<ProtocolReply> replyFuture;
 
-    Callback(long id, String type, Duration timeout, CompletableFuture<byte[]> future) {
+    Callback(long id, String type, Duration timeout, CompletableFuture<ProtocolReply> future) {
       this.id = id;
       this.type = type;
       this.timeout = getTimeoutMillis(type, timeout);
@@ -163,11 +203,11 @@ abstract class AbstractClientConnection implements ClientConnection {
     /**
      * Completes the callback with the given value.
      *
-     * @param value the value with which to complete the callback
+     * @param reply the value with which to complete the callback
      */
-    void complete(byte[] value) {
+    void complete(ProtocolReply reply) {
       scheduledFuture.cancel(false);
-      replyFuture.complete(value);
+      replyFuture.complete(reply);
     }
 
     /**

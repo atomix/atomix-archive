@@ -15,11 +15,11 @@
  */
 package io.atomix.cluster.messaging.impl;
 
-import io.netty.channel.Channel;
-
 import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ScheduledExecutorService;
+
+import io.netty.channel.Channel;
 
 /**
  * Client-side Netty remote connection.
@@ -33,7 +33,7 @@ final class RemoteClientConnection extends AbstractClientConnection {
   }
 
   @Override
-  public CompletableFuture<Void> sendAsync(ProtocolRequest message) {
+  public CompletableFuture<Void> sendAsync(ProtocolMessage message) {
     CompletableFuture<Void> future = new CompletableFuture<>();
     channel.writeAndFlush(message).addListener(channelFuture -> {
       if (!channelFuture.isSuccess()) {
@@ -46,9 +46,9 @@ final class RemoteClientConnection extends AbstractClientConnection {
   }
 
   @Override
-  public CompletableFuture<byte[]> sendAndReceive(ProtocolRequest message, Duration timeout) {
-    CompletableFuture<byte[]> future = new CompletableFuture<>();
-    Callback callback = new Callback(message.id(), message.subject(), timeout, future);
+  public CompletableFuture<ProtocolReply> sendAndReceive(String subject, ProtocolMessage message, Duration timeout) {
+    CompletableFuture<ProtocolReply> future = new CompletableFuture<>();
+    Callback callback = new Callback(message.id(), subject, timeout, future);
     channel.writeAndFlush(message).addListener(channelFuture -> {
       if (!channelFuture.isSuccess()) {
         callback.completeExceptionally(channelFuture.cause());

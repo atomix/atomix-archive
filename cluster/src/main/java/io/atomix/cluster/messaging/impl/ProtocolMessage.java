@@ -25,7 +25,11 @@ public abstract class ProtocolMessage {
    */
   public enum Type {
     REQUEST(1),
-    REPLY(2);
+    REPLY(2),
+    STREAM_REQUEST(3),
+    STREAM_REPLY(4),
+    STREAM(5),
+    STREAM_END(6);
 
     private final int id;
 
@@ -54,35 +58,41 @@ public abstract class ProtocolMessage {
           return REQUEST;
         case 2:
           return REPLY;
+        case 3:
+          return STREAM_REQUEST;
+        case 4:
+          return STREAM_REPLY;
+        case 5:
+          return STREAM;
+        case 6:
+          return STREAM_END;
         default:
           throw new IllegalArgumentException("Unknown status ID " + id);
       }
     }
   }
 
-  private final long id;
-  private final byte[] payload;
+  protected static final byte[] EMPTY_PAYLOAD = new byte[0];
 
-  protected ProtocolMessage(long id, byte[] payload) {
+  private final long id;
+
+  protected ProtocolMessage(long id) {
     this.id = id;
-    this.payload = payload;
   }
 
+  /**
+   * Returns the message type.
+   *
+   * @return the message type
+   */
   public abstract Type type();
 
-  public boolean isRequest() {
-    return type() == Type.REQUEST;
-  }
-
-  public boolean isReply() {
-    return type() == Type.REPLY;
-  }
-
+  /**
+   * Returns the message ID.
+   *
+   * @return the message ID
+   */
   public long id() {
     return id;
-  }
-
-  public byte[] payload() {
-    return payload;
   }
 }

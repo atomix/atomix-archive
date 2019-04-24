@@ -47,17 +47,33 @@ abstract class AbstractMessageEncoder extends MessageToByteEncoder<Object> {
       ChannelHandlerContext context,
       Object rawMessage,
       ByteBuf out) {
+    ProtocolMessage message = (ProtocolMessage) rawMessage;
     if (!addressWritten) {
-      encodeAddress((ProtocolMessage) rawMessage, out);
+      encodeAddress(message, out);
       addressWritten = true;
     }
 
-    encodeMessage((ProtocolMessage) rawMessage, out);
+    encodeMessage(message, out);
 
-    if (rawMessage instanceof ProtocolRequest) {
-      encodeRequest((ProtocolRequest) rawMessage, out);
-    } else if (rawMessage instanceof ProtocolReply) {
-      encodeReply((ProtocolReply) rawMessage, out);
+    switch (message.type()) {
+      case REQUEST:
+        encodeRequest((ProtocolRequest) message, out);
+        break;
+      case REPLY:
+        encodeReply((ProtocolReply) message, out);
+        break;
+      case STREAM_REQUEST:
+        encodeStreamRequest((ProtocolStreamRequest) message, out);
+        break;
+      case STREAM_REPLY:
+        encodeStreamReply((ProtocolStreamReply) message, out);
+        break;
+      case STREAM:
+        encodeStream((ProtocolStream) message, out);
+        break;
+      case STREAM_END:
+        encodeStreamEnd((ProtocolStreamEnd) message, out);
+        break;
     }
   }
 
@@ -65,9 +81,17 @@ abstract class AbstractMessageEncoder extends MessageToByteEncoder<Object> {
 
   protected abstract void encodeMessage(ProtocolMessage message, ByteBuf buffer);
 
-  protected abstract void encodeRequest(ProtocolRequest request, ByteBuf out);
+  protected abstract void encodeRequest(ProtocolRequest message, ByteBuf buffer);
 
-  protected abstract void encodeReply(ProtocolReply reply, ByteBuf out);
+  protected abstract void encodeReply(ProtocolReply message, ByteBuf buffer);
+
+  protected abstract void encodeStreamRequest(ProtocolStreamRequest message, ByteBuf buffer);
+
+  protected abstract void encodeStreamReply(ProtocolStreamReply message, ByteBuf buffer);
+
+  protected abstract void encodeStream(ProtocolStream message, ByteBuf buffer);
+
+  protected abstract void encodeStreamEnd(ProtocolStreamEnd message, ByteBuf buffer);
 
   static void writeString(ByteBuf buffer, String value) {
     final ByteBuf buf = buffer.alloc().buffer(ByteBufUtil.utf8MaxBytes(value));

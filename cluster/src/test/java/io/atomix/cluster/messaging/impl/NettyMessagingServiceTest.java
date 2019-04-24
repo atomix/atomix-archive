@@ -15,17 +15,6 @@
  */
 package io.atomix.cluster.messaging.impl;
 
-import com.google.common.util.concurrent.MoreExecutors;
-import com.google.common.util.concurrent.Uninterruptibles;
-import io.atomix.cluster.messaging.ManagedMessagingService;
-import io.atomix.cluster.messaging.MessagingConfig;
-import io.atomix.utils.net.Address;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Ignore;
-import org.junit.Test;
-import org.slf4j.Logger;
-
 import java.io.IOException;
 import java.net.ConnectException;
 import java.net.ServerSocket;
@@ -42,6 +31,20 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiFunction;
+
+import com.google.common.util.concurrent.MoreExecutors;
+import com.google.common.util.concurrent.Uninterruptibles;
+import io.atomix.cluster.messaging.ManagedMessagingService;
+import io.atomix.cluster.messaging.MessagingConfig;
+import io.atomix.cluster.messaging.StreamFunction;
+import io.atomix.cluster.messaging.StreamHandler;
+import io.atomix.utils.concurrent.Futures;
+import io.atomix.utils.net.Address;
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Ignore;
+import org.junit.Test;
+import org.slf4j.Logger;
 
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
@@ -69,8 +72,6 @@ public class NettyMessagingServiceTest {
 
   Address address1;
   Address address2;
-  Address addressv11;
-  Address addressv12;
   Address addressv21;
   Address addressv22;
   Address invalidAddress;
@@ -83,12 +84,6 @@ public class NettyMessagingServiceTest {
     address2 = Address.from(findAvailablePort(5002));
     netty2 = (ManagedMessagingService) new NettyMessagingService("test", address2, new MessagingConfig()).start().join();
 
-    addressv11 = Address.from(findAvailablePort(5003));
-    nettyv11 = (ManagedMessagingService) new NettyMessagingService("test", addressv11, new MessagingConfig(), ProtocolVersion.V1).start().join();
-
-    addressv12 = Address.from(findAvailablePort(5004));
-    nettyv12 = (ManagedMessagingService) new NettyMessagingService("test", addressv12, new MessagingConfig(), ProtocolVersion.V1).start().join();
-
     addressv21 = Address.from(findAvailablePort(5005));
     nettyv21 = (ManagedMessagingService) new NettyMessagingService("test", addressv21, new MessagingConfig(), ProtocolVersion.V2).start().join();
 
@@ -100,6 +95,7 @@ public class NettyMessagingServiceTest {
 
   /**
    * Returns a random String to be used as a test subject.
+   *
    * @return string
    */
   private String nextSubject() {
@@ -257,15 +253,115 @@ public class NettyMessagingServiceTest {
   }
 
   @Test
-  public void testV1() throws Exception {
+  public void testSendStream() throws Exception {
     String subject;
     byte[] payload = "Hello world!".getBytes();
     byte[] response;
 
     subject = nextSubject();
-    nettyv11.registerHandler(subject, (address, bytes) -> CompletableFuture.completedFuture(bytes));
-    response = nettyv12.sendAndReceive(addressv11, subject, payload).get(10, TimeUnit.SECONDS);
+    netty2.registerStreamHandler(subject, a -> new StreamFunction<byte[], CompletableFuture<byte[]>>() {
+      private byte[] value;
+
+      @Override
+      public void next(byte[] value) {
+        this.value = value;
+      }
+
+      @Override
+      public CompletableFuture<byte[]> complete() {
+        return CompletableFuture.completedFuture(value);
+      }
+
+      @Override
+      public CompletableFuture<byte[]> error(Throwable error) {
+        return Futures.exceptionalFuture(error);
+      }
+    });
+    StreamFunction<byte[], CompletableFuture<byte[]>> stream = netty1.sendStreamAndReceive(address2, subject).get(10, TimeUnit.SECONDS);
+    stream.next(payload);
+    response = stream.complete().get(10, TimeUnit.SECONDS);
     assertArrayEquals(payload, response);
+  }
+
+  @Test
+  public void testReceiveStream() throws Exception {
+    String subject;
+    byte[] payload = "Hello world!".getBytes();
+
+    subject = nextSubject();
+    netty2.registerStreamingHandler(subject, (address, bytes, handler) -> {
+      handler.next(bytes);
+      handler.complete();
+    });
+
+    CountDownLatch latch = new CountDownLatch(1);
+    final AtomicReference<byte[]> response = new AtomicReference<>();
+    netty1.sendAndReceiveStream(address2, subject, payload, new StreamHandler<byte[]>() {
+      @Override
+      public void next(byte[] value) {
+        response.set(value);
+      }
+
+      @Override
+      public void complete() {
+        latch.countDown();
+      }
+
+      @Override
+      public void error(Throwable error) {
+        latch.countDown();
+      }
+    });
+    latch.await(10, TimeUnit.SECONDS);
+    assertArrayEquals(payload, response.get());
+  }
+
+  @Test
+  public void testSendAndReceiveStream() throws Exception {
+    String subject;
+    byte[] payload = "Hello world!".getBytes();
+
+    subject = nextSubject();
+
+    netty2.registerStreamingStreamHandler(subject, (address, handler) -> new StreamHandler<byte[]>() {
+      @Override
+      public void next(byte[] value) {
+        handler.next(value);
+      }
+
+      @Override
+      public void complete() {
+        handler.complete();
+      }
+
+      @Override
+      public void error(Throwable error) {
+        handler.error(error);
+      }
+    });
+
+    CountDownLatch latch = new CountDownLatch(1);
+    final AtomicReference<byte[]> response = new AtomicReference<>();
+    StreamHandler<byte[]> handler = netty1.sendStreamAndReceiveStream(address2, subject, new StreamHandler<byte[]>() {
+      @Override
+      public void next(byte[] value) {
+        response.set(value);
+      }
+
+      @Override
+      public void complete() {
+        latch.countDown();
+      }
+
+      @Override
+      public void error(Throwable error) {
+        latch.countDown();
+      }
+    }).get(10, TimeUnit.SECONDS);
+    handler.next(payload);
+    handler.complete();
+    latch.await(10, TimeUnit.SECONDS);
+    assertArrayEquals(payload, response.get());
   }
 
   @Test
@@ -277,23 +373,6 @@ public class NettyMessagingServiceTest {
     subject = nextSubject();
     nettyv21.registerHandler(subject, (address, bytes) -> CompletableFuture.completedFuture(bytes));
     response = nettyv22.sendAndReceive(addressv21, subject, payload).get(10, TimeUnit.SECONDS);
-    assertArrayEquals(payload, response);
-  }
-
-  @Test
-  public void testVersionNegotiation() throws Exception {
-    String subject;
-    byte[] payload = "Hello world!".getBytes();
-    byte[] response;
-
-    subject = nextSubject();
-    nettyv11.registerHandler(subject, (address, bytes) -> CompletableFuture.completedFuture(bytes));
-    response = nettyv21.sendAndReceive(addressv11, subject, payload).get(10, TimeUnit.SECONDS);
-    assertArrayEquals(payload, response);
-
-    subject = nextSubject();
-    nettyv22.registerHandler(subject, (address, bytes) -> CompletableFuture.completedFuture(bytes));
-    response = nettyv12.sendAndReceive(addressv22, subject, payload).get(10, TimeUnit.SECONDS);
     assertArrayEquals(payload, response);
   }
 

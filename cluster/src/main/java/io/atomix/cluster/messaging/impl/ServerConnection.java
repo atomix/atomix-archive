@@ -15,21 +15,17 @@
  */
 package io.atomix.cluster.messaging.impl;
 
-import java.util.Optional;
-
 /**
  * Server-side connection interface which handles replying to messages.
  */
-interface ServerConnection extends Connection<ProtocolRequest> {
+interface ServerConnection extends Connection {
 
   /**
    * Sends a reply to the other side of the connection.
    *
-   * @param message the message to which to reply
-   * @param status  the reply status
-   * @param payload the response payload
+   * @param message the response message
    */
-  void reply(ProtocolRequest message, ProtocolReply.Status status, Optional<byte[]> payload);
+  void reply(ProtocolMessage message);
 
   /**
    * Closes the connection.

@@ -15,45 +15,23 @@
  */
 package io.atomix.cluster.messaging.impl;
 
-import com.google.common.base.MoreObjects;
-import io.atomix.utils.misc.ArraySizeHashPrinter;
-
 /**
  * Internal reply message.
  */
-public class ProtocolReply extends ProtocolMessage {
-  private final ProtocolStatus status;
+public final class ProtocolStream extends ProtocolMessage {
   private final byte[] payload;
 
-  public ProtocolReply(long id, ProtocolStatus status) {
-    this(id, status, EMPTY_PAYLOAD);
-  }
-
-  public ProtocolReply(long id, ProtocolStatus status, byte[] payload) {
+  public ProtocolStream(long id, byte[] payload) {
     super(id);
-    this.status = status;
     this.payload = payload;
   }
 
   @Override
   public Type type() {
-    return Type.REPLY;
-  }
-
-  public ProtocolStatus status() {
-    return status;
+    return Type.STREAM;
   }
 
   public byte[] payload() {
     return payload;
-  }
-
-  @Override
-  public String toString() {
-    return MoreObjects.toStringHelper(this)
-        .add("id", id())
-        .add("status", status())
-        .add("payload", ArraySizeHashPrinter.of(payload()))
-        .toString();
   }
 }

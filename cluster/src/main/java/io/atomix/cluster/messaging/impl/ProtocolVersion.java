@@ -23,12 +23,6 @@ import io.atomix.utils.net.Address;
  * Messaging protocol version.
  */
 public enum ProtocolVersion {
-  V1(1) {
-    @Override
-    public MessagingProtocol createProtocol(Address address) {
-      return new MessagingProtocolV1(address);
-    }
-  },
   V2(2) {
     @Override
     public MessagingProtocol createProtocol(Address address) {

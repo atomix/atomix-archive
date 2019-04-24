@@ -15,13 +15,32 @@
  */
 package io.atomix.cluster.messaging.impl;
 
-interface Connection<M extends ProtocolMessage> {
+import io.atomix.cluster.messaging.StreamHandler;
+
+interface Connection {
+
   /**
    * Dispatches a message received on the connection.
    *
    * @param message the message to dispatch
    */
-  void dispatch(M message);
+  void dispatch(ProtocolMessage message);
+
+  /**
+   * Registers a stream handler.
+   *
+   * @param id      the stream ID
+   * @param handler the stream handler
+   */
+  void registerStreamHandler(long id, StreamHandler<byte[]> handler);
+
+  /**
+   * Unregisters a stream handler.
+   *
+   * @param id the stream ID
+   * @return the unregistered handler
+   */
+  StreamHandler<byte[]> unregisterStreamHandler(long id);
 
   /**
    * Closes the connection.
