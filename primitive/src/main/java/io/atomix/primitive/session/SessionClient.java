@@ -1,25 +1,23 @@
 package io.atomix.primitive.session;
 
 import java.util.concurrent.CompletableFuture;
-import java.util.function.BiConsumer;
 
 import com.google.protobuf.Message;
-import io.atomix.primitive.event.EventType;
 import io.atomix.primitive.operation.CommandId;
 import io.atomix.primitive.operation.QueryId;
 import io.atomix.primitive.session.impl.CloseSessionRequest;
 import io.atomix.primitive.session.impl.CloseSessionResponse;
-import io.atomix.primitive.session.impl.EventContext;
 import io.atomix.primitive.session.impl.KeepAliveRequest;
 import io.atomix.primitive.session.impl.KeepAliveResponse;
 import io.atomix.primitive.session.impl.OpenSessionRequest;
 import io.atomix.primitive.session.impl.OpenSessionResponse;
 import io.atomix.primitive.session.impl.SessionCommandContext;
-import io.atomix.primitive.session.impl.SessionContext;
-import io.atomix.primitive.session.impl.SessionEventContext;
 import io.atomix.primitive.session.impl.SessionQueryContext;
+import io.atomix.primitive.session.impl.SessionResponseContext;
+import io.atomix.primitive.session.impl.SessionStreamContext;
 import io.atomix.primitive.util.ByteBufferDecoder;
 import io.atomix.primitive.util.ByteStringEncoder;
+import io.atomix.utils.StreamHandler;
 import org.apache.commons.lang3.tuple.Pair;
 
 /**
@@ -27,20 +25,40 @@ import org.apache.commons.lang3.tuple.Pair;
  */
 public interface SessionClient {
 
-  <T extends Message, U extends Message> CompletableFuture<Pair<SessionContext, U>> execute(
-      CommandId<T, U> command, SessionCommandContext context, T request, ByteStringEncoder<T> encoder, ByteBufferDecoder<U> decoder);
+  <T extends Message, U extends Message> CompletableFuture<Pair<SessionResponseContext, U>> execute(
+      CommandId<T, U> command,
+      SessionCommandContext context,
+      T request,
+      ByteStringEncoder<T> encoder,
+      ByteBufferDecoder<U> decoder);
 
-  <T extends Message, U extends Message> CompletableFuture<Pair<SessionContext, U>> execute(
-      QueryId<T, U> query, SessionQueryContext context, T request, ByteStringEncoder<T> encoder, ByteBufferDecoder<U> decoder);
+  <T extends Message, U extends Message> CompletableFuture<Pair<SessionResponseContext, U>> execute(
+      QueryId<T, U> query,
+      SessionQueryContext context,
+      T request,
+      ByteStringEncoder<T> encoder,
+      ByteBufferDecoder<U> decoder);
+
+  <T extends Message, U extends Message> CompletableFuture<Void> execute(
+      CommandId<T, Void> command,
+      SessionCommandContext context,
+      T request,
+      StreamHandler<Pair<SessionStreamContext, U>> handler,
+      ByteStringEncoder<T> encoder,
+      ByteBufferDecoder<U> decoder);
+
+  <T extends Message, U extends Message> CompletableFuture<Void> execute(
+      QueryId<T, Void> query,
+      SessionQueryContext context,
+      T request,
+      StreamHandler<Pair<SessionStreamContext, U>> handler,
+      ByteStringEncoder<T> encoder,
+      ByteBufferDecoder<U> decoder);
 
   CompletableFuture<OpenSessionResponse> openSession(OpenSessionRequest request);
 
   CompletableFuture<KeepAliveResponse> keepAlive(KeepAliveRequest request);
 
   CompletableFuture<CloseSessionResponse> closeSession(CloseSessionRequest request);
-
-  <T> void addEventListener(EventType eventType, SessionEventContext context, BiConsumer<EventContext, T> listener, ByteBufferDecoder<T> decoder);
-
-  void removeEventListener(EventType eventType, SessionEventContext context);
 
 }

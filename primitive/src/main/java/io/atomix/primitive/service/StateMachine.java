@@ -21,6 +21,7 @@ import java.io.OutputStream;
 import java.util.concurrent.CompletableFuture;
 
 import io.atomix.primitive.operation.OperationType;
+import io.atomix.utils.StreamHandler;
 import org.slf4j.Logger;
 
 /**
@@ -53,13 +54,6 @@ public interface StateMachine {
      * @return the current operation type
      */
     OperationType getOperationType();
-
-    /**
-     * Returns the current role of the state machine.
-     *
-     * @return the current role of the state machine
-     */
-    Role getRole();
 
     /**
      * Returns the state machine logger.
@@ -108,11 +102,29 @@ public interface StateMachine {
   CompletableFuture<byte[]> apply(Command<byte[]> command);
 
   /**
+   * Applies the given command to the state machine.
+   *
+   * @param command the command to apply
+   * @param handler the response stream handler
+   * @return the state machine output
+   */
+  CompletableFuture<Void> apply(Command<byte[]> command, StreamHandler<byte[]> handler);
+
+  /**
    * Applies the given query to the state machine.
    *
    * @param query the query to apply
    * @return the state machine output
    */
   CompletableFuture<byte[]> apply(Query<byte[]> query);
+
+  /**
+   * Applies the given query to the state machine.
+   *
+   * @param query the query to apply
+   * @param handler the response stream handler
+   * @return the state machine output
+   */
+  CompletableFuture<Void> apply(Query<byte[]> query, StreamHandler<byte[]> handler);
 
 }

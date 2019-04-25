@@ -2,7 +2,7 @@ package io.atomix.cluster.messaging.impl;
 
 import java.util.function.Function;
 
-import io.atomix.cluster.messaging.StreamFunction;
+import io.atomix.utils.StreamFunction;
 
 /**
  * Transcoding stream handler.

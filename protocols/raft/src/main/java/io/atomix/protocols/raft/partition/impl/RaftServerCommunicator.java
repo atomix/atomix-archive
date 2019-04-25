@@ -16,11 +16,13 @@
 package io.atomix.protocols.raft.partition.impl;
 
 import java.util.concurrent.CompletableFuture;
+import java.util.function.BiFunction;
 import java.util.function.Function;
 
-import com.google.common.base.Preconditions;
 import io.atomix.cluster.MemberId;
 import io.atomix.cluster.messaging.ClusterCommunicationService;
+import io.atomix.cluster.messaging.ClusterStreamingService;
+import io.atomix.primitive.util.ByteArrayDecoder;
 import io.atomix.raft.protocol.AppendRequest;
 import io.atomix.raft.protocol.AppendResponse;
 import io.atomix.raft.protocol.CommandRequest;
@@ -44,7 +46,9 @@ import io.atomix.raft.protocol.TransferRequest;
 import io.atomix.raft.protocol.TransferResponse;
 import io.atomix.raft.protocol.VoteRequest;
 import io.atomix.raft.protocol.VoteResponse;
+import io.atomix.utils.StreamHandler;
 
+import static com.google.common.base.Preconditions.checkNotNull;
 import static io.atomix.utils.concurrent.Futures.uncheck;
 
 /**
@@ -53,14 +57,16 @@ import static io.atomix.utils.concurrent.Futures.uncheck;
 public class RaftServerCommunicator implements RaftServerProtocol {
   private final RaftMessageContext context;
   private final ClusterCommunicationService clusterCommunicator;
+  private final ClusterStreamingService streamingService;
 
-  public RaftServerCommunicator(ClusterCommunicationService clusterCommunicator) {
-    this(null, clusterCommunicator);
+  public RaftServerCommunicator(ClusterCommunicationService clusterCommunicator, ClusterStreamingService streamingService) {
+    this(null, clusterCommunicator, streamingService);
   }
 
-  public RaftServerCommunicator(String prefix, ClusterCommunicationService clusterCommunicator) {
+  public RaftServerCommunicator(String prefix, ClusterCommunicationService clusterCommunicator, ClusterStreamingService streamingService) {
     this.context = new RaftMessageContext(prefix);
-    this.clusterCommunicator = Preconditions.checkNotNull(clusterCommunicator, "clusterCommunicator cannot be null");
+    this.clusterCommunicator = checkNotNull(clusterCommunicator, "clusterCommunicator cannot be null");
+    this.streamingService = checkNotNull(streamingService, "streamingService cannot be null");
   }
 
   private <T, U> CompletableFuture<U> sendAndReceive(
@@ -79,6 +85,17 @@ public class RaftServerCommunicator implements RaftServerProtocol {
   }
 
   @Override
+  public CompletableFuture<Void> queryStream(String server, QueryRequest request, StreamHandler<QueryResponse> handler) {
+    return streamingService.send(
+        context.queryStreamSubject,
+        request,
+        QueryRequest::toByteArray,
+        bytes -> ByteArrayDecoder.decode(bytes, QueryResponse::parseFrom),
+        handler,
+        MemberId.from(server));
+  }
+
+  @Override
   public CompletableFuture<CommandResponse> command(String memberId, CommandRequest request) {
     return sendAndReceive(
         context.commandSubject,
@@ -86,6 +103,17 @@ public class RaftServerCommunicator implements RaftServerProtocol {
         CommandRequest::toByteArray,
         uncheck(CommandResponse::parseFrom),
         MemberId.from(memberId));
+  }
+
+  @Override
+  public CompletableFuture<Void> commandStream(String server, CommandRequest request, StreamHandler<CommandResponse> handler) {
+    return streamingService.send(
+        context.commandStreamSubject,
+        request,
+        CommandRequest::toByteArray,
+        bytes -> ByteArrayDecoder.decode(bytes, CommandResponse::parseFrom),
+        handler,
+        MemberId.from(server));
   }
 
   @Override
@@ -193,6 +221,20 @@ public class RaftServerCommunicator implements RaftServerProtocol {
   }
 
   @Override
+  public void registerQueryStreamHandler(BiFunction<QueryRequest, StreamHandler<QueryResponse>, CompletableFuture<Void>> handler) {
+    streamingService.subscribe(
+        context.queryStreamSubject,
+        bytes -> ByteArrayDecoder.decode(bytes, QueryRequest::parseFrom),
+        handler::apply,
+        QueryResponse::toByteArray);
+  }
+
+  @Override
+  public void unregisterQueryStreamHandler() {
+    streamingService.unsubscribe(context.queryStreamSubject);
+  }
+
+  @Override
   public void registerCommandHandler(Function<CommandRequest, CompletableFuture<CommandResponse>> handler) {
     clusterCommunicator.subscribe(
         context.commandSubject,
@@ -204,6 +246,20 @@ public class RaftServerCommunicator implements RaftServerProtocol {
   @Override
   public void unregisterCommandHandler() {
     clusterCommunicator.unsubscribe(context.commandSubject);
+  }
+
+  @Override
+  public void registerCommandStreamHandler(BiFunction<CommandRequest, StreamHandler<CommandResponse>, CompletableFuture<Void>> handler) {
+    streamingService.subscribe(
+        context.commandStreamSubject,
+        bytes -> ByteArrayDecoder.decode(bytes, CommandRequest::parseFrom),
+        handler::apply,
+        CommandResponse::toByteArray);
+  }
+
+  @Override
+  public void unregisterCommandStreamHandler() {
+    streamingService.unsubscribe(context.commandStreamSubject);
   }
 
   @Override

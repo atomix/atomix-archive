@@ -11,20 +11,25 @@ option java_multiple_files = true;
 
 // Session managed service snapshot
 message SessionManagedServiceSnapshot {
-    repeated ServiceSession sessions = 7;
-    bytes snapshot = 8;
+    repeated SessionSnapshot sessions = 1;
+    bytes snapshot = 2;
 }
 
 // Service session
-message ServiceSession {
+message SessionSnapshot {
     int64 session_id = 1;
-    string member_id = 2;
-    int64 timeout = 3;
-    int64 timestamp = 4;
-    int64 command_sequence = 5;
-    int64 event_index = 6;
-    int64 last_completed = 7;
-    int64 last_applied = 8;
+    int64 timeout = 2;
+    int64 timestamp = 3;
+    int64 command_sequence = 4;
+    int64 last_applied = 5;
+    repeated SessionStreamSnapshot streams = 6;
+}
+
+// Service session stream
+message SessionStreamSnapshot {
+    uint64 stream_id = 1;
+    uint64 sequence_number = 2;
+    uint64 last_completed = 3;
 }
 
 message SessionRequest {
@@ -44,13 +49,13 @@ message SessionResponse {
         CloseSessionResponse close_session = 3;
         SessionCommandResponse command = 4;
         SessionQueryResponse query = 5;
+        SessionStreamResponse stream = 6;
     }
 }
 
 message OpenSessionRequest {
-    string member_id = 1;
-    int64 session_id = 2;
-    int64 timeout = 3;
+    int64 session_id = 1;
+    int64 timeout = 2;
 }
 
 message OpenSessionResponse {
@@ -59,7 +64,7 @@ message OpenSessionResponse {
 message KeepAliveRequest {
     int64 session_id = 1;
     int64 command_sequence = 2;
-    int64 event_index = 3;
+    map<int64, int64> streams = 3;
 }
 
 message KeepAliveResponse {
@@ -80,7 +85,7 @@ message SessionCommandRequest {
 }
 
 message SessionCommandResponse {
-    SessionContext session = 1;
+    SessionResponseContext context = 1;
     bytes output = 2;
 }
 
@@ -91,7 +96,7 @@ message SessionQueryRequest {
 }
 
 message SessionQueryResponse {
-    SessionContext session = 1;
+    SessionResponseContext context = 1;
     bytes output = 2;
 }
 
@@ -108,36 +113,30 @@ message SessionQueryContext {
 
 message SessionEventContext {
     uint64 session_id = 1;
-}
-
-message SessionContext {
-    uint64 index = 1;
-    uint64 event_index = 2;
-    uint64 sequence = 3;
-}
-
-message EventRequest {
-    int64 session_id = 1;
-    int64 event_index = 2;
-    int64 previous_index = 3;
-    repeated PrimitiveEvent events = 4;
-}
-
-message EventContext {
-    uint64 session_id = 1;
     uint64 index = 2;
     uint64 previous_index = 3;
     uint64 event_count = 4;
     uint64 event_index = 5;
-    PrimitiveEvent event = 6;
+}
+
+message SessionResponseContext {
+    uint64 index = 1;
+    uint64 stream_index = 2;
+    uint64 sequence = 3;
+}
+
+message SessionStreamContext {
+    uint64 stream_id = 1;
+    uint64 index = 2;
+    uint64 sequence = 3;
+}
+
+message SessionStreamResponse {
+    SessionStreamContext context = 1;
+    bytes value = 2;
 }
 
 message PrimitiveEvent {
     string type = 1;
     bytes value = 2;
-}
-
-message ResetRequest {
-    int64 session_id = 1;
-    int64 event_index = 2;
 }

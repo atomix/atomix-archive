@@ -5,8 +5,6 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.concurrent.Executor;
 
-import io.atomix.primitive.operation.OperationId;
-import io.atomix.primitive.service.impl.DefaultServiceExecutor;
 import io.atomix.utils.concurrent.Scheduler;
 import org.slf4j.Logger;
 
@@ -15,43 +13,27 @@ import org.slf4j.Logger;
  */
 public abstract class AbstractPrimitiveService implements PrimitiveService {
   private Context context;
-  private ServiceExecutor executor;
+  private Scheduler scheduler;
+  private Executor executor;
 
-  @Override
-  public void init(Context context) {
+  /**
+   * Initializes the service.
+   *
+   * @param context the state machine context
+   * @param scheduler the state machine scheduler
+   */
+  protected void init(Context context, Scheduler scheduler, Executor executor) {
     this.context = context;
-    this.executor = new DefaultServiceExecutor(context.getLogger());
-    configure(executor);
+    this.scheduler = scheduler;
+    this.executor = executor;
   }
 
   /**
    * Configures the service operations.
    *
-   * @param executor the service executor
+   * @param registry the service operation registry
    */
-  protected abstract void configure(ServiceExecutor executor);
-
-  /**
-   * Applies the given command.
-   *
-   * @param operationId the command operation ID
-   * @param command     the command to apply
-   * @return the command result
-   */
-  protected byte[] apply(OperationId operationId, Command<byte[]> command) {
-    return executor.apply(operationId, command);
-  }
-
-  /**
-   * Applies the given query.
-   *
-   * @param operationId the query operation ID
-   * @param query       the query to apply
-   * @return the query result
-   */
-  protected byte[] apply(OperationId operationId, Query<byte[]> query) {
-    return executor.apply(operationId, query);
-  }
+  protected abstract void configure(ServiceOperationRegistry registry);
 
   /**
    * Returns the current index.
@@ -77,7 +59,7 @@ public abstract class AbstractPrimitiveService implements PrimitiveService {
    * @return the deterministic service scheduler
    */
   protected Scheduler getScheduler() {
-    return executor;
+    return scheduler;
   }
 
   /**

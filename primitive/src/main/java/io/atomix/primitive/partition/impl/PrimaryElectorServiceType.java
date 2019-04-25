@@ -18,6 +18,6 @@ public class PrimaryElectorServiceType implements ServiceType {
 
   @Override
   public PrimitiveService newService(PartitionId partitionId, PartitionManagementService managementService) {
-    return new PrimaryElectorService(partitionId, managementService);
+    return new PrimaryElectorService();
   }
 }

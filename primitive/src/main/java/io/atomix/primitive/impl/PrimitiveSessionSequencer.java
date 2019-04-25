@@ -22,8 +22,8 @@ import java.util.Queue;
 
 import com.google.common.annotations.VisibleForTesting;
 import io.atomix.primitive.session.SessionClient;
-import io.atomix.primitive.session.impl.EventContext;
-import io.atomix.primitive.session.impl.SessionContext;
+import io.atomix.primitive.session.impl.SessionResponseContext;
+import io.atomix.primitive.session.impl.SessionStreamContext;
 import io.atomix.utils.logging.ContextualLoggerFactory;
 import io.atomix.utils.logging.LoggerContext;
 import org.slf4j.Logger;
@@ -65,7 +65,7 @@ final class PrimitiveSessionSequencer {
   @VisibleForTesting
   long responseSequence;
   @VisibleForTesting
-  long eventIndex;
+  long streamIndex;
   private final Queue<EventCallback> eventCallbacks = new ArrayDeque<>();
   private final Map<Long, ResponseCallback> responseCallbacks = new HashMap<>();
 
@@ -99,11 +99,11 @@ final class PrimitiveSessionSequencer {
    * @param event    The publish request.
    * @param callback The callback to sequence.
    */
-  public void sequenceEvent(EventContext event, Runnable callback) {
+  public void sequenceEvent(SessionStreamContext event, Runnable callback) {
     if (requestSequence == responseSequence) {
       log.trace("Completing {}", event);
       callback.run();
-      eventIndex = event.getEventIndex();
+      streamIndex = event.getIndex();
     } else {
       eventCallbacks.add(new EventCallback(event, callback));
       completeResponses();
@@ -124,7 +124,7 @@ final class PrimitiveSessionSequencer {
    * @param context  The response to sequence.
    * @param callback The callback to sequence.
    */
-  public void sequenceResponse(long sequence, SessionContext context, Runnable callback) {
+  public void sequenceResponse(long sequence, SessionResponseContext context, Runnable callback) {
     // If the request sequence number is equal to the next response sequence number, attempt to complete the response.
     if (sequence == responseSequence + 1) {
       if (completeResponse(context, callback)) {
@@ -165,7 +165,7 @@ final class PrimitiveSessionSequencer {
       while (eventCallback != null) {
         log.trace("Completing {}", eventCallback.event);
         eventCallback.run();
-        eventIndex = eventCallback.event.getEventIndex();
+        streamIndex = eventCallback.event.getIndex();
         eventCallback = eventCallbacks.poll();
       }
     }
@@ -174,7 +174,7 @@ final class PrimitiveSessionSequencer {
   /**
    * Completes a sequenced response if possible.
    */
-  private boolean completeResponse(SessionContext response, Runnable callback) {
+  private boolean completeResponse(SessionResponseContext response, Runnable callback) {
     // If the response is null, that indicates an exception occurred. The best we can do is complete
     // the response in sequential order.
     if (response == null) {
@@ -185,22 +185,22 @@ final class PrimitiveSessionSequencer {
 
     // If the response's event index is greater than the current event index, that indicates that events that were
     // published prior to the response have not yet been completed. Attempt to complete pending events.
-    if (response.getEventIndex() > eventIndex) {
+    if (response.getIndex() > streamIndex) {
       // For each pending event with an eventIndex less than or equal to the response eventIndex, complete the event.
       // This is safe since we know that sequenced responses should see sequential order of events.
       EventCallback eventCallback = eventCallbacks.peek();
-      while (eventCallback != null && eventCallback.event.getEventIndex() <= response.getEventIndex()) {
+      while (eventCallback != null && eventCallback.event.getIndex() <= response.getStreamIndex()) {
         eventCallbacks.remove();
         log.trace("Completing event {}", eventCallback.event);
         eventCallback.run();
-        eventIndex = eventCallback.event.getEventIndex();
+        streamIndex = eventCallback.event.getIndex();
         eventCallback = eventCallbacks.peek();
       }
     }
 
     // If after completing pending events the eventIndex is greater than or equal to the response's eventIndex, complete the response.
     // Note that the event protocol initializes the eventIndex to the session ID.
-    if (response.getEventIndex() <= eventIndex || (eventIndex == 0 && response.getEventIndex() == state.getSessionId().id())) {
+    if (response.getStreamIndex() <= streamIndex || (streamIndex == 0 && response.getStreamIndex() == state.getSessionId().id())) {
       log.trace("Completing response {}", response);
       callback.run();
       return true;
@@ -213,10 +213,10 @@ final class PrimitiveSessionSequencer {
    * Response callback holder.
    */
   private static final class ResponseCallback implements Runnable {
-    private final SessionContext context;
+    private final SessionResponseContext context;
     private final Runnable callback;
 
-    private ResponseCallback(SessionContext context, Runnable callback) {
+    private ResponseCallback(SessionResponseContext context, Runnable callback) {
       this.context = context;
       this.callback = callback;
     }
@@ -231,10 +231,10 @@ final class PrimitiveSessionSequencer {
    * Event callback holder.
    */
   private static final class EventCallback implements Runnable {
-    private final EventContext event;
+    private final SessionStreamContext event;
     private final Runnable callback;
 
-    private EventCallback(EventContext event, Runnable callback) {
+    private EventCallback(SessionStreamContext event, Runnable callback) {
       this.event = event;
       this.callback = callback;
     }

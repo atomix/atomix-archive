@@ -18,8 +18,10 @@ package io.atomix.raft.protocol;
 import java.net.ConnectException;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.BiFunction;
 import java.util.function.Function;
 
+import io.atomix.utils.StreamHandler;
 import io.atomix.utils.concurrent.Futures;
 import io.atomix.utils.concurrent.ThreadContext;
 
@@ -28,7 +30,9 @@ import io.atomix.utils.concurrent.ThreadContext;
  */
 public class TestRaftServerProtocol extends TestRaftProtocol implements RaftServerProtocol {
   private Function<QueryRequest, CompletableFuture<QueryResponse>> queryHandler;
+  private BiFunction<QueryRequest, StreamHandler<QueryResponse>, CompletableFuture<Void>> queryStreamHandler;
   private Function<CommandRequest, CompletableFuture<CommandResponse>> commandHandler;
+  private BiFunction<CommandRequest, StreamHandler<CommandResponse>, CompletableFuture<Void>> commandStreamHandler;
   private Function<JoinRequest, CompletableFuture<JoinResponse>> joinHandler;
   private Function<LeaveRequest, CompletableFuture<LeaveResponse>> leaveHandler;
   private Function<ConfigureRequest, CompletableFuture<ConfigureResponse>> configureHandler;
@@ -59,8 +63,18 @@ public class TestRaftServerProtocol extends TestRaftProtocol implements RaftServ
   }
 
   @Override
+  public CompletableFuture<Void> queryStream(String server, QueryRequest request, StreamHandler<QueryResponse> handler) {
+    return getServer(server).thenCompose(listener -> listener.queryStream(request, handler));
+  }
+
+  @Override
   public CompletableFuture<CommandResponse> command(String serverId, CommandRequest request) {
     return scheduleTimeout(getServer(serverId).thenCompose(listener -> listener.command(request)));
+  }
+
+  @Override
+  public CompletableFuture<Void> commandStream(String server, CommandRequest request, StreamHandler<CommandResponse> handler) {
+    return getServer(server).thenCompose(listener -> listener.commandStream(request, handler));
   }
 
   @Override
@@ -126,6 +140,24 @@ public class TestRaftServerProtocol extends TestRaftProtocol implements RaftServ
     this.queryHandler = null;
   }
 
+  CompletableFuture<Void> queryStream(QueryRequest request, StreamHandler<QueryResponse> handler) {
+    if (queryStreamHandler != null) {
+      return queryStreamHandler.apply(request, handler);
+    } else {
+      return Futures.exceptionalFuture(new ConnectException());
+    }
+  }
+
+  @Override
+  public void registerQueryStreamHandler(BiFunction<QueryRequest, StreamHandler<QueryResponse>, CompletableFuture<Void>> handler) {
+    this.queryStreamHandler = handler;
+  }
+
+  @Override
+  public void unregisterQueryStreamHandler() {
+    this.queryStreamHandler = null;
+  }
+
   CompletableFuture<CommandResponse> command(CommandRequest request) {
     if (commandHandler != null) {
       return commandHandler.apply(request);
@@ -142,6 +174,24 @@ public class TestRaftServerProtocol extends TestRaftProtocol implements RaftServ
   @Override
   public void unregisterCommandHandler() {
     this.commandHandler = null;
+  }
+
+  CompletableFuture<Void> commandStream(CommandRequest request, StreamHandler<CommandResponse> handler) {
+    if (commandStreamHandler != null) {
+      return commandStreamHandler.apply(request, handler);
+    } else {
+      return Futures.exceptionalFuture(new ConnectException());
+    }
+  }
+
+  @Override
+  public void registerCommandStreamHandler(BiFunction<CommandRequest, StreamHandler<CommandResponse>, CompletableFuture<Void>> handler) {
+    this.commandStreamHandler = handler;
+  }
+
+  @Override
+  public void unregisterCommandStreamHandler() {
+    this.commandStreamHandler = null;
   }
 
   CompletableFuture<JoinResponse> join(JoinRequest request) {

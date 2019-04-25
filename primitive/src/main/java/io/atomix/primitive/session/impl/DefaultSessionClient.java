@@ -1,26 +1,19 @@
 package io.atomix.primitive.session.impl;
 
-import java.util.Map;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.function.BiConsumer;
-import java.util.function.Consumer;
 
 import com.google.protobuf.Message;
-import io.atomix.primitive.event.EventType;
 import io.atomix.primitive.operation.CommandId;
 import io.atomix.primitive.operation.QueryId;
 import io.atomix.primitive.partition.PartitionClient;
-import io.atomix.primitive.service.impl.ListenRequest;
 import io.atomix.primitive.service.impl.ServiceId;
 import io.atomix.primitive.service.impl.ServiceRequest;
 import io.atomix.primitive.service.impl.ServiceResponse;
 import io.atomix.primitive.session.SessionClient;
-import io.atomix.primitive.session.SessionClientProtocol;
 import io.atomix.primitive.util.ByteArrayDecoder;
 import io.atomix.primitive.util.ByteBufferDecoder;
 import io.atomix.primitive.util.ByteStringEncoder;
-import io.atomix.utils.concurrent.ThreadContext;
+import io.atomix.utils.StreamHandler;
 import org.apache.commons.lang3.tuple.Pair;
 
 /**
@@ -29,19 +22,10 @@ import org.apache.commons.lang3.tuple.Pair;
 public class DefaultSessionClient implements SessionClient {
   private final ServiceId serviceId;
   private final PartitionClient client;
-  private final ThreadContext context;
-  private final SessionClientProtocol protocol;
-  private final Map<Long, SessionEventListener> eventListeners = new ConcurrentHashMap<>();
 
-  public DefaultSessionClient(
-      ServiceId serviceId,
-      PartitionClient client,
-      SessionClientProtocol protocol,
-      ThreadContext context) {
+  public DefaultSessionClient(ServiceId serviceId, PartitionClient client) {
     this.serviceId = serviceId;
     this.client = client;
-    this.protocol = protocol;
-    this.context = context;
   }
 
   @Override
@@ -69,7 +53,7 @@ public class DefaultSessionClient implements SessionClient {
   }
 
   @Override
-  public <T extends Message, U extends Message> CompletableFuture<Pair<SessionContext, U>> execute(
+  public <T extends Message, U extends Message> CompletableFuture<Pair<SessionResponseContext, U>> execute(
       CommandId<T, U> command, SessionCommandContext context, T request, ByteStringEncoder<T> encoder, ByteBufferDecoder<U> decoder) {
     return command(SessionRequest.newBuilder()
         .setCommand(SessionCommandRequest.newBuilder()
@@ -79,11 +63,11 @@ public class DefaultSessionClient implements SessionClient {
             .build())
         .build())
         .thenApply(response -> response.getCommand())
-        .thenApply(response -> Pair.of(response.getSession(), ByteBufferDecoder.decode(response.getOutput().asReadOnlyByteBuffer(), decoder)));
+        .thenApply(response -> Pair.of(response.getContext(), ByteBufferDecoder.decode(response.getOutput().asReadOnlyByteBuffer(), decoder)));
   }
 
   @Override
-  public <T extends Message, U extends Message> CompletableFuture<Pair<SessionContext, U>> execute(
+  public <T extends Message, U extends Message> CompletableFuture<Pair<SessionResponseContext, U>> execute(
       QueryId<T, U> query, SessionQueryContext context, T request, ByteStringEncoder<T> encoder, ByteBufferDecoder<U> decoder) {
     return query(SessionRequest.newBuilder()
         .setQuery(SessionQueryRequest.newBuilder()
@@ -93,7 +77,77 @@ public class DefaultSessionClient implements SessionClient {
             .build())
         .build())
         .thenApply(response -> response.getQuery())
-        .thenApply(response -> Pair.of(response.getSession(), ByteBufferDecoder.decode(response.getOutput().asReadOnlyByteBuffer(), decoder)));
+        .thenApply(response -> Pair.of(response.getContext(), ByteBufferDecoder.decode(response.getOutput().asReadOnlyByteBuffer(), decoder)));
+  }
+
+  @Override
+  public <T extends Message, U extends Message> CompletableFuture<Void> execute(
+      CommandId<T, Void> command,
+      SessionCommandContext context,
+      T request,
+      StreamHandler<Pair<SessionStreamContext, U>> handler,
+      ByteStringEncoder<T> encoder,
+      ByteBufferDecoder<U> decoder) {
+    return command(SessionRequest.newBuilder()
+            .setCommand(SessionCommandRequest.newBuilder()
+                .setContext(context)
+                .setName(command.id())
+                .setInput(ByteStringEncoder.encode(request, encoder))
+                .build())
+            .build(),
+        new StreamHandler<SessionResponse>() {
+          @Override
+          public void next(SessionResponse response) {
+            handler.next(Pair.of(
+                response.getStream().getContext(),
+                ByteBufferDecoder.decode(response.getCommand().getOutput().asReadOnlyByteBuffer(), decoder)));
+          }
+
+          @Override
+          public void complete() {
+            handler.complete();
+          }
+
+          @Override
+          public void error(Throwable error) {
+            handler.error(error);
+          }
+        });
+  }
+
+  @Override
+  public <T extends Message, U extends Message> CompletableFuture<Void> execute(
+      QueryId<T, Void> query,
+      SessionQueryContext context,
+      T request,
+      StreamHandler<Pair<SessionStreamContext, U>> handler,
+      ByteStringEncoder<T> encoder,
+      ByteBufferDecoder<U> decoder) {
+    return query(SessionRequest.newBuilder()
+            .setQuery(SessionQueryRequest.newBuilder()
+                .setContext(context)
+                .setName(query.id())
+                .setInput(ByteStringEncoder.encode(request, encoder))
+                .build())
+            .build(),
+        new StreamHandler<SessionResponse>() {
+          @Override
+          public void next(SessionResponse response) {
+            handler.next(Pair.of(
+                response.getStream().getContext(),
+                ByteBufferDecoder.decode(response.getQuery().getOutput().asReadOnlyByteBuffer(), decoder)));
+          }
+
+          @Override
+          public void complete() {
+            handler.complete();
+          }
+
+          @Override
+          public void error(Throwable error) {
+            handler.error(error);
+          }
+        });
   }
 
   private CompletableFuture<SessionResponse> command(SessionRequest request) {
@@ -106,6 +160,32 @@ public class DefaultSessionClient implements SessionClient {
         .thenApply(response -> ByteBufferDecoder.decode(response.getResponse().asReadOnlyByteBuffer(), SessionResponse::parseFrom));
   }
 
+  private CompletableFuture<Void> command(SessionRequest request, StreamHandler<SessionResponse> handler) {
+    return client.command(ServiceRequest.newBuilder()
+            .setId(serviceId)
+            .setRequest(request.toByteString())
+            .build()
+            .toByteArray(),
+        new StreamHandler<byte[]>() {
+          @Override
+          public void next(byte[] response) {
+            ServiceResponse serviceResponse = ByteArrayDecoder.decode(response, ServiceResponse::parseFrom);
+            SessionResponse sessionResponse = ByteBufferDecoder.decode(serviceResponse.getResponse().asReadOnlyByteBuffer(), SessionResponse::parseFrom);
+            handler.next(sessionResponse);
+          }
+
+          @Override
+          public void complete() {
+            handler.complete();
+          }
+
+          @Override
+          public void error(Throwable error) {
+            handler.error(error);
+          }
+        });
+  }
+
   private CompletableFuture<SessionResponse> query(SessionRequest request) {
     return client.query(ServiceRequest.newBuilder()
         .setId(serviceId)
@@ -116,47 +196,29 @@ public class DefaultSessionClient implements SessionClient {
         .thenApply(response -> ByteBufferDecoder.decode(response.getResponse().asReadOnlyByteBuffer(), SessionResponse::parseFrom));
   }
 
-  @Override
-  public synchronized <T> void addEventListener(EventType eventType, SessionEventContext context, BiConsumer<EventContext, T> listener, ByteBufferDecoder<T> decoder) {
-    SessionEventListener eventListener = eventListeners.computeIfAbsent(context.getSessionId(), SessionEventListener::new);
-    eventListener.addListener(eventType, listener, decoder);
-  }
+  private CompletableFuture<Void> query(SessionRequest request, StreamHandler<SessionResponse> handler) {
+    return client.query(ServiceRequest.newBuilder()
+            .setId(serviceId)
+            .setRequest(request.toByteString())
+            .build()
+            .toByteArray(),
+        new StreamHandler<byte[]>() {
+          @Override
+          public void next(byte[] response) {
+            ServiceResponse serviceResponse = ByteArrayDecoder.decode(response, ServiceResponse::parseFrom);
+            SessionResponse sessionResponse = ByteBufferDecoder.decode(serviceResponse.getResponse().asReadOnlyByteBuffer(), SessionResponse::parseFrom);
+            handler.next(sessionResponse);
+          }
 
-  @Override
-  public synchronized void removeEventListener(EventType eventType, SessionEventContext context) {
-    SessionEventListener eventListener = eventListeners.get(context.getSessionId());
-    if (eventListener != null) {
-      eventListener.removeListener(eventType);
-    }
-  }
+          @Override
+          public void complete() {
+            handler.complete();
+          }
 
-  private class SessionEventListener implements Consumer<EventRequest> {
-    private final long sessionId;
-    private final Map<String, BiConsumer<EventContext, PrimitiveEvent>> listeners = new ConcurrentHashMap<>();
-
-    public SessionEventListener(long sessionId) {
-      this.sessionId = sessionId;
-    }
-
-    synchronized <T> void addListener(EventType eventType, BiConsumer<EventContext, T> listener, ByteBufferDecoder<T> decoder) {
-      listeners.put(eventType.id(), (context, event) ->
-          listener.accept(context, ByteBufferDecoder.decode(event.getValue().asReadOnlyByteBuffer(), decoder)));
-      if (listeners.size() == 1) {
-        protocol.registerEventConsumer(ListenRequest.newBuilder().setSessionId(sessionId).build(), this, context);
-      }
-    }
-
-    synchronized void removeListener(EventType eventType) {
-      listeners.remove(eventType.id());
-      if (listeners.isEmpty()) {
-        protocol.unregisterEventConsumer(ListenRequest.newBuilder().setSessionId(sessionId).build());
-      }
-      eventListeners.remove(sessionId);
-    }
-
-    @Override
-    public void accept(EventRequest eventRequest) {
-
-    }
+          @Override
+          public void error(Throwable error) {
+            handler.error(error);
+          }
+        });
   }
 }

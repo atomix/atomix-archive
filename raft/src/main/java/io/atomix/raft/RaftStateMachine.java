@@ -20,6 +20,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.concurrent.CompletableFuture;
 
+import io.atomix.utils.StreamHandler;
 import org.slf4j.Logger;
 
 /**
@@ -52,13 +53,6 @@ public interface RaftStateMachine {
      * @return the Raft operation type
      */
     RaftOperation.Type getOperationType();
-
-    /**
-     * Returns the current role of the state machine.
-     *
-     * @return the current role of the state machine
-     */
-    RaftServer.Role getRole();
 
     /**
      * Returns the state machine logger.
@@ -107,11 +101,27 @@ public interface RaftStateMachine {
   CompletableFuture<byte[]> apply(RaftCommand command);
 
   /**
+   * Applies the given command to the state machine.
+   *
+   * @param command the command to apply
+   * @return the state machine output
+   */
+  CompletableFuture<Void> apply(RaftCommand command, StreamHandler<byte[]> handler);
+
+  /**
    * Applies the given query to the state machine.
    *
    * @param query the query to apply
    * @return the state machine output
    */
   CompletableFuture<byte[]> apply(RaftQuery query);
+
+  /**
+   * Applies the given query to the state machine.
+   *
+   * @param query the query to apply
+   * @return the state machine output
+   */
+  CompletableFuture<Void> apply(RaftQuery query, StreamHandler<byte[]> handler);
 
 }

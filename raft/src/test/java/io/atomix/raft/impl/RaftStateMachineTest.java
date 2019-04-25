@@ -37,6 +37,7 @@ import io.atomix.raft.storage.log.InitializeEntry;
 import io.atomix.raft.storage.log.RaftLogEntry;
 import io.atomix.raft.storage.log.RaftLogWriter;
 import io.atomix.raft.storage.snapshot.Snapshot;
+import io.atomix.utils.StreamHandler;
 import io.atomix.utils.concurrent.ThreadModel;
 import org.junit.After;
 import org.junit.Before;
@@ -198,7 +199,17 @@ public class RaftStateMachineTest {
     }
 
     @Override
+    public CompletableFuture<Void> apply(RaftCommand command, StreamHandler<byte[]> handler) {
+      return null;
+    }
+
+    @Override
     public CompletableFuture<byte[]> apply(RaftQuery query) {
+      return null;
+    }
+
+    @Override
+    public CompletableFuture<Void> apply(RaftQuery query, StreamHandler<byte[]> handler) {
       return null;
     }
   }

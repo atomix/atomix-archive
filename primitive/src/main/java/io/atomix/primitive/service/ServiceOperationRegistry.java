@@ -16,20 +16,18 @@
 
 package io.atomix.primitive.service;
 
-import java.util.concurrent.Executor;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
 import io.atomix.primitive.Consistency;
-import io.atomix.primitive.util.ByteArrayDecoder;
-import io.atomix.primitive.util.ByteArrayEncoder;
 import io.atomix.primitive.operation.OperationId;
 import io.atomix.primitive.operation.OperationType;
 import io.atomix.primitive.operation.PrimitiveOperation;
-import io.atomix.utils.concurrent.Scheduler;
-
-import static com.google.common.base.Preconditions.checkNotNull;
+import io.atomix.primitive.util.ByteArrayDecoder;
+import io.atomix.primitive.util.ByteArrayEncoder;
+import io.atomix.utils.StreamHandler;
 
 /**
  * Facilitates registration and execution of state machine commands and provides deterministic scheduling.
@@ -68,25 +66,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
  * @see PrimitiveService
  * @see ServiceContext
  */
-public interface ServiceExecutor extends Executor, Scheduler {
-
-  /**
-   * Applies the given command to the executor.
-   *
-   * @param operationId the operation ID
-   * @param command     the command to apply
-   * @return the command result
-   */
-  byte[] apply(OperationId operationId, Command<byte[]> command);
-
-  /**
-   * Applies the given query to the executor.
-   *
-   * @param operationId the operation ID
-   * @param query       the query to apply
-   * @return the command result
-   */
-  byte[] apply(OperationId operationId, Query<byte[]> query);
+public interface ServiceOperationRegistry {
 
   /**
    * Registers a operation callback.
@@ -95,23 +75,7 @@ public interface ServiceExecutor extends Executor, Scheduler {
    * @param callback    the operation callback
    * @throws NullPointerException if the {@code operationId} or {@code callback} is null
    */
-  void handle(OperationId operationId, Function<byte[], byte[]> callback);
-
-  /**
-   * Registers a operation callback.
-   *
-   * @param operationId the operation identifier
-   * @param callback    the operation callback
-   * @throws NullPointerException if the {@code operationId} or {@code callback} is null
-   */
-  default void register(OperationId operationId, Runnable callback) {
-    checkNotNull(operationId, "operationId cannot be null");
-    checkNotNull(callback, "callback cannot be null");
-    handle(operationId, commit -> {
-      callback.run();
-      return null;
-    });
-  }
+  void register(OperationId operationId, Runnable callback);
 
   /**
    * Registers a no argument operation callback.
@@ -143,5 +107,26 @@ public interface ServiceExecutor extends Executor, Scheduler {
    * @throws NullPointerException if the {@code operationId} or {@code callback} is null
    */
   <T, R> void register(OperationId operationId, Function<T, R> callback, ByteArrayDecoder<T> decoder, ByteArrayEncoder<R> encoder);
+
+  /**
+   * Registers an operation callback.
+   *
+   * @param operationId the operation identifier
+   * @param callback    the operation callback
+   * @param encoder     the response encoder
+   * @throws NullPointerException if the {@code operationId} or {@code callback} is null
+   */
+  <R> void register(OperationId operationId, Consumer<StreamHandler<R>> callback, ByteArrayEncoder<R> encoder);
+
+  /**
+   * Registers an operation callback.
+   *
+   * @param operationId the operation identifier
+   * @param callback    the operation callback
+   * @param decoder     the operation decoder
+   * @param encoder     the response encoder
+   * @throws NullPointerException if the {@code operationId} or {@code callback} is null
+   */
+  <T, R> void register(OperationId operationId, BiConsumer<T, StreamHandler<R>> callback, ByteArrayDecoder<T> decoder, ByteArrayEncoder<R> encoder);
 
 }

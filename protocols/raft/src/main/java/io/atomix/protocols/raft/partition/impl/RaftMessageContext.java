@@ -20,7 +20,9 @@ package io.atomix.protocols.raft.partition.impl;
  */
 class RaftMessageContext {
   final String querySubject;
+  final String queryStreamSubject;
   final String commandSubject;
+  final String commandStreamSubject;
   final String joinSubject;
   final String leaveSubject;
   final String configureSubject;
@@ -33,7 +35,9 @@ class RaftMessageContext {
 
   RaftMessageContext(String prefix) {
     this.querySubject = getSubject(prefix, "query");
+    this.queryStreamSubject = getSubject(prefix, "query-stream");
     this.commandSubject = getSubject(prefix, "command");
+    this.commandStreamSubject = getSubject(prefix, "command-stream");
     this.joinSubject = getSubject(prefix, "join");
     this.leaveSubject = getSubject(prefix, "leave");
     this.configureSubject = getSubject(prefix, "configure");

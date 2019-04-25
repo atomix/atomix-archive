@@ -22,11 +22,9 @@ import io.atomix.primitive.partition.PartitionId;
  */
 public class PrimitiveMessageContext {
   private final String prefix;
-  final String eventSubject;
 
   public PrimitiveMessageContext(PartitionId partitionId) {
     this.prefix = String.format("%s-%d", partitionId.getGroup(), partitionId.getPartition());
-    this.eventSubject = getSubject(prefix, "event");
   }
 
   private static String getSubject(String prefix, String type) {
@@ -35,5 +33,13 @@ public class PrimitiveMessageContext {
     } else {
       return String.format("%s-%s", prefix, type);
     }
+  }
+
+  String eventSubject(long sessionId) {
+    return String.format("%s-event-%d", prefix, sessionId);
+  }
+
+  String responseSubject(long sessionId) {
+    return String.format("%s-stream-%d", prefix, sessionId);
   }
 }

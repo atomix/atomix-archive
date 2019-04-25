@@ -26,6 +26,7 @@ import java.util.stream.Stream;
 import com.google.common.collect.Maps;
 import io.atomix.cluster.ClusterMembershipService;
 import io.atomix.cluster.messaging.ClusterCommunicationService;
+import io.atomix.cluster.messaging.ClusterStreamingService;
 import io.atomix.primitive.partition.ManagedPartitionGroup;
 import io.atomix.primitive.partition.ManagedPartitionGroupMembershipService;
 import io.atomix.primitive.partition.ManagedPartitionService;
@@ -38,7 +39,6 @@ import io.atomix.primitive.partition.PartitionGroupTypeRegistry;
 import io.atomix.primitive.partition.PartitionManagementService;
 import io.atomix.primitive.partition.PartitionService;
 import io.atomix.primitive.service.ServiceTypeRegistry;
-import io.atomix.primitive.session.impl.DefaultSessionProtocolService;
 import io.atomix.utils.concurrent.Futures;
 import io.atomix.utils.config.ConfigurationException;
 import org.slf4j.Logger;
@@ -52,6 +52,7 @@ public class DefaultPartitionService implements ManagedPartitionService {
 
   private final ClusterMembershipService clusterMembershipService;
   private final ClusterCommunicationService communicationService;
+  private final ClusterStreamingService streamingService;
   private final ServiceTypeRegistry serviceTypeRegistry;
   private final ManagedPartitionGroupMembershipService groupMembershipService;
   private ManagedPartitionGroup systemGroup;
@@ -66,12 +67,14 @@ public class DefaultPartitionService implements ManagedPartitionService {
   public DefaultPartitionService(
       ClusterMembershipService membershipService,
       ClusterCommunicationService messagingService,
+      ClusterStreamingService streamingService,
       ServiceTypeRegistry serviceTypeRegistry,
       ManagedPartitionGroup systemGroup,
       Collection<ManagedPartitionGroup> groups,
       PartitionGroupTypeRegistry groupTypeRegistry) {
     this.clusterMembershipService = membershipService;
     this.communicationService = messagingService;
+    this.streamingService = streamingService;
     this.serviceTypeRegistry = serviceTypeRegistry;
     this.groupMembershipService = new DefaultPartitionGroupMembershipService(
         membershipService, messagingService, systemGroup, groups, groupTypeRegistry);
@@ -147,9 +150,9 @@ public class DefaultPartitionService implements ManagedPartitionService {
                   PartitionManagementService managementService = new DefaultPartitionManagementService(
                       clusterMembershipService,
                       communicationService,
+                      streamingService,
                       serviceTypeRegistry,
-                      electionService,
-                      new DefaultSessionProtocolService(communicationService));
+                      electionService);
                   if (systemGroupMembership.members().contains(clusterMembershipService.getLocalMember().id())) {
                     return systemGroup.join(managementService);
                   } else {
@@ -164,9 +167,9 @@ public class DefaultPartitionService implements ManagedPartitionService {
             .thenApply(v2 -> new DefaultPartitionManagementService(
                 clusterMembershipService,
                 communicationService,
+                streamingService,
                 serviceTypeRegistry,
-                systemElectionService,
-                new DefaultSessionProtocolService(communicationService))))
+                systemElectionService)))
         .thenCompose(managementService -> {
           this.partitionManagementService = (PartitionManagementService) managementService;
           List<CompletableFuture> futures = groupMembershipService.getMemberships().stream()

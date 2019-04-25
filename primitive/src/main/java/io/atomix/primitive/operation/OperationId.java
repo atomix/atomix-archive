@@ -18,20 +18,27 @@ package io.atomix.primitive.operation;
 /**
  * Operation ID.
  */
-public interface OperationId<T, U> {
+public abstract class OperationId<T, U> {
+  private final String id;
+
+  public OperationId(String id) {
+    this.id = id;
+  }
 
   /**
    * Returns the operation ID.
    *
    * @return the operation ID
    */
-  String id();
+  public String id() {
+    return id;
+  }
 
   /**
    * Returns the operation type.
    *
    * @return the operation type
    */
-  OperationType type();
+  public abstract OperationType type();
 
 }

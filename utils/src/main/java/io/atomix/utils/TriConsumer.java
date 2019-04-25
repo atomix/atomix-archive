@@ -1,4 +1,4 @@
-package io.atomix.cluster.messaging;
+package io.atomix.utils;
 
 /**
  * Stream handler function.

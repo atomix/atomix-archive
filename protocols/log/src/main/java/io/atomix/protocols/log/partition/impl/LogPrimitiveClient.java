@@ -11,6 +11,7 @@ import io.atomix.primitive.partition.PartitionClient;
 import io.atomix.primitive.service.Command;
 import io.atomix.primitive.service.Query;
 import io.atomix.primitive.service.StateMachine;
+import io.atomix.utils.StreamHandler;
 import io.atomix.utils.concurrent.ThreadContext;
 
 /**
@@ -21,6 +22,7 @@ public class LogPrimitiveClient implements PartitionClient {
   private final StateMachine stateMachine;
   private final ThreadContext stateContext;
   private final ThreadContext threadContext;
+  private final Map<Long, StreamHandler<byte[]>> streams = new ConcurrentHashMap<>();
   private final Map<Long, CompletableFuture<byte[]>> futures = new ConcurrentHashMap<>();
   private final AtomicLong currentIndex = new AtomicLong();
   private final AtomicLong currentTimestamp = new AtomicLong();
@@ -45,6 +47,12 @@ public class LogPrimitiveClient implements PartitionClient {
   }
 
   @Override
+  public CompletableFuture<Void> command(byte[] value, StreamHandler<byte[]> handler) {
+    return client.producer().append(value)
+        .thenAccept(index -> streams.put(index, handler));
+  }
+
+  @Override
   public CompletableFuture<byte[]> query(byte[] value) {
     CompletableFuture<byte[]> future = new CompletableFuture<>();
     stateContext.execute(() -> stateMachine.apply(new Query<>(currentIndex.get(), currentTimestamp.get(), value))
@@ -56,6 +64,20 @@ public class LogPrimitiveClient implements PartitionClient {
               future.completeExceptionally(error);
             }
           });
+        }));
+    return future;
+  }
+
+  @Override
+  public CompletableFuture<Void> query(byte[] value, StreamHandler<byte[]> handler) {
+    CompletableFuture<Void> future = new CompletableFuture<>();
+    stateContext.execute(() -> stateMachine.apply(new Query<>(currentIndex.get(), currentTimestamp.get(), value), handler)
+        .whenComplete((result, error) -> {
+          if (error == null) {
+            future.complete(result);
+          } else {
+            future.completeExceptionally(error);
+          }
         }));
     return future;
   }

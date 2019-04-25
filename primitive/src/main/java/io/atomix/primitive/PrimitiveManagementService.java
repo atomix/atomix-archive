@@ -23,7 +23,6 @@ import io.atomix.primitive.partition.PartitionService;
 import io.atomix.primitive.protocol.PrimitiveProtocolTypeRegistry;
 import io.atomix.primitive.serialization.SerializationService;
 import io.atomix.primitive.session.SessionIdService;
-import io.atomix.primitive.session.SessionProtocolService;
 import io.atomix.utils.concurrent.ThreadContextFactory;
 
 /**
@@ -107,13 +106,6 @@ public interface PrimitiveManagementService {
    * @return the session ID service
    */
   SessionIdService getSessionIdService();
-
-  /**
-   * Returns the session protocol service.
-   *
-   * @return the session protocol service
-   */
-  SessionProtocolService getSessionProtocolService();
 
   /**
    * Returns the thread context factory.

@@ -24,6 +24,7 @@ import io.atomix.protocols.raft.partition.RaftPartition;
 import io.atomix.raft.RaftClient;
 import io.atomix.raft.protocol.RaftClientProtocol;
 import io.atomix.utils.Managed;
+import io.atomix.utils.StreamHandler;
 import io.atomix.utils.concurrent.ThreadContextFactory;
 import org.slf4j.Logger;
 
@@ -74,8 +75,18 @@ public class RaftPartitionClient implements PartitionClient, Managed<RaftPartiti
   }
 
   @Override
+  public CompletableFuture<Void> command(byte[] value, StreamHandler<byte[]> handler) {
+    return client.write(value, handler);
+  }
+
+  @Override
   public CompletableFuture<byte[]> query(byte[] value) {
     return client.read(value);
+  }
+
+  @Override
+  public CompletableFuture<Void> query(byte[] value, StreamHandler<byte[]> handler) {
+    return client.read(value, handler);
   }
 
   @Override

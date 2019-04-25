@@ -38,6 +38,7 @@ import io.atomix.raft.cluster.RaftMember;
 import io.atomix.raft.protocol.TestRaftProtocolFactory;
 import io.atomix.raft.storage.RaftStorage;
 import io.atomix.storage.StorageLevel;
+import io.atomix.utils.StreamHandler;
 import io.atomix.utils.concurrent.SingleThreadContext;
 import io.atomix.utils.concurrent.ThreadContext;
 import net.jodah.concurrentunit.ConcurrentTestCase;
@@ -727,7 +728,17 @@ public class RaftTest extends ConcurrentTestCase {
     }
 
     @Override
+    public CompletableFuture<Void> apply(RaftCommand command, StreamHandler<byte[]> handler) {
+      return null;
+    }
+
+    @Override
     public CompletableFuture<byte[]> apply(RaftQuery query) {
+      return null;
+    }
+
+    @Override
+    public CompletableFuture<Void> apply(RaftQuery query, StreamHandler<byte[]> handler) {
       return null;
     }
   }

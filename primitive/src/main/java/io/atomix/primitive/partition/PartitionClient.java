@@ -17,6 +17,8 @@ package io.atomix.primitive.partition;
 
 import java.util.concurrent.CompletableFuture;
 
+import io.atomix.utils.StreamHandler;
+
 /**
  * Primitive client.
  */
@@ -31,11 +33,27 @@ public interface PartitionClient {
   CompletableFuture<byte[]> command(byte[] value);
 
   /**
+   * Sends a command to the partition.
+   *
+   * @param value the command to send
+   * @return a future to be completed with the result
+   */
+  CompletableFuture<Void> command(byte[] value, StreamHandler<byte[]> handler);
+
+  /**
    * Sets a query to the partition.
    *
    * @param value the query parameter
    * @return a future to be completed with the result
    */
   CompletableFuture<byte[]> query(byte[] value);
+
+  /**
+   * Sets a query to the partition.
+   *
+   * @param value the query parameter
+   * @return a future to be completed with the result
+   */
+  CompletableFuture<Void> query(byte[] value, StreamHandler<byte[]> handler);
 
 }

@@ -44,6 +44,7 @@ import io.atomix.raft.protocol.TransferResponse;
 import io.atomix.raft.protocol.VoteRequest;
 import io.atomix.raft.protocol.VoteResponse;
 import io.atomix.raft.storage.system.RaftConfiguration;
+import io.atomix.utils.StreamHandler;
 import io.atomix.utils.concurrent.Futures;
 
 /**
@@ -171,6 +172,17 @@ public class InactiveRole extends AbstractRole {
   }
 
   @Override
+  public CompletableFuture<Void> onCommand(CommandRequest request, StreamHandler<CommandResponse> handler) {
+    logRequest(request);
+    handler.next(logResponse(CommandResponse.newBuilder()
+        .setStatus(ResponseStatus.ERROR)
+        .setError(RaftError.UNAVAILABLE)
+        .build()));
+    handler.complete();
+    return CompletableFuture.completedFuture(null);
+  }
+
+  @Override
   public CompletableFuture<QueryResponse> onQuery(QueryRequest request) {
     logRequest(request);
     return Futures.completedFuture(logResponse(QueryResponse.newBuilder()
@@ -179,4 +191,13 @@ public class InactiveRole extends AbstractRole {
         .build()));
   }
 
+  @Override
+  public CompletableFuture<Void> onQuery(QueryRequest request, StreamHandler<QueryResponse> handler) {
+    logRequest(request);
+    handler.next(logResponse(QueryResponse.newBuilder()
+        .setStatus(ResponseStatus.ERROR)
+        .setError(RaftError.UNAVAILABLE)
+        .build()));
+    return CompletableFuture.completedFuture(null);
+  }
 }

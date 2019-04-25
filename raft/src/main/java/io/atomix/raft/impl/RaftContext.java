@@ -54,6 +54,7 @@ import io.atomix.raft.storage.snapshot.SnapshotStore;
 import io.atomix.raft.storage.system.MetaStore;
 import io.atomix.raft.utils.LoadMonitor;
 import io.atomix.storage.StorageException;
+import io.atomix.utils.StreamHandler;
 import io.atomix.utils.concurrent.ComposableFuture;
 import io.atomix.utils.concurrent.SingleThreadContext;
 import io.atomix.utils.concurrent.ThreadContext;
@@ -635,7 +636,9 @@ public class RaftContext implements AutoCloseable {
     protocol.registerPollHandler(request -> runOnContext(() -> role.onPoll(request)));
     protocol.registerVoteHandler(request -> runOnContext(() -> role.onVote(request)));
     protocol.registerCommandHandler(request -> runOnContextIfReady(() -> role.onCommand(request), CommandResponse::newBuilder));
+    protocol.registerCommandStreamHandler((request, handler) -> runOnContextIfReady(() -> role.onCommand(request, handler), handler, CommandResponse::newBuilder));
     protocol.registerQueryHandler(request -> runOnContextIfReady(() -> role.onQuery(request), QueryResponse::newBuilder));
+    protocol.registerQueryStreamHandler((request, handler) -> runOnContextIfReady(() -> role.onQuery(request, handler), handler, QueryResponse::newBuilder));
   }
 
   @SuppressWarnings("unchecked")
@@ -649,6 +652,20 @@ public class RaftContext implements AutoCloseable {
       builder.setField(builder.getDescriptorForType().findFieldByName("error"), RaftError.ILLEGAL_MEMBER_STATE);
       return CompletableFuture.completedFuture((R) builder.build());
     }
+  }
+
+  private <R extends Message> CompletableFuture<Void> runOnContextIfReady(
+      Runnable callback, StreamHandler<R> handler, Supplier<Message.Builder> builderSupplier) {
+    if (state == State.READY) {
+      threadContext.execute(callback);
+    } else {
+      Message.Builder builder = builderSupplier.get();
+      builder.setField(builder.getDescriptorForType().findFieldByName("status"), ResponseStatus.ERROR);
+      builder.setField(builder.getDescriptorForType().findFieldByName("error"), RaftError.ILLEGAL_MEMBER_STATE);
+      handler.next((R) builder.build());
+      handler.complete();
+    }
+    return CompletableFuture.completedFuture(null);
   }
 
   private <R extends Message> CompletableFuture<R> runOnContext(Supplier<CompletableFuture<R>> function) {
@@ -715,14 +732,14 @@ public class RaftContext implements AutoCloseable {
         protocol.transfer(leader.memberId(), TransferRequest.newBuilder()
             .setMemberId(member.memberId())
             .build()).whenCompleteAsync((response, error) -> {
-              if (error != null) {
-                future.completeExceptionally(error);
-              } else if (response.getStatus() == ResponseStatus.ERROR) {
-                future.completeExceptionally(new RaftException.ProtocolException("Failed to transfer leadership"));
-              } else {
-                transition(RaftServer.Role.CANDIDATE);
-              }
-            }, threadContext);
+          if (error != null) {
+            future.completeExceptionally(error);
+          } else if (response.getStatus() == ResponseStatus.ERROR) {
+            future.completeExceptionally(new RaftException.ProtocolException("Failed to transfer leadership"));
+          } else {
+            transition(RaftServer.Role.CANDIDATE);
+          }
+        }, threadContext);
       } else {
         transition(RaftServer.Role.CANDIDATE);
       }

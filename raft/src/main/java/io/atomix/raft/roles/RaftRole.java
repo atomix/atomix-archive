@@ -41,6 +41,7 @@ import io.atomix.raft.protocol.TransferResponse;
 import io.atomix.raft.protocol.VoteRequest;
 import io.atomix.raft.protocol.VoteResponse;
 import io.atomix.utils.Managed;
+import io.atomix.utils.StreamHandler;
 
 /**
  * Raft role interface.
@@ -135,11 +136,27 @@ public interface RaftRole extends Managed<RaftRole> {
   CompletableFuture<CommandResponse> onCommand(CommandRequest request);
 
   /**
+   * Handles a command request.
+   *
+   * @param request The request to handle.
+   * @return a future to be completed once the command is complete
+   */
+  CompletableFuture<Void> onCommand(CommandRequest request, StreamHandler<CommandResponse> handler);
+
+  /**
    * Handles a query request.
    *
    * @param request The request to handle.
    * @return A completable future to be completed with the request response.
    */
   CompletableFuture<QueryResponse> onQuery(QueryRequest request);
+
+  /**
+   * Handles a query request.
+   *
+   * @param request The request to handle.
+   * @return a future to be completed once the query is complete
+   */
+  CompletableFuture<Void> onQuery(QueryRequest request, StreamHandler<QueryResponse> handler);
 
 }

@@ -19,7 +19,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 
-import io.atomix.primitive.service.ServiceExecutor;
+import io.atomix.primitive.service.ServiceOperationRegistry;
 import io.atomix.primitive.service.SimplePrimitiveService;
 import io.atomix.primitive.session.impl.proto.NextRequest;
 import io.atomix.primitive.session.impl.proto.NextResponse;
@@ -46,8 +46,12 @@ public class SessionIdGeneratorService extends SimplePrimitiveService {
   }
 
   @Override
-  protected void configure(ServiceExecutor executor) {
-    executor.register(SessionIdGeneratorOperations.NEXT, this::next, NextRequest::parseFrom, NextResponse::toByteArray);
+  protected void configure(ServiceOperationRegistry registry) {
+    registry.register(
+        SessionIdGeneratorOperations.NEXT,
+        this::next,
+        NextRequest::parseFrom,
+        NextResponse::toByteArray);
   }
 
   protected NextResponse next(NextRequest request) {

@@ -17,6 +17,8 @@ package io.atomix.raft.protocol;
 
 import java.util.concurrent.CompletableFuture;
 
+import io.atomix.utils.StreamHandler;
+
 /**
  * Raft client protocol.
  */
@@ -25,19 +27,37 @@ public interface RaftClientProtocol {
   /**
    * Sends a query request to the given node.
    *
-   * @param memberId  the node to which to send the request
+   * @param server  the node to which to send the request
    * @param request the request to send
    * @return a future to be completed with the response
    */
-  CompletableFuture<QueryResponse> query(String memberId, QueryRequest request);
+  CompletableFuture<QueryResponse> query(String server, QueryRequest request);
+
+  /**
+   * Sends a query request to the given node.
+   *
+   * @param server  the node to which to send the request
+   * @param request the request to send
+   * @return a future to be completed with the response
+   */
+  CompletableFuture<Void> queryStream(String server, QueryRequest request, StreamHandler<QueryResponse> handler);
 
   /**
    * Sends a command request to the given node.
    *
-   * @param memberId  the node to which to send the request
+   * @param server  the node to which to send the request
    * @param request the request to send
    * @return a future to be completed with the response
    */
-  CompletableFuture<CommandResponse> command(String memberId, CommandRequest request);
+  CompletableFuture<CommandResponse> command(String server, CommandRequest request);
+
+  /**
+   * Sends a command request to the given node.
+   *
+   * @param server  the node to which to send the request
+   * @param request the request to send
+   * @return a future to be completed with the response
+   */
+  CompletableFuture<Void> commandStream(String server, CommandRequest request, StreamHandler<CommandResponse> handler);
 
 }

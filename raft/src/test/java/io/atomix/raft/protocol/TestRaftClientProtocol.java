@@ -19,6 +19,7 @@ import java.net.ConnectException;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
+import io.atomix.utils.StreamHandler;
 import io.atomix.utils.concurrent.Futures;
 import io.atomix.utils.concurrent.ThreadContext;
 
@@ -46,7 +47,17 @@ public class TestRaftClientProtocol extends TestRaftProtocol implements RaftClie
   }
 
   @Override
+  public CompletableFuture<Void> queryStream(String server, QueryRequest request, StreamHandler<QueryResponse> handler) {
+    return getServer(server).thenCompose(protocol -> protocol.queryStream(request, handler));
+  }
+
+  @Override
   public CompletableFuture<CommandResponse> command(String server, CommandRequest request) {
     return scheduleTimeout(getServer(server).thenCompose(protocol -> protocol.command(request)));
+  }
+
+  @Override
+  public CompletableFuture<Void> commandStream(String server, CommandRequest request, StreamHandler<CommandResponse> handler) {
+    return getServer(server).thenCompose(protocol -> protocol.commandStream(request, handler));
   }
 }

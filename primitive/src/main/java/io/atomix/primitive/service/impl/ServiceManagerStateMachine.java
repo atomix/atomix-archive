@@ -16,6 +16,7 @@ import io.atomix.primitive.service.Query;
 import io.atomix.primitive.service.ServiceType;
 import io.atomix.primitive.service.StateMachine;
 import io.atomix.primitive.util.ByteArrayDecoder;
+import io.atomix.utils.StreamHandler;
 import io.atomix.utils.concurrent.Futures;
 
 /**
@@ -89,6 +90,32 @@ public class ServiceManagerStateMachine implements StateMachine {
   }
 
   @Override
+  public CompletableFuture<Void> apply(Command<byte[]> command, StreamHandler<byte[]> handler) {
+    Command<ServiceRequest> serviceCommand = command.map(bytes -> ByteArrayDecoder.decode(bytes, ServiceRequest::parseFrom));
+    ServiceId id = serviceCommand.value().getId();
+    ServiceStateMachine service = services.computeIfAbsent(id.getName(), name -> newService(id.getName(), id.getType()));
+    return service.apply(serviceCommand.map(request -> request.getRequest().toByteArray()), new StreamHandler<byte[]>() {
+      @Override
+      public void next(byte[] response) {
+        handler.next(ServiceResponse.newBuilder()
+            .setResponse(ByteString.copyFrom(response))
+            .build()
+            .toByteArray());
+      }
+
+      @Override
+      public void complete() {
+        handler.complete();
+      }
+
+      @Override
+      public void error(Throwable error) {
+        handler.error(error);
+      }
+    });
+  }
+
+  @Override
   public CompletableFuture<byte[]> apply(Query<byte[]> query) {
     Query<ServiceRequest> serviceQuery = query.map(bytes -> ByteArrayDecoder.decode(bytes, ServiceRequest::parseFrom));
     ServiceId id = serviceQuery.value().getId();
@@ -101,5 +128,34 @@ public class ServiceManagerStateMachine implements StateMachine {
             .setResponse(ByteString.copyFrom(response))
             .build()
             .toByteArray());
+  }
+
+  @Override
+  public CompletableFuture<Void> apply(Query<byte[]> query, StreamHandler<byte[]> handler) {
+    Query<ServiceRequest> serviceQuery = query.map(bytes -> ByteArrayDecoder.decode(bytes, ServiceRequest::parseFrom));
+    ServiceId id = serviceQuery.value().getId();
+    ServiceStateMachine service = services.get(id.getName());
+    if (service == null) {
+      return Futures.exceptionalFuture(new PrimitiveException.UnknownService());
+    }
+    return service.apply(serviceQuery.map(request -> request.getRequest().toByteArray()), new StreamHandler<byte[]>() {
+      @Override
+      public void next(byte[] response) {
+        handler.next(ServiceResponse.newBuilder()
+            .setResponse(ByteString.copyFrom(response))
+            .build()
+            .toByteArray());
+      }
+
+      @Override
+      public void complete() {
+        handler.complete();
+      }
+
+      @Override
+      public void error(Throwable error) {
+        handler.error(error);
+      }
+    });
   }
 }

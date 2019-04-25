@@ -1,118 +1,102 @@
-/*
- * Copyright 2017-present Open Networking Foundation
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
 package io.atomix.primitive.service.impl;
 
-import java.time.Duration;
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.Iterator;
-import java.util.LinkedList;
-import java.util.List;
 import java.util.Map;
-import java.util.Queue;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
 import io.atomix.primitive.PrimitiveException;
-import io.atomix.primitive.util.ByteArrayDecoder;
-import io.atomix.primitive.util.ByteArrayEncoder;
 import io.atomix.primitive.operation.OperationId;
-import io.atomix.primitive.operation.OperationType;
 import io.atomix.primitive.service.Command;
 import io.atomix.primitive.service.Query;
-import io.atomix.primitive.service.ServiceExecutor;
-import io.atomix.utils.concurrent.Scheduled;
+import io.atomix.primitive.service.ServiceOperationRegistry;
+import io.atomix.primitive.util.ByteArrayDecoder;
+import io.atomix.primitive.util.ByteArrayEncoder;
+import io.atomix.utils.StreamHandler;
 import org.slf4j.Logger;
 
-import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
-import static com.google.common.base.Preconditions.checkState;
 import static io.atomix.primitive.util.ByteArrayDecoder.decode;
 import static io.atomix.primitive.util.ByteArrayEncoder.encode;
 
-/**
- * Default operation executor.
- */
-public class DefaultServiceExecutor implements ServiceExecutor {
+public class DefaultServiceExecutor extends DefaultServiceScheduler implements ServiceOperationRegistry {
   private final Logger log;
-  private final Queue<Runnable> tasks = new LinkedList<>();
-  private final List<ScheduledTask> scheduledTasks = new ArrayList<>();
-  private final List<ScheduledTask> complete = new ArrayList<>();
   private final Map<String, Function<byte[], byte[]>> operations = new HashMap<>();
-  private OperationType operationType;
-  private long timestamp;
+  private final Map<String, BiConsumer<byte[], StreamHandler<byte[]>>> streamOperations = new HashMap<>();
 
   public DefaultServiceExecutor(Logger log) {
+    super(log);
     this.log = log;
   }
 
-  @Override
-  public void handle(OperationId operationId, Function<byte[], byte[]> callback) {
-    checkNotNull(operationId, "operationId cannot be null");
-    checkNotNull(callback, "callback cannot be null");
-    operations.put(operationId.id(), callback);
-    log.trace("Registered operation callback {}", operationId);
-  }
-
-  @Override
-  public <R> void register(OperationId operationId, Supplier<R> callback, ByteArrayEncoder<R> encoder) {
-    checkNotNull(operationId, "operationId cannot be null");
-    checkNotNull(callback, "callback cannot be null");
-    handle(operationId, commit -> encode(callback.get(), encoder));
-  }
-
-  @Override
-  public <T> void register(OperationId operationId, Consumer<T> callback, ByteArrayDecoder<T> decoder) {
-    checkNotNull(operationId, "operationId cannot be null");
-    checkNotNull(callback, "callback cannot be null");
-    handle(operationId, bytes -> {
-      callback.accept(decode(bytes, decoder));
-      return null;
-    });
-  }
-
-  @Override
-  public <T, R> void register(OperationId operationId, Function<T, R> callback, ByteArrayDecoder<T> decoder, ByteArrayEncoder<R> encoder) {
-    checkNotNull(operationId, "operationId cannot be null");
-    checkNotNull(callback, "callback cannot be null");
-    handle(operationId, bytes -> encode(callback.apply(decode(bytes, decoder)), encoder));
-  }
-
-  @Override
+  /**
+   * Applies the given command to the service.
+   *
+   * @param operationId the command ID
+   * @param command     the command
+   * @return the command result
+   */
   public byte[] apply(OperationId operationId, Command<byte[]> command) {
     log.trace("Executing {}", command);
-
-    tick(command.timestamp());
-
-    this.operationType = OperationType.COMMAND;
-    this.timestamp = command.timestamp();
-
+    startCommand(command.timestamp());
     try {
       return apply(operationId, command.value());
     } finally {
-      runTasks();
+      completeCommand();
     }
   }
 
-  @Override
+  /**
+   * Applies the given command to the service.
+   *
+   * @param operationId the command ID
+   * @param command     the command
+   * @param handler     the stream handler
+   */
+  public void apply(OperationId operationId, Command<byte[]> command, StreamHandler<byte[]> handler) {
+    log.trace("Executing {}", command);
+    startCommand(command.timestamp());
+    try {
+      apply(operationId, command.value(), handler);
+    } finally {
+      completeCommand();
+    }
+  }
+
+  /**
+   * Applies the given query to the service.
+   *
+   * @param operationId the query ID
+   * @param query       the query
+   * @return the query result
+   */
   public byte[] apply(OperationId operationId, Query<byte[]> query) {
     log.trace("Executing {}", query);
-    this.operationType = OperationType.QUERY;
-    return apply(operationId, query.value());
+    startQuery();
+    try {
+      return apply(operationId, query.value());
+    } finally {
+      completeQuery();
+    }
+  }
+
+  /**
+   * Applies the given query to the service.
+   *
+   * @param operationId the query ID
+   * @param query       the query
+   * @param handler     the stream handler
+   */
+  public void apply(OperationId operationId, Query<byte[]> query, StreamHandler<byte[]> handler) {
+    log.trace("Executing {}", query);
+    startQuery();
+    try {
+      apply(operationId, query.value(), handler);
+    } finally {
+      completeQuery();
+    }
   }
 
   /**
@@ -141,173 +125,114 @@ public class DefaultServiceExecutor implements ServiceExecutor {
   }
 
   /**
-   * Advances the scheduler's clock.
+   * Applies the given value to the given operation.
    *
-   * @param timestamp the updated timestamp
+   * @param operationId the operation ID
+   * @param value       the operation value
+   * @param handler     the stream handler
    */
-  private void tick(long timestamp) {
-    this.timestamp = timestamp;
-    this.operationType = OperationType.COMMAND;
-    if (!scheduledTasks.isEmpty()) {
-      // Iterate through scheduled tasks until we reach a task that has not met its scheduled time.
-      // The tasks list is sorted by time on insertion.
-      Iterator<ScheduledTask> iterator = scheduledTasks.iterator();
-      while (iterator.hasNext()) {
-        ScheduledTask task = iterator.next();
-        if (task.isRunnable(timestamp)) {
-          this.timestamp = task.time;
-          this.operationType = OperationType.COMMAND;
-          log.trace("Executing scheduled task {}", task);
-          task.execute();
-          complete.add(task);
-          iterator.remove();
-        } else {
-          break;
-        }
-      }
+  private void apply(OperationId operationId, byte[] value, StreamHandler<byte[]> handler) {
+    // Look up the registered callback for the operation.
+    BiConsumer<byte[], StreamHandler<byte[]>> operation = streamOperations.get(operationId.id());
 
-      // Iterate through tasks that were completed and reschedule them.
-      for (ScheduledTask task : complete) {
-        task.reschedule(this.timestamp);
-      }
-      complete.clear();
-    }
-  }
-
-  /**
-   * Checks that the current operation is of the given type.
-   *
-   * @param type    the operation type
-   * @param message the message to print if the current operation does not match the given type
-   */
-  private void checkOperation(OperationType type, String message) {
-    checkState(operationType == type, message);
-  }
-
-  /**
-   * Executes tasks after an operation.
-   */
-  private void runTasks() {
-    // Execute any tasks that were queue during execution of the command.
-    if (!tasks.isEmpty()) {
-      for (Runnable task : tasks) {
-        log.trace("Executing task {}", task);
-        task.run();
-      }
-      tasks.clear();
-    }
-  }
-
-  @Override
-  public void execute(Runnable callback) {
-    checkOperation(OperationType.COMMAND, "callbacks can only be scheduled during command execution");
-    checkNotNull(callback, "callback cannot be null");
-    tasks.add(callback);
-  }
-
-  @Override
-  public Scheduled schedule(Duration delay, Runnable callback) {
-    checkOperation(OperationType.COMMAND, "callbacks can only be scheduled during command execution");
-    checkArgument(!delay.isNegative(), "delay cannot be negative");
-    checkNotNull(callback, "callback cannot be null");
-    log.trace("Scheduled callback {} with delay {}", callback, delay);
-    return new ScheduledTask(callback, delay.toMillis()).schedule();
-  }
-
-  @Override
-  public Scheduled schedule(Duration initialDelay, Duration interval, Runnable callback) {
-    checkOperation(OperationType.COMMAND, "callbacks can only be scheduled during command execution");
-    checkArgument(!initialDelay.isNegative(), "initialDelay cannot be negative");
-    checkArgument(!interval.isNegative(), "interval cannot be negative");
-    checkNotNull(callback, "callback cannot be null");
-    log.trace("Scheduled repeating callback {} with initial delay {} and interval {}", callback, initialDelay, interval);
-    return new ScheduledTask(callback, initialDelay.toMillis(), interval.toMillis()).schedule();
-  }
-
-  /**
-   * Scheduled task.
-   */
-  private class ScheduledTask implements Scheduled {
-    private final long interval;
-    private final Runnable callback;
-    private long time;
-
-    private ScheduledTask(Runnable callback, long delay) {
-      this(callback, delay, 0);
-    }
-
-    private ScheduledTask(Runnable callback, long delay, long interval) {
-      this.interval = interval;
-      this.callback = callback;
-      this.time = timestamp + delay;
-    }
-
-    /**
-     * Schedules the task.
-     */
-    private Scheduled schedule() {
-      // Perform binary search to insert the task at the appropriate position in the tasks list.
-      if (scheduledTasks.isEmpty()) {
-        scheduledTasks.add(this);
-      } else {
-        int l = 0;
-        int u = scheduledTasks.size() - 1;
-        int i;
-        while (true) {
-          i = (u + l) / 2;
-          long t = scheduledTasks.get(i).time;
-          if (t == time) {
-            scheduledTasks.add(i, this);
-            return this;
-          } else if (t < time) {
-            l = i + 1;
-            if (l > u) {
-              scheduledTasks.add(i + 1, this);
-              return this;
-            }
-          } else {
-            u = i - 1;
-            if (l > u) {
-              scheduledTasks.add(i, this);
-              return this;
-            }
-          }
-        }
-      }
-      return this;
-    }
-
-    /**
-     * Reschedules the task.
-     */
-    private void reschedule(long timestamp) {
-      if (interval > 0) {
-        time = timestamp + interval;
-        schedule();
-      }
-    }
-
-    /**
-     * Returns a boolean value indicating whether the task delay has been met.
-     */
-    private boolean isRunnable(long timestamp) {
-      return timestamp > time;
-    }
-
-    /**
-     * Executes the task.
-     */
-    private synchronized void execute() {
+    if (operation == null) {
+      throw new IllegalStateException("Unknown state machine operation: " + operationId);
+    } else {
+      // Execute the operation. If the operation return value is a Future, await the result,
+      // otherwise immediately complete the execution future.
       try {
-        callback.run();
+        operation.accept(value, handler);
       } catch (Exception e) {
-        log.error("An exception occurred in a scheduled task", e);
+        log.warn("State machine operation failed: {}", e.getMessage());
+        throw new PrimitiveException.ServiceException(e);
       }
     }
+  }
 
-    @Override
-    public synchronized void cancel() {
-      scheduledTasks.remove(this);
-    }
+  private void handle(OperationId operationId, Function<byte[], byte[]> callback) {
+    checkNotNull(operationId, "operationId cannot be null");
+    checkNotNull(callback, "callback cannot be null");
+    operations.put(operationId.id(), callback);
+    log.trace("Registered operation callback {}", operationId);
+  }
+
+  @Override
+  public void register(OperationId operationId, Runnable callback) {
+    checkNotNull(operationId, "operationId cannot be null");
+    checkNotNull(callback, "callback cannot be null");
+    handle(operationId, commit -> {
+      callback.run();
+      return null;
+    });
+  }
+
+  @Override
+  public <R> void register(OperationId operationId, Supplier<R> callback, ByteArrayEncoder<R> encoder) {
+    checkNotNull(operationId, "operationId cannot be null");
+    checkNotNull(callback, "callback cannot be null");
+    handle(operationId, commit -> encode(callback.get(), encoder));
+  }
+
+  @Override
+  public <T> void register(OperationId operationId, Consumer<T> callback, ByteArrayDecoder<T> decoder) {
+    checkNotNull(operationId, "operationId cannot be null");
+    checkNotNull(callback, "callback cannot be null");
+    handle(operationId, bytes -> {
+      callback.accept(decode(bytes, decoder));
+      return null;
+    });
+  }
+
+  @Override
+  public <T, R> void register(OperationId operationId, Function<T, R> callback, ByteArrayDecoder<T> decoder, ByteArrayEncoder<R> encoder) {
+    checkNotNull(operationId, "operationId cannot be null");
+    checkNotNull(callback, "callback cannot be null");
+    handle(operationId, bytes -> encode(callback.apply(decode(bytes, decoder)), encoder));
+  }
+
+  @Override
+  public <R> void register(OperationId operationId, Consumer<StreamHandler<R>> callback, ByteArrayEncoder<R> encoder) {
+    checkNotNull(operationId, "operationId cannot be null");
+    checkNotNull(callback, "callback cannot be null");
+    streamOperations.put(operationId.id(), (bytes, handler) -> callback.accept(new StreamHandler<R>() {
+      @Override
+      public void next(R value) {
+        handler.next(encode(value, encoder));
+      }
+
+      @Override
+      public void complete() {
+        handler.complete();
+      }
+
+      @Override
+      public void error(Throwable error) {
+        handler.error(error);
+      }
+    }));
+    log.trace("Registered operation callback {}", operationId);
+  }
+
+  @Override
+  public <T, R> void register(OperationId operationId, BiConsumer<T, StreamHandler<R>> callback, ByteArrayDecoder<T> decoder, ByteArrayEncoder<R> encoder) {
+    checkNotNull(operationId, "operationId cannot be null");
+    checkNotNull(callback, "callback cannot be null");
+    streamOperations.put(operationId.id(), (bytes, handler) -> callback.accept(decode(bytes, decoder), new StreamHandler<R>() {
+      @Override
+      public void next(R value) {
+        handler.next(encode(value, encoder));
+      }
+
+      @Override
+      public void complete() {
+        handler.complete();
+      }
+
+      @Override
+      public void error(Throwable error) {
+        handler.error(error);
+      }
+    }));
+    log.trace("Registered operation callback {}", operationId);
   }
 }

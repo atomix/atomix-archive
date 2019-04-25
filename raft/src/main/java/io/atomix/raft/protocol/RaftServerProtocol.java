@@ -16,7 +16,10 @@
 package io.atomix.raft.protocol;
 
 import java.util.concurrent.CompletableFuture;
+import java.util.function.BiFunction;
 import java.util.function.Function;
+
+import io.atomix.utils.StreamHandler;
 
 /**
  * Raft server protocol.
@@ -33,6 +36,15 @@ public interface RaftServerProtocol {
   CompletableFuture<QueryResponse> query(String server, QueryRequest request);
 
   /**
+   * Sends a query request to the given node.
+   *
+   * @param server  the node to which to send the request
+   * @param request the request to send
+   * @return a future to be completed with the response
+   */
+  CompletableFuture<Void> queryStream(String server, QueryRequest request, StreamHandler<QueryResponse> handler);
+
+  /**
    * Sends a command request to the given node.
    *
    * @param server  the node to which to send the request
@@ -40,6 +52,15 @@ public interface RaftServerProtocol {
    * @return a future to be completed with the response
    */
   CompletableFuture<CommandResponse> command(String server, CommandRequest request);
+
+  /**
+   * Sends a command request to the given node.
+   *
+   * @param member  the node to which to send the request
+   * @param request the request to send
+   * @return a future to be completed with the response
+   */
+  CompletableFuture<Void> commandStream(String member, CommandRequest request, StreamHandler<CommandResponse> handler);
 
   /**
    * Sends a join request to the given node.
@@ -135,6 +156,18 @@ public interface RaftServerProtocol {
   void unregisterQueryHandler();
 
   /**
+   * Registers a query stream callback.
+   *
+   * @param handler the query stream handler to register
+   */
+  void registerQueryStreamHandler(BiFunction<QueryRequest, StreamHandler<QueryResponse>, CompletableFuture<Void>> handler);
+
+  /**
+   * Unregisters a query stream callback.
+   */
+  void unregisterQueryStreamHandler();
+
+  /**
    * Registers a command request callback.
    *
    * @param handler the open session request handler to register
@@ -145,6 +178,18 @@ public interface RaftServerProtocol {
    * Unregisters the command request handler.
    */
   void unregisterCommandHandler();
+
+  /**
+   * Registers a command stream callback.
+   *
+   * @param handler the command stream handler to register
+   */
+  void registerCommandStreamHandler(BiFunction<CommandRequest, StreamHandler<CommandResponse>, CompletableFuture<Void>> handler);
+
+  /**
+   * Unregisters a command stream callback.
+   */
+  void unregisterCommandStreamHandler();
 
   /**
    * Registers a join request callback.

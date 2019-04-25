@@ -1,7 +1,7 @@
 package io.atomix.cluster.messaging.impl;
 
 import io.atomix.cluster.messaging.MessagingException;
-import io.atomix.cluster.messaging.StreamHandler;
+import io.atomix.utils.StreamHandler;
 
 /**
  * Abstract connection.

@@ -18,6 +18,7 @@ package io.atomix.raft.impl;
 import java.net.ConnectException;
 import java.util.Collection;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import com.google.common.base.Throwables;
 import com.google.protobuf.ByteString;
@@ -26,10 +27,13 @@ import io.atomix.raft.RaftClient;
 import io.atomix.raft.RaftException;
 import io.atomix.raft.ReadConsistency;
 import io.atomix.raft.protocol.CommandRequest;
+import io.atomix.raft.protocol.CommandResponse;
 import io.atomix.raft.protocol.QueryRequest;
+import io.atomix.raft.protocol.QueryResponse;
 import io.atomix.raft.protocol.RaftClientProtocol;
 import io.atomix.raft.protocol.RaftError;
 import io.atomix.raft.protocol.ResponseStatus;
+import io.atomix.utils.StreamHandler;
 import io.atomix.utils.concurrent.ThreadContext;
 import io.atomix.utils.concurrent.ThreadContextFactory;
 import io.atomix.utils.logging.ContextualLoggerFactory;
@@ -125,6 +129,64 @@ public class DefaultRaftClient implements RaftClient {
   }
 
   @Override
+  public CompletableFuture<Void> write(byte[] value, StreamHandler<byte[]> handler) {
+    String member = selector.leader();
+    if (member == null) {
+      member = next();
+    }
+    return protocol.commandStream(member, CommandRequest.newBuilder()
+            .setValue(ByteString.copyFrom(value))
+            .build(),
+        new StreamHandler<CommandResponse>() {
+          private final AtomicBoolean complete = new AtomicBoolean();
+
+          @Override
+          public void next(CommandResponse response) {
+            if (response.getStatus() == ResponseStatus.OK) {
+              term = response.getTerm();
+              String leader = selector.leader();
+              Collection<String> members = response.getMembersList();
+              if (leader == null && !response.getLeader().equals("")) {
+                selector.reset(response.getLeader(), members);
+              } else if (leader != null && response.getLeader().equals("")) {
+                selector.reset(null, members);
+              } else if (leader != null && !response.getLeader().equals("") && !response.getLeader().equals(leader)) {
+                selector.reset(response.getLeader(), members);
+              }
+
+              if (!complete.get()) {
+                handler.next(response.getOutput().toByteArray());
+              }
+            } else {
+              if (response.getError() == RaftError.NO_LEADER) {
+                current = null;
+              }
+              if (complete.compareAndSet(false, true)) {
+                handler.error(createException(response.getError(), response.getMessage()));
+              }
+            }
+          }
+
+          @Override
+          public void complete() {
+            if (complete.compareAndSet(false, true)) {
+              handler.complete();
+            }
+          }
+
+          @Override
+          public void error(Throwable error) {
+            if (Throwables.getRootCause(error) instanceof ConnectException) {
+              current = null;
+            }
+            if (complete.compareAndSet(false, true)) {
+              handler.error(error);
+            }
+          }
+        });
+  }
+
+  @Override
   public CompletableFuture<byte[]> read(byte[] value, ReadConsistency consistency) {
     CompletableFuture<byte[]> future = new CompletableFuture<>();
     protocol.query(next(), QueryRequest.newBuilder()
@@ -151,10 +213,50 @@ public class DefaultRaftClient implements RaftClient {
     return future;
   }
 
+  @Override
+  public CompletableFuture<Void> read(byte[] value, ReadConsistency consistency, StreamHandler<byte[]> handler) {
+    return protocol.queryStream(next(), QueryRequest.newBuilder()
+            .setValue(ByteString.copyFrom(value))
+            .setReadConsistency(io.atomix.raft.protocol.ReadConsistency.valueOf(consistency.name()))
+            .build(),
+        new StreamHandler<QueryResponse>() {
+          private final AtomicBoolean complete = new AtomicBoolean();
+
+          @Override
+          public void next(QueryResponse response) {
+            if (response.getStatus() == ResponseStatus.OK) {
+              handler.next(response.getOutput().toByteArray());
+            } else {
+              if (response.getError() == RaftError.NO_LEADER) {
+                current = null;
+              }
+              handler.error(createException(response.getError(), response.getMessage()));
+            }
+          }
+
+          @Override
+          public void complete() {
+            if (complete.compareAndSet(false, true)) {
+              handler.complete();
+            }
+          }
+
+          @Override
+          public void error(Throwable error) {
+            if (Throwables.getRootCause(error) instanceof ConnectException) {
+              current = null;
+            }
+            if (complete.compareAndSet(false, true)) {
+              handler.error(error);
+            }
+          }
+        });
+  }
+
   /**
    * Creates a new exception from an error response.
    *
-   * @param error the Raft error
+   * @param error   the Raft error
    * @param message the error message
    * @return the exception
    */

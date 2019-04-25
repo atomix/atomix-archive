@@ -15,8 +15,10 @@
  */
 package io.atomix.primitive.partition.impl;
 
+import com.google.protobuf.Empty;
 import io.atomix.primitive.operation.CommandId;
 import io.atomix.primitive.operation.QueryId;
+import io.atomix.primitive.partition.PrimaryElectionEvent;
 
 /**
  * Primary elector operations.
@@ -24,6 +26,7 @@ import io.atomix.primitive.operation.QueryId;
 public final class PrimaryElectorOperations {
   public static final CommandId<EnterRequest, EnterResponse> ENTER = new CommandId<>("enter");
   public static final QueryId<GetTermRequest, GetTermResponse> GET_TERM = new QueryId<>("getTerm");
+  public static final CommandId<Empty, PrimaryElectionEvent> STREAM_EVENTS = new CommandId<>("stream");
 
   private PrimaryElectorOperations() {
   }

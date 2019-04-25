@@ -35,6 +35,7 @@ import io.atomix.raft.storage.log.RaftLogReader;
 import io.atomix.raft.storage.snapshot.Snapshot;
 import io.atomix.storage.StorageLevel;
 import io.atomix.storage.journal.Indexed;
+import io.atomix.utils.StreamHandler;
 import io.atomix.utils.concurrent.ComposableFuture;
 import io.atomix.utils.concurrent.OrderedFuture;
 import io.atomix.utils.concurrent.ThreadContext;
@@ -62,6 +63,7 @@ public class RaftStateMachineManager implements RaftStateMachine.Context, AutoCl
   private final RaftLog log;
   private final RaftLogReader reader;
   private final Map<Long, CompletableFuture> futures = Maps.newHashMap();
+  private final Map<Long, StreamHandler<byte[]>> handlers = Maps.newHashMap();
   private volatile CompletableFuture<Void> compactFuture;
   private RaftOperation.Type operationType;
   private long lastIndex;
@@ -96,11 +98,6 @@ public class RaftStateMachineManager implements RaftStateMachine.Context, AutoCl
   @Override
   public RaftOperation.Type getOperationType() {
     return operationType;
-  }
-
-  @Override
-  public RaftServer.Role getRole() {
-    return raft.getRole();
   }
 
   @Override
@@ -326,6 +323,24 @@ public class RaftStateMachineManager implements RaftStateMachine.Context, AutoCl
   }
 
   /**
+   * Applies the entry at the given index to the state machine.
+   * <p>
+   * Calls to this method are assumed to expect a result. This means linearizable session events triggered by the
+   * application of the command at the given index will be awaited before completing the returned future.
+   *
+   * @param index The index to apply.
+   * @param handler The stream handler
+   * @return A completable future to be completed once the commit has been applied.
+   */
+  @SuppressWarnings("unchecked")
+  public CompletableFuture<Void> apply(long index, StreamHandler<byte[]> handler) {
+    CompletableFuture<Void> future = futures.computeIfAbsent(index, i -> new CompletableFuture<Void>());
+    handlers.put(index, handler);
+    enqueueBatch(index);
+    return future;
+  }
+
+  /**
    * Applies all entries up to the given index.
    *
    * @param index the index up to which to apply entries
@@ -362,16 +377,30 @@ public class RaftStateMachineManager implements RaftStateMachine.Context, AutoCl
           throw new IllegalStateException("inconsistent index applying entry " + index + ": " + entry);
         }
         CompletableFuture future = futures.remove(index);
-        apply(entry).whenComplete((r, e) -> {
-          raft.setLastApplied(index);
-          if (future != null) {
-            if (e == null) {
-              future.complete(r);
-            } else {
-              future.completeExceptionally(e);
+        StreamHandler<byte[]> handler = handlers.remove(index);
+        if (handler != null) {
+          apply(entry, handler).whenComplete((r, e) -> {
+            raft.setLastApplied(index);
+            if (future != null) {
+              if (e == null) {
+                future.complete(r);
+              } else {
+                future.completeExceptionally(e);
+              }
             }
-          }
-        });
+          });
+        } else {
+          apply(entry).whenComplete((r, e) -> {
+            raft.setLastApplied(index);
+            if (future != null) {
+              if (e == null) {
+                future.complete(r);
+              } else {
+                future.completeExceptionally(e);
+              }
+            }
+          });
+        }
       } catch (Exception e) {
         logger.error("Failed to apply {}: {}", entry, e);
       }
@@ -421,17 +450,97 @@ public class RaftStateMachineManager implements RaftStateMachine.Context, AutoCl
           }
 
           if (entry.entry().hasCommand()) {
-            applyCommand(entry).whenComplete((r, e) -> {
-              if (e != null) {
-                future.completeExceptionally(e);
-              } else {
-                future.complete((T) r);
-              }
-            });
+            if (entry.entry().getCommand().getStream()) {
+              applyCommand(entry, new StreamHandler<byte[]>() {
+                @Override
+                public void next(byte[] value) {
+
+                }
+
+                @Override
+                public void complete() {
+
+                }
+
+                @Override
+                public void error(Throwable error) {
+
+                }
+              }).whenComplete((r, e) -> {
+                if (e != null) {
+                  future.completeExceptionally(e);
+                } else {
+                  future.complete((T) r);
+                }
+              });
+            } else {
+              applyCommand(entry).whenComplete((r, e) -> {
+                if (e != null) {
+                  future.completeExceptionally(e);
+                } else {
+                  future.complete((T) r);
+                }
+              });
+            }
           } else if (entry.entry().hasInitialize()) {
             future.complete((T) applyInitialize(entry));
           } else if (entry.entry().hasConfiguration()) {
             future.complete((T) applyConfiguration(entry));
+          } else {
+            future.completeExceptionally(new RaftException.ProtocolException("Unknown entry type"));
+          }
+        }
+      } catch (Exception e) {
+        future.completeExceptionally(e);
+      }
+    });
+    return future;
+  }
+
+  /**
+   * Applies an entry to the state machine.
+   * <p>
+   * Calls to this method are assumed to expect a result. This means linearizable session events triggered by the
+   * application of the given entry will be awaited before completing the returned future.
+   *
+   * @param entry The entry to apply.
+   * @return A completable future to be completed with the result.
+   */
+  @SuppressWarnings("unchecked")
+  public CompletableFuture<Void> apply(Indexed<RaftLogEntry> entry, StreamHandler<byte[]> handler) {
+    CompletableFuture<Void> future = new CompletableFuture<>();
+    stateContext.execute(() -> {
+      logger.trace("Applying {}", entry);
+      try {
+        if (entry.entry().hasQuery()) {
+          applyQuery(entry, handler).whenComplete((r, e) -> {
+            if (e != null) {
+              future.completeExceptionally(e);
+            } else {
+              future.complete(null);
+            }
+          });
+        } else {
+          // Get the current snapshot. If the snapshot is for a higher index then skip this operation.
+          // If the snapshot is for the prior index, install it.
+          Snapshot snapshot = raft.getSnapshotStore().getCurrentSnapshot();
+          if (snapshot != null) {
+            if (snapshot.index() >= entry.index()) {
+              future.complete(null);
+              return;
+            } else if (snapshot.index() == entry.index() - 1) {
+              install(snapshot);
+            }
+          }
+
+          if (entry.entry().hasCommand()) {
+            applyCommand(entry, handler).whenComplete((r, e) -> {
+              if (e != null) {
+                future.completeExceptionally(e);
+              } else {
+                future.complete(null);
+              }
+            });
           } else {
             future.completeExceptionally(new RaftException.ProtocolException("Unknown entry type"));
           }
@@ -510,6 +619,21 @@ public class RaftStateMachineManager implements RaftStateMachine.Context, AutoCl
   }
 
   /**
+   * Applies a command entry to the state machine.
+   */
+  private CompletableFuture<Void> applyCommand(Indexed<RaftLogEntry> entry, StreamHandler<byte[]> handler) {
+    raft.getLoadMonitor().recordEvent();
+    operationType = RaftOperation.Type.COMMAND;
+    lastIndex = entry.index();
+    lastTimestamp = Math.max(lastTimestamp, entry.entry().getTimestamp());
+    RaftCommand command = new RaftCommand(
+        lastIndex,
+        lastTimestamp,
+        entry.entry().getCommand().getValue().toByteArray());
+    return stateMachine.apply(command, handler);
+  }
+
+  /**
    * Applies a query entry to the state machine.
    */
   private CompletableFuture<OperationResult> applyQuery(Indexed<RaftLogEntry> entry) {
@@ -521,6 +645,18 @@ public class RaftStateMachineManager implements RaftStateMachine.Context, AutoCl
     return stateMachine.apply(query)
         .thenApply(OperationResult::succeeded)
         .exceptionally(OperationResult::failed);
+  }
+
+  /**
+   * Applies a query entry to the state machine.
+   */
+  private CompletableFuture<Void> applyQuery(Indexed<RaftLogEntry> entry, StreamHandler<byte[]> handler) {
+    operationType = RaftOperation.Type.QUERY;
+    RaftQuery query = new RaftQuery(
+        lastIndex,
+        lastTimestamp,
+        entry.entry().getCommand().getValue().toByteArray());
+    return stateMachine.apply(query, handler);
   }
 
   @Override

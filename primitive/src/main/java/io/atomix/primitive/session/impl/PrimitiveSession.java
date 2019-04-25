@@ -15,28 +15,23 @@
  */
 package io.atomix.primitive.session.impl;
 
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Queue;
 import java.util.concurrent.CompletableFuture;
 
-import io.atomix.cluster.MemberId;
 import io.atomix.primitive.PrimitiveException;
-import io.atomix.primitive.operation.OperationType;
 import io.atomix.primitive.service.PrimitiveService;
-import io.atomix.primitive.service.Role;
 import io.atomix.primitive.session.Session;
 import io.atomix.primitive.session.SessionId;
-import io.atomix.primitive.session.SessionServerProtocol;
 import io.atomix.utils.concurrent.Futures;
 import io.atomix.utils.misc.TimestampPrinter;
 import org.slf4j.Logger;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
-import static com.google.common.base.Preconditions.checkState;
 
 /**
  * Primitive session.
@@ -44,38 +39,27 @@ import static com.google.common.base.Preconditions.checkState;
 public class PrimitiveSession implements Session {
   private final Logger log;
   private final SessionId sessionId;
-  private final MemberId memberId;
   private final long timeout;
-  private final SessionServerProtocol protocol;
   private final PrimitiveService.Context context;
   private volatile State state = State.CLOSED;
   private volatile long lastUpdated;
   private volatile long commandSequence;
   private volatile long commandLowWaterMark;
-  private volatile long eventIndex;
-  private volatile long completeIndex;
   private volatile long lastApplied;
   private final Map<Long, Runnable> sequenceCommands = new HashMap<>();
   private final Map<Long, List<Runnable>> indexQueries = new HashMap<>();
   private final Map<Long, List<Runnable>> sequenceQueries = new HashMap<>();
   private final Map<Long, CompletableFuture<SessionCommandResponse>> results = new HashMap<>();
-  private final Queue<EventHolder> events = new LinkedList<>();
-  private volatile EventHolder currentEventList;
+  private final PrimitiveStreamRegistry streams = new PrimitiveStreamRegistry();
 
   public PrimitiveSession(
       SessionId sessionId,
-      MemberId memberId,
       long timeout,
       long lastUpdated,
-      SessionServerProtocol protocol,
       PrimitiveService.Context context) {
     this.sessionId = sessionId;
-    this.memberId = memberId;
     this.timeout = timeout;
     this.lastUpdated = lastUpdated;
-    this.eventIndex = sessionId.id();
-    this.completeIndex = sessionId.id();
-    this.protocol = protocol;
     this.context = context;
     this.log = context.getLogger();
   }
@@ -83,11 +67,6 @@ public class PrimitiveSession implements Session {
   @Override
   public SessionId sessionId() {
     return sessionId;
-  }
-
-  @Override
-  public MemberId memberId() {
-    return memberId;
   }
 
   /**
@@ -293,132 +272,44 @@ public class PrimitiveSession implements Session {
   }
 
   /**
-   * Returns the session event index.
+   * Adds a stream to the session.
    *
-   * @return The session event index.
+   * @param streamId the stream ID
    */
-  public long getEventIndex() {
-    return eventIndex;
+  public PrimitiveSessionStream addStream(long streamId) {
+    return new PrimitiveSessionStream(streamId, streams, context);
   }
 
   /**
-   * Sets the session event index.
+   * Returns a stream by ID.
    *
-   * @param eventIndex the session event index
+   * @param streamId the stream ID
+   * @return the stream
    */
-  public void setEventIndex(long eventIndex) {
-    this.eventIndex = eventIndex;
-  }
-
-  @Override
-  public void publish(PrimitiveEvent event) {
-    // Store volatile state in a local variable.
-    State state = this.state;
-
-    // If the sessions's state is not active, just ignore the event.
-    if (!state.active()) {
-      return;
-    }
-
-    // If the event is being published during a read operation, throw an exception.
-    checkState(context.getOperationType() == OperationType.COMMAND, "session events can only be published during command execution");
-
-    // If the client acked an index greater than the current event sequence number since we know the
-    // client must have received it from another server.
-    if (completeIndex > context.getIndex()) {
-      return;
-    }
-
-    // If no event has been published for this index yet, create a new event holder.
-    if (this.currentEventList == null || this.currentEventList.eventIndex != context.getIndex()) {
-      long previousIndex = eventIndex;
-      eventIndex = context.getIndex();
-      this.currentEventList = new EventHolder(eventIndex, previousIndex);
-    }
-
-    // Add the event to the event holder.
-    this.currentEventList.events.add(event);
+  public PrimitiveSessionStream getStream(long streamId) {
+    return streams.getStream(streamId);
   }
 
   /**
-   * Commits events for the given index.
-   */
-  public void commit(long index) {
-    if (currentEventList != null && currentEventList.eventIndex == index) {
-      events.add(currentEventList);
-      sendEvents(currentEventList);
-      currentEventList = null;
-    }
-  }
-
-  /**
-   * Returns the index of the highest event acked for the session.
+   * Returns the collection of open streams.
    *
-   * @return The index of the highest event acked for the session.
+   * @return the collection of open streams
    */
-  public long getLastCompleted() {
-    // If there are any queued events, return the index prior to the first event in the queue.
-    EventHolder event = events.peek();
-    if (event != null && event.eventIndex > completeIndex) {
-      return event.eventIndex - 1;
-    }
-    return 0;
+  public Collection<PrimitiveSessionStream> getStreams() {
+    return streams.getStreams();
   }
 
   /**
-   * Sets the last completed event index for the session.
+   * Returns the last stream index.
    *
-   * @param lastCompleted the last completed index
+   * @return the last stream index
    */
-  public void setLastCompleted(long lastCompleted) {
-    this.completeIndex = lastCompleted;
-  }
-
-  /**
-   * Clears events up to the given sequence.
-   *
-   * @param index The index to clear.
-   */
-  private void clearEvents(long index) {
-    if (index > completeIndex) {
-      EventHolder event = events.peek();
-      while (event != null && event.eventIndex <= index) {
-        events.remove();
-        completeIndex = event.eventIndex;
-        event = events.peek();
-      }
-      completeIndex = index;
-    }
-  }
-
-  /**
-   * Resends events from the given sequence.
-   *
-   * @param index The index from which to resend events.
-   */
-  public void resendEvents(long index) {
-    clearEvents(index);
-    for (EventHolder event : events) {
-      sendEvents(event);
-    }
-  }
-
-  /**
-   * Sends an event to the session.
-   */
-  private void sendEvents(EventHolder event) {
-    // Only send events to the client if this server is the leader.
-    if (context.getRole() == Role.PRIMARY) {
-      EventRequest request = EventRequest.newBuilder()
-          .setSessionId(sessionId().id())
-          .setEventIndex(event.eventIndex)
-          .setPreviousIndex(event.previousIndex)
-          .addAllEvents(event.events)
-          .build();
-
-      log.trace("Sending {}", request);
-      protocol.event(memberId, request);
-    }
+  public long getStreamIndex() {
+    return getStreams()
+        .stream()
+        .mapToLong(stream -> stream.getLastIndex())
+        .max()
+        .orElse(context.getIndex());
   }
 
   /**
@@ -426,6 +317,7 @@ public class PrimitiveSession implements Session {
    */
   public void open() {
     setState(State.OPEN);
+    streams.getStreams().forEach(stream -> stream.complete());
   }
 
   /**
@@ -433,6 +325,7 @@ public class PrimitiveSession implements Session {
    */
   public void expire() {
     setState(State.EXPIRED);
+    streams.getStreams().forEach(stream -> stream.complete());
   }
 
   /**
@@ -440,6 +333,7 @@ public class PrimitiveSession implements Session {
    */
   public void close() {
     setState(State.CLOSED);
+    streams.getStreams().forEach(stream -> stream.complete());
   }
 
   @Override
@@ -460,19 +354,4 @@ public class PrimitiveSession implements Session {
         .add("timestamp", TimestampPrinter.of(lastUpdated))
         .toString();
   }
-
-  /**
-   * Event holder.
-   */
-  private static class EventHolder {
-    private final long eventIndex;
-    private final long previousIndex;
-    private final List<PrimitiveEvent> events = new LinkedList<>();
-
-    private EventHolder(long eventIndex, long previousIndex) {
-      this.eventIndex = eventIndex;
-      this.previousIndex = previousIndex;
-    }
-  }
-
 }

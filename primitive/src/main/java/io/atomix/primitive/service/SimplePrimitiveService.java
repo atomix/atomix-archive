@@ -7,28 +7,29 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
 import com.google.protobuf.ByteString;
+import io.atomix.primitive.operation.CommandId;
 import io.atomix.primitive.operation.OperationId;
-import io.atomix.primitive.operation.OperationType;
-import io.atomix.primitive.operation.impl.DefaultOperationId;
+import io.atomix.primitive.operation.QueryId;
 import io.atomix.primitive.service.impl.CommandRequest;
 import io.atomix.primitive.service.impl.CommandResponse;
 import io.atomix.primitive.service.impl.DefaultServiceExecutor;
 import io.atomix.primitive.service.impl.QueryRequest;
 import io.atomix.primitive.service.impl.QueryResponse;
 import io.atomix.primitive.util.ByteArrayDecoder;
+import io.atomix.utils.StreamHandler;
 
 /**
  * Simple primitive service.
  */
 public abstract class SimplePrimitiveService extends AbstractPrimitiveService implements PrimitiveService {
-  private Context context;
-  private ServiceExecutor executor;
+  private DefaultServiceExecutor executor;
   private final Map<Long, List<Runnable>> indexQueries = new HashMap<>();
 
   @Override
   public void init(Context context) {
-    this.context = context;
     this.executor = new DefaultServiceExecutor(context.getLogger());
+    super.init(context, executor, executor);
+    configure(executor);
   }
 
   @Override
@@ -42,8 +43,8 @@ public abstract class SimplePrimitiveService extends AbstractPrimitiveService im
         .thenApply(CommandResponse::toByteArray);
   }
 
-  protected CompletableFuture<CommandResponse> applyCommand(Command<CommandRequest> command) {
-    OperationId operationId = new DefaultOperationId(command.value().getName(), OperationType.COMMAND);
+  private CompletableFuture<CommandResponse> applyCommand(Command<CommandRequest> command) {
+    OperationId operationId = new CommandId(command.value().getName());
     byte[] output = executor.apply(operationId, command.map(r -> r.getCommand().toByteArray()));
     return CompletableFuture.completedFuture(CommandResponse.newBuilder()
         .setIndex(getCurrentIndex())
@@ -52,12 +53,56 @@ public abstract class SimplePrimitiveService extends AbstractPrimitiveService im
   }
 
   @Override
+  public CompletableFuture<Void> apply(Command<byte[]> command, StreamHandler<byte[]> handler) {
+    return applyCommand(command.map(bytes -> ByteArrayDecoder.decode(bytes, CommandRequest::parseFrom)), new StreamHandler<CommandResponse>() {
+      @Override
+      public void next(CommandResponse response) {
+        handler.next(response.toByteArray());
+      }
+
+      @Override
+      public void complete() {
+        handler.complete();
+      }
+
+      @Override
+      public void error(Throwable error) {
+        handler.error(error);
+      }
+    });
+  }
+
+  private CompletableFuture<Void> applyCommand(Command<CommandRequest> command, StreamHandler<CommandResponse> handler) {
+    OperationId operationId = new CommandId(command.value().getName());
+    executor.apply(operationId, command.map(r -> r.getCommand().toByteArray()), new StreamHandler<byte[]>() {
+      @Override
+      public void next(byte[] value) {
+        handler.next(CommandResponse.newBuilder()
+            .setIndex(getCurrentIndex())
+            .setOutput(ByteString.copyFrom(value))
+            .build());
+      }
+
+      @Override
+      public void complete() {
+        handler.complete();
+      }
+
+      @Override
+      public void error(Throwable error) {
+        handler.error(error);
+      }
+    });
+    return CompletableFuture.completedFuture(null);
+  }
+
+  @Override
   public CompletableFuture<byte[]> apply(Query<byte[]> query) {
     return applyQuery(query.map(bytes -> ByteArrayDecoder.decode(bytes, QueryRequest::parseFrom)))
         .thenApply(QueryResponse::toByteArray);
   }
 
-  protected CompletableFuture<QueryResponse> applyQuery(Query<QueryRequest> query) {
+  private CompletableFuture<QueryResponse> applyQuery(Query<QueryRequest> query) {
     CompletableFuture<QueryResponse> future = new CompletableFuture<>();
     if (query.value().getIndex() > getCurrentIndex()) {
       indexQueries.computeIfAbsent(query.value().getIndex(), index -> new LinkedList<>())
@@ -69,11 +114,66 @@ public abstract class SimplePrimitiveService extends AbstractPrimitiveService im
   }
 
   private void applyQuery(Query<QueryRequest> request, CompletableFuture<QueryResponse> future) {
-    OperationId operationId = new DefaultOperationId(request.value().getName(), OperationType.QUERY);
+    OperationId operationId = new QueryId(request.value().getName());
     byte[] output = executor.apply(operationId, request.map(r -> r.getQuery().toByteArray()));
     future.complete(QueryResponse.newBuilder()
         .setIndex(getCurrentIndex())
         .setOutput(ByteString.copyFrom(output))
         .build());
+  }
+
+  @Override
+  public CompletableFuture<Void> apply(Query<byte[]> query, StreamHandler<byte[]> handler) {
+    return applyQuery(query.map(bytes -> ByteArrayDecoder.decode(bytes, QueryRequest::parseFrom)), new StreamHandler<QueryResponse>() {
+      @Override
+      public void next(QueryResponse response) {
+        handler.next(response.toByteArray());
+      }
+
+      @Override
+      public void complete() {
+        handler.complete();
+      }
+
+      @Override
+      public void error(Throwable error) {
+        handler.error(error);
+      }
+    });
+  }
+
+  private CompletableFuture<Void> applyQuery(Query<QueryRequest> query, StreamHandler<QueryResponse> handler) {
+    CompletableFuture<Void> future = new CompletableFuture<>();
+    if (query.value().getIndex() > getCurrentIndex()) {
+      indexQueries.computeIfAbsent(query.value().getIndex(), index -> new LinkedList<>())
+          .add(() -> applyQuery(query, handler, future));
+    } else {
+      applyQuery(query, handler, future);
+    }
+    return future;
+  }
+
+  private void applyQuery(Query<QueryRequest> query, StreamHandler<QueryResponse> handler, CompletableFuture<Void> future) {
+    OperationId operationId = new QueryId(query.value().getName());
+    executor.apply(operationId, query.map(r -> r.getQuery().toByteArray()), new StreamHandler<byte[]>() {
+      @Override
+      public void next(byte[] value) {
+        handler.next(QueryResponse.newBuilder()
+            .setIndex(getCurrentIndex())
+            .setOutput(ByteString.copyFrom(value))
+            .build());
+      }
+
+      @Override
+      public void complete() {
+        handler.complete();
+      }
+
+      @Override
+      public void error(Throwable error) {
+        handler.error(error);
+      }
+    });
+    future.complete(null);
   }
 }

@@ -97,12 +97,6 @@ message SessionMetadata {
     uint64 index = 3;
 }
 
-message OperationResponse {
-    int64 index = 1;
-    int64 event_index = 2;
-    bytes output = 3;
-}
-
 message CommandRequest {
     string name = 1;
     bytes command = 2;
@@ -122,9 +116,4 @@ message QueryRequest {
 message QueryResponse {
     uint64 index = 1;
     bytes output = 2;
-}
-
-message ResetRequest {
-    int64 session_id = 1;
-    int64 event_index = 2;
 }

@@ -13,8 +13,8 @@ import io.atomix.primitive.operation.OperationType;
 import io.atomix.primitive.service.Command;
 import io.atomix.primitive.service.PrimitiveService;
 import io.atomix.primitive.service.Query;
-import io.atomix.primitive.service.Role;
 import io.atomix.primitive.service.StateMachine;
+import io.atomix.utils.StreamHandler;
 import io.atomix.utils.logging.ContextualLoggerFactory;
 import io.atomix.utils.logging.LoggerContext;
 import org.slf4j.Logger;
@@ -89,8 +89,18 @@ public class ServiceStateMachine implements StateMachine {
   }
 
   @Override
+  public CompletableFuture<Void> apply(Command<byte[]> command, StreamHandler<byte[]> handler) {
+    return stateMachine.apply(new Command<>(++index, command.timestamp(), command.value()), handler);
+  }
+
+  @Override
   public CompletableFuture<byte[]> apply(Query<byte[]> query) {
-    return stateMachine.apply(new Query<>(++index, query.timestamp(), query.value()));
+    return stateMachine.apply(new Query<>(index, query.timestamp(), query.value()));
+  }
+
+  @Override
+  public CompletableFuture<Void> apply(Query<byte[]> query, StreamHandler<byte[]> handler) {
+    return stateMachine.apply(new Query<>(index, query.timestamp(), query.value()), handler);
   }
 
   /**
@@ -134,11 +144,6 @@ public class ServiceStateMachine implements StateMachine {
     @Override
     public OperationType getOperationType() {
       return parent.getOperationType();
-    }
-
-    @Override
-    public Role getRole() {
-      return parent.getRole();
     }
 
     @Override

@@ -174,6 +174,7 @@ public class RaftPartition implements Partition {
         config,
         managementService.getMembershipService().getLocalMember().id(),
         managementService.getMessagingService(),
+        managementService.getStreamingService(),
         threadContextFactory);
   }
 
@@ -185,7 +186,8 @@ public class RaftPartition implements Partition {
         this,
         new RaftClientCommunicator(
             name(),
-            managementService.getMessagingService()),
+            managementService.getMessagingService(),
+            managementService.getStreamingService()),
         threadContextFactory);
   }
 

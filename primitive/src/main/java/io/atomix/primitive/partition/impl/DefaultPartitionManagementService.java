@@ -17,10 +17,10 @@ package io.atomix.primitive.partition.impl;
 
 import io.atomix.cluster.ClusterMembershipService;
 import io.atomix.cluster.messaging.ClusterCommunicationService;
+import io.atomix.cluster.messaging.ClusterStreamingService;
 import io.atomix.primitive.partition.PartitionManagementService;
 import io.atomix.primitive.partition.PrimaryElectionService;
 import io.atomix.primitive.service.ServiceTypeRegistry;
-import io.atomix.primitive.session.SessionProtocolService;
 
 /**
  * Default partition management service.
@@ -28,21 +28,21 @@ import io.atomix.primitive.session.SessionProtocolService;
 public class DefaultPartitionManagementService implements PartitionManagementService {
   private final ClusterMembershipService membershipService;
   private final ClusterCommunicationService communicationService;
+  private final ClusterStreamingService streamingService;
   private final ServiceTypeRegistry serviceTypes;
   private final PrimaryElectionService electionService;
-  private final SessionProtocolService protocolService;
 
   public DefaultPartitionManagementService(
       ClusterMembershipService membershipService,
       ClusterCommunicationService communicationService,
+      ClusterStreamingService streamingService,
       ServiceTypeRegistry serviceTypes,
-      PrimaryElectionService electionService,
-      SessionProtocolService protocolService) {
+      PrimaryElectionService electionService) {
     this.membershipService = membershipService;
     this.communicationService = communicationService;
+    this.streamingService = streamingService;
     this.serviceTypes = serviceTypes;
     this.electionService = electionService;
-    this.protocolService = protocolService;
   }
 
   @Override
@@ -56,6 +56,11 @@ public class DefaultPartitionManagementService implements PartitionManagementSer
   }
 
   @Override
+  public ClusterStreamingService getStreamingService() {
+    return streamingService;
+  }
+
+  @Override
   public ServiceTypeRegistry getServiceTypes() {
     return serviceTypes;
   }
@@ -63,10 +68,5 @@ public class DefaultPartitionManagementService implements PartitionManagementSer
   @Override
   public PrimaryElectionService getElectionService() {
     return electionService;
-  }
-
-  @Override
-  public SessionProtocolService getSessionProtocolService() {
-    return protocolService;
   }
 }

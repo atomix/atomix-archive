@@ -60,6 +60,7 @@ import io.atomix.raft.storage.log.RaftLogEntry;
 import io.atomix.raft.storage.system.RaftConfiguration;
 import io.atomix.storage.StorageException;
 import io.atomix.storage.journal.Indexed;
+import io.atomix.utils.StreamHandler;
 import io.atomix.utils.concurrent.Futures;
 import io.atomix.utils.concurrent.Scheduled;
 
@@ -627,6 +628,118 @@ public final class LeaderRole extends ActiveRole {
   }
 
   @Override
+  public CompletableFuture<Void> onCommand(final CommandRequest request, StreamHandler<CommandResponse> handler) {
+    raft.checkThread();
+    logRequest(request);
+
+    if (transferring) {
+      handler.next(CommandResponse.newBuilder()
+          .setStatus(ResponseStatus.ERROR)
+          .setError(RaftError.ILLEGAL_MEMBER_STATE)
+          .build());
+      handler.complete();
+      return CompletableFuture.completedFuture(null);
+    }
+
+    final long term = raft.getTerm();
+    final long timestamp = System.currentTimeMillis();
+
+    CompletableFuture<Void> future = new CompletableFuture<>();
+    appendAndCompact(RaftLogEntry.newBuilder()
+        .setTerm(term)
+        .setTimestamp(timestamp)
+        .setCommand(CommandEntry.newBuilder()
+            .setValue(request.getValue())
+            .setStream(true)
+            .build())
+        .build())
+        .whenCompleteAsync((entry, appendError) -> {
+          if (appendError != null) {
+            Throwable cause = Throwables.getRootCause(appendError);
+            if (Throwables.getRootCause(appendError) instanceof StorageException.TooLarge) {
+              log.warn("Failed to append command {}", request, cause);
+              handler.next(CommandResponse.newBuilder()
+                  .setStatus(ResponseStatus.ERROR)
+                  .setError(RaftError.PROTOCOL_ERROR)
+                  .build());
+              handler.complete();
+            } else {
+              handler.next(CommandResponse.newBuilder()
+                  .setStatus(ResponseStatus.ERROR)
+                  .setError(RaftError.COMMAND_FAILURE)
+                  .build());
+              handler.complete();
+            }
+            future.complete(null);
+            return;
+          }
+
+          // Replicate the command to followers.
+          appender.appendEntries(entry.index()).whenComplete((commitIndex, commitError) -> {
+            raft.checkThread();
+            if (isRunning()) {
+              // If the command was successfully committed, apply it to the state machine.
+              if (commitError == null) {
+                raft.getServiceManager().<OperationResult>apply(entry.index(), new StreamHandler<byte[]>() {
+                  @Override
+                  public void next(byte[] value) {
+                    handler.next(CommandResponse.newBuilder()
+                        .setStatus(ResponseStatus.OK)
+                        .setOutput(ByteString.copyFrom(value))
+                        .build());
+                  }
+
+                  @Override
+                  public void complete() {
+                    handler.complete();
+                  }
+
+                  @Override
+                  public void error(Throwable error) {
+                    if (error instanceof RaftException) {
+                      handler.next(CommandResponse.newBuilder()
+                          .setStatus(ResponseStatus.ERROR)
+                          .setError(((RaftException) error).getType())
+                          .build());
+                      handler.complete();
+                    } else if (error instanceof CompletionException && error.getCause() instanceof RaftException) {
+                      handler.next(CommandResponse.newBuilder()
+                          .setStatus(ResponseStatus.ERROR)
+                          .setError(((RaftException) error.getCause()).getType())
+                          .build());
+                      handler.complete();
+                    } else {
+                      log.warn("An unexpected error occurred: {}", error);
+                      handler.next(CommandResponse.newBuilder()
+                          .setStatus(ResponseStatus.ERROR)
+                          .setError(RaftError.PROTOCOL_ERROR)
+                          .build());
+                      handler.complete();
+                    }
+                  }
+                }).whenComplete((result, error) -> future.complete(null));
+              } else {
+                handler.next(CommandResponse.newBuilder()
+                    .setStatus(ResponseStatus.ERROR)
+                    .setError(RaftError.COMMAND_FAILURE)
+                    .build());
+                handler.complete();
+                future.complete(null);
+              }
+            } else {
+              handler.next(CommandResponse.newBuilder()
+                  .setStatus(ResponseStatus.ERROR)
+                  .setError(RaftError.COMMAND_FAILURE)
+                  .build());
+              handler.complete();
+              future.complete(null);
+            }
+          });
+        }, raft.getThreadContext());
+    return future;
+  }
+
+  @Override
   public CompletableFuture<QueryResponse> onQuery(final QueryRequest request) {
     raft.checkThread();
     logRequest(request);
@@ -684,6 +797,25 @@ public final class LeaderRole extends ActiveRole {
                 .setError(RaftError.QUERY_FAILURE)
                 .setMessage(error.getMessage())
                 .build()), raft.getThreadContext());
+  }
+
+  @Override
+  public CompletableFuture<Void> onQuery(final QueryRequest request, StreamHandler<QueryResponse> handler) {
+    raft.checkThread();
+    logRequest(request);
+
+    final Indexed<RaftLogEntry> entry = new Indexed<>(
+        raft.getLogWriter().getLastIndex(),
+        RaftLogEntry.newBuilder()
+            .setTerm(raft.getTerm())
+            .setTimestamp(System.currentTimeMillis())
+            .setQuery(QueryEntry.newBuilder()
+                .setValue(request.getValue())
+                .build())
+            .build(), 0);
+
+    // No linearizability guarantee for stream queries.
+    return queryLocal(entry, handler);
   }
 
   /**

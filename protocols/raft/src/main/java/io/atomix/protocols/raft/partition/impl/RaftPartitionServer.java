@@ -27,6 +27,7 @@ import java.util.stream.Collectors;
 
 import io.atomix.cluster.MemberId;
 import io.atomix.cluster.messaging.ClusterCommunicationService;
+import io.atomix.cluster.messaging.ClusterStreamingService;
 import io.atomix.primitive.partition.Partition;
 import io.atomix.primitive.service.StateMachine;
 import io.atomix.protocols.raft.partition.RaftPartition;
@@ -54,6 +55,7 @@ public class RaftPartitionServer {
   private final RaftPartition partition;
   private final RaftPartitionGroupConfig config;
   private final ClusterCommunicationService clusterCommunicator;
+  private final ClusterStreamingService streamingService;
   private final ThreadContextFactory threadContextFactory;
   private RaftServer server;
 
@@ -62,11 +64,13 @@ public class RaftPartitionServer {
       RaftPartitionGroupConfig config,
       MemberId localMemberId,
       ClusterCommunicationService clusterCommunicator,
+      ClusterStreamingService streamingService,
       ThreadContextFactory threadContextFactory) {
     this.partition = partition;
     this.config = config;
     this.localMemberId = localMemberId;
     this.clusterCommunicator = clusterCommunicator;
+    this.streamingService = streamingService;
     this.threadContextFactory = threadContextFactory;
   }
 
@@ -161,7 +165,8 @@ public class RaftPartitionServer {
         .withName(partition.name())
         .withProtocol(new RaftServerCommunicator(
             partition.name(),
-            clusterCommunicator))
+            clusterCommunicator,
+            streamingService))
         .withStateMachine(new RaftPartitionStateMachine(stateMachine))
         .withElectionTimeout(Duration.ofMillis(ELECTION_TIMEOUT_MILLIS))
         .withHeartbeatInterval(Duration.ofMillis(HEARTBEAT_INTERVAL_MILLIS))

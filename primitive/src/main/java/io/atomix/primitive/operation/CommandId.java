@@ -3,16 +3,9 @@ package io.atomix.primitive.operation;
 /**
  * Command ID.
  */
-public class CommandId<T, U> implements OperationId<T, U> {
-  private final String id;
-
+public class CommandId<T, U> extends OperationId<T, U> {
   public CommandId(String id) {
-    this.id = id;
-  }
-
-  @Override
-  public String id() {
-    return id;
+    super(id);
   }
 
   @Override

@@ -23,6 +23,7 @@ import java.util.concurrent.CompletableFuture;
 
 import io.atomix.raft.impl.DefaultRaftClient;
 import io.atomix.raft.protocol.RaftClientProtocol;
+import io.atomix.utils.StreamHandler;
 import io.atomix.utils.concurrent.ThreadContextFactory;
 import io.atomix.utils.concurrent.ThreadModel;
 
@@ -106,6 +107,14 @@ public interface RaftClient {
   CompletableFuture<byte[]> write(byte[] value);
 
   /**
+   * Sends a write to the Raft cluster.
+   *
+   * @param value the value to write
+   * @return a future to be completed with the result
+   */
+  CompletableFuture<Void> write(byte[] value, StreamHandler<byte[]> handler);
+
+  /**
    * Sets a read to the Raft cluster.
    *
    * @param value the read parameter
@@ -123,6 +132,25 @@ public interface RaftClient {
    * @return a future to be completed with the result
    */
   CompletableFuture<byte[]> read(byte[] value, ReadConsistency consistency);
+
+  /**
+   * Sets a read to the Raft cluster.
+   *
+   * @param value the read parameter
+   * @return a future to be completed with the result
+   */
+  default CompletableFuture<Void> read(byte[] value, StreamHandler<byte[]> handler) {
+    return read(value, ReadConsistency.LINEARIZABLE, handler);
+  }
+
+  /**
+   * Sets a read to the Raft cluster.
+   *
+   * @param value the read parameter
+   * @param consistency the read consistency level
+   * @return a future to be completed with the result
+   */
+  CompletableFuture<Void> read(byte[] value, ReadConsistency consistency, StreamHandler<byte[]> handler);
 
   /**
    * Connects the client to Raft cluster via the default server address.

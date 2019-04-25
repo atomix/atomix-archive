@@ -18,16 +18,18 @@ package io.atomix.protocols.raft.partition.impl;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
 
-import com.google.common.base.Preconditions;
 import io.atomix.cluster.MemberId;
 import io.atomix.cluster.messaging.ClusterCommunicationService;
+import io.atomix.cluster.messaging.ClusterStreamingService;
+import io.atomix.primitive.util.ByteArrayDecoder;
 import io.atomix.raft.protocol.CommandRequest;
 import io.atomix.raft.protocol.CommandResponse;
 import io.atomix.raft.protocol.QueryRequest;
 import io.atomix.raft.protocol.QueryResponse;
 import io.atomix.raft.protocol.RaftClientProtocol;
+import io.atomix.utils.StreamHandler;
 
-import static io.atomix.utils.concurrent.Futures.uncheck;
+import static com.google.common.base.Preconditions.checkNotNull;
 
 /**
  * Raft client protocol that uses a cluster communicator.
@@ -35,14 +37,16 @@ import static io.atomix.utils.concurrent.Futures.uncheck;
 public class RaftClientCommunicator implements RaftClientProtocol {
   private final RaftMessageContext context;
   private final ClusterCommunicationService clusterCommunicator;
+  private final ClusterStreamingService streamingService;
 
-  public RaftClientCommunicator(ClusterCommunicationService clusterCommunicator) {
-    this(null, clusterCommunicator);
+  public RaftClientCommunicator(ClusterCommunicationService clusterCommunicator, ClusterStreamingService streamingService) {
+    this(null, clusterCommunicator, streamingService);
   }
 
-  public RaftClientCommunicator(String prefix, ClusterCommunicationService clusterCommunicator) {
+  public RaftClientCommunicator(String prefix, ClusterCommunicationService clusterCommunicator, ClusterStreamingService streamingService) {
     this.context = new RaftMessageContext(prefix);
-    this.clusterCommunicator = Preconditions.checkNotNull(clusterCommunicator, "clusterCommunicator cannot be null");
+    this.clusterCommunicator = checkNotNull(clusterCommunicator, "clusterCommunicator cannot be null");
+    this.streamingService = checkNotNull(streamingService, "streamingService cannot be null");
   }
 
   private <T, U> CompletableFuture<U> sendAndReceive(
@@ -51,22 +55,45 @@ public class RaftClientCommunicator implements RaftClientProtocol {
   }
 
   @Override
-  public CompletableFuture<QueryResponse> query(String memberId, QueryRequest request) {
+  public CompletableFuture<QueryResponse> query(String server, QueryRequest request) {
     return sendAndReceive(
         context.querySubject,
         request,
         QueryRequest::toByteArray,
-        uncheck(QueryResponse::parseFrom),
-        MemberId.from(memberId));
+        bytes -> ByteArrayDecoder.decode(bytes, QueryResponse::parseFrom),
+        MemberId.from(server));
   }
 
   @Override
-  public CompletableFuture<CommandResponse> command(String memberId, CommandRequest request) {
+  public CompletableFuture<Void> queryStream(String server, QueryRequest request, StreamHandler<QueryResponse> handler) {
+    return streamingService.send(
+        context.queryStreamSubject,
+        request,
+        QueryRequest::toByteArray,
+        bytes -> ByteArrayDecoder.decode(bytes, QueryResponse::parseFrom),
+        handler,
+        MemberId.from(server));
+  }
+
+  @Override
+  public CompletableFuture<CommandResponse> command(String server, CommandRequest request) {
     return sendAndReceive(
         context.commandSubject,
         request,
         CommandRequest::toByteArray,
-        uncheck(CommandResponse::parseFrom),
-        MemberId.from(memberId));
+        bytes -> ByteArrayDecoder.decode(bytes, CommandResponse::parseFrom),
+        MemberId.from(server));
+
+  }
+
+  @Override
+  public CompletableFuture<Void> commandStream(String server, CommandRequest request, StreamHandler<CommandResponse> handler) {
+    return streamingService.send(
+        context.commandStreamSubject,
+        request,
+        CommandRequest::toByteArray,
+        bytes -> ByteArrayDecoder.decode(bytes, CommandResponse::parseFrom),
+        handler,
+        MemberId.from(server));
   }
 }

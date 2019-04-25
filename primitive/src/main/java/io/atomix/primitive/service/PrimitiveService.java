@@ -19,7 +19,4 @@ package io.atomix.primitive.service;
  * Base class for user-provided services.
  */
 public interface PrimitiveService extends StateMachine {
-
-
-
 }

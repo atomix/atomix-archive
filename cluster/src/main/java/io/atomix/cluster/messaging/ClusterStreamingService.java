@@ -7,6 +7,8 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 
 import io.atomix.cluster.MemberId;
+import io.atomix.utils.StreamFunction;
+import io.atomix.utils.StreamHandler;
 
 /**
  * Cluster streaming service.

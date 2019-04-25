@@ -23,6 +23,7 @@ import java.util.concurrent.CompletionException;
 import com.google.protobuf.ByteString;
 import io.atomix.raft.RaftException;
 import io.atomix.raft.RaftServer;
+import io.atomix.raft.cluster.impl.DefaultRaftMember;
 import io.atomix.raft.impl.OperationResult;
 import io.atomix.raft.impl.RaftContext;
 import io.atomix.raft.protocol.AppendRequest;
@@ -53,6 +54,7 @@ import io.atomix.raft.storage.log.RaftLogWriter;
 import io.atomix.raft.storage.snapshot.Snapshot;
 import io.atomix.storage.StorageException;
 import io.atomix.storage.journal.Indexed;
+import io.atomix.utils.StreamHandler;
 import io.atomix.utils.time.WallClockTimestamp;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
@@ -399,6 +401,45 @@ public class PassiveRole extends InactiveRole {
     }
   }
 
+  @Override
+  public CompletableFuture<Void> onQuery(QueryRequest request, StreamHandler<QueryResponse> handler) {
+    raft.checkThread();
+    logRequest(request);
+
+    // If this server has not yet applied entries up to the client's session ID, forward the
+    // query to the leader. This ensures that a follower does not tell the client its session
+    // doesn't exist if the follower hasn't had a chance to see the session's registration entry.
+    if (raft.getState() != RaftContext.State.READY) {
+      log.trace("State out of sync, forwarding query to leader");
+      return queryForward(request, handler);
+    }
+
+    // If the session's consistency level is SEQUENTIAL, handle the request here, otherwise forward it.
+    if (request.getReadConsistency() == ReadConsistency.SEQUENTIAL) {
+
+      // If the commit index is not in the log then we've fallen too far behind the leader to perform a local query.
+      // Forward the request to the leader.
+      if (raft.getLogWriter().getLastIndex() < raft.getCommitIndex()) {
+        log.trace("State out of sync, forwarding query to leader");
+        return queryForward(request, handler);
+      }
+
+      final Indexed<RaftLogEntry> entry = new Indexed<>(
+          raft.getLogWriter().getLastIndex(),
+          RaftLogEntry.newBuilder()
+              .setTerm(raft.getTerm())
+              .setTimestamp(System.currentTimeMillis())
+              .setQuery(QueryEntry.newBuilder()
+                  .setValue(request.getValue())
+                  .build())
+              .build(), 0);
+
+      return applyQuery(entry, handler);
+    } else {
+      return queryForward(request, handler);
+    }
+  }
+
   /**
    * Forwards the query to the leader.
    */
@@ -420,10 +461,35 @@ public class PassiveRole extends InactiveRole {
   }
 
   /**
+   * Forwards the query to the leader.
+   */
+  private CompletableFuture<Void> queryForward(QueryRequest request, StreamHandler<QueryResponse> handler) {
+    DefaultRaftMember leader = raft.getLeader();
+    if (leader == null) {
+      handler.next(QueryResponse.newBuilder()
+          .setStatus(ResponseStatus.ERROR)
+          .setError(RaftError.NO_LEADER)
+          .build());
+      handler.complete();
+      return CompletableFuture.completedFuture(null);
+    } else {
+      log.trace("Forwarding {}", request);
+      return raft.getProtocol().queryStream(leader.memberId(), request, handler);
+    }
+  }
+
+  /**
    * Performs a local query.
    */
   protected CompletableFuture<QueryResponse> queryLocal(Indexed<RaftLogEntry> entry) {
     return applyQuery(entry);
+  }
+
+  /**
+   * Performs a local query.
+   */
+  protected CompletableFuture<Void> queryLocal(Indexed<RaftLogEntry> entry, StreamHandler<QueryResponse> handler) {
+    return applyQuery(entry, handler);
   }
 
   /**
@@ -437,6 +503,47 @@ public class PassiveRole extends InactiveRole {
       completeQuery(result, QueryResponse.newBuilder(), error, future);
     });
     return future;
+  }
+
+  protected CompletableFuture<Void> applyQuery(Indexed<RaftLogEntry> entry, StreamHandler<QueryResponse> handler) {
+    return raft.getServiceManager().apply(entry, new StreamHandler<byte[]>() {
+      @Override
+      public void next(byte[] value) {
+        handler.next(QueryResponse.newBuilder()
+            .setStatus(ResponseStatus.OK)
+            .setOutput(ByteString.copyFrom(value))
+            .build());
+      }
+
+      @Override
+      public void complete() {
+        handler.complete();
+      }
+
+      @Override
+      public void error(Throwable error) {
+        if (error instanceof RaftException) {
+          handler.next(QueryResponse.newBuilder()
+              .setStatus(ResponseStatus.ERROR)
+              .setError(((RaftException) error).getType())
+              .build());
+          handler.complete();
+        } else if (error instanceof CompletionException && error.getCause() instanceof RaftException) {
+          handler.next(QueryResponse.newBuilder()
+              .setStatus(ResponseStatus.ERROR)
+              .setError(((RaftException) error.getCause()).getType())
+              .build());
+          handler.complete();
+        } else {
+          log.warn("An unexpected error occurred: {}", error);
+          handler.next(QueryResponse.newBuilder()
+              .setStatus(ResponseStatus.ERROR)
+              .setError(RaftError.PROTOCOL_ERROR)
+              .build());
+          handler.complete();
+        }
+      }
+    });
   }
 
   /**

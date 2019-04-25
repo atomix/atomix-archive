@@ -25,24 +25,18 @@ import io.atomix.primitive.session.impl.KeepAliveRequest;
 import io.atomix.primitive.session.impl.KeepAliveResponse;
 import io.atomix.primitive.session.impl.OpenSessionRequest;
 import io.atomix.primitive.session.impl.OpenSessionResponse;
-import io.atomix.primitive.session.impl.SessionClientCommunicator;
 
 /**
  * Interface for session aware primitive proxies.
  */
 public abstract class SessionEnabledPrimitiveProxy extends AbstractPrimitiveProxy<SessionClient> {
-
   public SessionEnabledPrimitiveProxy(Context context) {
     super(context);
   }
 
   @Override
   protected SessionClient createClient() {
-    return new DefaultSessionClient(
-        serviceId(),
-        getPartitionClient(),
-        new SessionClientCommunicator(getManagementService().getCommunicationService(), partitionId()),
-        context());
+    return new DefaultSessionClient(serviceId(), getPartitionClient());
   }
 
   /**

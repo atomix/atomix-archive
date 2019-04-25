@@ -15,34 +15,8 @@
  */
 package io.atomix.primitive.session;
 
-import com.google.protobuf.ByteString;
-import io.atomix.cluster.MemberId;
-import io.atomix.primitive.event.EventType;
-import io.atomix.primitive.session.impl.PrimitiveEvent;
-import io.atomix.primitive.util.ByteArrayEncoder;
-
 /**
- * Provides an interface to communicating with a client via session events.
- * <p>
- * Sessions represent a connection between a single client and all servers in a Raft cluster. Session information
- * is replicated via the Raft consensus algorithm, and clients can safely switch connections between servers without
- * losing their session. All consistency guarantees are provided within the context of a session. Once a session is
- * expired or closed, linearizability, sequential consistency, and other guarantees for events and operations are
- * effectively lost. Session implementations guarantee linearizability for session messages by coordinating between
- * the client and a single server at any given time. This means messages {@link #publish(PrimitiveEvent) published}
- * via the {@link Session} are guaranteed to arrive on the other side of the connection exactly once and in the order
- * in which they are sent by replicated state machines. In the event of a server-to-client message being lost, the
- * message will be resent so long as at least one Raft server is able to communicate with the client and the client's
- * session does not expire while switching between servers.
- * <p>
- * Messages are sent to the other side of the session using the {@link #publish(PrimitiveEvent)} method:
- * <pre>
- *   {@code
- *     session.publish("myEvent", "Hello world!");
- *   }
- * </pre>
- * When the message is published, it will be queued to be sent to the other side of the connection. Raft guarantees
- * that the message will eventually be received by the client unless the session itself times out or is closed.
+ * Provides session context for session-managed state machines.
  */
 public interface Session {
 
@@ -54,49 +28,11 @@ public interface Session {
   SessionId sessionId();
 
   /**
-   * Returns the member identifier to which the session belongs.
-   *
-   * @return The member to which the session belongs.
-   */
-  MemberId memberId();
-
-  /**
    * Returns the session state.
    *
    * @return The session state.
    */
   State getState();
-
-  /**
-   * Publishes an empty event to the session.
-   *
-   * @param eventType the event type
-   */
-  default void publish(EventType eventType) {
-    publish(eventType, null, v -> null);
-  }
-
-  /**
-   * Publishes an event to the session.
-   *
-   * @param eventType the event identifier
-   * @param event     the event value
-   * @param encoder   the event encoder
-   * @param <T>       the event type
-   */
-  default <T> void publish(EventType eventType, T event, ByteArrayEncoder<T> encoder) {
-    publish(PrimitiveEvent.newBuilder()
-        .setType(eventType.id())
-        .setValue(ByteString.copyFrom(ByteArrayEncoder.encode(event, encoder)))
-        .build());
-  }
-
-  /**
-   * Publishes an event to the session.
-   *
-   * @param event the event to publish
-   */
-  void publish(PrimitiveEvent event);
 
   /**
    * Session state enums.

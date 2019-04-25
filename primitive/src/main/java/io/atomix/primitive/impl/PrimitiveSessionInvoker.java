@@ -32,8 +32,8 @@ import io.atomix.primitive.PrimitiveException;
 import io.atomix.primitive.PrimitiveState;
 import io.atomix.primitive.proxy.SessionEnabledPrimitiveProxy;
 import io.atomix.primitive.session.impl.SessionCommandContext;
-import io.atomix.primitive.session.impl.SessionContext;
 import io.atomix.primitive.session.impl.SessionQueryContext;
+import io.atomix.primitive.session.impl.SessionResponseContext;
 import org.apache.commons.lang3.tuple.Pair;
 
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -71,13 +71,13 @@ final class PrimitiveSessionInvoker<P extends SessionEnabledPrimitiveProxy> {
     this.sequencer = checkNotNull(sequencer, "sequencer");
   }
 
-  public <T> CompletableFuture<T> command(BiFunction<P, SessionCommandContext, CompletableFuture<Pair<SessionContext, T>>> function) {
+  public <T> CompletableFuture<T> command(BiFunction<P, SessionCommandContext, CompletableFuture<Pair<SessionResponseContext, T>>> function) {
     CompletableFuture<T> future = new CompletableFuture<>();
     proxy.context().execute(() -> invokeCommand(function, future));
     return future;
   }
 
-  public <T> CompletableFuture<T> query(BiFunction<P, SessionQueryContext, CompletableFuture<Pair<SessionContext, T>>> function) {
+  public <T> CompletableFuture<T> query(BiFunction<P, SessionQueryContext, CompletableFuture<Pair<SessionResponseContext, T>>> function) {
     CompletableFuture<T> future = new CompletableFuture<>();
     proxy.context().execute(() -> invokeQuery(function, future));
     return future;
@@ -86,7 +86,7 @@ final class PrimitiveSessionInvoker<P extends SessionEnabledPrimitiveProxy> {
   /**
    * Submits a command request to the cluster.
    */
-  private <T> void invokeCommand(BiFunction<P, SessionCommandContext, CompletableFuture<Pair<SessionContext, T>>> command, CompletableFuture<T> future) {
+  private <T> void invokeCommand(BiFunction<P, SessionCommandContext, CompletableFuture<Pair<SessionResponseContext, T>>> command, CompletableFuture<T> future) {
     SessionCommandContext context = SessionCommandContext.newBuilder()
         .setSessionId(state.getSessionId().id())
         .setSequenceNumber(state.nextCommandRequest())
@@ -97,7 +97,7 @@ final class PrimitiveSessionInvoker<P extends SessionEnabledPrimitiveProxy> {
   /**
    * Submits a query request to the cluster.
    */
-  private <T> void invokeQuery(BiFunction<P, SessionQueryContext, CompletableFuture<Pair<SessionContext, T>>> query, CompletableFuture<T> future) {
+  private <T> void invokeQuery(BiFunction<P, SessionQueryContext, CompletableFuture<Pair<SessionResponseContext, T>>> query, CompletableFuture<T> future) {
     SessionQueryContext context = SessionQueryContext.newBuilder()
         .setSessionId(state.getSessionId().id())
         .setLastSequenceNumber(state.getCommandRequest())
@@ -167,14 +167,14 @@ final class PrimitiveSessionInvoker<P extends SessionEnabledPrimitiveProxy> {
   /**
    * Operation attempt.
    */
-  private abstract class OperationAttempt<T, U> implements BiConsumer<Pair<SessionContext, U>, Throwable> {
+  private abstract class OperationAttempt<T, U> implements BiConsumer<Pair<SessionResponseContext, U>, Throwable> {
     protected final long id;
     protected final T context;
     protected final int attempt;
-    protected final BiFunction<P, T, CompletableFuture<Pair<SessionContext, U>>> operation;
+    protected final BiFunction<P, T, CompletableFuture<Pair<SessionResponseContext, U>>> operation;
     protected final CompletableFuture<U> future;
 
-    protected OperationAttempt(long id, T context, int attempt, BiFunction<P, T, CompletableFuture<Pair<SessionContext, U>>> operation, CompletableFuture<U> future) {
+    protected OperationAttempt(long id, T context, int attempt, BiFunction<P, T, CompletableFuture<Pair<SessionResponseContext, U>>> operation, CompletableFuture<U> future) {
       this.id = id;
       this.context = context;
       this.attempt = attempt;
@@ -208,7 +208,7 @@ final class PrimitiveSessionInvoker<P extends SessionEnabledPrimitiveProxy> {
      *
      * @param response The operation response.
      */
-    protected abstract void complete(Pair<SessionContext, U> response);
+    protected abstract void complete(Pair<SessionResponseContext, U> response);
 
     /**
      * Completes the operation with an exception.
@@ -225,7 +225,7 @@ final class PrimitiveSessionInvoker<P extends SessionEnabledPrimitiveProxy> {
      * @param response The operation response.
      * @param callback The callback to run in sequence.
      */
-    protected final void sequence(Pair<SessionContext, U> response, Runnable callback) {
+    protected final void sequence(Pair<SessionResponseContext, U> response, Runnable callback) {
       sequencer.sequenceResponse(id, response.getLeft(), callback);
     }
 
@@ -279,7 +279,7 @@ final class PrimitiveSessionInvoker<P extends SessionEnabledPrimitiveProxy> {
     CommandAttempt(
         long id,
         SessionCommandContext context,
-        BiFunction<P, SessionCommandContext, CompletableFuture<Pair<SessionContext, T>>> command,
+        BiFunction<P, SessionCommandContext, CompletableFuture<Pair<SessionResponseContext, T>>> command,
         CompletableFuture<T> future) {
       super(id, context, 1, command, future);
     }
@@ -288,7 +288,7 @@ final class PrimitiveSessionInvoker<P extends SessionEnabledPrimitiveProxy> {
         long id,
         SessionCommandContext context,
         int attempt,
-        BiFunction<P, SessionCommandContext, CompletableFuture<Pair<SessionContext, T>>> command,
+        BiFunction<P, SessionCommandContext, CompletableFuture<Pair<SessionResponseContext, T>>> command,
         CompletableFuture<T> future) {
       super(id, context, attempt, command, future);
     }
@@ -304,7 +304,7 @@ final class PrimitiveSessionInvoker<P extends SessionEnabledPrimitiveProxy> {
     }
 
     @Override
-    public void accept(Pair<SessionContext, T> response, Throwable error) {
+    public void accept(Pair<SessionResponseContext, T> response, Throwable error) {
       if (error == null) {
         complete(response);
       } else if (EXPIRED_PREDICATE.test(error) || (error instanceof CompletionException && EXPIRED_PREDICATE.test(error.getCause()))) {
@@ -322,7 +322,7 @@ final class PrimitiveSessionInvoker<P extends SessionEnabledPrimitiveProxy> {
 
     @Override
     @SuppressWarnings("unchecked")
-    protected void complete(Pair<SessionContext, T> response) {
+    protected void complete(Pair<SessionResponseContext, T> response) {
       sequence(response, () -> {
         state.setCommandResponse(id);
         state.setResponseIndex(response.getLeft().getIndex());
@@ -338,7 +338,7 @@ final class PrimitiveSessionInvoker<P extends SessionEnabledPrimitiveProxy> {
     QueryAttempt(
         long id,
         SessionQueryContext context,
-        BiFunction<P, SessionQueryContext, CompletableFuture<Pair<SessionContext, T>>> query,
+        BiFunction<P, SessionQueryContext, CompletableFuture<Pair<SessionResponseContext, T>>> query,
         CompletableFuture<T> future) {
       super(id, context, 1, query, future);
     }
@@ -347,7 +347,7 @@ final class PrimitiveSessionInvoker<P extends SessionEnabledPrimitiveProxy> {
         long id,
         SessionQueryContext context,
         int attempt,
-        BiFunction<P, SessionQueryContext, CompletableFuture<Pair<SessionContext, T>>> query,
+        BiFunction<P, SessionQueryContext, CompletableFuture<Pair<SessionResponseContext, T>>> query,
         CompletableFuture<T> future) {
       super(id, context, attempt, query, future);
     }
@@ -363,7 +363,7 @@ final class PrimitiveSessionInvoker<P extends SessionEnabledPrimitiveProxy> {
     }
 
     @Override
-    public void accept(Pair<SessionContext, T> response, Throwable error) {
+    public void accept(Pair<SessionResponseContext, T> response, Throwable error) {
       if (error == null) {
         complete(response);
       } else if (EXPIRED_PREDICATE.test(error) || (error instanceof CompletionException && EXPIRED_PREDICATE.test(error.getCause()))) {
@@ -381,7 +381,7 @@ final class PrimitiveSessionInvoker<P extends SessionEnabledPrimitiveProxy> {
 
     @Override
     @SuppressWarnings("unchecked")
-    protected void complete(Pair<SessionContext, T> response) {
+    protected void complete(Pair<SessionResponseContext, T> response) {
       sequence(response, () -> {
         state.setResponseIndex(response.getLeft().getIndex());
         future.complete(response.getRight());

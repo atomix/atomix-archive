@@ -30,6 +30,7 @@ message ConfigurationEntry {
 
 message CommandEntry {
     bytes value = 1;
+    bool stream = 2;
 }
 
 message QueryEntry {
