@@ -38,7 +38,7 @@ import io.atomix.raft.cluster.RaftMember;
 import io.atomix.raft.protocol.TestRaftProtocolFactory;
 import io.atomix.raft.storage.RaftStorage;
 import io.atomix.storage.StorageLevel;
-import io.atomix.utils.StreamHandler;
+import io.atomix.utils.stream.StreamHandler;
 import io.atomix.utils.concurrent.SingleThreadContext;
 import io.atomix.utils.concurrent.ThreadContext;
 import net.jodah.concurrentunit.ConcurrentTestCase;

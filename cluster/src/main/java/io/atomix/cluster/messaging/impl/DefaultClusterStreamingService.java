@@ -14,9 +14,11 @@ import io.atomix.cluster.MemberId;
 import io.atomix.cluster.messaging.ClusterStreamingService;
 import io.atomix.cluster.messaging.ManagedClusterStreamingService;
 import io.atomix.cluster.messaging.MessagingService;
-import io.atomix.utils.StreamFunction;
-import io.atomix.utils.StreamHandler;
+import io.atomix.utils.stream.StreamFunction;
+import io.atomix.utils.stream.StreamHandler;
 import io.atomix.utils.concurrent.Futures;
+import io.atomix.utils.stream.TranscodingStreamFunction;
+import io.atomix.utils.stream.TranscodingStreamHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

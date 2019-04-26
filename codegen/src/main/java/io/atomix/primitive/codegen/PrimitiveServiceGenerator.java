@@ -42,14 +42,12 @@ import org.apache.commons.lang3.tuple.Pair;
 public class PrimitiveServiceGenerator {
 
   private static final String OPERATIONS_TEMPLATE = "operations.ftlh";
-  private static final String EVENTS_TEMPLATE = "events.ftlh";
   private static final String SIMPLE_SERVICE_TEMPLATE = "simple_service.ftlh";
   private static final String SESSION_SERVICE_TEMPLATE = "session_service.ftlh";
   private static final String SIMPLE_PROXY_TEMPLATE = "simple_proxy.ftlh";
   private static final String SESSION_PROXY_TEMPLATE = "session_proxy.ftlh";
 
   private static final String OPERATIONS_SUFFIX = "Operations";
-  private static final String EVENTS_SUFFIX = "Events";
   private static final String SERVICE_SUFFIX = "Service";
   private static final String PROXY_SUFFIX = "Proxy";
   private static final String ABSTRACT_PREFIX = "Abstract";
@@ -91,15 +89,6 @@ public class PrimitiveServiceGenerator {
         generate(
             OPERATIONS_TEMPLATE,
             serviceContext.getOperationsClass(),
-            serviceContext,
-            response);
-      }
-
-      // Generate the primitive events.
-      if (!serviceContext.getEvents().isEmpty()) {
-        generate(
-            EVENTS_TEMPLATE,
-            serviceContext.getEventsClass(),
             serviceContext,
             response);
       }
@@ -187,13 +176,10 @@ public class PrimitiveServiceGenerator {
     context.setServiceClass(buildServiceClassDescriptor(serviceDescriptor, fileDescriptor));
     context.setProxyClass(buildProxyClassDescriptor(serviceDescriptor, fileDescriptor));
     context.setOperationsClass(buildOperationsClassDescriptor(serviceDescriptor, fileDescriptor));
-    context.setEventsClass(buildEventsClassDescriptor(serviceDescriptor, fileDescriptor));
     context.setSession(isSessionService(serviceDescriptor));
     for (DescriptorProtos.MethodDescriptorProto methodDescriptor : serviceDescriptor.getMethodList()) {
       if (isOperationMethod(methodDescriptor)) {
         context.addOperation(buildOperationDescriptor(methodDescriptor, serviceDescriptor, fileDescriptor, messages));
-      } else if (isEventMethod(methodDescriptor)) {
-        context.addEvent(buildEventDescriptor(methodDescriptor, serviceDescriptor, fileDescriptor, messages));
       }
     }
     return context;
@@ -251,23 +237,6 @@ public class PrimitiveServiceGenerator {
   }
 
   /**
-   * Builds an class descriptor for the given service events.
-   *
-   * @param serviceDescriptor the service descriptor
-   * @param fileDescriptor    the descriptor for the file to which the service belongs
-   * @return the generated class descriptor
-   */
-  private ClassDescriptor buildEventsClassDescriptor(
-      DescriptorProtos.ServiceDescriptorProto serviceDescriptor,
-      DescriptorProtos.FileDescriptorProto fileDescriptor) {
-    ClassDescriptor eventsClass = new ClassDescriptor();
-    eventsClass.setPackageName(getPackageName(fileDescriptor));
-    eventsClass.setFileName(getBaseFilePath(EVENTS_SUFFIX, serviceDescriptor, fileDescriptor));
-    eventsClass.setClassName(getSuffixedClassName(EVENTS_SUFFIX, serviceDescriptor));
-    return eventsClass;
-  }
-
-  /**
    * Builds an class descriptor for the given service message.
    *
    * @param messageDescriptor the message descriptor
@@ -301,37 +270,14 @@ public class PrimitiveServiceGenerator {
     OperationDescriptor operation = new OperationDescriptor();
     operation.setMethodName(getMethodName(methodDescriptor));
     operation.setRequestClass(buildMessageClassDescriptor(inputType.getRight(), inputType.getLeft()));
-    if (!isEventMethod(methodDescriptor)) {
-      operation.setResponseClass(buildMessageClassDescriptor(outputType.getRight(), outputType.getLeft()));
-    }
+    operation.setResponseClass(buildMessageClassDescriptor(outputType.getRight(), outputType.getLeft()));
     operation.setOperationsClass(buildOperationsClassDescriptor(serviceDescriptor, fileDescriptor));
+    operation.setAsync(isAsyncMethod(methodDescriptor));
+    operation.setStream(methodDescriptor.getServerStreaming());
     operation.setType(getOperationType(methodDescriptor));
     operation.setName(getOperationName(methodDescriptor));
     operation.setConstantName(getOperationConstant(methodDescriptor));
     return operation;
-  }
-
-  /**
-   * Builds a descriptor for the given service operation.
-   *
-   * @param methodDescriptor the method descriptor
-   * @param messages         the message lookup table
-   * @return the generated method
-   */
-  private EventDescriptor buildEventDescriptor(
-      DescriptorProtos.MethodDescriptorProto methodDescriptor,
-      DescriptorProtos.ServiceDescriptorProto serviceDescriptor,
-      DescriptorProtos.FileDescriptorProto fileDescriptor,
-      MessageTable messages) {
-    Pair<DescriptorProtos.FileDescriptorProto, DescriptorProtos.DescriptorProto> outputType = messages.get(methodDescriptor.getOutputType());
-    EventDescriptor event = new EventDescriptor();
-    event.setMethodName(getMethodName(methodDescriptor));
-    event.setValueClass(buildMessageClassDescriptor(outputType.getRight(), outputType.getLeft()));
-    event.setEventsClass(buildEventsClassDescriptor(serviceDescriptor, fileDescriptor));
-    event.setType(getOperationType(methodDescriptor));
-    event.setName(getOperationName(methodDescriptor));
-    event.setConstantName(getOperationConstant(methodDescriptor));
-    return event;
   }
 
   /**
@@ -356,13 +302,13 @@ public class PrimitiveServiceGenerator {
   }
 
   /**
-   * Returns a boolean indicating whether the given descriptor is for a primitive event.
+   * Returns a boolean indicating whether the given method is an asynchronous method.
    *
-   * @param methodDescriptor the method descriptor
-   * @return indicates whether the given descriptor is a primitive event
+   * @param methodDescriptor tne method descriptor
+   * @return indicates whether the given method is an asynchronous method
    */
-  private boolean isEventMethod(DescriptorProtos.MethodDescriptorProto methodDescriptor) {
-    return methodDescriptor.getOptions().hasExtension(PrimitiveServiceProto.event);
+  private boolean isAsyncMethod(DescriptorProtos.MethodDescriptorProto methodDescriptor) {
+    return methodDescriptor.getOptions().getExtension(PrimitiveServiceProto.operation).getAsync();
   }
 
   /**
@@ -606,7 +552,6 @@ public class PrimitiveServiceGenerator {
     private ClassDescriptor operationsClass;
     private ClassDescriptor eventsClass;
     private List<OperationDescriptor> operations = new ArrayList<>();
-    private List<EventDescriptor> events = new ArrayList<>();
     private boolean session;
 
     public String getServiceName() {
@@ -669,24 +614,16 @@ public class PrimitiveServiceGenerator {
       return operations.stream().anyMatch(operation -> operation.getType().equals(OperationType.QUERY.name()));
     }
 
-    public List<EventDescriptor> getEvents() {
-      return events;
+    public boolean isHasStreams() {
+      return operations.stream().anyMatch(OperationDescriptor::isStream);
     }
 
-    public void setEvents(List<EventDescriptor> events) {
-      this.events = events;
-    }
-
-    public void addEvent(EventDescriptor event) {
-      events.add(event);
-    }
-
-    public boolean isHasEvents() {
-      return !events.isEmpty();
+    public boolean isHasAsyncs() {
+      return operations.stream().anyMatch(OperationDescriptor::isAsync);
     }
 
     public boolean isSession() {
-      return session || !getEvents().isEmpty();
+      return session || isHasStreams() || isHasAsyncs();
     }
 
     public void setSession(boolean session) {
@@ -736,6 +673,8 @@ public class PrimitiveServiceGenerator {
     private ClassDescriptor requestClass;
     private ClassDescriptor responseClass;
     private ClassDescriptor operationsClass;
+    private boolean async;
+    private boolean stream;
     private String type;
     private String name;
     private String constantName;
@@ -772,61 +711,20 @@ public class PrimitiveServiceGenerator {
       this.operationsClass = operationsClass;
     }
 
-    public String getType() {
-      return type;
+    public boolean isAsync() {
+      return async;
     }
 
-    public void setType(String type) {
-      this.type = type;
+    public void setAsync(boolean async) {
+      this.async = async;
     }
 
-    public String getName() {
-      return name;
+    public boolean isStream() {
+      return stream;
     }
 
-    public void setName(String name) {
-      this.name = name;
-    }
-
-    public String getConstantName() {
-      return constantName;
-    }
-
-    public void setConstantName(String constantName) {
-      this.constantName = constantName;
-    }
-  }
-
-  public static class EventDescriptor {
-    private String methodName;
-    private ClassDescriptor valueClass;
-    private ClassDescriptor eventsClass;
-    private String type;
-    private String name;
-    private String constantName;
-
-    public String getMethodName() {
-      return methodName;
-    }
-
-    public void setMethodName(String methodName) {
-      this.methodName = methodName;
-    }
-
-    public ClassDescriptor getValueClass() {
-      return valueClass;
-    }
-
-    public void setValueClass(ClassDescriptor valueClass) {
-      this.valueClass = valueClass;
-    }
-
-    public ClassDescriptor getEventsClass() {
-      return eventsClass;
-    }
-
-    public void setEventsClass(ClassDescriptor eventsClass) {
-      this.eventsClass = eventsClass;
+    public void setStream(boolean stream) {
+      this.stream = stream;
     }
 
     public String getType() {

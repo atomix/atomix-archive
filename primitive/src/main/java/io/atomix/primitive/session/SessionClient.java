@@ -17,7 +17,7 @@ import io.atomix.primitive.session.impl.SessionResponseContext;
 import io.atomix.primitive.session.impl.SessionStreamContext;
 import io.atomix.primitive.util.ByteBufferDecoder;
 import io.atomix.primitive.util.ByteStringEncoder;
-import io.atomix.utils.StreamHandler;
+import io.atomix.utils.stream.StreamHandler;
 import org.apache.commons.lang3.tuple.Pair;
 
 /**
@@ -39,16 +39,16 @@ public interface SessionClient {
       ByteStringEncoder<T> encoder,
       ByteBufferDecoder<U> decoder);
 
-  <T extends Message, U extends Message> CompletableFuture<Void> execute(
-      CommandId<T, Void> command,
+  <T extends Message, U extends Message> CompletableFuture<SessionResponseContext> execute(
+      CommandId<T, U> command,
       SessionCommandContext context,
       T request,
       StreamHandler<Pair<SessionStreamContext, U>> handler,
       ByteStringEncoder<T> encoder,
       ByteBufferDecoder<U> decoder);
 
-  <T extends Message, U extends Message> CompletableFuture<Void> execute(
-      QueryId<T, Void> query,
+  <T extends Message, U extends Message> CompletableFuture<SessionResponseContext> execute(
+      QueryId<T, U> query,
       SessionQueryContext context,
       T request,
       StreamHandler<Pair<SessionStreamContext, U>> handler,

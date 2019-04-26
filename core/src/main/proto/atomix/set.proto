@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package atomix.set.service;
 
+import "google/protobuf/empty.proto";
 import "atomix/metadata.proto";
 import "atomix/primitive/service.proto";
 
@@ -12,9 +13,15 @@ option java_multiple_files = true;
 // Distributed set snapshot
 message DistributedSetSnapshot {
     repeated string values = 1;
-    repeated int64 listeners = 2;
+    repeated DistributedSetListener listeners = 2;
     repeated string locked_elements = 4;
     map<string, DistributedSetTransaction> transactions = 5;
+}
+
+// Distributed set listener.
+message DistributedSetListener {
+    uint64 session_id = 1;
+    uint64 stream_id = 2;
 }
 
 // Distributed set transaction
@@ -86,10 +93,6 @@ message ListenRequest {
 
 message ListenResponse {
     atomix.metadata.Metadata metadata = 1;
-}
-
-message SetEvent {
-    atomix.metadata.Metadata metadata = 1;
     Type type = 2;
     string value = 3;
 
@@ -100,7 +103,7 @@ message SetEvent {
 }
 
 message UnlistenRequest {
-
+    int64 stream_id = 1;
 }
 
 message UnlistenResponse {
@@ -111,11 +114,6 @@ message IterateRequest {
 }
 
 message IterateResponse {
-    atomix.metadata.Metadata metadata = 1;
-    int32 size = 2;
-}
-
-message IterateEvent {
     atomix.metadata.Metadata metadata = 1;
     string value = 2;
 }
@@ -205,15 +203,10 @@ service SetService {
             type: COMMAND
         };
     }
-    rpc Listen(ListenRequest) returns (ListenResponse) {
+    rpc Listen(ListenRequest) returns (stream ListenResponse) {
         option (atomix.primitive.service.operation) = {
             name: "listen"
             type: COMMAND
-        };
-    }
-    rpc OnEvent(atomix.primitive.service.EventListener) returns (stream SetEvent) {
-        option (atomix.primitive.service.event) = {
-            name: "event"
         };
     }
     rpc Unlisten(UnlistenRequest) returns (UnlistenResponse) {
@@ -222,15 +215,10 @@ service SetService {
             type: COMMAND
         };
     }
-    rpc Iterate(IterateRequest) returns (IterateResponse) {
+    rpc Iterate(IterateRequest) returns (stream IterateResponse) {
         option (atomix.primitive.service.operation) = {
             name: "iterate"
-            type: COMMAND
-        };
-    }
-    rpc OnIterate(atomix.primitive.service.EventListener) returns (stream IterateEvent) {
-        option (atomix.primitive.service.event) = {
-            name: "iterate"
+            type: QUERY
         };
     }
     rpc Prepare(PrepareRequest) returns (PrepareResponse) {

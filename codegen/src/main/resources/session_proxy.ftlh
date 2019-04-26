@@ -18,46 +18,39 @@ package ${proxyClass.packageName};
 import io.atomix.primitive.PrimitiveManagementService;
 import io.atomix.primitive.partition.PartitionId;
 import io.atomix.primitive.proxy.SessionEnabledPrimitiveProxy;
-import io.atomix.primitive.session.impl.EventContext;
 import io.atomix.primitive.service.impl.ServiceId;
-import io.atomix.primitive.session.impl.SessionContext;
+import io.atomix.primitive.session.impl.SessionResponseContext;
 <#if hasCommands>
 import io.atomix.primitive.session.impl.SessionCommandContext;
 </#if>
 <#if hasQueries>
 import io.atomix.primitive.session.impl.SessionQueryContext;
 </#if>
-<#if hasEvents>
-import io.atomix.primitive.session.impl.SessionEventContext;
+<#if hasStreams>
+import io.atomix.primitive.session.impl.SessionStreamContext;
+import io.atomix.utils.stream.StreamHandler;
+import io.atomix.utils.stream.FutureStreamHandler;
+import io.atomix.utils.stream.TranscodingStreamHandler;
+<#elseif hasAsyncs>
+import io.atomix.primitive.session.impl.SessionStreamContext;
+import io.atomix.utils.stream.StreamHandler;
 </#if>
 import io.atomix.utils.concurrent.ThreadContext;
 
 import java.util.concurrent.CompletableFuture;
-<#if hasEvents>
-import java.util.function.BiConsumer;
-</#if>
-
 import org.apache.commons.lang3.tuple.Pair;
-
 <#list operations as operation>
 <#if operation.operationsClass.packageName != proxyClass.packageName>
-import ${operation.operationsClass.packageName}.${operation.operationsClass.className}
+import ${operation.operationsClass.packageName}.${operation.operationsClass.className};
 </#if>
 <#if operation.requestClass.packageName != proxyClass.packageName>
-import ${operation.requestClass.packageName}.${operation.requestClass.className}
+import ${operation.requestClass.packageName}.${operation.requestClass.className};
 </#if>
 <#if operation.responseClass.packageName != proxyClass.packageName>
-import ${operation.responseClass.packageName}.${operation.responseClass.className}
+import ${operation.responseClass.packageName}.${operation.responseClass.className};
 </#if>
 </#list>
-<#list events as event>
-<#if event.eventsClass.packageName != proxyClass.packageName>
-import ${event.eventsClass.packageName}.${operation.eventsClass.className}
-</#if>
-<#if event.valueClass.packageName != proxyClass.packageName>
-import ${event.valueClass.packageName}.${operation.valueClass.className}
-</#if>
-</#list>
+
 /**
  * Atomix generated proxy ${proxyClass.className}.
  */
@@ -67,13 +60,80 @@ public class ${proxyClass.className} extends SessionEnabledPrimitiveProxy {
     }
 
     <#list operations as operation>
+    <#if operation.stream>
+    /**
+     * Atomix generated method ${operation.methodName}.
+     *
+     * @param request the request object
+     * @param handler the response handler
+     * @return the response future
+     */
+    public CompletableFuture<SessionResponseContext> ${operation.methodName}(
+            <#if operation.type == "QUERY">
+            SessionQueryContext context,
+            <#else>
+            SessionCommandContext context,
+            </#if>
+            ${operation.requestClass.className} request,
+            StreamHandler<Pair<SessionStreamContext, ${operation.responseClass.className}>> handler) {
+        return getClient().execute(
+            ${operation.operationsClass.className}.${operation.constantName},
+            context,
+            request,
+            handler,
+            ${operation.requestClass.className}::toByteString,
+            ${operation.responseClass.className}::parseFrom);
+    }
+    <#elseif operation.async>
     /**
      * Atomix generated method ${operation.methodName}.
      *
      * @param request the request object
      * @return the response object
      */
-    public CompletableFuture<Pair<SessionContext, ${operation.responseClass.className}>> ${operation.methodName}(
+    public CompletableFuture<Pair<SessionResponseContext, ${operation.responseClass.className}>> ${operation.methodName}(
+            <#if operation.type == "QUERY">
+            SessionQueryContext context,
+            <#else>
+            SessionCommandContext context,
+            </#if>
+            ${operation.requestClass.className} request) {
+        CompletableFuture<Pair<SessionResponseContext, ${operation.responseClass.className}>> future = new CompletableFuture<>();
+        getClient().execute(
+            ${operation.operationsClass.className}.${operation.constantName},
+            context,
+            request,
+            new StreamHandler<Pair<SessionStreamContext, LockResponse>>() {
+                @Override
+                public void next(Pair<SessionStreamContext, LockResponse> response) {
+                    future.complete(Pair.of(SessionResponseContext.newBuilder()
+                        .setIndex(response.getLeft().getIndex())
+                        .addStreams(response.getLeft())
+                        .build(), response.getRight()));
+                }
+
+                @Override
+                public void complete() {
+                    future.complete(null);
+                }
+
+                @Override
+                public void error(Throwable error) {
+                    future.completeExceptionally(error);
+                }
+            },
+            ${operation.requestClass.className}::toByteString,
+            ${operation.responseClass.className}::parseFrom);
+        return future;
+    }
+    <#else>
+    /**
+     * Atomix generated method ${operation.methodName}.
+     *
+     * @param request the request object
+     * @return the response object
+     */
+    public CompletableFuture<Pair<SessionResponseContext, ${operation.responseClass.className}>> ${operation.methodName}(
             <#if operation.type == "QUERY">
             SessionQueryContext context,
             <#else>
@@ -87,23 +147,7 @@ public class ${proxyClass.className} extends SessionEnabledPrimitiveProxy {
             ${operation.requestClass.className}::toByteString,
             ${operation.responseClass.className}::parseFrom);
     }
-
-    </#list>
-    <#list events as event>
-    /**
-     * Atomix generated event listener method.
-     *
-     * @param listener the event listener
-     */
-    public void ${event.methodName}(
-            SessionEventContext context,
-            BiConsumer<EventContext, ${event.valueClass.className}> listener) {
-        getClient().addEventListener(
-            ${event.eventsClass.className}.${event.constantName},
-            context,
-            listener,
-            ${event.valueClass.className}::parseFrom);
-    }
+    </#if>
 
     </#list>
 }

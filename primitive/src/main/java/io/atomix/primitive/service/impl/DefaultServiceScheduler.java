@@ -87,7 +87,7 @@ public class DefaultServiceScheduler implements Scheduler, Executor {
    *
    * @param timestamp the updated timestamp
    */
-  public void startCommand(long timestamp) {
+  protected void startCommand(long timestamp) {
     this.timestamp = timestamp;
     this.operationType = OperationType.COMMAND;
     if (!scheduledTasks.isEmpty()) {

@@ -11,14 +11,15 @@ public class PrimitiveStreamRegistry {
   private final Map<Long, PrimitiveSessionStream> streams = new HashMap<>();
 
   public void register(PrimitiveSessionStream stream) {
-    streams.put(stream.id(), stream);
+    streams.put(stream.id().streamId(), stream);
   }
 
   public void unregister(PrimitiveSessionStream stream) {
-    streams.remove(stream.id());
+    streams.remove(stream.id().streamId());
   }
 
-  public PrimitiveSessionStream getStream(long streamId) {
+  @SuppressWarnings("unchecked")
+  public <T> PrimitiveSessionStream<T> getStream(long streamId) {
     return streams.get(streamId);
   }
 

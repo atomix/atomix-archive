@@ -54,7 +54,7 @@ import io.atomix.raft.storage.log.RaftLogWriter;
 import io.atomix.raft.storage.snapshot.Snapshot;
 import io.atomix.storage.StorageException;
 import io.atomix.storage.journal.Indexed;
-import io.atomix.utils.StreamHandler;
+import io.atomix.utils.stream.StreamHandler;
 import io.atomix.utils.time.WallClockTimestamp;
 
 import static com.google.common.base.MoreObjects.toStringHelper;

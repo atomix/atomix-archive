@@ -20,14 +20,13 @@ import java.util.Collection;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
-import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 import com.google.common.collect.Maps;
 import io.atomix.core.collection.CollectionEvent;
 import io.atomix.core.collection.CollectionEventListener;
 import io.atomix.core.iterator.AsyncIterator;
-import io.atomix.core.iterator.impl.DefaultAsyncIterator;
+import io.atomix.core.iterator.impl.StreamHandlerIterator;
 import io.atomix.core.set.AsyncDistributedSet;
 import io.atomix.core.set.DistributedSet;
 import io.atomix.core.transaction.TransactionId;
@@ -35,52 +34,39 @@ import io.atomix.core.transaction.TransactionLog;
 import io.atomix.primitive.PrimitiveManagementService;
 import io.atomix.primitive.impl.ManagedAsyncPrimitive;
 import io.atomix.utils.concurrent.Futures;
+import io.atomix.utils.stream.StreamHandler;
+import io.atomix.utils.stream.TranscodingStreamHandler;
 
 /**
  * Raw async distributed set.
  */
 public class RawAsyncDistributedSet extends ManagedAsyncPrimitive<SetProxy> implements AsyncDistributedSet<String> {
-  private final Map<Long, DefaultAsyncIterator<String>> iterators = Maps.newConcurrentMap();
   private final Map<CollectionEventListener<String>, Executor> eventListeners = Maps.newConcurrentMap();
+  private volatile long streamId;
 
   public RawAsyncDistributedSet(SetProxy proxy, Duration timeout, PrimitiveManagementService managementService) {
     super(proxy, timeout, managementService);
-    event((p, s) -> p.onEvent(s, listener(this::onEvent)));
-    event((p, s) -> p.onIterate(s, listener(this::onIterate)));
-  }
-
-  private void onEvent(SetEvent event) {
-    CollectionEvent<String> collectionEvent = new CollectionEvent<>(
-        CollectionEvent.Type.valueOf(event.getType().name()), event.getValue());
-    eventListeners.forEach((listener, executor) -> executor.execute(() -> listener.event(collectionEvent)));
-  }
-
-  private void onIterate(IterateEvent event) {
-    DefaultAsyncIterator<String> iterator = iterators.get(event.getMetadata().getIndex());
-    if (iterator != null) {
-      iterator.add(event.getValue());
-    }
   }
 
   @Override
   public CompletableFuture<Boolean> add(String element) {
-    return command((proxy, session) -> proxy.add(session, AddRequest.newBuilder()
+    return execute(SetProxy::add, AddRequest.newBuilder()
         .addValues(element)
-        .build()))
+        .build())
         .thenApply(response -> response.getAdded());
   }
 
   @Override
   public CompletableFuture<Boolean> remove(String element) {
-    return command((proxy, session) -> proxy.remove(session, RemoveRequest.newBuilder()
+    return execute(SetProxy::remove, RemoveRequest.newBuilder()
         .addValues(element)
-        .build()))
+        .build())
         .thenApply(response -> response.getRemoved());
   }
 
   @Override
   public CompletableFuture<Integer> size() {
-    return query((proxy, session) -> proxy.size(session, SizeRequest.newBuilder().build()))
+    return execute(SetProxy::size, SizeRequest.newBuilder().build())
         .thenApply(response -> response.getSize());
   }
 
@@ -91,31 +77,31 @@ public class RawAsyncDistributedSet extends ManagedAsyncPrimitive<SetProxy> impl
 
   @Override
   public CompletableFuture<Void> clear() {
-    return command((proxy, session) -> proxy.clear(session, ClearRequest.newBuilder().build()))
+    return execute(SetProxy::clear, ClearRequest.newBuilder().build())
         .thenApply(response -> null);
   }
 
   @Override
   public CompletableFuture<Boolean> contains(String element) {
-    return query((proxy, session) -> proxy.contains(session, ContainsRequest.newBuilder()
+    return execute(SetProxy::contains, ContainsRequest.newBuilder()
         .addValues(element)
-        .build()))
+        .build())
         .thenApply(response -> response.getContains());
   }
 
   @Override
   public CompletableFuture<Boolean> addAll(Collection<? extends String> c) {
-    return command((proxy, session) -> proxy.add(session, AddRequest.newBuilder()
+    return execute(SetProxy::add, AddRequest.newBuilder()
         .addAllValues((Iterable<String>) c)
-        .build()))
+        .build())
         .thenApply(response -> response.getAdded());
   }
 
   @Override
   public CompletableFuture<Boolean> containsAll(Collection<? extends String> c) {
-    return query((proxy, session) -> proxy.contains(session, ContainsRequest.newBuilder()
+    return execute(SetProxy::contains, ContainsRequest.newBuilder()
         .addAllValues((Iterable<String>) c)
-        .build()))
+        .build())
         .thenApply(response -> response.getContains());
   }
 
@@ -126,17 +112,35 @@ public class RawAsyncDistributedSet extends ManagedAsyncPrimitive<SetProxy> impl
 
   @Override
   public CompletableFuture<Boolean> removeAll(Collection<? extends String> c) {
-    return command((proxy, session) -> proxy.remove(session, RemoveRequest.newBuilder()
+    return execute(SetProxy::remove, RemoveRequest.newBuilder()
         .addAllValues((Iterable<String>) c)
-        .build()))
+        .build())
         .thenApply(response -> response.getRemoved());
   }
 
   @Override
   public synchronized CompletableFuture<Void> addListener(CollectionEventListener<String> listener, Executor executor) {
     if (eventListeners.putIfAbsent(listener, executor) == null) {
-      return command((proxy, session) -> proxy.listen(session, ListenRequest.newBuilder().build()))
-          .thenApply(response -> null);
+      return execute(SetProxy::listen, ListenRequest.newBuilder().build(), new StreamHandler<ListenResponse>() {
+        @Override
+        public void next(ListenResponse response) {
+          eventListeners.forEach((l, e) -> e.execute(() -> l.event(new CollectionEvent<>(
+              CollectionEvent.Type.valueOf(response.getType().name()), response.getValue()))));
+        }
+
+        @Override
+        public void complete() {
+
+        }
+
+        @Override
+        public void error(Throwable error) {
+
+        }
+      }).thenApply(streamId -> {
+        this.streamId = streamId;
+        return null;
+      });
     } else {
       return CompletableFuture.completedFuture(null);
     }
@@ -146,7 +150,7 @@ public class RawAsyncDistributedSet extends ManagedAsyncPrimitive<SetProxy> impl
   public synchronized CompletableFuture<Void> removeListener(CollectionEventListener<String> listener) {
     eventListeners.remove(listener);
     if (eventListeners.isEmpty()) {
-      return command((proxy, session) -> proxy.unlisten(session, UnlistenRequest.newBuilder().build()))
+      return execute(SetProxy::unlisten, UnlistenRequest.newBuilder().setStreamId(streamId).build())
           .thenApply(response -> null);
     }
     return CompletableFuture.completedFuture(null);
@@ -154,15 +158,17 @@ public class RawAsyncDistributedSet extends ManagedAsyncPrimitive<SetProxy> impl
 
   @Override
   public AsyncIterator<String> iterator() {
-    Supplier<CompletableFuture<DefaultAsyncIterator.Context>> contextFactory = () ->
-        command((proxy, session) -> proxy.iterate(session, IterateRequest.newBuilder().build()))
-            .thenApply(response -> new DefaultAsyncIterator.Context(response.getMetadata().getIndex(), response.getSize()));
-    return new DefaultAsyncIterator<>(contextFactory, iterators::put, iterators::remove);
+    StreamHandlerIterator<String> iterator = new StreamHandlerIterator<>();
+    execute(
+        SetProxy::iterate,
+        IterateRequest.newBuilder().build(),
+        new TranscodingStreamHandler<>(iterator, response -> response.getValue()));
+    return iterator;
   }
 
   @Override
   public CompletableFuture<Boolean> prepare(TransactionLog<SetUpdate<String>> transactionLog) {
-    return command((proxy, session) -> proxy.prepare(session, PrepareRequest.newBuilder()
+    return execute(SetProxy::prepare, PrepareRequest.newBuilder()
         .setTransactionId(transactionLog.transactionId().id())
         .setTransaction(DistributedSetTransaction.newBuilder()
             .setVersion(transactionLog.version())
@@ -173,23 +179,23 @@ public class RawAsyncDistributedSet extends ManagedAsyncPrimitive<SetProxy> impl
                     .build())
                 .collect(Collectors.toList()))
             .build())
-        .build()))
+        .build())
         .thenApply(response -> response.getStatus() == PrepareResponse.Status.OK);
   }
 
   @Override
   public CompletableFuture<Void> commit(TransactionId transactionId) {
-    return command((proxy, session) -> proxy.commit(session, CommitRequest.newBuilder()
+    return execute(SetProxy::commit, CommitRequest.newBuilder()
         .setTransactionId(transactionId.id())
-        .build()))
+        .build())
         .thenApply(response -> null);
   }
 
   @Override
   public CompletableFuture<Void> rollback(TransactionId transactionId) {
-    return command((proxy, session) -> proxy.rollback(session, RollbackRequest.newBuilder()
+    return execute(SetProxy::rollback, RollbackRequest.newBuilder()
         .setTransactionId(transactionId.id())
-        .build()))
+        .build())
         .thenApply(response -> null);
   }
 

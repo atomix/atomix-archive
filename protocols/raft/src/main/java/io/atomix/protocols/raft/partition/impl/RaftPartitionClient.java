@@ -24,7 +24,7 @@ import io.atomix.protocols.raft.partition.RaftPartition;
 import io.atomix.raft.RaftClient;
 import io.atomix.raft.protocol.RaftClientProtocol;
 import io.atomix.utils.Managed;
-import io.atomix.utils.StreamHandler;
+import io.atomix.utils.stream.StreamHandler;
 import io.atomix.utils.concurrent.ThreadContextFactory;
 import org.slf4j.Logger;
 

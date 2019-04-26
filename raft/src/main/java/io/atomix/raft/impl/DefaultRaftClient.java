@@ -33,7 +33,7 @@ import io.atomix.raft.protocol.QueryResponse;
 import io.atomix.raft.protocol.RaftClientProtocol;
 import io.atomix.raft.protocol.RaftError;
 import io.atomix.raft.protocol.ResponseStatus;
-import io.atomix.utils.StreamHandler;
+import io.atomix.utils.stream.StreamHandler;
 import io.atomix.utils.concurrent.ThreadContext;
 import io.atomix.utils.concurrent.ThreadContextFactory;
 import io.atomix.utils.logging.ContextualLoggerFactory;

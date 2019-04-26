@@ -13,7 +13,7 @@ import io.atomix.raft.RaftCommand;
 import io.atomix.raft.RaftOperation;
 import io.atomix.raft.RaftQuery;
 import io.atomix.raft.RaftStateMachine;
-import io.atomix.utils.StreamHandler;
+import io.atomix.utils.stream.StreamHandler;
 import org.slf4j.Logger;
 
 /**

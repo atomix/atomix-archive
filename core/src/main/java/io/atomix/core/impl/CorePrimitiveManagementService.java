@@ -27,7 +27,6 @@ import io.atomix.primitive.partition.PartitionService;
 import io.atomix.primitive.protocol.PrimitiveProtocolTypeRegistry;
 import io.atomix.primitive.serialization.SerializationService;
 import io.atomix.primitive.session.SessionIdService;
-import io.atomix.primitive.session.SessionProtocolService;
 import io.atomix.utils.concurrent.ThreadContextFactory;
 
 /**
@@ -45,7 +44,6 @@ public class CorePrimitiveManagementService implements PrimitiveManagementServic
   private final PrimitiveProtocolTypeRegistry protocolTypeRegistry;
   private final PartitionGroupTypeRegistry partitionGroupTypeRegistry;
   private final SessionIdService sessionIdService;
-  private final SessionProtocolService sessionProtocolService;
   private final ThreadContextFactory threadFactory;
 
   public CorePrimitiveManagementService(
@@ -60,7 +58,6 @@ public class CorePrimitiveManagementService implements PrimitiveManagementServic
       PrimitiveProtocolTypeRegistry protocolTypeRegistry,
       PartitionGroupTypeRegistry partitionGroupTypeRegistry,
       SessionIdService sessionIdService,
-      SessionProtocolService sessionProtocolService,
       ThreadContextFactory threadFactory) {
     this.membershipService = membershipService;
     this.communicationService = communicationService;
@@ -73,7 +70,6 @@ public class CorePrimitiveManagementService implements PrimitiveManagementServic
     this.protocolTypeRegistry = protocolTypeRegistry;
     this.partitionGroupTypeRegistry = partitionGroupTypeRegistry;
     this.sessionIdService = sessionIdService;
-    this.sessionProtocolService = sessionProtocolService;
     this.threadFactory = threadFactory;
   }
 
@@ -130,11 +126,6 @@ public class CorePrimitiveManagementService implements PrimitiveManagementServic
   @Override
   public SessionIdService getSessionIdService() {
     return sessionIdService;
-  }
-
-  @Override
-  public SessionProtocolService getSessionProtocolService() {
-    return sessionProtocolService;
   }
 
   @Override

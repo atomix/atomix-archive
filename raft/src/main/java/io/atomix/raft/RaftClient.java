@@ -23,7 +23,7 @@ import java.util.concurrent.CompletableFuture;
 
 import io.atomix.raft.impl.DefaultRaftClient;
 import io.atomix.raft.protocol.RaftClientProtocol;
-import io.atomix.utils.StreamHandler;
+import io.atomix.utils.stream.StreamHandler;
 import io.atomix.utils.concurrent.ThreadContextFactory;
 import io.atomix.utils.concurrent.ThreadModel;
 

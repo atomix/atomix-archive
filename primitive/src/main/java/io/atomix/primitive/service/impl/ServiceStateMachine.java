@@ -14,7 +14,7 @@ import io.atomix.primitive.service.Command;
 import io.atomix.primitive.service.PrimitiveService;
 import io.atomix.primitive.service.Query;
 import io.atomix.primitive.service.StateMachine;
-import io.atomix.utils.StreamHandler;
+import io.atomix.utils.stream.StreamHandler;
 import io.atomix.utils.logging.ContextualLoggerFactory;
 import io.atomix.utils.logging.LoggerContext;
 import org.slf4j.Logger;

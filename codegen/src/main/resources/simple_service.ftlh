@@ -15,37 +15,77 @@
  */
 package ${serviceClass.packageName};
 
-import io.atomix.primitive.service.ServiceExecutor;
+import io.atomix.primitive.service.ServiceOperationRegistry;
 import io.atomix.primitive.service.SimplePrimitiveService;
+<#if hasStreams>
+import io.atomix.utils.stream.StreamHandler;
+</#if>
 
 <#list operations as operation>
 <#if operation.operationsClass.packageName != proxyClass.packageName>
-import ${operation.operationsClass.packageName}.${operation.operationsClass.className}
+import ${operation.operationsClass.packageName}.${operation.operationsClass.className};
 </#if>
 <#if operation.requestClass.packageName != proxyClass.packageName>
-import ${operation.requestClass.packageName}.${operation.requestClass.className}
+import ${operation.requestClass.packageName}.${operation.requestClass.className};
 </#if>
 <#if operation.responseClass.packageName != proxyClass.packageName>
-import ${operation.responseClass.packageName}.${operation.responseClass.className}
+import ${operation.responseClass.packageName}.${operation.responseClass.className};
 </#if>
+
 </#list>
+<#if hasAsyncs>
+import java.util.concurrent.CompletableFuture;
+
+</#if>
 /**
  * Atomix generated service interface ${serviceClass.className}.
  */
 public abstract class ${serviceClass.className} extends SimplePrimitiveService {
 
     @Override
-    protected void configure(ServiceExecutor executor) {
+    protected void configure(ServiceOperationRegistry registry) {
         <#list operations as operation>
-        executor.register(
+        <#if operation.async>
+        registry.register(
+            ${operation.operationsClass.className}.${operation.constantName},
+            (request, handler) -> ${operation.methodName}(request).whenComplete((response, error) -> {
+              if (error == null) {
+                  handler.next(response);
+                  handler.complete();
+              } else {
+                  handler.error(error);
+              }
+            }),
+            ${operation.requestClass.className}::parseFrom,
+            ${operation.responseClass.className}::toByteArray);
+        <#else>
+        registry.register(
             ${operation.operationsClass.className}.${operation.constantName},
             this::${operation.methodName},
             ${operation.requestClass.className}::parseFrom,
             ${operation.responseClass.className}::toByteArray);
-         </#list>
+        </#if>
+        </#list>
     }
 
     <#list operations as operation>
+    <#if operation.stream>
+    /**
+     * Atomix generated method ${operation.methodName}.
+     *
+     * @param request the request object
+     * @param handler the response stream
+     */
+    public abstract void ${operation.methodName}(${operation.requestClass.className} request, StreamHandler<${operation.responseClass.className}> handler);
+    <#elseif operation.async>
+    /**
+     * Atomix generated method ${operation.methodName}.
+     *
+     * @param request the request object
+     * @return the response object
+     */
+    public abstract CompletableFuture<${operation.responseClass.className}> ${operation.methodName}(${operation.requestClass.className} request);
+    <#else>
     /**
      * Atomix generated method ${operation.methodName}.
      *
@@ -53,6 +93,7 @@ public abstract class ${serviceClass.className} extends SimplePrimitiveService {
      * @return the response object
      */
     public abstract ${operation.responseClass.className} ${operation.methodName}(${operation.requestClass.className} request);
+    </#if>
 
     </#list>
 }

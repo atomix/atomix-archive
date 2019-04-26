@@ -60,7 +60,7 @@ import io.atomix.raft.storage.log.RaftLogEntry;
 import io.atomix.raft.storage.system.RaftConfiguration;
 import io.atomix.storage.StorageException;
 import io.atomix.storage.journal.Indexed;
-import io.atomix.utils.StreamHandler;
+import io.atomix.utils.stream.StreamHandler;
 import io.atomix.utils.concurrent.Futures;
 import io.atomix.utils.concurrent.Scheduled;
 

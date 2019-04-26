@@ -20,7 +20,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.concurrent.CompletableFuture;
 
-import io.atomix.utils.StreamHandler;
+import io.atomix.utils.stream.StreamHandler;
 import org.slf4j.Logger;
 
 /**

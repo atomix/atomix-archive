@@ -16,7 +16,7 @@ import io.atomix.primitive.service.Query;
 import io.atomix.primitive.service.ServiceType;
 import io.atomix.primitive.service.StateMachine;
 import io.atomix.primitive.util.ByteArrayDecoder;
-import io.atomix.utils.StreamHandler;
+import io.atomix.utils.stream.StreamHandler;
 import io.atomix.utils.concurrent.Futures;
 
 /**

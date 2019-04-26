@@ -17,8 +17,6 @@ package io.atomix.primitive.impl;
 
 import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
-import java.util.function.BiConsumer;
-import java.util.function.BiFunction;
 import java.util.function.Consumer;
 
 import io.atomix.primitive.PrimitiveManagementService;
@@ -26,13 +24,8 @@ import io.atomix.primitive.PrimitiveState;
 import io.atomix.primitive.proxy.SessionEnabledPrimitiveProxy;
 import io.atomix.primitive.session.impl.CloseSessionRequest;
 import io.atomix.primitive.session.impl.OpenSessionRequest;
-import io.atomix.primitive.session.impl.SessionCommandContext;
-import io.atomix.primitive.session.impl.SessionQueryContext;
-import io.atomix.primitive.session.impl.SessionResponseContext;
-import io.atomix.primitive.session.impl.SessionStreamContext;
-import io.atomix.utils.StreamHandler;
 import io.atomix.utils.concurrent.Futures;
-import org.apache.commons.lang3.tuple.Pair;
+import io.atomix.utils.stream.StreamHandler;
 
 /**
  * Session enabled asynchronous primitive.
@@ -42,7 +35,7 @@ public abstract class ManagedAsyncPrimitive<P extends SessionEnabledPrimitivePro
   private final PrimitiveManagementService managementService;
   private PrimitiveSessionState state;
   private PrimitiveSessionSequencer sequencer;
-  private PrimitiveSessionInvoker<P> invoker;
+  private PrimitiveSessionExecutor<P> executor;
 
   public ManagedAsyncPrimitive(
       P proxy,
@@ -53,47 +46,30 @@ public abstract class ManagedAsyncPrimitive<P extends SessionEnabledPrimitivePro
     this.managementService = managementService;
   }
 
-  protected <T> CompletableFuture<T> orderedCommand(
-      BiFunction<P, SessionCommandContext, CompletableFuture<Pair<SessionResponseContext, T>>> function) {
-    return invoker.command(function);
+  protected <T, U> CompletableFuture<U> execute(
+      CommandFunction<P, T, U> function,
+      T request) {
+    return executor.execute(function, request);
   }
 
-  protected CompletableFuture<Void> orderedCommand(BiConsumer<P, SessionCommandContext> function) {
-    return invoker.command((proxy, context) -> {
-      function.accept(proxy, context);
-      return CompletableFuture.completedFuture(null);
-    });
+  protected <T, U> CompletableFuture<Long> execute(
+      CommandStreamFunction<P, T, U> function,
+      T request,
+      StreamHandler<U> handler) {
+    return executor.execute(function, request, handler);
   }
 
-  protected <T> CompletableFuture<T> orderedQuery(
-      BiFunction<P, SessionQueryContext, CompletableFuture<Pair<SessionResponseContext, T>>> function) {
-    return invoker.query(function);
+  protected <T, U> CompletableFuture<U> execute(
+      QueryFunction<P, T, U> function,
+      T request) {
+    return executor.execute(function, request);
   }
 
-  protected CompletableFuture<Void> orderedQuery(BiConsumer<P, SessionQueryContext> function) {
-    return invoker.query((proxy, context) -> {
-      function.accept(proxy, context);
-      return CompletableFuture.completedFuture(null);
-    });
-  }
-
-  protected <T> StreamHandler<Pair<SessionStreamContext, T>> orderedStream(StreamHandler<Pair<SessionStreamContext, T>> handler) {
-    return new StreamHandler<Pair<SessionStreamContext, T>>() {
-      @Override
-      public void next(Pair<SessionStreamContext, T> value) {
-        sequencer.sequenceEvent(value.getLeft(), () -> handler.next(value));
-      }
-
-      @Override
-      public void complete() {
-        handler.complete();
-      }
-
-      @Override
-      public void error(Throwable error) {
-        handler.error(error);
-      }
-    };
+  protected <T, U> CompletableFuture<Void> execute(
+      QueryStreamFunction<P, T, U> function,
+      T request,
+      StreamHandler<U> handler) {
+    return executor.execute(function, request, handler);
   }
 
   protected void state(Consumer<PrimitiveState> consumer) {
@@ -123,7 +99,7 @@ public abstract class ManagedAsyncPrimitive<P extends SessionEnabledPrimitivePro
               timeout);
           state = new PrimitiveSessionState(sessionId, timeout.toMillis());
           sequencer = new PrimitiveSessionSequencer(state, context);
-          invoker = new PrimitiveSessionInvoker<>(getProxy(), state, context, sequencer);
+          executor = new PrimitiveSessionExecutor<>(getProxy(), state, context, sequencer);
           return null;
         }));
   }

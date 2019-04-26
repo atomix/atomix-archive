@@ -43,7 +43,7 @@ import io.atomix.primitive.service.ServiceOperationRegistry;
 import io.atomix.primitive.service.SessionManagedPrimitiveService;
 import io.atomix.primitive.session.Session;
 import io.atomix.primitive.session.SessionId;
-import io.atomix.utils.StreamHandler;
+import io.atomix.utils.stream.StreamHandler;
 import io.atomix.utils.concurrent.Scheduled;
 
 import static com.google.common.base.Throwables.throwIfUnchecked;

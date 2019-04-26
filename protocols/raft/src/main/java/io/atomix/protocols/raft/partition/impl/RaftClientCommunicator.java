@@ -27,7 +27,7 @@ import io.atomix.raft.protocol.CommandResponse;
 import io.atomix.raft.protocol.QueryRequest;
 import io.atomix.raft.protocol.QueryResponse;
 import io.atomix.raft.protocol.RaftClientProtocol;
-import io.atomix.utils.StreamHandler;
+import io.atomix.utils.stream.StreamHandler;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 

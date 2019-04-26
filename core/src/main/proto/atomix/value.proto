@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package atomix.value.service;
 
+import "google/protobuf/empty.proto";
 import "atomix/metadata.proto";
 import "atomix/primitive/service.proto";
 
@@ -13,7 +14,13 @@ option java_multiple_files = true;
 message AtomicValueSnapshot {
     int64 version = 1;
     bytes value = 2;
-    repeated int64 listeners = 3;
+    repeated AtomicValueListener listeners = 3;
+}
+
+// Atomic value listener.
+message AtomicValueListener {
+    uint64 session_id = 1;
+    uint64 stream_id = 2;
 }
 
 message GetRequest {
@@ -55,10 +62,6 @@ message ListenRequest {
 
 message ListenResponse {
     atomix.metadata.Metadata metadata = 1;
-}
-
-message ValueEvent {
-    atomix.metadata.Metadata metadata = 1;
     Type type = 2;
     bytes previous_value = 3;
     int64 previous_version = 4;
@@ -71,7 +74,7 @@ message ValueEvent {
 }
 
 message UnlistenRequest {
-
+    int64 stream_id = 1;
 }
 
 message UnlistenResponse {
@@ -100,16 +103,10 @@ service ValueService {
         };
     }
 
-    rpc Listen(ListenRequest) returns (ListenResponse) {
+    rpc Listen(ListenRequest) returns (stream ListenResponse) {
         option (atomix.primitive.service.operation) = {
             name: "listen"
             type: COMMAND
-        };
-    }
-
-    rpc OnEvent(atomix.primitive.service.EventListener) returns (stream ValueEvent) {
-        option (atomix.primitive.service.event) = {
-            name: "event"
         };
     }
 

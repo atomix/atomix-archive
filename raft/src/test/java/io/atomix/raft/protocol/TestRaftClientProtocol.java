@@ -19,7 +19,7 @@ import java.net.ConnectException;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
-import io.atomix.utils.StreamHandler;
+import io.atomix.utils.stream.StreamHandler;
 import io.atomix.utils.concurrent.Futures;
 import io.atomix.utils.concurrent.ThreadContext;
 

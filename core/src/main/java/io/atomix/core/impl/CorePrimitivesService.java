@@ -46,7 +46,6 @@ import io.atomix.primitive.partition.impl.DefaultPartitionGroupTypeRegistry;
 import io.atomix.primitive.protocol.PrimitiveProtocol;
 import io.atomix.primitive.protocol.impl.DefaultPrimitiveProtocolTypeRegistry;
 import io.atomix.primitive.serialization.SerializationService;
-import io.atomix.primitive.session.impl.DefaultSessionProtocolService;
 import io.atomix.primitive.session.impl.ReplicatedSessionIdService;
 import io.atomix.utils.concurrent.ThreadContextFactory;
 import org.slf4j.Logger;
@@ -161,7 +160,6 @@ public class CorePrimitivesService implements ManagedPrimitivesService {
               new DefaultPrimitiveProtocolTypeRegistry(registry.getTypes(PrimitiveProtocol.Type.class)),
               new DefaultPartitionGroupTypeRegistry(registry.getTypes(PartitionGroup.Type.class)),
               new ReplicatedSessionIdService(partitionService.getSystemPartitionGroup()),
-              new DefaultSessionProtocolService(communicationService),
               threadContextFactory);
           this.transactionService = new CoreTransactionService(managementService);
         })

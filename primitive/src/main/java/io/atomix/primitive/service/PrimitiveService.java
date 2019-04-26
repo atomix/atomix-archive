@@ -15,8 +15,23 @@
  */
 package io.atomix.primitive.service;
 
+import io.atomix.primitive.operation.OperationId;
+
 /**
  * Base class for user-provided services.
  */
 public interface PrimitiveService extends StateMachine {
+
+  /**
+   * Primitive service context.
+   */
+  interface Context extends StateMachine.Context {
+    /**
+     * Returns the current operation ID.
+     *
+     * @return the current operation ID
+     */
+    OperationId getOperationId();
+  }
+
 }

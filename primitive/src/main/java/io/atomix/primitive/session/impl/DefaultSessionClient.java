@@ -13,7 +13,7 @@ import io.atomix.primitive.session.SessionClient;
 import io.atomix.primitive.util.ByteArrayDecoder;
 import io.atomix.primitive.util.ByteBufferDecoder;
 import io.atomix.primitive.util.ByteStringEncoder;
-import io.atomix.utils.StreamHandler;
+import io.atomix.utils.stream.StreamHandler;
 import org.apache.commons.lang3.tuple.Pair;
 
 /**
@@ -81,14 +81,16 @@ public class DefaultSessionClient implements SessionClient {
   }
 
   @Override
-  public <T extends Message, U extends Message> CompletableFuture<Void> execute(
-      CommandId<T, Void> command,
+  public <T extends Message, U extends Message> CompletableFuture<SessionResponseContext> execute(
+      CommandId<T, U> command,
       SessionCommandContext context,
       T request,
       StreamHandler<Pair<SessionStreamContext, U>> handler,
       ByteStringEncoder<T> encoder,
       ByteBufferDecoder<U> decoder) {
-    return command(SessionRequest.newBuilder()
+    CompletableFuture<SessionResponseContext> future = new CompletableFuture<>();
+    command(
+        SessionRequest.newBuilder()
             .setCommand(SessionCommandRequest.newBuilder()
                 .setContext(context)
                 .setName(command.id())
@@ -98,9 +100,13 @@ public class DefaultSessionClient implements SessionClient {
         new StreamHandler<SessionResponse>() {
           @Override
           public void next(SessionResponse response) {
-            handler.next(Pair.of(
-                response.getStream().getContext(),
-                ByteBufferDecoder.decode(response.getCommand().getOutput().asReadOnlyByteBuffer(), decoder)));
+            if (response.hasCommand()) {
+              future.complete(response.getCommand().getContext());
+            } else {
+              handler.next(Pair.of(
+                  response.getStream().getContext(),
+                  ByteBufferDecoder.decode(response.getCommand().getOutput().asReadOnlyByteBuffer(), decoder)));
+            }
           }
 
           @Override
@@ -112,18 +118,25 @@ public class DefaultSessionClient implements SessionClient {
           public void error(Throwable error) {
             handler.error(error);
           }
+        })
+        .whenComplete((result, error) -> {
+          if (error != null) {
+            future.completeExceptionally(error);
+          }
         });
+    return future;
   }
 
   @Override
-  public <T extends Message, U extends Message> CompletableFuture<Void> execute(
-      QueryId<T, Void> query,
+  public <T extends Message, U extends Message> CompletableFuture<SessionResponseContext> execute(
+      QueryId<T, U> query,
       SessionQueryContext context,
       T request,
       StreamHandler<Pair<SessionStreamContext, U>> handler,
       ByteStringEncoder<T> encoder,
       ByteBufferDecoder<U> decoder) {
-    return query(SessionRequest.newBuilder()
+    CompletableFuture<SessionResponseContext> future = new CompletableFuture<>();
+    query(SessionRequest.newBuilder()
             .setQuery(SessionQueryRequest.newBuilder()
                 .setContext(context)
                 .setName(query.id())
@@ -133,9 +146,13 @@ public class DefaultSessionClient implements SessionClient {
         new StreamHandler<SessionResponse>() {
           @Override
           public void next(SessionResponse response) {
-            handler.next(Pair.of(
-                response.getStream().getContext(),
-                ByteBufferDecoder.decode(response.getQuery().getOutput().asReadOnlyByteBuffer(), decoder)));
+            if (response.hasQuery()) {
+              future.complete(response.getQuery().getContext());
+            } else {
+              handler.next(Pair.of(
+                  response.getStream().getContext(),
+                  ByteBufferDecoder.decode(response.getQuery().getOutput().asReadOnlyByteBuffer(), decoder)));
+            }
           }
 
           @Override
@@ -147,7 +164,13 @@ public class DefaultSessionClient implements SessionClient {
           public void error(Throwable error) {
             handler.error(error);
           }
+        })
+        .whenComplete((result, error) -> {
+          if (error != null) {
+            future.completeExceptionally(error);
+          }
         });
+    return future;
   }
 
   private CompletableFuture<SessionResponse> command(SessionRequest request) {

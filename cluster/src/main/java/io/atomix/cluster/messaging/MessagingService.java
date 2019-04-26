@@ -23,8 +23,8 @@ import java.util.function.BiFunction;
 import java.util.function.Function;
 
 import com.google.common.util.concurrent.MoreExecutors;
-import io.atomix.utils.StreamFunction;
-import io.atomix.utils.StreamHandler;
+import io.atomix.utils.stream.StreamFunction;
+import io.atomix.utils.stream.StreamHandler;
 import io.atomix.utils.TriConsumer;
 import io.atomix.utils.net.Address;
 

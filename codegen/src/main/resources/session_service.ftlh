@@ -15,51 +15,90 @@
  */
 package ${serviceClass.packageName};
 
-import io.atomix.primitive.partition.PartitionId;
-import io.atomix.primitive.partition.PartitionManagementService;
 import io.atomix.primitive.session.SessionId;
-import io.atomix.primitive.service.ServiceExecutor;
 import io.atomix.primitive.service.SessionManagedPrimitiveService;
+import io.atomix.primitive.service.ServiceOperationRegistry;
+<#if hasStreams>
+import io.atomix.primitive.session.SessionStreamHandler;
+import io.atomix.utils.stream.StreamHandler;
+</#if>
 
 <#list operations as operation>
 <#if operation.operationsClass.packageName != proxyClass.packageName>
-import ${operation.operationsClass.packageName}.${operation.operationsClass.className}
+import ${operation.operationsClass.packageName}.${operation.operationsClass.className};
 </#if>
 <#if operation.requestClass.packageName != proxyClass.packageName>
-import ${operation.requestClass.packageName}.${operation.requestClass.className}
+import ${operation.requestClass.packageName}.${operation.requestClass.className};
 </#if>
 <#if operation.responseClass.packageName != proxyClass.packageName>
-import ${operation.responseClass.packageName}.${operation.responseClass.className}
+import ${operation.responseClass.packageName}.${operation.responseClass.className};
 </#if>
+
 </#list>
-<#list events as event>
-<#if event.eventsClass.packageName != proxyClass.packageName>
-import ${event.eventsClass.packageName}.${operation.eventsClass.className}
+<#if hasAsyncs>
+import java.util.concurrent.CompletableFuture;
+
 </#if>
-<#if event.valueClass.packageName != proxyClass.packageName>
-import ${event.valueClass.packageName}.${operation.valueClass.className}
-</#if>
-</#list>
 /**
  * Atomix generated service interface ${serviceClass.className}.
  */
 public abstract class ${serviceClass.className} extends SessionManagedPrimitiveService {
-    protected ${serviceClass.className}(PartitionId partitionId, PartitionManagementService managementService) {
-        super(partitionId, managementService);
-    }
-
     @Override
-    protected void configure(ServiceExecutor executor) {
+    protected void configure(ServiceOperationRegistry registry) {
         <#list operations as operation>
-        executor.register(
+        <#if operation.async>
+        registry.register(
+            ${operation.operationsClass.className}.${operation.constantName},
+            (request, handler) -> ${operation.methodName}(request).whenComplete((response, error) -> {
+              if (error == null) {
+                  handler.next(response);
+                  handler.complete();
+              } else {
+                  handler.error(error);
+              }
+            }),
+            ${operation.requestClass.className}::parseFrom,
+            ${operation.responseClass.className}::toByteArray);
+        <#else>
+        <#if operation.type == "COMMAND" && operation.stream>
+        registry.register(
+            ${operation.operationsClass.className}.${operation.constantName},
+            (request, handler) -> ${operation.methodName}(request, (SessionStreamHandler<${operation.responseClass.className}>) handler),
+            ${operation.requestClass.className}::parseFrom,
+            ${operation.responseClass.className}::toByteArray);
+        <#else>
+        registry.register(
             ${operation.operationsClass.className}.${operation.constantName},
             this::${operation.methodName},
             ${operation.requestClass.className}::parseFrom,
             ${operation.responseClass.className}::toByteArray);
-         </#list>
+        </#if>
+        </#if>
+        </#list>
     }
 
     <#list operations as operation>
+    <#if operation.stream>
+    /**
+     * Atomix generated method ${operation.methodName}.
+     *
+     * @param request the request object
+     * @param handler the response stream
+     */
+    <#if operation.type == "COMMAND">
+    public abstract void ${operation.methodName}(${operation.requestClass.className} request, SessionStreamHandler<${operation.responseClass.className}> handler);
+    <#else>
+    public abstract void ${operation.methodName}(${operation.requestClass.className} request, StreamHandler<${operation.responseClass.className}> handler);
+    </#if>
+    <#elseif operation.async>
+    /**
+     * Atomix generated method ${operation.methodName}.
+     *
+     * @param request the request object
+     * @return the response object
+     */
+    public abstract CompletableFuture<${operation.responseClass.className}> ${operation.methodName}(${operation.requestClass.className} request);
+    <#else>
     /**
      * Atomix generated method ${operation.methodName}.
      *
@@ -67,18 +106,7 @@ public abstract class ${serviceClass.className} extends SessionManagedPrimitiveS
      * @return the response object
      */
     public abstract ${operation.responseClass.className} ${operation.methodName}(${operation.requestClass.className} request);
-
-    </#list>
-
-    <#list events as event>
-    /**
-     * Atomix generated event producer method.
-     *
-     * @param event the event to produce
-     */
-    protected void ${event.methodName}(SessionId sessionId, ${event.valueClass.className} event) {
-        getSession(sessionId).publish(${event.eventsClass.className}.${event.constantName}, event, ${event.valueClass.className}::toByteArray);
-    }
+    </#if>
 
     </#list>
 }

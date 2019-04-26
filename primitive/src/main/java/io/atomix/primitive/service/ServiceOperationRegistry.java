@@ -27,7 +27,7 @@ import io.atomix.primitive.operation.OperationType;
 import io.atomix.primitive.operation.PrimitiveOperation;
 import io.atomix.primitive.util.ByteArrayDecoder;
 import io.atomix.primitive.util.ByteArrayEncoder;
-import io.atomix.utils.StreamHandler;
+import io.atomix.utils.stream.StreamHandler;
 
 /**
  * Facilitates registration and execution of state machine commands and provides deterministic scheduling.

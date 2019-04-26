@@ -43,7 +43,6 @@ import io.atomix.primitive.partition.PartitionService;
 import io.atomix.primitive.protocol.PrimitiveProtocolTypeRegistry;
 import io.atomix.primitive.serialization.SerializationService;
 import io.atomix.primitive.session.SessionIdService;
-import io.atomix.primitive.session.SessionProtocolService;
 import io.atomix.utils.concurrent.ThreadContextFactory;
 
 /**
@@ -199,11 +198,6 @@ public class CorePrimitiveRegistry implements ManagedPrimitiveRegistry {
 
     @Override
     public SessionIdService getSessionIdService() {
-      throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public SessionProtocolService getSessionProtocolService() {
       throw new UnsupportedOperationException();
     }
 

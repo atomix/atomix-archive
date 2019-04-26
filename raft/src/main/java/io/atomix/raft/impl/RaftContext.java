@@ -54,7 +54,7 @@ import io.atomix.raft.storage.snapshot.SnapshotStore;
 import io.atomix.raft.storage.system.MetaStore;
 import io.atomix.raft.utils.LoadMonitor;
 import io.atomix.storage.StorageException;
-import io.atomix.utils.StreamHandler;
+import io.atomix.utils.stream.StreamHandler;
 import io.atomix.utils.concurrent.ComposableFuture;
 import io.atomix.utils.concurrent.SingleThreadContext;
 import io.atomix.utils.concurrent.ThreadContext;

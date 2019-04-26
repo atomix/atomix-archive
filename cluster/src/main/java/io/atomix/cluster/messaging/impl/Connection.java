@@ -15,7 +15,7 @@
  */
 package io.atomix.cluster.messaging.impl;
 
-import io.atomix.utils.StreamHandler;
+import io.atomix.utils.stream.StreamHandler;
 
 interface Connection {
 

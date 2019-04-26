@@ -17,7 +17,7 @@ package io.atomix.raft.protocol;
 
 import java.util.concurrent.CompletableFuture;
 
-import io.atomix.utils.StreamHandler;
+import io.atomix.utils.stream.StreamHandler;
 
 /**
  * Raft client protocol.

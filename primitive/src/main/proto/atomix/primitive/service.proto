@@ -22,18 +22,11 @@ enum ServiceTypeInfo {
 message ServiceOperationInfo {
     string name = 1;
     atomix.primitive.operation.OperationTypeInfo type = 2;
-}
-
-message ServiceEventInfo {
-    string name = 1;
-}
-
-message EventListener {
+    bool async = 3;
 }
 
 extend google.protobuf.MethodOptions {
     ServiceOperationInfo operation = 50003;
-    ServiceEventInfo event = 50004;
 }
 
 message ServiceId {

@@ -1,0 +1,46 @@
+syntax = "proto3";
+
+package atomix.codegen.test;
+
+import "google/protobuf/empty.proto";
+import "atomix/primitive/service.proto";
+
+option java_package = "io.atomix.primitive.codegen";
+option java_outer_classname = "TestProto";
+option java_multiple_files = true;
+
+message TestRequest {
+    uint64 foo = 1;
+}
+
+message TestResponse {
+    string bar = 1;
+}
+
+// Test service
+service TestService {
+    rpc Command(TestRequest) returns (TestResponse) {
+        option (atomix.primitive.service.operation) = {
+            name: "command"
+            type: COMMAND
+        };
+    }
+    rpc CommandStream(TestRequest) returns (stream TestResponse) {
+        option (atomix.primitive.service.operation) = {
+            name: "commandStream"
+            type: COMMAND
+        };
+    }
+    rpc Query(TestRequest) returns (TestResponse) {
+        option (atomix.primitive.service.operation) = {
+            name: "query"
+            type: QUERY
+        };
+    }
+    rpc QueryStream(TestRequest) returns (stream TestResponse) {
+        option (atomix.primitive.service.operation) = {
+            name: "queryStream"
+            type: QUERY
+        };
+    }
+}

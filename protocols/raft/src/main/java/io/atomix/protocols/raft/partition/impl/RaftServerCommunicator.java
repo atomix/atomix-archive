@@ -46,7 +46,7 @@ import io.atomix.raft.protocol.TransferRequest;
 import io.atomix.raft.protocol.TransferResponse;
 import io.atomix.raft.protocol.VoteRequest;
 import io.atomix.raft.protocol.VoteResponse;
-import io.atomix.utils.StreamHandler;
+import io.atomix.utils.stream.StreamHandler;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 import static io.atomix.utils.concurrent.Futures.uncheck;

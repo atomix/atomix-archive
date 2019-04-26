@@ -1,9 +1,9 @@
-package io.atomix.utils;
+package io.atomix.utils.stream;
 
 /**
- * Message stream.
+ * Stream function.
  */
-public interface StreamHandler<T> {
+public interface StreamFunction<T, U> {
 
   /**
    * Called to handle the next value.
@@ -14,14 +14,17 @@ public interface StreamHandler<T> {
 
   /**
    * Called when the stream is complete.
+   *
+   * @return the result
    */
-  void complete();
+  U complete();
 
   /**
    * Called when a stream error occurs.
    *
    * @param error the stream error
+   * @return the result
    */
-  void error(Throwable error);
+  U error(Throwable error);
 
 }

@@ -4,19 +4,25 @@ import java.util.LinkedList;
 import java.util.Queue;
 
 import com.google.protobuf.ByteString;
+import io.atomix.primitive.operation.OperationId;
 import io.atomix.primitive.operation.OperationType;
-import io.atomix.primitive.service.StateMachine;
-import io.atomix.utils.StreamHandler;
+import io.atomix.primitive.service.impl.DefaultServiceExecutor;
+import io.atomix.primitive.session.SessionStreamHandler;
+import io.atomix.primitive.session.StreamId;
+import io.atomix.primitive.util.ByteArrayEncoder;
+import io.atomix.utils.stream.StreamHandler;
 
 import static com.google.common.base.Preconditions.checkState;
 
 /**
  * Primitive session stream.
  */
-public class PrimitiveSessionStream implements StreamHandler<byte[]> {
-  private final long streamId;
+public class PrimitiveSessionStream<T> implements SessionStreamHandler<T> {
+  private final StreamId streamId;
+  private final OperationId<?, T> operationId;
   private final PrimitiveStreamRegistry registry;
-  private final StateMachine.Context context;
+  private final DefaultServiceExecutor executor;
+  private final ByteArrayEncoder<T> encoder;
   private StreamHandler<SessionStreamResponse> handler;
   private long currentSequence;
   private long completeSequence;
@@ -25,12 +31,15 @@ public class PrimitiveSessionStream implements StreamHandler<byte[]> {
   private boolean open = true;
 
   public PrimitiveSessionStream(
-      long streamId,
+      StreamId streamId,
+      OperationId<?, T> operationId,
       PrimitiveStreamRegistry registry,
-      StateMachine.Context context) {
+      DefaultServiceExecutor executor) {
     this.streamId = streamId;
+    this.operationId = operationId;
     this.registry = registry;
-    this.context = context;
+    this.executor = executor;
+    this.encoder = executor.encoder(operationId);
     registry.register(this);
   }
 
@@ -39,8 +48,17 @@ public class PrimitiveSessionStream implements StreamHandler<byte[]> {
    *
    * @return the stream ID
    */
-  public long id() {
+  public StreamId id() {
     return streamId;
+  }
+
+  /**
+   * Returns the stream operation ID.
+   *
+   * @return the stream operation ID
+   */
+  public OperationId<?, T> operationId() {
+    return operationId;
   }
 
   /**
@@ -85,7 +103,7 @@ public class PrimitiveSessionStream implements StreamHandler<byte[]> {
    * @return the last index enqueued in the stream
    */
   public long getLastIndex() {
-    return !events.isEmpty() ? lastIndex : context.getIndex();
+    return !events.isEmpty() ? lastIndex : executor.getIndex();
   }
 
   /**
@@ -98,13 +116,13 @@ public class PrimitiveSessionStream implements StreamHandler<byte[]> {
   }
 
   @Override
-  public void next(byte[] value) {
+  public void next(T value) {
     if (!open) {
       return;
     }
 
     // If the event is being published during a read operation, throw an exception.
-    checkState(context.getOperationType() == OperationType.COMMAND, "session events can only be published during command execution");
+    checkState(executor.getOperationType() == OperationType.COMMAND, "session events can only be published during command execution");
 
     // If the client acked a sequence number greater than the current event sequence number since we know the
     // client must have received it from another server.
@@ -113,8 +131,8 @@ public class PrimitiveSessionStream implements StreamHandler<byte[]> {
       return;
     }
 
-    lastIndex = context.getIndex();
-    EventHolder event = new EventHolder(sequence, lastIndex, value);
+    lastIndex = executor.getIndex();
+    EventHolder event = new EventHolder(sequence, lastIndex, ByteArrayEncoder.encode(value, encoder));
     events.add(event);
     sendEvent(event);
   }
@@ -151,7 +169,7 @@ public class PrimitiveSessionStream implements StreamHandler<byte[]> {
     if (event != null) {
       return event.index - 1;
     }
-    return context.getIndex();
+    return executor.getIndex();
   }
 
   /**
@@ -190,7 +208,7 @@ public class PrimitiveSessionStream implements StreamHandler<byte[]> {
     if (handler != null) {
       handler.next(SessionStreamResponse.newBuilder()
           .setContext(SessionStreamContext.newBuilder()
-              .setStreamId(streamId)
+              .setStreamId(streamId.streamId())
               .setIndex(event.index)
               .setSequence(event.sequence)
               .build())

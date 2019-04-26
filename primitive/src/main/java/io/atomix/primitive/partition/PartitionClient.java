@@ -17,7 +17,7 @@ package io.atomix.primitive.partition;
 
 import java.util.concurrent.CompletableFuture;
 
-import io.atomix.utils.StreamHandler;
+import io.atomix.utils.stream.StreamHandler;
 
 /**
  * Primitive client.

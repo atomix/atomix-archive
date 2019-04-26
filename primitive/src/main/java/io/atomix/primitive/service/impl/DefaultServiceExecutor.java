@@ -8,41 +8,73 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 
 import io.atomix.primitive.PrimitiveException;
+import io.atomix.primitive.operation.CommandId;
 import io.atomix.primitive.operation.OperationId;
+import io.atomix.primitive.operation.OperationType;
+import io.atomix.primitive.operation.QueryId;
 import io.atomix.primitive.service.Command;
+import io.atomix.primitive.service.PrimitiveService;
 import io.atomix.primitive.service.Query;
 import io.atomix.primitive.service.ServiceOperationRegistry;
+import io.atomix.primitive.service.StateMachine;
 import io.atomix.primitive.util.ByteArrayDecoder;
 import io.atomix.primitive.util.ByteArrayEncoder;
-import io.atomix.utils.StreamHandler;
+import io.atomix.utils.stream.StreamHandler;
 import org.slf4j.Logger;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 import static io.atomix.primitive.util.ByteArrayDecoder.decode;
 import static io.atomix.primitive.util.ByteArrayEncoder.encode;
 
-public class DefaultServiceExecutor extends DefaultServiceScheduler implements ServiceOperationRegistry {
-  private final Logger log;
+public class DefaultServiceExecutor extends DefaultServiceScheduler implements ServiceOperationRegistry, PrimitiveService.Context {
+  private final StateMachine.Context context;
   private final Map<String, Function<byte[], byte[]>> operations = new HashMap<>();
   private final Map<String, BiConsumer<byte[], StreamHandler<byte[]>>> streamOperations = new HashMap<>();
+  private final Map<String, ByteArrayEncoder> encoders = new HashMap<>();
+  private OperationId operationId;
 
-  public DefaultServiceExecutor(Logger log) {
-    super(log);
-    this.log = log;
+  public DefaultServiceExecutor(StateMachine.Context context) {
+    super(context.getLogger());
+    this.context = context;
+  }
+
+  @Override
+  public OperationId getOperationId() {
+    return operationId;
+  }
+
+  @Override
+  public long getIndex() {
+    return context.getIndex();
+  }
+
+  @Override
+  public long getTimestamp() {
+    return context.getTimestamp();
+  }
+
+  @Override
+  public OperationType getOperationType() {
+    return operationId.type();
+  }
+
+  @Override
+  public Logger getLogger() {
+    return context.getLogger();
   }
 
   /**
    * Applies the given command to the service.
    *
-   * @param operationId the command ID
+   * @param commandId the command ID
    * @param command     the command
    * @return the command result
    */
-  public byte[] apply(OperationId operationId, Command<byte[]> command) {
-    log.trace("Executing {}", command);
-    startCommand(command.timestamp());
+  public byte[] apply(CommandId commandId, Command<byte[]> command) {
+    getLogger().trace("Executing {}", command);
+    startCommand(commandId, command.timestamp());
     try {
-      return apply(operationId, command.value());
+      return apply(commandId, command.value());
     } finally {
       completeCommand();
     }
@@ -51,32 +83,42 @@ public class DefaultServiceExecutor extends DefaultServiceScheduler implements S
   /**
    * Applies the given command to the service.
    *
-   * @param operationId the command ID
+   * @param commandId the command ID
    * @param command     the command
    * @param handler     the stream handler
    */
-  public void apply(OperationId operationId, Command<byte[]> command, StreamHandler<byte[]> handler) {
-    log.trace("Executing {}", command);
-    startCommand(command.timestamp());
+  public void apply(CommandId commandId, Command<byte[]> command, StreamHandler<byte[]> handler) {
+    getLogger().trace("Executing {}", command);
+    startCommand(commandId, command.timestamp());
     try {
-      apply(operationId, command.value(), handler);
+      apply(commandId, command.value(), handler);
     } finally {
       completeCommand();
     }
   }
 
+  protected void startCommand(CommandId commandId, long timestamp) {
+    operationId = commandId;
+    startCommand(timestamp);
+  }
+
+  @Override
+  protected void completeCommand() {
+    operationId = null;
+  }
+
   /**
    * Applies the given query to the service.
    *
-   * @param operationId the query ID
+   * @param queryId the query ID
    * @param query       the query
    * @return the query result
    */
-  public byte[] apply(OperationId operationId, Query<byte[]> query) {
-    log.trace("Executing {}", query);
-    startQuery();
+  public byte[] apply(QueryId queryId, Query<byte[]> query) {
+    getLogger().trace("Executing {}", query);
+    startQuery(queryId);
     try {
-      return apply(operationId, query.value());
+      return apply(queryId, query.value());
     } finally {
       completeQuery();
     }
@@ -85,18 +127,27 @@ public class DefaultServiceExecutor extends DefaultServiceScheduler implements S
   /**
    * Applies the given query to the service.
    *
-   * @param operationId the query ID
+   * @param queryId the query ID
    * @param query       the query
    * @param handler     the stream handler
    */
-  public void apply(OperationId operationId, Query<byte[]> query, StreamHandler<byte[]> handler) {
-    log.trace("Executing {}", query);
-    startQuery();
+  public void apply(QueryId queryId, Query<byte[]> query, StreamHandler<byte[]> handler) {
+    getLogger().trace("Executing {}", query);
+    startQuery(queryId);
     try {
-      apply(operationId, query.value(), handler);
+      apply(queryId, query.value(), handler);
     } finally {
       completeQuery();
     }
+  }
+
+  protected void startQuery(QueryId queryId) {
+    this.operationId = queryId;
+  }
+
+  @Override
+  protected void completeQuery() {
+    operationId = null;
   }
 
   /**
@@ -118,7 +169,7 @@ public class DefaultServiceExecutor extends DefaultServiceScheduler implements S
       try {
         return operation.apply(value);
       } catch (Exception e) {
-        log.warn("State machine operation failed: {}", e.getMessage());
+        getLogger().warn("State machine operation failed: {}", e.getMessage());
         throw new PrimitiveException.ServiceException(e);
       }
     }
@@ -143,7 +194,7 @@ public class DefaultServiceExecutor extends DefaultServiceScheduler implements S
       try {
         operation.accept(value, handler);
       } catch (Exception e) {
-        log.warn("State machine operation failed: {}", e.getMessage());
+        getLogger().warn("State machine operation failed: {}", e.getMessage());
         throw new PrimitiveException.ServiceException(e);
       }
     }
@@ -153,7 +204,7 @@ public class DefaultServiceExecutor extends DefaultServiceScheduler implements S
     checkNotNull(operationId, "operationId cannot be null");
     checkNotNull(callback, "callback cannot be null");
     operations.put(operationId.id(), callback);
-    log.trace("Registered operation callback {}", operationId);
+    getLogger().trace("Registered operation callback {}", operationId);
   }
 
   @Override
@@ -194,6 +245,7 @@ public class DefaultServiceExecutor extends DefaultServiceScheduler implements S
   public <R> void register(OperationId operationId, Consumer<StreamHandler<R>> callback, ByteArrayEncoder<R> encoder) {
     checkNotNull(operationId, "operationId cannot be null");
     checkNotNull(callback, "callback cannot be null");
+    encoders.put(operationId.id(), encoder);
     streamOperations.put(operationId.id(), (bytes, handler) -> callback.accept(new StreamHandler<R>() {
       @Override
       public void next(R value) {
@@ -210,13 +262,14 @@ public class DefaultServiceExecutor extends DefaultServiceScheduler implements S
         handler.error(error);
       }
     }));
-    log.trace("Registered operation callback {}", operationId);
+    getLogger().trace("Registered operation callback {}", operationId);
   }
 
   @Override
   public <T, R> void register(OperationId operationId, BiConsumer<T, StreamHandler<R>> callback, ByteArrayDecoder<T> decoder, ByteArrayEncoder<R> encoder) {
     checkNotNull(operationId, "operationId cannot be null");
     checkNotNull(callback, "callback cannot be null");
+    encoders.put(operationId.id(), encoder);
     streamOperations.put(operationId.id(), (bytes, handler) -> callback.accept(decode(bytes, decoder), new StreamHandler<R>() {
       @Override
       public void next(R value) {
@@ -233,6 +286,18 @@ public class DefaultServiceExecutor extends DefaultServiceScheduler implements S
         handler.error(error);
       }
     }));
-    log.trace("Registered operation callback {}", operationId);
+    getLogger().trace("Registered operation callback {}", operationId);
+  }
+
+  /**
+   * Returns the encoder for the given operation.
+   *
+   * @param operationId the operation ID
+   * @param <T>         the operation type
+   * @return the operation encoder
+   */
+  @SuppressWarnings("unchecked")
+  public <T> ByteArrayEncoder<T> encoder(OperationId operationId) {
+    return encoders.get(operationId.id());
   }
 }

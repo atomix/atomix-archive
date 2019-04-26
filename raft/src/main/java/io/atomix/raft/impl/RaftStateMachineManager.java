@@ -35,7 +35,7 @@ import io.atomix.raft.storage.log.RaftLogReader;
 import io.atomix.raft.storage.snapshot.Snapshot;
 import io.atomix.storage.StorageLevel;
 import io.atomix.storage.journal.Indexed;
-import io.atomix.utils.StreamHandler;
+import io.atomix.utils.stream.StreamHandler;
 import io.atomix.utils.concurrent.ComposableFuture;
 import io.atomix.utils.concurrent.OrderedFuture;
 import io.atomix.utils.concurrent.ThreadContext;

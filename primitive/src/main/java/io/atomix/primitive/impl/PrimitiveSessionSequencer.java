@@ -17,6 +17,7 @@ package io.atomix.primitive.impl;
 
 import java.util.ArrayDeque;
 import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.Map;
 import java.util.Queue;
 
@@ -66,7 +67,7 @@ final class PrimitiveSessionSequencer {
   long responseSequence;
   @VisibleForTesting
   long streamIndex;
-  private final Queue<EventCallback> eventCallbacks = new ArrayDeque<>();
+  private final Map<Long, StreamSequencer> streams = new HashMap<>();
   private final Map<Long, ResponseCallback> responseCallbacks = new HashMap<>();
 
   PrimitiveSessionSequencer(PrimitiveSessionState state, ManagedPrimitiveContext context) {
@@ -96,18 +97,12 @@ final class PrimitiveSessionSequencer {
    * and the next response in the sequence of responses is checked to determine whether the event can be
    * completed.
    *
-   * @param event    The publish request.
+   * @param context   The publish request.
    * @param callback The callback to sequence.
    */
-  public void sequenceEvent(SessionStreamContext event, Runnable callback) {
-    if (requestSequence == responseSequence) {
-      log.trace("Completing {}", event);
-      callback.run();
-      streamIndex = event.getIndex();
-    } else {
-      eventCallbacks.add(new EventCallback(event, callback));
-      completeResponses();
-    }
+  public void sequenceStream(SessionStreamContext context, Runnable callback) {
+    streams.computeIfAbsent(context.getStreamId(), id -> new StreamSequencer())
+        .sequenceEvent(context, callback);
   }
 
   /**
@@ -161,12 +156,8 @@ final class PrimitiveSessionSequencer {
     // Once we've completed as many responses as possible, if no more operations are outstanding
     // and events remain in the event queue, complete the events.
     if (requestSequence == responseSequence) {
-      EventCallback eventCallback = eventCallbacks.poll();
-      while (eventCallback != null) {
-        log.trace("Completing {}", eventCallback.event);
-        eventCallback.run();
-        streamIndex = eventCallback.event.getIndex();
-        eventCallback = eventCallbacks.poll();
+      for (StreamSequencer stream : streams.values()) {
+        stream.completeStream();
       }
     }
   }
@@ -183,29 +174,44 @@ final class PrimitiveSessionSequencer {
       return true;
     }
 
-    // If the response's event index is greater than the current event index, that indicates that events that were
-    // published prior to the response have not yet been completed. Attempt to complete pending events.
-    if (response.getIndex() > streamIndex) {
-      // For each pending event with an eventIndex less than or equal to the response eventIndex, complete the event.
-      // This is safe since we know that sequenced responses should see sequential order of events.
-      EventCallback eventCallback = eventCallbacks.peek();
-      while (eventCallback != null && eventCallback.event.getIndex() <= response.getStreamIndex()) {
-        eventCallbacks.remove();
-        log.trace("Completing event {}", eventCallback.event);
-        eventCallback.run();
-        streamIndex = eventCallback.event.getIndex();
-        eventCallback = eventCallbacks.peek();
-      }
+    // Iterate through all streams in the response context and complete streams up to the stream sequence number.
+    boolean complete = true;
+    for (SessionStreamContext stream : response.getStreamsList()) {
+      complete = !complete || completeStream(stream);
     }
 
     // If after completing pending events the eventIndex is greater than or equal to the response's eventIndex, complete the response.
     // Note that the event protocol initializes the eventIndex to the session ID.
-    if (response.getStreamIndex() <= streamIndex || (streamIndex == 0 && response.getStreamIndex() == state.getSessionId().id())) {
+    if (complete) {
       log.trace("Completing response {}", response);
       callback.run();
       return true;
     } else {
       return false;
+    }
+  }
+
+  /**
+   * Completes sequenced values in the given stream.
+   */
+  private boolean completeStream(SessionStreamContext stream) {
+    StreamSequencer sequencer = streams.get(stream.getStreamId());
+    if (sequencer == null) {
+      return false;
+    }
+    return sequencer.completeStream(stream);
+  }
+
+  /**
+   * Closes the given stream.
+   *
+   * @param streamId the stream ID
+   * @param callback the callback to run once the stream has been closed
+   */
+  public void closeStream(long streamId, Runnable callback) {
+    StreamSequencer stream = streams.get(streamId);
+    if (stream != null) {
+      stream.close(callback);
     }
   }
 
@@ -224,6 +230,89 @@ final class PrimitiveSessionSequencer {
     @Override
     public void run() {
       callback.run();
+    }
+  }
+
+  /**
+   * Stream sequencer.
+   */
+  private class StreamSequencer {
+    private long streamIndex;
+    private long streamSequence;
+    private long completeSequence;
+    private final Queue<EventCallback> eventCallbacks = new LinkedList<>();
+    private Runnable closeCallback;
+
+    /**
+     * Sequences the given event.
+     *
+     * @param context the stream context
+     * @param callback the callback to execute
+     */
+    void sequenceEvent(SessionStreamContext context, Runnable callback) {
+      // If the sequence number is equal to the next stream sequence number, accept the event.
+      if (context.getSequence() == streamSequence + 1) {
+        streamSequence = context.getSequence();
+        if (requestSequence == responseSequence) {
+          log.trace("Completing {}", context);
+          callback.run();
+          completeSequence = context.getSequence();
+        } else {
+          eventCallbacks.add(new EventCallback(context, callback));
+          completeResponses();
+        }
+      }
+    }
+
+    /**
+     * Completes the stream up to the given context.
+     *
+     * @param context the stream context
+     * @return indicates whether the stream was completed up to the given context
+     */
+    boolean completeStream(SessionStreamContext context) {
+      // For each pending event with an eventIndex less than or equal to the response eventIndex, complete the event.
+      // This is safe since we know that sequenced responses should see sequential order of events.
+      EventCallback eventCallback = eventCallbacks.peek();
+      while (eventCallback != null && eventCallback.event.getSequence() <= context.getSequence()) {
+        eventCallbacks.remove();
+        log.trace("Completing event {}", eventCallback.event);
+        eventCallback.run();
+        completeSequence = eventCallback.event.getSequence();
+        if (eventCallback.event.getSequence() == context.getSequence()) {
+          if (closeCallback != null) {
+            closeCallback.run();
+          }
+          return true;
+        }
+        eventCallback = eventCallbacks.peek();
+      }
+      return false;
+    }
+
+    /**
+     * Completes all pending events in the stream.
+     */
+    void completeStream() {
+      EventCallback eventCallback = eventCallbacks.poll();
+      while (eventCallback != null) {
+        log.trace("Completing {}", eventCallback.event);
+        eventCallback.run();
+        completeSequence = eventCallback.event.getIndex();
+        eventCallback = eventCallbacks.poll();
+      }
+      if (closeCallback != null) {
+        closeCallback.run();
+      }
+    }
+
+    /**
+     * Closes the stream.
+     *
+     * @param callback the callback to run once the stream is closed
+     */
+    void close(Runnable callback) {
+      closeCallback = callback;
     }
   }
 

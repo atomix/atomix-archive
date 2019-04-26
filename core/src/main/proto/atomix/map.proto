@@ -11,11 +11,17 @@ option java_multiple_files = true;
 
 // Atomic map snapshot
 message AtomicMapSnapshot {
-    repeated int64 listeners = 1;
+    repeated AtomicMapListener listeners = 1;
     repeated string prepared_keys = 2;
     map<string, AtomicMapEntryValue> entries = 3;
     map<string, AtomicMapTransaction> transactions = 4;
     int64 version = 5;
+}
+
+// Atomic map listener.
+message AtomicMapListener {
+    uint64 session_id = 1;
+    uint64 stream_id = 2;
 }
 
 // Atomic map entry value
@@ -137,18 +143,6 @@ message ListenRequest {
 
 message ListenResponse {
     atomix.metadata.Metadata metadata = 1;
-}
-
-message UnlistenRequest {
-
-}
-
-message UnlistenResponse {
-    atomix.metadata.Metadata metadata = 1;
-}
-
-message MapEvent {
-    atomix.metadata.Metadata metadata = 1;
     Type type = 2;
     string key = 3;
     bytes old_value = 4;
@@ -161,6 +155,14 @@ message MapEvent {
         UPDATED = 1;
         REMOVED = 2;
     }
+}
+
+message UnlistenRequest {
+    int64 stream_id = 1;
+}
+
+message UnlistenResponse {
+    atomix.metadata.Metadata metadata = 1;
 }
 
 enum UpdateStatus {
@@ -261,15 +263,10 @@ service MapService {
             type: COMMAND
         };
     }
-    rpc Listen(ListenRequest) returns (ListenResponse) {
+    rpc Listen(ListenRequest) returns (stream ListenResponse) {
         option (atomix.primitive.service.operation) = {
             name: "listen"
             type: COMMAND
-        };
-    }
-    rpc OnEvent(atomix.primitive.service.EventListener) returns (stream MapEvent) {
-        option (atomix.primitive.service.event) = {
-            name: "event"
         };
     }
     rpc Unlisten(UnlistenRequest) returns (UnlistenResponse) {

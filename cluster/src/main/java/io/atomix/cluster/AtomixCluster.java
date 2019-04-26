@@ -15,6 +15,12 @@
  */
 package io.atomix.cluster;
 
+import java.io.File;
+import java.util.Collections;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.stream.Stream;
+
 import io.atomix.cluster.discovery.BootstrapDiscoveryProvider;
 import io.atomix.cluster.discovery.MulticastDiscoveryConfig;
 import io.atomix.cluster.discovery.MulticastDiscoveryProvider;
@@ -25,15 +31,18 @@ import io.atomix.cluster.impl.DefaultNodeDiscoveryService;
 import io.atomix.cluster.messaging.BroadcastService;
 import io.atomix.cluster.messaging.ClusterCommunicationService;
 import io.atomix.cluster.messaging.ClusterEventService;
+import io.atomix.cluster.messaging.ClusterStreamingService;
 import io.atomix.cluster.messaging.ManagedBroadcastService;
 import io.atomix.cluster.messaging.ManagedClusterCommunicationService;
 import io.atomix.cluster.messaging.ManagedClusterEventService;
+import io.atomix.cluster.messaging.ManagedClusterStreamingService;
 import io.atomix.cluster.messaging.ManagedMessagingService;
 import io.atomix.cluster.messaging.ManagedUnicastService;
 import io.atomix.cluster.messaging.MessagingService;
 import io.atomix.cluster.messaging.UnicastService;
 import io.atomix.cluster.messaging.impl.DefaultClusterCommunicationService;
 import io.atomix.cluster.messaging.impl.DefaultClusterEventService;
+import io.atomix.cluster.messaging.impl.DefaultClusterStreamingService;
 import io.atomix.cluster.messaging.impl.NettyBroadcastService;
 import io.atomix.cluster.messaging.impl.NettyMessagingService;
 import io.atomix.cluster.messaging.impl.NettyUnicastService;
@@ -47,12 +56,6 @@ import io.atomix.utils.config.ConfigMapper;
 import io.atomix.utils.net.Address;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.io.File;
-import java.util.Collections;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.stream.Stream;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
 
@@ -171,6 +174,7 @@ public class AtomixCluster implements BootstrapService, Managed<Void> {
   protected final GroupMembershipProtocol membershipProtocol;
   protected final ManagedClusterMembershipService membershipService;
   protected final ManagedClusterCommunicationService communicationService;
+  protected final ManagedClusterStreamingService streamingService;
   protected final ManagedClusterEventService eventService;
   protected volatile CompletableFuture<Void> openFuture;
   protected volatile CompletableFuture<Void> closeFuture;
@@ -199,6 +203,7 @@ public class AtomixCluster implements BootstrapService, Managed<Void> {
     this.membershipProtocol = buildMembershipProtocol(config);
     this.membershipService = buildClusterMembershipService(config, this, discoveryProvider, membershipProtocol, version);
     this.communicationService = buildClusterMessagingService(getMembershipService(), getMessagingService(), getUnicastService());
+    this.streamingService = buildClusterStreamingService(getMembershipService(), getMessagingService());
     this.eventService = buildClusterEventService(getMembershipService(), getMessagingService());
   }
 
@@ -267,6 +272,17 @@ public class AtomixCluster implements BootstrapService, Managed<Void> {
   }
 
   /**
+   * Returns the cluster streaming service.
+   * <p>
+   * The cluster streaming service is used for high-level client, server, and bi-directional streams.
+   *
+   * @return the cluster streaming service
+   */
+  public ClusterStreamingService getStreamingService() {
+    return streamingService;
+  }
+
+  /**
    * Returns the cluster event service.
    * <p>
    * The cluster event service is used for high-level publish-subscribe messaging.
@@ -301,6 +317,7 @@ public class AtomixCluster implements BootstrapService, Managed<Void> {
         .thenComposeAsync(v -> broadcastService.start(), threadContext)
         .thenComposeAsync(v -> membershipService.start(), threadContext)
         .thenComposeAsync(v -> communicationService.start(), threadContext)
+        .thenComposeAsync(v -> streamingService.start(), threadContext)
         .thenComposeAsync(v -> eventService.start(), threadContext)
         .thenApply(v -> null);
   }
@@ -328,6 +345,8 @@ public class AtomixCluster implements BootstrapService, Managed<Void> {
 
   protected CompletableFuture<Void> stopServices() {
     return communicationService.stop()
+        .exceptionally(e -> null)
+        .thenComposeAsync(v -> streamingService.stop(), threadContext)
         .exceptionally(e -> null)
         .thenComposeAsync(v -> eventService.stop(), threadContext)
         .exceptionally(e -> null)
@@ -448,6 +467,14 @@ public class AtomixCluster implements BootstrapService, Managed<Void> {
   protected static ManagedClusterCommunicationService buildClusterMessagingService(
       ClusterMembershipService membershipService, MessagingService messagingService, UnicastService unicastService) {
     return new DefaultClusterCommunicationService(membershipService, messagingService, unicastService);
+  }
+
+  /**
+   * Builds a cluster streaming service.
+   */
+  protected static ManagedClusterStreamingService buildClusterStreamingService(
+      ClusterMembershipService membershipService, MessagingService messagingService) {
+    return new DefaultClusterStreamingService(membershipService, messagingService);
   }
 
   /**

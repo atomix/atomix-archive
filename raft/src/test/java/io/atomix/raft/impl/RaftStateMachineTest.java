@@ -37,7 +37,7 @@ import io.atomix.raft.storage.log.InitializeEntry;
 import io.atomix.raft.storage.log.RaftLogEntry;
 import io.atomix.raft.storage.log.RaftLogWriter;
 import io.atomix.raft.storage.snapshot.Snapshot;
-import io.atomix.utils.StreamHandler;
+import io.atomix.utils.stream.StreamHandler;
 import io.atomix.utils.concurrent.ThreadModel;
 import org.junit.After;
 import org.junit.Before;

@@ -34,6 +34,7 @@ import io.atomix.cluster.ClusterMembershipService;
 import io.atomix.cluster.discovery.NodeDiscoveryConfig;
 import io.atomix.cluster.discovery.NodeDiscoveryProvider;
 import io.atomix.cluster.messaging.ClusterCommunicationService;
+import io.atomix.cluster.messaging.ClusterStreamingService;
 import io.atomix.cluster.messaging.ManagedBroadcastService;
 import io.atomix.cluster.messaging.ManagedMessagingService;
 import io.atomix.cluster.messaging.ManagedUnicastService;
@@ -472,7 +473,7 @@ public class Atomix extends AtomixCluster implements PrimitivesService {
     this.registry = registry;
     this.config = new DefaultConfigService(config.getPrimitiveDefaults().values(), config.getPrimitives().values());
     this.serializationService = new CoreSerializationService(config.isTypeRegistrationRequired(), config.isCompatibleSerialization());
-    this.partitions = buildPartitionService(config, getMembershipService(), getCommunicationService(), registry);
+    this.partitions = buildPartitionService(config, getMembershipService(), getCommunicationService(), getStreamingService(), registry);
     this.primitives = new CorePrimitivesService(
         getMembershipService(),
         getCommunicationService(),
@@ -695,6 +696,7 @@ public class Atomix extends AtomixCluster implements PrimitivesService {
       AtomixConfig config,
       ClusterMembershipService clusterMembershipService,
       ClusterCommunicationService messagingService,
+      ClusterStreamingService streamingService,
       AtomixRegistry registry) {
     List<ManagedPartitionGroup> partitionGroups = new ArrayList<>();
     for (PartitionGroupConfig<?> partitionGroupConfig : config.getPartitionGroups().values()) {
@@ -704,6 +706,7 @@ public class Atomix extends AtomixCluster implements PrimitivesService {
     return new DefaultPartitionService(
         clusterMembershipService,
         messagingService,
+        streamingService,
         new DefaultServiceTypeRegistry(registry.getTypes(ServiceType.class)),
         buildSystemPartitionGroup(config),
         partitionGroups,

@@ -13,6 +13,7 @@ import io.atomix.core.value.AtomicValueEvent;
 import io.atomix.core.value.AtomicValueEventListener;
 import io.atomix.primitive.PrimitiveManagementService;
 import io.atomix.primitive.impl.ManagedAsyncPrimitive;
+import io.atomix.utils.stream.StreamHandler;
 import io.atomix.utils.time.Versioned;
 
 /**
@@ -20,18 +21,18 @@ import io.atomix.utils.time.Versioned;
  */
 public class RawAsyncAtomicValue extends ManagedAsyncPrimitive<ValueProxy> implements AsyncAtomicValue<byte[]> {
   private final Set<AtomicValueEventListener<byte[]>> eventListeners = new CopyOnWriteArraySet<>();
+  private volatile long streamId;
 
   public RawAsyncAtomicValue(ValueProxy proxy, Duration timeout, PrimitiveManagementService managementService) {
     super(proxy, timeout, managementService);
-    event((p, s) -> p.onEvent(s, listener(this::onEvent)));
   }
 
   @Override
   public CompletableFuture<Optional<Versioned<byte[]>>> compareAndSet(byte[] expect, byte[] update) {
-    return command((proxy, session) -> proxy.checkAndSet(session, CheckAndSetRequest.newBuilder()
+    return execute(ValueProxy::checkAndSet, CheckAndSetRequest.newBuilder()
         .setCheck(ByteString.copyFrom(expect))
         .setUpdate(ByteString.copyFrom(update))
-        .build()))
+        .build())
         .thenApply(response -> {
           if (response.getSucceeded()) {
             return Optional.of(new Versioned<>(update, response.getVersion()));
@@ -42,10 +43,10 @@ public class RawAsyncAtomicValue extends ManagedAsyncPrimitive<ValueProxy> imple
 
   @Override
   public CompletableFuture<Optional<Versioned<byte[]>>> compareAndSet(long version, byte[] value) {
-    return command((proxy, session) -> proxy.checkAndSet(session, CheckAndSetRequest.newBuilder()
+    return execute(ValueProxy::checkAndSet, CheckAndSetRequest.newBuilder()
         .setVersion(version)
         .setUpdate(ByteString.copyFrom(value))
-        .build()))
+        .build())
         .thenApply(response -> {
           if (response.getSucceeded()) {
             return Optional.of(new Versioned<>(value, response.getVersion()));
@@ -56,7 +57,7 @@ public class RawAsyncAtomicValue extends ManagedAsyncPrimitive<ValueProxy> imple
 
   @Override
   public CompletableFuture<Versioned<byte[]>> get() {
-    return query((proxy, session) -> proxy.get(session, GetRequest.newBuilder().build()))
+    return execute(ValueProxy::get, GetRequest.newBuilder().build())
         .thenApply(response -> {
           if (!response.getValue().isEmpty()) {
             return new Versioned<>(response.getValue().toByteArray(), response.getVersion());
@@ -67,9 +68,9 @@ public class RawAsyncAtomicValue extends ManagedAsyncPrimitive<ValueProxy> imple
 
   @Override
   public CompletableFuture<Versioned<byte[]>> getAndSet(byte[] value) {
-    return command((proxy, session) -> proxy.set(session, SetRequest.newBuilder()
+    return execute(ValueProxy::set, SetRequest.newBuilder()
         .setValue(ByteString.copyFrom(value))
-        .build()))
+        .build())
         .thenApply(response -> {
           if (!response.getPreviousValue().isEmpty()) {
             return new Versioned<>(response.getPreviousValue().toByteArray(), response.getPreviousVersion());
@@ -80,9 +81,9 @@ public class RawAsyncAtomicValue extends ManagedAsyncPrimitive<ValueProxy> imple
 
   @Override
   public CompletableFuture<Versioned<byte[]>> set(byte[] value) {
-    return command((proxy, session) -> proxy.set(session, SetRequest.newBuilder()
+    return execute(ValueProxy::set, SetRequest.newBuilder()
         .setValue(ByteString.copyFrom(value))
-        .build()))
+        .build())
         .thenApply(response -> new Versioned<>(value, response.getVersion()));
   }
 
@@ -91,8 +92,28 @@ public class RawAsyncAtomicValue extends ManagedAsyncPrimitive<ValueProxy> imple
     boolean add = eventListeners.isEmpty();
     eventListeners.add(listener);
     if (add) {
-      return command((proxy, session) -> proxy.listen(session, ListenRequest.newBuilder().build()))
-          .thenApply(response -> null);
+      return execute(ValueProxy::listen, ListenRequest.newBuilder().build(), new StreamHandler<ListenResponse>() {
+        @Override
+        public void next(ListenResponse response) {
+          eventListeners.forEach(l -> l.event(new AtomicValueEvent<>(
+              AtomicValueEvent.Type.UPDATE,
+              response.getPreviousVersion() != 0 ? new Versioned<>(response.getPreviousValue().toByteArray(), response.getPreviousVersion()) : null,
+              response.getNewVersion() != 0 ? new Versioned<>(response.getNewValue().toByteArray(), response.getNewVersion()) : null)));
+        }
+
+        @Override
+        public void complete() {
+
+        }
+
+        @Override
+        public void error(Throwable error) {
+
+        }
+      }).thenApply(streamId -> {
+        this.streamId = streamId;
+        return null;
+      });
     }
     return CompletableFuture.completedFuture(null);
   }
@@ -101,21 +122,10 @@ public class RawAsyncAtomicValue extends ManagedAsyncPrimitive<ValueProxy> imple
   public synchronized CompletableFuture<Void> removeListener(AtomicValueEventListener<byte[]> listener) {
     eventListeners.remove(listener);
     if (eventListeners.isEmpty()) {
-      return command((proxy, session) -> proxy.unlisten(session, UnlistenRequest.newBuilder().build()))
+      return execute(ValueProxy::unlisten, UnlistenRequest.newBuilder().setStreamId(streamId).build())
           .thenApply(response -> null);
     }
     return CompletableFuture.completedFuture(null);
-  }
-
-  private void onEvent(ValueEvent event) {
-    onEvent(new AtomicValueEvent<>(
-        AtomicValueEvent.Type.UPDATE,
-        event.getPreviousVersion() != 0 ? new Versioned<>(event.getPreviousValue().toByteArray(), event.getPreviousVersion()) : null,
-        event.getNewVersion() != 0 ? new Versioned<>(event.getNewValue().toByteArray(), event.getNewVersion()) : null));
-  }
-
-  private void onEvent(AtomicValueEvent<byte[]> event) {
-    eventListeners.forEach(listener -> listener.event(event));
   }
 
   @Override

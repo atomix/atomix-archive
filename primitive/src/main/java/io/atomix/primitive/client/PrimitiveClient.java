@@ -6,7 +6,7 @@ import com.google.protobuf.Message;
 import io.atomix.primitive.operation.OperationId;
 import io.atomix.primitive.util.ByteBufferDecoder;
 import io.atomix.primitive.util.ByteStringEncoder;
-import io.atomix.utils.StreamHandler;
+import io.atomix.utils.stream.StreamHandler;
 
 /**
  * Primitive client.

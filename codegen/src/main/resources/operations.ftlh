@@ -17,18 +17,19 @@ package ${operationsClass.packageName};
 
 import io.atomix.primitive.operation.CommandId;
 import io.atomix.primitive.operation.QueryId;
+
 <#list operations as operation>
 <#if operation.operationsClass.packageName != proxyClass.packageName>
-import ${operation.operationsClass.packageName}.${operation.operationsClass.className}
+import ${operation.operationsClass.packageName}.${operation.operationsClass.className};
 </#if>
 <#if operation.requestClass.packageName != proxyClass.packageName>
-import ${operation.requestClass.packageName}.${operation.requestClass.className}
+import ${operation.requestClass.packageName}.${operation.requestClass.className};
 </#if>
 <#if operation.responseClass.packageName != proxyClass.packageName>
-import ${operation.responseClass.packageName}.${operation.responseClass.className}
+import ${operation.responseClass.packageName}.${operation.responseClass.className};
 </#if>
-</#list>
 
+</#list>
 /**
  * Atomix generated operations ${operationsClass.className}.
  */

@@ -7,7 +7,7 @@ import java.time.Duration;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
-import java.util.LinkedHashSet;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -20,7 +20,10 @@ import io.atomix.primitive.service.PrimitiveService;
 import io.atomix.primitive.service.ServiceType;
 import io.atomix.primitive.session.Session;
 import io.atomix.primitive.session.SessionId;
+import io.atomix.primitive.session.SessionStreamHandler;
+import io.atomix.primitive.session.StreamId;
 import io.atomix.utils.concurrent.Scheduled;
+import io.atomix.utils.stream.StreamHandler;
 
 /**
  * Map service.
@@ -41,20 +44,16 @@ public class MapService extends AbstractMapService {
 
     @Override
     public PrimitiveService newService(PartitionId partitionId, PartitionManagementService managementService) {
-      return new MapService(partitionId, managementService);
+      return new MapService();
     }
   }
 
   private Map<String, AtomicMapEntryValue> map = new ConcurrentHashMap<>();
   private Set<String> preparedKeys = new HashSet<>();
   private Map<String, AtomicMapTransaction> activeTransactions = new HashMap<>();
-  private Set<SessionId> listeners = new LinkedHashSet<>();
+  private Map<StreamId, StreamHandler<ListenResponse>> streams = new LinkedHashMap<>();
   private long currentVersion;
   private Map<String, Scheduled> timers = new HashMap<>();
-
-  public MapService(PartitionId partitionId, PartitionManagementService managementService) {
-    super(partitionId, managementService);
-  }
 
   @Override
   public SizeResponse size(SizeRequest request) {
@@ -125,8 +124,8 @@ public class MapService extends AbstractMapService {
 
       scheduleTtl(request.getKey(), newValue);
 
-      onEvent(MapEvent.newBuilder()
-          .setType(MapEvent.Type.INSERTED)
+      onEvent(ListenResponse.newBuilder()
+          .setType(ListenResponse.Type.INSERTED)
           .setKey(request.getKey())
           .setNewValue(newValue.getValue())
           .setNewVersion(newValue.getVersion())
@@ -161,8 +160,8 @@ public class MapService extends AbstractMapService {
 
       scheduleTtl(request.getKey(), newValue);
 
-      onEvent(MapEvent.newBuilder()
-          .setType(MapEvent.Type.UPDATED)
+      onEvent(ListenResponse.newBuilder()
+          .setType(ListenResponse.Type.UPDATED)
           .setKey(request.getKey())
           .setOldValue(oldValue.getValue())
           .setOldVersion(oldValue.getVersion())
@@ -206,8 +205,8 @@ public class MapService extends AbstractMapService {
 
         scheduleTtl(request.getKey(), newValue);
 
-        onEvent(MapEvent.newBuilder()
-            .setType(MapEvent.Type.INSERTED)
+        onEvent(ListenResponse.newBuilder()
+            .setType(ListenResponse.Type.INSERTED)
             .setKey(request.getKey())
             .setNewValue(newValue.getValue())
             .setNewVersion(newValue.getVersion())
@@ -241,8 +240,8 @@ public class MapService extends AbstractMapService {
 
         scheduleTtl(request.getKey(), newValue);
 
-        onEvent(MapEvent.newBuilder()
-            .setType(MapEvent.Type.UPDATED)
+        onEvent(ListenResponse.newBuilder()
+            .setType(ListenResponse.Type.UPDATED)
             .setKey(request.getKey())
             .setNewValue(newValue.getValue())
             .setNewVersion(newValue.getVersion())
@@ -312,8 +311,8 @@ public class MapService extends AbstractMapService {
       cancelTtl(request.getKey());
 
       // Trigger a REMOVED event.
-      onEvent(MapEvent.newBuilder()
-          .setType(MapEvent.Type.REMOVED)
+      onEvent(ListenResponse.newBuilder()
+          .setType(ListenResponse.Type.REMOVED)
           .setKey(request.getKey())
           .setOldValue(value.getValue())
           .setOldVersion(value.getVersion())
@@ -338,8 +337,8 @@ public class MapService extends AbstractMapService {
 
   @Override
   public ClearResponse clear(ClearRequest request) {
-    map.forEach((key, value) -> onEvent(MapEvent.newBuilder()
-        .setType(MapEvent.Type.REMOVED)
+    map.forEach((key, value) -> onEvent(ListenResponse.newBuilder()
+        .setType(ListenResponse.Type.REMOVED)
         .setKey(key)
         .setOldValue(value.getValue())
         .setOldVersion(value.getVersion())
@@ -353,18 +352,13 @@ public class MapService extends AbstractMapService {
   }
 
   @Override
-  public ListenResponse listen(ListenRequest request) {
-    listeners.add(getCurrentSession().sessionId());
-    return ListenResponse.newBuilder()
-        .setMetadata(Metadata.newBuilder()
-            .setIndex(getCurrentIndex())
-            .build())
-        .build();
+  public void listen(ListenRequest request, SessionStreamHandler<ListenResponse> handler) {
+    streams.put(handler.id(), handler);
   }
 
   @Override
   public UnlistenResponse unlisten(UnlistenRequest request) {
-    listeners.remove(getCurrentSession().sessionId());
+    streams.remove(new StreamId(getCurrentSession().sessionId(), request.getStreamId()));
     return UnlistenResponse.newBuilder()
         .setMetadata(Metadata.newBuilder()
             .setIndex(getCurrentIndex())
@@ -528,12 +522,12 @@ public class MapService extends AbstractMapService {
             .build();
       }
 
-      MapEvent event;
+      ListenResponse event;
       if (newValue != null) {
         map.put(key, newValue);
         if (newValue.getType() != AtomicMapEntryValue.Type.TOMBSTONE && previousValue != null && previousValue.getType() != AtomicMapEntryValue.Type.TOMBSTONE) {
-          event = MapEvent.newBuilder()
-              .setType(MapEvent.Type.UPDATED)
+          event = ListenResponse.newBuilder()
+              .setType(ListenResponse.Type.UPDATED)
               .setKey(key)
               .setOldValue(previousValue.getValue())
               .setOldVersion(previousValue.getVersion())
@@ -541,23 +535,23 @@ public class MapService extends AbstractMapService {
               .setNewVersion(newValue.getVersion())
               .build();
         } else if (newValue.getType() != AtomicMapEntryValue.Type.TOMBSTONE) {
-          event = MapEvent.newBuilder()
-              .setType(MapEvent.Type.INSERTED)
+          event = ListenResponse.newBuilder()
+              .setType(ListenResponse.Type.INSERTED)
               .setKey(key)
               .setNewValue(newValue.getValue())
               .setNewVersion(newValue.getVersion())
               .build();
         } else {
-          event = MapEvent.newBuilder()
-              .setType(MapEvent.Type.REMOVED)
+          event = ListenResponse.newBuilder()
+              .setType(ListenResponse.Type.REMOVED)
               .setKey(key)
               .setOldValue(previousValue.getValue())
               .setOldVersion(previousValue.getVersion())
               .build();
         }
       } else {
-        event = MapEvent.newBuilder()
-            .setType(MapEvent.Type.REMOVED)
+        event = ListenResponse.newBuilder()
+            .setType(ListenResponse.Type.REMOVED)
             .setKey(key)
             .setOldValue(previousValue.getValue())
             .setOldVersion(previousValue.getVersion())
@@ -641,8 +635,8 @@ public class MapService extends AbstractMapService {
    *
    * @param event the event to publish
    */
-  protected void onEvent(MapEvent event) {
-    listeners.forEach(sessionId -> onEvent(sessionId, event));
+  protected void onEvent(ListenResponse event) {
+    streams.values().forEach(stream -> stream.next(event));
   }
 
   /**
@@ -655,8 +649,8 @@ public class MapService extends AbstractMapService {
     if (value.getTtl() > 0) {
       timers.put(key, getScheduler().schedule(Duration.ofMillis(value.getTtl() - (getCurrentTimestamp() - value.getCreated())), () -> {
         map.remove(key, value);
-        onEvent(MapEvent.newBuilder()
-            .setType(MapEvent.Type.REMOVED)
+        onEvent(ListenResponse.newBuilder()
+            .setType(ListenResponse.Type.REMOVED)
             .setKey(key)
             .setOldValue(value.getValue())
             .setOldVersion(value.getVersion())
@@ -679,19 +673,22 @@ public class MapService extends AbstractMapService {
 
   @Override
   protected void onExpire(Session session) {
-    listeners.remove(session.sessionId());
+    getStreams(session.sessionId()).forEach(stream -> streams.remove(stream.id()));
   }
 
   @Override
   protected void onClose(Session session) {
-    listeners.remove(session.sessionId());
+    getStreams(session.sessionId()).forEach(stream -> streams.remove(stream.id()));
   }
 
   @Override
   public void backup(OutputStream output) throws IOException {
     AtomicMapSnapshot.newBuilder()
-        .addAllListeners(listeners.stream()
-            .map(SessionId::id)
+        .addAllListeners(streams.keySet().stream()
+            .map(streamId -> AtomicMapListener.newBuilder()
+                .setSessionId(streamId.sessionId().id())
+                .setStreamId(streamId.streamId())
+                .build())
             .collect(Collectors.toList()))
         .addAllPreparedKeys(preparedKeys)
         .putAllEntries(map)
@@ -704,9 +701,11 @@ public class MapService extends AbstractMapService {
   @Override
   public void restore(InputStream input) throws IOException {
     AtomicMapSnapshot snapshot = AtomicMapSnapshot.parseFrom(input);
-    listeners = snapshot.getListenersList().stream()
-        .map(SessionId::from)
-        .collect(Collectors.toCollection(LinkedHashSet::new));
+    streams = new LinkedHashMap<>();
+    snapshot.getListenersList().forEach(listener -> {
+      StreamId streamId = new StreamId(SessionId.from(listener.getSessionId()), listener.getStreamId());
+      streams.put(streamId, getStream(streamId));
+    });
     preparedKeys = new HashSet<>(snapshot.getPreparedKeysList());
     map = new ConcurrentHashMap<>(snapshot.getEntriesMap());
     activeTransactions = new HashMap<>(snapshot.getTransactionsMap());

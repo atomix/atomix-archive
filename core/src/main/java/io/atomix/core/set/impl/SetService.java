@@ -19,9 +19,9 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.HashMap;
-import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.stream.Collectors;
@@ -34,6 +34,9 @@ import io.atomix.primitive.service.PrimitiveService;
 import io.atomix.primitive.service.ServiceType;
 import io.atomix.primitive.session.Session;
 import io.atomix.primitive.session.SessionId;
+import io.atomix.primitive.session.SessionStreamHandler;
+import io.atomix.primitive.session.StreamId;
+import io.atomix.utils.stream.StreamHandler;
 
 /**
  * Set service.
@@ -54,22 +57,14 @@ public class SetService extends AbstractSetService {
 
     @Override
     public PrimitiveService newService(PartitionId partitionId, PartitionManagementService managementService) {
-      return new SetService(partitionId, managementService);
+      return new SetService();
     }
   }
 
   private Set<String> set = Sets.newConcurrentHashSet();
-  private Set<SessionId> listeners = new CopyOnWriteArraySet<>();
+  private Map<StreamId, StreamHandler<ListenResponse>> streams = new ConcurrentHashMap<>();
   private Set<String> lockedElements = new ConcurrentSkipListSet<>();
   private Map<String, DistributedSetTransaction> transactions = new HashMap<>();
-
-  public SetService(PartitionId partitionId, PartitionManagementService managementService) {
-    super(partitionId, managementService);
-  }
-
-  private void onEvent(SetEvent event) {
-    listeners.forEach(sessionId -> onEvent(sessionId, event));
-  }
 
   @Override
   public SizeResponse size(SizeRequest request) {
@@ -116,10 +111,10 @@ public class SetService extends AbstractSetService {
       } else {
         boolean added = set.add(value);
         if (added) {
-          onEvent(SetEvent.newBuilder()
-              .setType(SetEvent.Type.ADDED)
+          streams.values().forEach(stream -> stream.next(ListenResponse.newBuilder()
+              .setType(ListenResponse.Type.ADDED)
               .setValue(value)
-              .build());
+              .build()));
         }
         return AddResponse.newBuilder()
             .setMetadata(Metadata.newBuilder()
@@ -144,10 +139,10 @@ public class SetService extends AbstractSetService {
       boolean added = set.addAll(request.getValuesList());
       if (added) {
         for (String value : request.getValuesList()) {
-          onEvent(SetEvent.newBuilder()
-              .setType(SetEvent.Type.ADDED)
+          streams.values().forEach(stream -> stream.next(ListenResponse.newBuilder()
+              .setType(ListenResponse.Type.ADDED)
               .setValue(value)
-              .build());
+              .build()));
         }
       }
       return AddResponse.newBuilder()
@@ -183,10 +178,10 @@ public class SetService extends AbstractSetService {
       } else {
         boolean removed = set.remove(value);
         if (removed) {
-          onEvent(SetEvent.newBuilder()
-              .setType(SetEvent.Type.REMOVED)
+          streams.values().forEach(stream -> stream.next(ListenResponse.newBuilder()
+              .setType(ListenResponse.Type.REMOVED)
               .setValue(value)
-              .build());
+              .build()));
         }
         return RemoveResponse.newBuilder()
             .setMetadata(Metadata.newBuilder()
@@ -211,10 +206,10 @@ public class SetService extends AbstractSetService {
       boolean removed = set.removeAll(request.getValuesList());
       if (removed) {
         for (String value : request.getValuesList()) {
-          onEvent(SetEvent.newBuilder()
-              .setType(SetEvent.Type.REMOVED)
+          streams.values().forEach(stream -> stream.next(ListenResponse.newBuilder()
+              .setType(ListenResponse.Type.REMOVED)
               .setValue(value)
-              .build());
+              .build()));
         }
       }
       return RemoveResponse.newBuilder()
@@ -230,10 +225,10 @@ public class SetService extends AbstractSetService {
   @Override
   public ClearResponse clear(ClearRequest request) {
     for (String value : set) {
-      onEvent(SetEvent.newBuilder()
-          .setType(SetEvent.Type.REMOVED)
+      streams.values().forEach(stream -> stream.next(ListenResponse.newBuilder()
+          .setType(ListenResponse.Type.REMOVED)
           .setValue(value)
-          .build());
+          .build()));
     }
     set.clear();
     return ClearResponse.newBuilder()
@@ -244,18 +239,13 @@ public class SetService extends AbstractSetService {
   }
 
   @Override
-  public ListenResponse listen(ListenRequest request) {
-    listeners.add(getCurrentSession().sessionId());
-    return ListenResponse.newBuilder()
-        .setMetadata(Metadata.newBuilder()
-            .setIndex(getCurrentIndex())
-            .build())
-        .build();
+  public void listen(ListenRequest request, SessionStreamHandler<ListenResponse> handler) {
+    streams.put(handler.id(), handler);
   }
 
   @Override
   public UnlistenResponse unlisten(UnlistenRequest request) {
-    listeners.remove(getCurrentSession().sessionId());
+    streams.remove(new StreamId(getCurrentSession().sessionId(), request.getStreamId()));
     return UnlistenResponse.newBuilder()
         .setMetadata(Metadata.newBuilder()
             .setIndex(getCurrentIndex())
@@ -264,24 +254,17 @@ public class SetService extends AbstractSetService {
   }
 
   @Override
-  public IterateResponse iterate(IterateRequest request) {
-    SessionId sessionId = getCurrentSession().sessionId();
+  public void iterate(IterateRequest request, StreamHandler<IterateResponse> handler) {
     long index = getCurrentIndex();
-    int size = set.size();
     for (String value : set) {
-      onIterate(sessionId, IterateEvent.newBuilder()
+      handler.next(IterateResponse.newBuilder()
           .setMetadata(Metadata.newBuilder()
               .setIndex(index)
               .build())
           .setValue(value)
           .build());
     }
-    return IterateResponse.newBuilder()
-        .setMetadata(Metadata.newBuilder()
-            .setIndex(index)
-            .build())
-        .setSize(size)
-        .build();
+    handler.complete();
   }
 
   @Override
@@ -406,20 +389,25 @@ public class SetService extends AbstractSetService {
 
   @Override
   protected void onExpire(Session session) {
-    listeners.remove(session.sessionId());
+    getStreams(session.sessionId())
+        .forEach(stream -> streams.remove(stream.id()));
   }
 
   @Override
   protected void onClose(Session session) {
-    listeners.remove(session.sessionId());
+    getStreams(session.sessionId())
+        .forEach(stream -> streams.remove(stream.id()));
   }
 
   @Override
   public void backup(OutputStream output) throws IOException {
     DistributedSetSnapshot.newBuilder()
         .addAllValues(set)
-        .addAllListeners(listeners.stream()
-            .map(SessionId::id)
+        .addAllListeners(streams.keySet().stream()
+            .map(streamId -> DistributedSetListener.newBuilder()
+                .setSessionId(streamId.sessionId().id())
+                .setStreamId(streamId.streamId())
+                .build())
             .collect(Collectors.toList()))
         .addAllLockedElements(lockedElements)
         .putAllTransactions(transactions)
@@ -431,9 +419,11 @@ public class SetService extends AbstractSetService {
   public void restore(InputStream input) throws IOException {
     DistributedSetSnapshot snapshot = DistributedSetSnapshot.parseFrom(input);
     set = Sets.newConcurrentHashSet(snapshot.getValuesList());
-    listeners = snapshot.getListenersList().stream()
-        .map(SessionId::from)
-        .collect(Collectors.toCollection(LinkedHashSet::new));
+    streams = new ConcurrentHashMap<>();
+    snapshot.getListenersList().forEach(listener -> {
+      StreamId streamId = new StreamId(SessionId.from(listener.getSessionId()), listener.getStreamId());
+      streams.put(streamId, getStream(streamId));
+    });
     lockedElements = new CopyOnWriteArraySet<>(snapshot.getLockedElementsList());
     transactions = new HashMap<>(snapshot.getTransactionsMap());
   }

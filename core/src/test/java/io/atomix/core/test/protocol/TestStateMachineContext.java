@@ -5,7 +5,6 @@ import java.util.concurrent.atomic.AtomicLong;
 import io.atomix.primitive.operation.OperationType;
 import io.atomix.primitive.service.Command;
 import io.atomix.primitive.service.Query;
-import io.atomix.primitive.service.Role;
 import io.atomix.primitive.service.StateMachine;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -37,11 +36,6 @@ public class TestStateMachineContext implements StateMachine.Context {
   @Override
   public Logger getLogger() {
     return LOGGER;
-  }
-
-  @Override
-  public Role getRole() {
-    return Role.PRIMARY;
   }
 
   Command<byte[]> command(byte[] value) {

@@ -24,6 +24,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Queue;
+import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
 import io.atomix.core.impl.Metadata;
@@ -56,7 +57,7 @@ public class LockService extends AbstractLockService {
 
     @Override
     public PrimitiveService newService(PartitionId partitionId, PartitionManagementService managementService) {
-      return new LockService(partitionId, managementService);
+      return new LockService();
     }
   }
 
@@ -64,46 +65,41 @@ public class LockService extends AbstractLockService {
   Queue<LockHolder> queue = new ArrayDeque<>();
   final Map<Long, Scheduled> timers = new HashMap<>();
 
-  public LockService(PartitionId partitionId, PartitionManagementService managementService) {
-    super(partitionId, managementService);
-  }
-
   @Override
-  public LockResponse lock(LockRequest request) {
+  public CompletableFuture<LockResponse> lock(LockRequest request) {
     Session session = getCurrentSession();
     // If the lock is not already owned, immediately grant the lock to the requester.
     // Note that we still have to publish an event to the session. The event is guaranteed to be received
     // by the client-side primitive after the LOCK response.
     if (lock == null) {
       lock = new LockHolder(
-          request.getId(),
           getCurrentIndex(),
           session.sessionId(),
-          0);
-      onLock(session.sessionId(), LockEvent.newBuilder()
+          0,
+          null);
+      return CompletableFuture.completedFuture(LockResponse.newBuilder()
           .setMetadata(Metadata.newBuilder()
               .setIndex(getCurrentIndex())
               .build())
-          .setId(request.getId())
           .setAcquired(true)
           .build());
       // If the timeout is 0, that indicates this is a tryLock request. Immediately fail the request.
     } else if (request.getTimeout() == 0) {
-      onLock(session.sessionId(), LockEvent.newBuilder()
+      return CompletableFuture.completedFuture(LockResponse.newBuilder()
           .setMetadata(Metadata.newBuilder()
               .setIndex(getCurrentIndex())
               .build())
-          .setId(request.getId())
           .setAcquired(false)
           .build());
       // If a timeout exists, add the request to the queue and set a timer. Note that the lock request expiration
       // time is based on the *state machine* time - not the system time - to ensure consistency across servers.
     } else if (request.getTimeout() > 0) {
+      CompletableFuture<LockResponse> future = new CompletableFuture<>();
       LockHolder holder = new LockHolder(
-          request.getId(),
           getCurrentIndex(),
           session.sessionId(),
-          getCurrentTimestamp() + request.getTimeout());
+          getCurrentTimestamp() + request.getTimeout(),
+          future);
       queue.add(holder);
       timers.put(getCurrentIndex(), getScheduler().schedule(Duration.ofMillis(request.getTimeout()), () -> {
         // When the lock request timer expires, remove the request from the queue and publish a FAILED
@@ -112,29 +108,26 @@ public class LockService extends AbstractLockService {
         timers.remove(getCurrentIndex());
         queue.remove(holder);
         if (session.getState().active()) {
-          onLock(session.sessionId(), LockEvent.newBuilder()
+          future.complete(LockResponse.newBuilder()
               .setMetadata(Metadata.newBuilder()
-                  .setIndex(getCurrentIndex())
+                  .setIndex(holder.index)
                   .build())
-              .setId(request.getId())
               .setAcquired(false)
               .build());
         }
       }));
+      return future;
       // If the lock is -1, just add the request to the queue with no expiration.
     } else {
+      CompletableFuture<LockResponse> future = new CompletableFuture<>();
       LockHolder holder = new LockHolder(
-          request.getId(),
           getCurrentIndex(),
           session.sessionId(),
-          0);
+          0,
+          future);
       queue.add(holder);
+      return future;
     }
-    return LockResponse.newBuilder()
-        .setMetadata(Metadata.newBuilder()
-            .setIndex(getCurrentIndex())
-            .build())
-        .build();
   }
 
   @Override
@@ -144,12 +137,11 @@ public class LockService extends AbstractLockService {
       // If the current lock ID does not match the requested lock ID, preserve the existing lock.
       // However, ensure the associated lock request is removed from the queue.
       if (!lock.session.equals(getCurrentSession().sessionId())
-          || (request.getId() != 0 && lock.id != request.getId())
           || (request.getIndex() != 0 && lock.index != request.getIndex())) {
         Iterator<LockHolder> iterator = queue.iterator();
         while (iterator.hasNext()) {
           LockHolder lock = iterator.next();
-          if (lock.session.equals(getCurrentSession().sessionId()) && lock.id == request.getId()) {
+          if (lock.session.equals(getCurrentSession().sessionId()) && lock.index == request.getIndex()) {
             iterator.remove();
             Scheduled timer = timers.remove(lock.index);
             if (timer != null) {
@@ -176,11 +168,10 @@ public class LockService extends AbstractLockService {
         // Notify the client that it has acquired the lock.
         Session lockSession = getSession(lock.session);
         if (lockSession != null && lockSession.getState().active()) {
-          onLock(lock.session, LockEvent.newBuilder()
+          lock.future.complete(LockResponse.newBuilder()
               .setMetadata(Metadata.newBuilder()
-                  .setIndex(getCurrentIndex())
+                  .setIndex(lock.index)
                   .build())
-              .setId(lock.id)
               .setAcquired(true)
               .build());
           break;
@@ -211,7 +202,6 @@ public class LockService extends AbstractLockService {
     AtomicLockSnapshot.Builder builder = AtomicLockSnapshot.newBuilder();
     if (lock != null) {
       builder.setLock(LockCall.newBuilder()
-          .setId(lock.id)
           .setIndex(lock.index)
           .setSessionId(lock.session.id())
           .setExpire(lock.expire)
@@ -220,7 +210,6 @@ public class LockService extends AbstractLockService {
 
     builder.addAllQueue(queue.stream()
         .map(lock -> LockCall.newBuilder()
-            .setId(lock.id)
             .setIndex(lock.index)
             .setSessionId(lock.session.id())
             .setExpire(lock.expire)
@@ -235,18 +224,18 @@ public class LockService extends AbstractLockService {
     AtomicLockSnapshot snapshot = AtomicLockSnapshot.parseFrom(input);
     if (snapshot.hasLock()) {
       lock = new LockHolder(
-          snapshot.getLock().getId(),
           snapshot.getLock().getIndex(),
           SessionId.from(snapshot.getLock().getSessionId()),
-          snapshot.getLock().getExpire());
+          snapshot.getLock().getExpire(),
+          CompletableFuture.completedFuture(null));
     }
 
     queue = snapshot.getQueueList().stream()
         .map(lock -> new LockHolder(
-            lock.getId(),
             lock.getIndex(),
             SessionId.from(lock.getSessionId()),
-            lock.getExpire()))
+            lock.getExpire(),
+            CompletableFuture.completedFuture(null)))
         .collect(Collectors.toCollection(ArrayDeque::new));
 
     // After the snapshot is installed, we need to cancel any existing timers and schedule new ones based on the
@@ -260,11 +249,10 @@ public class LockService extends AbstractLockService {
           queue.remove(holder);
           Session session = getSession(holder.session);
           if (session != null && session.getState().active()) {
-            onLock(holder.session, LockEvent.newBuilder()
+            holder.future.complete(LockResponse.newBuilder()
                 .setMetadata(Metadata.newBuilder()
                     .setIndex(holder.index)
                     .build())
-                .setId(holder.id)
                 .setAcquired(false)
                 .build());
           }
@@ -310,11 +298,10 @@ public class LockService extends AbstractLockService {
         // Notify the client that it has acquired the lock.
         Session lockSession = getSession(lock.session);
         if (lockSession != null && lockSession.getState().active()) {
-          onLock(lock.session, LockEvent.newBuilder()
+          lock.future.complete(LockResponse.newBuilder()
               .setMetadata(Metadata.newBuilder()
                   .setIndex(lock.index)
                   .build())
-              .setId(lock.id)
               .setAcquired(true)
               .build());
           break;
@@ -325,22 +312,21 @@ public class LockService extends AbstractLockService {
   }
 
   class LockHolder {
-    final int id;
     final long index;
     final SessionId session;
     final long expire;
+    final CompletableFuture<LockResponse> future;
 
-    LockHolder(int id, long index, SessionId session, long expire) {
-      this.id = id;
+    LockHolder(long index, SessionId session, long expire, CompletableFuture<LockResponse> future) {
       this.index = index;
       this.session = session;
       this.expire = expire;
+      this.future = future;
     }
 
     @Override
     public String toString() {
       return toStringHelper(this)
-          .add("id", id)
           .add("index", index)
           .add("session", session)
           .add("expire", expire)

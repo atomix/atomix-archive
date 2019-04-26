@@ -8,7 +8,6 @@ import java.util.concurrent.CompletableFuture;
 
 import com.google.protobuf.ByteString;
 import io.atomix.primitive.operation.CommandId;
-import io.atomix.primitive.operation.OperationId;
 import io.atomix.primitive.operation.QueryId;
 import io.atomix.primitive.service.impl.CommandRequest;
 import io.atomix.primitive.service.impl.CommandResponse;
@@ -16,7 +15,7 @@ import io.atomix.primitive.service.impl.DefaultServiceExecutor;
 import io.atomix.primitive.service.impl.QueryRequest;
 import io.atomix.primitive.service.impl.QueryResponse;
 import io.atomix.primitive.util.ByteArrayDecoder;
-import io.atomix.utils.StreamHandler;
+import io.atomix.utils.stream.StreamHandler;
 
 /**
  * Simple primitive service.
@@ -26,9 +25,9 @@ public abstract class SimplePrimitiveService extends AbstractPrimitiveService im
   private final Map<Long, List<Runnable>> indexQueries = new HashMap<>();
 
   @Override
-  public void init(Context context) {
-    this.executor = new DefaultServiceExecutor(context.getLogger());
-    super.init(context, executor, executor);
+  public void init(StateMachine.Context context) {
+    this.executor = new DefaultServiceExecutor(context);
+    super.init(executor, executor, executor);
     configure(executor);
   }
 
@@ -44,8 +43,8 @@ public abstract class SimplePrimitiveService extends AbstractPrimitiveService im
   }
 
   private CompletableFuture<CommandResponse> applyCommand(Command<CommandRequest> command) {
-    OperationId operationId = new CommandId(command.value().getName());
-    byte[] output = executor.apply(operationId, command.map(r -> r.getCommand().toByteArray()));
+    CommandId commandId = new CommandId(command.value().getName());
+    byte[] output = executor.apply(commandId, command.map(r -> r.getCommand().toByteArray()));
     return CompletableFuture.completedFuture(CommandResponse.newBuilder()
         .setIndex(getCurrentIndex())
         .setOutput(ByteString.copyFrom(output))
@@ -73,8 +72,8 @@ public abstract class SimplePrimitiveService extends AbstractPrimitiveService im
   }
 
   private CompletableFuture<Void> applyCommand(Command<CommandRequest> command, StreamHandler<CommandResponse> handler) {
-    OperationId operationId = new CommandId(command.value().getName());
-    executor.apply(operationId, command.map(r -> r.getCommand().toByteArray()), new StreamHandler<byte[]>() {
+    CommandId commandId = new CommandId(command.value().getName());
+    executor.apply(commandId, command.map(r -> r.getCommand().toByteArray()), new StreamHandler<byte[]>() {
       @Override
       public void next(byte[] value) {
         handler.next(CommandResponse.newBuilder()
@@ -114,8 +113,8 @@ public abstract class SimplePrimitiveService extends AbstractPrimitiveService im
   }
 
   private void applyQuery(Query<QueryRequest> request, CompletableFuture<QueryResponse> future) {
-    OperationId operationId = new QueryId(request.value().getName());
-    byte[] output = executor.apply(operationId, request.map(r -> r.getQuery().toByteArray()));
+    QueryId queryId = new QueryId(request.value().getName());
+    byte[] output = executor.apply(queryId, request.map(r -> r.getQuery().toByteArray()));
     future.complete(QueryResponse.newBuilder()
         .setIndex(getCurrentIndex())
         .setOutput(ByteString.copyFrom(output))
@@ -154,8 +153,8 @@ public abstract class SimplePrimitiveService extends AbstractPrimitiveService im
   }
 
   private void applyQuery(Query<QueryRequest> query, StreamHandler<QueryResponse> handler, CompletableFuture<Void> future) {
-    OperationId operationId = new QueryId(query.value().getName());
-    executor.apply(operationId, query.map(r -> r.getQuery().toByteArray()), new StreamHandler<byte[]>() {
+    QueryId queryId = new QueryId(query.value().getName());
+    executor.apply(queryId, query.map(r -> r.getQuery().toByteArray()), new StreamHandler<byte[]>() {
       @Override
       public void next(byte[] value) {
         handler.next(QueryResponse.newBuilder()
