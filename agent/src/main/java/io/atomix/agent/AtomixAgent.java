@@ -15,6 +15,13 @@
  */
 package io.atomix.agent;
 
+import java.io.File;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
 import ch.qos.logback.classic.Level;
 import com.google.common.collect.Lists;
 import io.atomix.cluster.MemberId;
@@ -25,8 +32,6 @@ import io.atomix.core.Atomix;
 import io.atomix.core.AtomixConfig;
 import io.atomix.grpc.GrpcService;
 import io.atomix.grpc.ManagedGrpcService;
-import io.atomix.rest.ManagedRestService;
-import io.atomix.rest.RestService;
 import io.atomix.utils.net.Address;
 import io.atomix.utils.net.MalformedAddressException;
 import net.sourceforge.argparse4j.ArgumentParsers;
@@ -38,13 +43,6 @@ import net.sourceforge.argparse4j.inf.ArgumentType;
 import net.sourceforge.argparse4j.inf.Namespace;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.io.File;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 
 /**
  * Atomix agent runner.
@@ -69,11 +67,6 @@ public class AtomixAgent {
     final Atomix atomix = buildAtomix(namespace);
     atomix.start().join();
     logger.info("Atomix listening at {}", atomix.getMembershipService().getLocalMember().address());
-
-    final ManagedRestService rest = buildRestService(atomix, namespace);
-    rest.start().join();
-    logger.warn("The Atomix HTTP API is BETA and is intended for development and debugging purposes only!");
-    logger.info("HTTP server listening at {}", rest.address());
 
     final ManagedGrpcService grpc = buildGrpcService(atomix, namespace);
     grpc.start().join();
@@ -258,18 +251,6 @@ public class AtomixAgent {
         .type(Integer.class)
         .metavar("PORT")
         .help("Sets the multicast port. Defaults to 54321");
-    parser.addArgument("--http-host")
-        .type(String.class)
-        .metavar("HOST")
-        .required(false)
-        .setDefault("0.0.0.0")
-        .help("Sets the host to which to bind the HTTP server. Defaults to 0.0.0.0 (all interfaces)");
-    parser.addArgument("--http-port", "-p")
-        .type(Integer.class)
-        .metavar("PORT")
-        .required(false)
-        .setDefault(5678)
-        .help("Sets the port on which to run the HTTP server. Defaults to 5678");
     parser.addArgument("--grpc-host")
         .type(String.class)
         .metavar("HOST")
@@ -377,22 +358,6 @@ public class AtomixAgent {
    */
   private static Atomix buildAtomix(Namespace namespace) {
     return Atomix.builder(createConfig(namespace)).withShutdownHookEnabled().build();
-  }
-
-  /**
-   * Builds a REST service for the given Atomix instance from the given namespace.
-   *
-   * @param atomix the Atomix instance
-   * @param namespace the namespace from which to build the service
-   * @return the managed REST service
-   */
-  private static ManagedRestService buildRestService(Atomix atomix, Namespace namespace) {
-    final String httpHost = namespace.getString("http_host");
-    final Integer httpPort = namespace.getInt("http_port");
-    return RestService.builder()
-        .withAtomix(atomix)
-        .withAddress(Address.from(httpHost, httpPort))
-        .build();
   }
 
   /**

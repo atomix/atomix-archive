@@ -119,8 +119,8 @@ public class AtomixAgentTest {
         .build();
     client2.start().join();
 
-    AtomicMap<String, String> map1 = client1.getAtomicMap("test");
-    AtomicMap<String, String> map2 = client2.getAtomicMap("test");
+    AtomicMap<String, String> map1 = client1.<String, String>atomicMapBuilder("test").build();
+    AtomicMap<String, String> map2 = client2.<String, String>atomicMapBuilder("test").build();
 
     map1.put("foo", "bar");
     assertEquals("bar", map2.get("foo").value());

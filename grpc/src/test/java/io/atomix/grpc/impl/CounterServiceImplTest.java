@@ -79,18 +79,18 @@ public class CounterServiceImplTest extends GrpcServiceTest<CounterServiceGrpc.C
     assertEquals(2, counter2.increment(IncrementRequest.newBuilder()
         .setId(counterId)
         .build())
-        .getValue());
+        .getNextValue());
     assertEquals(4, counter2.increment(IncrementRequest.newBuilder()
         .setId(counterId)
         .setDelta(2)
         .build())
-        .getValue());
+        .getNextValue());
     Thread.sleep(100);
     assertEquals(4, counter1.get(GetRequest.newBuilder().setId(counterId).build()).getValue());
     assertEquals(2, counter2.decrement(DecrementRequest.newBuilder()
         .setId(counterId)
         .setDelta(2)
         .build())
-        .getValue());
+        .getNextValue());
   }
 }

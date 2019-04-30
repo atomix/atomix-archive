@@ -76,7 +76,7 @@ public class MapServiceImplTest extends GrpcServiceTest<MapServiceGrpc.MapServic
         .setId(mapId)
         .setKey("foo")
         .setValue(ByteString.copyFrom("bar".getBytes()))
-        .build()).getVersion() > 0);
+        .build()).getHeaders().getHeaders(0).getIndex() > 0);
     assertArrayEquals("bar".getBytes(), map1.get(GetRequest.newBuilder()
         .setId(mapId)
         .setKey("foo")

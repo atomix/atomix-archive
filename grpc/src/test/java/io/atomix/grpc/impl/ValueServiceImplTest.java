@@ -18,7 +18,7 @@ package io.atomix.grpc.impl;
 import com.google.protobuf.ByteString;
 import io.atomix.core.Atomix;
 import io.atomix.grpc.protocol.MultiRaftProtocol;
-import io.atomix.grpc.value.CasRequest;
+import io.atomix.grpc.value.CheckAndSetRequest;
 import io.atomix.grpc.value.GetRequest;
 import io.atomix.grpc.value.SetRequest;
 import io.atomix.grpc.value.ValueId;
@@ -78,7 +78,7 @@ public class ValueServiceImplTest extends GrpcServiceTest<ValueServiceGrpc.Value
         .setId(valueId)
         .build()).getValue().toByteArray());
 
-    assertTrue(value2.cas(CasRequest.newBuilder()
+    assertTrue(value2.checkAndSet(CheckAndSetRequest.newBuilder()
         .setId(valueId)
         .setVersion(version)
         .setUpdate(ByteString.copyFrom("Hello world again!".getBytes()))
