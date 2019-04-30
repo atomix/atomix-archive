@@ -2,8 +2,6 @@ syntax = "proto3";
 
 package atomix.value.service;
 
-import "google/protobuf/empty.proto";
-import "atomix/metadata.proto";
 import "atomix/primitive/service.proto";
 
 option java_package = "io.atomix.core.value.impl";
@@ -28,9 +26,8 @@ message GetRequest {
 }
 
 message GetResponse {
-    atomix.metadata.Metadata metadata = 1;
-    bytes value = 2;
-    int64 version = 3;
+    bytes value = 1;
+    int64 version = 2;
 }
 
 message SetRequest {
@@ -38,10 +35,9 @@ message SetRequest {
 }
 
 message SetResponse {
-    atomix.metadata.Metadata metadata = 1;
-    int64 version = 2;
-    bytes previous_value = 3;
-    int64 previous_version = 4;
+    int64 version = 1;
+    bytes previous_value = 2;
+    int64 previous_version = 3;
 }
 
 message CheckAndSetRequest {
@@ -51,9 +47,8 @@ message CheckAndSetRequest {
 }
 
 message CheckAndSetResponse {
-    atomix.metadata.Metadata metadata = 1;
-    int64 version = 2;
-    bool succeeded = 3;
+    int64 version = 1;
+    bool succeeded = 2;
 }
 
 message ListenRequest {
@@ -61,12 +56,11 @@ message ListenRequest {
 }
 
 message ListenResponse {
-    atomix.metadata.Metadata metadata = 1;
-    Type type = 2;
-    bytes previous_value = 3;
-    int64 previous_version = 4;
-    bytes new_value = 5;
-    int64 new_version = 6;
+    Type type = 1;
+    bytes previous_value = 2;
+    int64 previous_version = 3;
+    bytes new_value = 4;
+    int64 new_version = 5;
 
     enum Type {
         UPDATED = 0;
@@ -78,7 +72,6 @@ message UnlistenRequest {
 }
 
 message UnlistenResponse {
-    atomix.metadata.Metadata metadata = 1;
 }
 
 service ValueService {

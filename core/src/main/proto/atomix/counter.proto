@@ -2,7 +2,6 @@ syntax = "proto3";
 
 package atomix.counter.service;
 
-import "atomix/metadata.proto";
 import "atomix/primitive/service.proto";
 
 option java_package = "io.atomix.core.counter.impl";
@@ -19,9 +18,8 @@ message IncrementRequest {
 }
 
 message IncrementResponse {
-    atomix.metadata.Metadata metadata = 1;
-    int64 previous_value = 2;
-    int64 next_value = 3;
+    int64 previous_value = 1;
+    int64 next_value = 2;
 }
 
 message DecrementRequest {
@@ -29,9 +27,8 @@ message DecrementRequest {
 }
 
 message DecrementResponse {
-    atomix.metadata.Metadata metadata = 1;
-    int64 previous_value = 2;
-    int64 next_value = 3;
+    int64 previous_value = 1;
+    int64 next_value = 2;
 }
 
 message GetRequest {
@@ -39,8 +36,7 @@ message GetRequest {
 }
 
 message GetResponse {
-    atomix.metadata.Metadata metadata = 1;
-    int64 value = 2;
+    int64 value = 1;
 }
 
 message SetRequest {
@@ -48,8 +44,7 @@ message SetRequest {
 }
 
 message SetResponse {
-    atomix.metadata.Metadata metadata = 1;
-    int64 previous_value = 2;
+    int64 previous_value = 1;
 }
 
 message CheckAndSetRequest {
@@ -58,8 +53,7 @@ message CheckAndSetRequest {
 }
 
 message CheckAndSetResponse {
-    atomix.metadata.Metadata metadata = 1;
-    bool succeeded = 2;
+    bool succeeded = 1;
 }
 
 service CounterService {

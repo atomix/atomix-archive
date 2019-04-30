@@ -73,7 +73,7 @@ final class PrimitiveSessionExecutor<P extends SessionEnabledPrimitiveProxy> {
   }
 
   protected <T, U> CompletableFuture<U> execute(
-      CommandFunction<P, T, U> function,
+      SessionCommandFunction<P, T, U> function,
       T request) {
     CompletableFuture<U> future = new CompletableFuture<>();
     proxy.context().execute(() -> invokeCommand(function, request, future));
@@ -81,7 +81,7 @@ final class PrimitiveSessionExecutor<P extends SessionEnabledPrimitiveProxy> {
   }
 
   protected <T, U> CompletableFuture<Long> execute(
-      CommandStreamFunction<P, T, U> function,
+      SessionCommandStreamFunction<P, T, U> function,
       T request,
       StreamHandler<U> handler) {
     CompletableFuture<Long> future = new CompletableFuture<>();
@@ -90,7 +90,7 @@ final class PrimitiveSessionExecutor<P extends SessionEnabledPrimitiveProxy> {
   }
 
   protected <T, U> CompletableFuture<U> execute(
-      QueryFunction<P, T, U> function,
+      SessionQueryFunction<P, T, U> function,
       T request) {
     CompletableFuture<U> future = new CompletableFuture<>();
     proxy.context().execute(() -> invokeQuery(function, request, future));
@@ -98,7 +98,7 @@ final class PrimitiveSessionExecutor<P extends SessionEnabledPrimitiveProxy> {
   }
 
   protected <T, U> CompletableFuture<Void> execute(
-      QueryStreamFunction<P, T, U> function,
+      SessionQueryStreamFunction<P, T, U> function,
       T request,
       StreamHandler<U> handler) {
     CompletableFuture<Void> future = new CompletableFuture<>();
@@ -109,7 +109,7 @@ final class PrimitiveSessionExecutor<P extends SessionEnabledPrimitiveProxy> {
   /**
    * Submits a command request to the cluster.
    */
-  private <T, U> void invokeCommand(CommandFunction<P, T, U> command, T request, CompletableFuture<U> future) {
+  private <T, U> void invokeCommand(SessionCommandFunction<P, T, U> command, T request, CompletableFuture<U> future) {
     SessionCommandContext context = SessionCommandContext.newBuilder()
         .setSessionId(state.getSessionId().id())
         .setSequenceNumber(state.nextCommandRequest())
@@ -121,7 +121,7 @@ final class PrimitiveSessionExecutor<P extends SessionEnabledPrimitiveProxy> {
    * Submits a command request to the cluster.
    */
   private <T, U> void invokeCommand(
-      CommandStreamFunction<P, T, U> command,
+      SessionCommandStreamFunction<P, T, U> command,
       T request,
       StreamHandler<U> handler,
       CompletableFuture<Long> future) {
@@ -135,7 +135,7 @@ final class PrimitiveSessionExecutor<P extends SessionEnabledPrimitiveProxy> {
   /**
    * Submits a query request to the cluster.
    */
-  private <T, U> void invokeQuery(QueryFunction<P, T, U> query, T request, CompletableFuture<U> future) {
+  private <T, U> void invokeQuery(SessionQueryFunction<P, T, U> query, T request, CompletableFuture<U> future) {
     SessionQueryContext context = SessionQueryContext.newBuilder()
         .setSessionId(state.getSessionId().id())
         .setLastSequenceNumber(state.getCommandRequest())
@@ -147,7 +147,7 @@ final class PrimitiveSessionExecutor<P extends SessionEnabledPrimitiveProxy> {
    * Submits a query request to the cluster.
    */
   private <T, U> void invokeQuery(
-      QueryStreamFunction<P, T, U> query,
+      SessionQueryStreamFunction<P, T, U> query,
       T request,
       StreamHandler<U> handler,
       CompletableFuture<Void> future) {
@@ -320,11 +320,11 @@ final class PrimitiveSessionExecutor<P extends SessionEnabledPrimitiveProxy> {
    * Command operation attempt.
    */
   private final class CommandAttempt<T, U> extends OperationAttempt<SessionCommandContext, T, U> implements BiConsumer<Pair<SessionResponseContext, U>, Throwable> {
-    private final CommandFunction<P, T, U> function;
+    private final SessionCommandFunction<P, T, U> function;
 
     CommandAttempt(
         long id,
-        CommandFunction<P, T, U> function,
+        SessionCommandFunction<P, T, U> function,
         SessionCommandContext context,
         T request,
         CompletableFuture<U> future) {
@@ -334,7 +334,7 @@ final class PrimitiveSessionExecutor<P extends SessionEnabledPrimitiveProxy> {
 
     CommandAttempt(
         long id,
-        CommandFunction<P, T, U> function,
+        SessionCommandFunction<P, T, U> function,
         SessionCommandContext context,
         T request,
         int attempt,
@@ -394,11 +394,11 @@ final class PrimitiveSessionExecutor<P extends SessionEnabledPrimitiveProxy> {
    * Query operation attempt.
    */
   private final class QueryAttempt<T, U> extends OperationAttempt<SessionQueryContext, T, U> implements BiConsumer<Pair<SessionResponseContext, U>, Throwable> {
-    private final QueryFunction<P, T, U> function;
+    private final SessionQueryFunction<P, T, U> function;
 
     QueryAttempt(
         long id,
-        QueryFunction<P, T, U> function,
+        SessionQueryFunction<P, T, U> function,
         SessionQueryContext context,
         T request,
         CompletableFuture<U> future) {
@@ -408,7 +408,7 @@ final class PrimitiveSessionExecutor<P extends SessionEnabledPrimitiveProxy> {
 
     QueryAttempt(
         long id,
-        QueryFunction<P, T, U> function,
+        SessionQueryFunction<P, T, U> function,
         SessionQueryContext context,
         T request,
         int attempt,
@@ -469,12 +469,12 @@ final class PrimitiveSessionExecutor<P extends SessionEnabledPrimitiveProxy> {
   private final class CommandStreamAttempt<T, U>
       extends OperationAttempt<SessionCommandContext, T, Long>
       implements StreamHandler<Pair<SessionStreamContext, U>>, BiConsumer<SessionResponseContext, Throwable> {
-    private final CommandStreamFunction<P, T, U> function;
+    private final SessionCommandStreamFunction<P, T, U> function;
     private final StreamHandler<U> handler;
 
     CommandStreamAttempt(
         long id,
-        CommandStreamFunction<P, T, U> function,
+        SessionCommandStreamFunction<P, T, U> function,
         SessionCommandContext context,
         T request,
         StreamHandler<U> handler,
@@ -486,7 +486,7 @@ final class PrimitiveSessionExecutor<P extends SessionEnabledPrimitiveProxy> {
 
     CommandStreamAttempt(
         long id,
-        CommandStreamFunction<P, T, U> function,
+        SessionCommandStreamFunction<P, T, U> function,
         SessionCommandContext context,
         T request,
         StreamHandler<U> handler,
@@ -553,12 +553,12 @@ final class PrimitiveSessionExecutor<P extends SessionEnabledPrimitiveProxy> {
   private final class QueryStreamAttempt<T, U>
       extends OperationAttempt<SessionQueryContext, T, Void>
       implements StreamHandler<Pair<SessionStreamContext, U>>, BiConsumer<SessionResponseContext, Throwable> {
-    private final QueryStreamFunction<P, T, U> function;
+    private final SessionQueryStreamFunction<P, T, U> function;
     private final StreamHandler<U> handler;
 
     QueryStreamAttempt(
         long id,
-        QueryStreamFunction<P, T, U> function,
+        SessionQueryStreamFunction<P, T, U> function,
         SessionQueryContext context,
         T request,
         StreamHandler<U> handler,
@@ -570,7 +570,7 @@ final class PrimitiveSessionExecutor<P extends SessionEnabledPrimitiveProxy> {
 
     QueryStreamAttempt(
         long id,
-        QueryStreamFunction<P, T, U> function,
+        SessionQueryStreamFunction<P, T, U> function,
         SessionQueryContext context,
         T request,
         StreamHandler<U> handler,

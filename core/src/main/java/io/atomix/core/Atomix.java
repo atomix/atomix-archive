@@ -499,6 +499,15 @@ public class Atomix extends AtomixCluster implements PrimitivesService {
   }
 
   /**
+   * Returns the Atomix primitive thread factory.
+   *
+   * @return the primitive thread context factory
+   */
+  public ThreadContextFactory getThreadFactory() {
+    return threadContextFactory;
+  }
+
+  /**
    * Returns the primitive configuration service.
    * <p>
    * The primitive configuration service provides all pre-defined named primitive configurations.

@@ -27,7 +27,6 @@ import java.util.Queue;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
-import io.atomix.core.impl.Metadata;
 import io.atomix.primitive.partition.PartitionId;
 import io.atomix.primitive.partition.PartitionManagementService;
 import io.atomix.primitive.service.PrimitiveService;
@@ -78,17 +77,12 @@ public class LockService extends AbstractLockService {
           0,
           null);
       return CompletableFuture.completedFuture(LockResponse.newBuilder()
-          .setMetadata(Metadata.newBuilder()
-              .setIndex(getCurrentIndex())
-              .build())
+          .setIndex(getCurrentIndex())
           .setAcquired(true)
           .build());
       // If the timeout is 0, that indicates this is a tryLock request. Immediately fail the request.
     } else if (request.getTimeout() == 0) {
       return CompletableFuture.completedFuture(LockResponse.newBuilder()
-          .setMetadata(Metadata.newBuilder()
-              .setIndex(getCurrentIndex())
-              .build())
           .setAcquired(false)
           .build());
       // If a timeout exists, add the request to the queue and set a timer. Note that the lock request expiration
@@ -109,9 +103,6 @@ public class LockService extends AbstractLockService {
         queue.remove(holder);
         if (session.getState().active()) {
           future.complete(LockResponse.newBuilder()
-              .setMetadata(Metadata.newBuilder()
-                  .setIndex(holder.index)
-                  .build())
               .setAcquired(false)
               .build());
         }
@@ -149,11 +140,7 @@ public class LockService extends AbstractLockService {
             }
           }
         }
-        return UnlockResponse.newBuilder()
-            .setMetadata(Metadata.newBuilder()
-                .setIndex(getCurrentIndex())
-                .build())
-            .build();
+        return UnlockResponse.newBuilder().build();
       }
 
       // The lock has been released. Populate the lock from the queue.
@@ -169,9 +156,7 @@ public class LockService extends AbstractLockService {
         Session lockSession = getSession(lock.session);
         if (lockSession != null && lockSession.getState().active()) {
           lock.future.complete(LockResponse.newBuilder()
-              .setMetadata(Metadata.newBuilder()
-                  .setIndex(lock.index)
-                  .build())
+              .setIndex(lock.index)
               .setAcquired(true)
               .build());
           break;
@@ -179,20 +164,13 @@ public class LockService extends AbstractLockService {
         lock = queue.poll();
       }
     }
-    return UnlockResponse.newBuilder()
-        .setMetadata(Metadata.newBuilder()
-            .setIndex(getCurrentIndex())
-            .build())
-        .build();
+    return UnlockResponse.newBuilder().build();
   }
 
   @Override
   public IsLockedResponse isLocked(IsLockedRequest request) {
     boolean locked = lock != null && (request.getIndex() == 0 || lock.index == request.getIndex());
     return IsLockedResponse.newBuilder()
-        .setMetadata(Metadata.newBuilder()
-            .setIndex(getCurrentIndex())
-            .build())
         .setLocked(locked)
         .build();
   }
@@ -250,9 +228,6 @@ public class LockService extends AbstractLockService {
           Session session = getSession(holder.session);
           if (session != null && session.getState().active()) {
             holder.future.complete(LockResponse.newBuilder()
-                .setMetadata(Metadata.newBuilder()
-                    .setIndex(holder.index)
-                    .build())
                 .setAcquired(false)
                 .build());
           }
@@ -299,9 +274,7 @@ public class LockService extends AbstractLockService {
         Session lockSession = getSession(lock.session);
         if (lockSession != null && lockSession.getState().active()) {
           lock.future.complete(LockResponse.newBuilder()
-              .setMetadata(Metadata.newBuilder()
-                  .setIndex(lock.index)
-                  .build())
+              .setIndex(lock.index)
               .setAcquired(true)
               .build());
           break;

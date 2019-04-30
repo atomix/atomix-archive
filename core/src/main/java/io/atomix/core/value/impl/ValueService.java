@@ -10,7 +10,6 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 
 import com.google.protobuf.ByteString;
-import io.atomix.core.impl.Metadata;
 import io.atomix.primitive.partition.PartitionId;
 import io.atomix.primitive.partition.PartitionManagementService;
 import io.atomix.primitive.service.PrimitiveService;
@@ -55,9 +54,6 @@ public class ValueService extends AbstractValueService {
 
     if (Arrays.equals(previousValue, nextValue)) {
       return SetResponse.newBuilder()
-          .setMetadata(Metadata.newBuilder()
-              .setIndex(getCurrentIndex())
-              .build())
           .setVersion(version.get())
           .setPreviousValue(request.getValue())
           .setPreviousVersion(version.get())
@@ -68,9 +64,6 @@ public class ValueService extends AbstractValueService {
     long previousVersion = version.getAndIncrement();
 
     ListenResponse event = ListenResponse.newBuilder()
-        .setMetadata(Metadata.newBuilder()
-            .setIndex(getCurrentIndex())
-            .build())
         .setType(ListenResponse.Type.UPDATED)
         .setPreviousValue(ByteString.copyFrom(previousValue))
         .setPreviousVersion(previousVersion)
@@ -80,9 +73,6 @@ public class ValueService extends AbstractValueService {
     streams.values().forEach(stream -> stream.next(event));
 
     return SetResponse.newBuilder()
-        .setMetadata(Metadata.newBuilder()
-            .setIndex(getCurrentIndex())
-            .build())
         .setVersion(version.get())
         .setPreviousValue(ByteString.copyFrom(previousValue))
         .setPreviousVersion(previousVersion)
@@ -92,9 +82,6 @@ public class ValueService extends AbstractValueService {
   @Override
   public GetResponse get(GetRequest request) {
     return GetResponse.newBuilder()
-        .setMetadata(Metadata.newBuilder()
-            .setIndex(getCurrentIndex())
-            .build())
         .setValue(ByteString.copyFrom(value))
         .setVersion(version.get())
         .build();
@@ -111,9 +98,6 @@ public class ValueService extends AbstractValueService {
         this.value = nextValue;
 
         ListenResponse event = ListenResponse.newBuilder()
-            .setMetadata(Metadata.newBuilder()
-                .setIndex(getCurrentIndex())
-                .build())
             .setType(ListenResponse.Type.UPDATED)
             .setPreviousValue(ByteString.copyFrom(previousValue))
             .setPreviousVersion(previousVersion)
@@ -123,17 +107,11 @@ public class ValueService extends AbstractValueService {
         streams.values().forEach(stream -> stream.next(event));
 
         return CheckAndSetResponse.newBuilder()
-            .setMetadata(Metadata.newBuilder()
-                .setIndex(getCurrentIndex())
-                .build())
             .setSucceeded(true)
             .setVersion(version.get())
             .build();
       } else {
         return CheckAndSetResponse.newBuilder()
-            .setMetadata(Metadata.newBuilder()
-                .setIndex(getCurrentIndex())
-                .build())
             .setSucceeded(false)
             .setVersion(version.get())
             .build();
@@ -146,9 +124,6 @@ public class ValueService extends AbstractValueService {
         this.value = nextValue;
 
         ListenResponse event = ListenResponse.newBuilder()
-            .setMetadata(Metadata.newBuilder()
-                .setIndex(getCurrentIndex())
-                .build())
             .setType(ListenResponse.Type.UPDATED)
             .setPreviousValue(ByteString.copyFrom(previousValue))
             .setPreviousVersion(previousVersion)
@@ -158,17 +133,11 @@ public class ValueService extends AbstractValueService {
         streams.values().forEach(stream -> stream.next(event));
 
         return CheckAndSetResponse.newBuilder()
-            .setMetadata(Metadata.newBuilder()
-                .setIndex(getCurrentIndex())
-                .build())
             .setSucceeded(true)
             .setVersion(version.get())
             .build();
       } else {
         return CheckAndSetResponse.newBuilder()
-            .setMetadata(Metadata.newBuilder()
-                .setIndex(getCurrentIndex())
-                .build())
             .setSucceeded(false)
             .setVersion(version.get())
             .build();
@@ -185,9 +154,6 @@ public class ValueService extends AbstractValueService {
   public UnlistenResponse unlisten(UnlistenRequest request) {
     streams.remove(new StreamId(getCurrentSession().sessionId(), request.getStreamId()));
     return UnlistenResponse.newBuilder()
-        .setMetadata(Metadata.newBuilder()
-            .setIndex(getCurrentIndex())
-            .build())
         .build();
   }
 

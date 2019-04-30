@@ -27,7 +27,6 @@ import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.stream.Collectors;
 
 import com.google.common.collect.Sets;
-import io.atomix.core.impl.Metadata;
 import io.atomix.primitive.partition.PartitionId;
 import io.atomix.primitive.partition.PartitionManagementService;
 import io.atomix.primitive.service.PrimitiveService;
@@ -69,9 +68,6 @@ public class SetService extends AbstractSetService {
   @Override
   public SizeResponse size(SizeRequest request) {
     return SizeResponse.newBuilder()
-        .setMetadata(Metadata.newBuilder()
-            .setIndex(getCurrentIndex())
-            .build())
         .setSize(set.size())
         .build();
   }
@@ -81,9 +77,6 @@ public class SetService extends AbstractSetService {
     boolean contains = request.getValuesCount() == 0
         || request.getValuesCount() == 1 ? set.contains(request.getValues(0)) : set.containsAll(request.getValuesList());
     return ContainsResponse.newBuilder()
-        .setMetadata(Metadata.newBuilder()
-            .setIndex(getCurrentIndex())
-            .build())
         .setContains(contains)
         .build();
   }
@@ -92,9 +85,6 @@ public class SetService extends AbstractSetService {
   public AddResponse add(AddRequest request) {
     if (request.getValuesCount() == 0) {
       return AddResponse.newBuilder()
-          .setMetadata(Metadata.newBuilder()
-              .setIndex(getCurrentIndex())
-              .build())
           .setStatus(UpdateStatus.NOOP)
           .setAdded(false)
           .build();
@@ -102,9 +92,6 @@ public class SetService extends AbstractSetService {
       String value = request.getValues(0);
       if (lockedElements.contains(value)) {
         return AddResponse.newBuilder()
-            .setMetadata(Metadata.newBuilder()
-                .setIndex(getCurrentIndex())
-                .build())
             .setStatus(UpdateStatus.WRITE_LOCK)
             .setAdded(false)
             .build();
@@ -117,9 +104,6 @@ public class SetService extends AbstractSetService {
               .build()));
         }
         return AddResponse.newBuilder()
-            .setMetadata(Metadata.newBuilder()
-                .setIndex(getCurrentIndex())
-                .build())
             .setStatus(UpdateStatus.OK)
             .setAdded(added)
             .build();
@@ -128,9 +112,6 @@ public class SetService extends AbstractSetService {
       for (String value : request.getValuesList()) {
         if (lockedElements.contains(value)) {
           return AddResponse.newBuilder()
-              .setMetadata(Metadata.newBuilder()
-                  .setIndex(getCurrentIndex())
-                  .build())
               .setStatus(UpdateStatus.WRITE_LOCK)
               .setAdded(false)
               .build();
@@ -146,9 +127,6 @@ public class SetService extends AbstractSetService {
         }
       }
       return AddResponse.newBuilder()
-          .setMetadata(Metadata.newBuilder()
-              .setIndex(getCurrentIndex())
-              .build())
           .setStatus(UpdateStatus.OK)
           .setAdded(added)
           .build();
@@ -159,9 +137,6 @@ public class SetService extends AbstractSetService {
   public RemoveResponse remove(RemoveRequest request) {
     if (request.getValuesCount() == 0) {
       return RemoveResponse.newBuilder()
-          .setMetadata(Metadata.newBuilder()
-              .setIndex(getCurrentIndex())
-              .build())
           .setStatus(UpdateStatus.NOOP)
           .setRemoved(false)
           .build();
@@ -169,9 +144,6 @@ public class SetService extends AbstractSetService {
       String value = request.getValues(0);
       if (lockedElements.contains(value)) {
         return RemoveResponse.newBuilder()
-            .setMetadata(Metadata.newBuilder()
-                .setIndex(getCurrentIndex())
-                .build())
             .setStatus(UpdateStatus.WRITE_LOCK)
             .setRemoved(false)
             .build();
@@ -184,9 +156,6 @@ public class SetService extends AbstractSetService {
               .build()));
         }
         return RemoveResponse.newBuilder()
-            .setMetadata(Metadata.newBuilder()
-                .setIndex(getCurrentIndex())
-                .build())
             .setStatus(UpdateStatus.OK)
             .setRemoved(removed)
             .build();
@@ -195,9 +164,6 @@ public class SetService extends AbstractSetService {
       for (String value : request.getValuesList()) {
         if (lockedElements.contains(value)) {
           return RemoveResponse.newBuilder()
-              .setMetadata(Metadata.newBuilder()
-                  .setIndex(getCurrentIndex())
-                  .build())
               .setStatus(UpdateStatus.WRITE_LOCK)
               .setRemoved(false)
               .build();
@@ -213,9 +179,6 @@ public class SetService extends AbstractSetService {
         }
       }
       return RemoveResponse.newBuilder()
-          .setMetadata(Metadata.newBuilder()
-              .setIndex(getCurrentIndex())
-              .build())
           .setStatus(UpdateStatus.OK)
           .setRemoved(removed)
           .build();
@@ -231,11 +194,7 @@ public class SetService extends AbstractSetService {
           .build()));
     }
     set.clear();
-    return ClearResponse.newBuilder()
-        .setMetadata(Metadata.newBuilder()
-            .setIndex(getCurrentIndex())
-            .build())
-        .build();
+    return ClearResponse.newBuilder().build();
   }
 
   @Override
@@ -246,21 +205,13 @@ public class SetService extends AbstractSetService {
   @Override
   public UnlistenResponse unlisten(UnlistenRequest request) {
     streams.remove(new StreamId(getCurrentSession().sessionId(), request.getStreamId()));
-    return UnlistenResponse.newBuilder()
-        .setMetadata(Metadata.newBuilder()
-            .setIndex(getCurrentIndex())
-            .build())
-        .build();
+    return UnlistenResponse.newBuilder().build();
   }
 
   @Override
   public void iterate(IterateRequest request, StreamHandler<IterateResponse> handler) {
-    long index = getCurrentIndex();
     for (String value : set) {
       handler.next(IterateResponse.newBuilder()
-          .setMetadata(Metadata.newBuilder()
-              .setIndex(index)
-              .build())
           .setValue(value)
           .build());
     }
@@ -272,9 +223,6 @@ public class SetService extends AbstractSetService {
     for (DistributedSetUpdate update : request.getTransaction().getUpdatesList()) {
       if (lockedElements.contains(update.getValue())) {
         return PrepareResponse.newBuilder()
-            .setMetadata(Metadata.newBuilder()
-                .setIndex(getCurrentIndex())
-                .build())
             .setStatus(PrepareResponse.Status.CONCURRENT_TRANSACTION)
             .build();
       }
@@ -287,9 +235,6 @@ public class SetService extends AbstractSetService {
         case NOT_CONTAINS:
           if (set.contains(element)) {
             return PrepareResponse.newBuilder()
-                .setMetadata(Metadata.newBuilder()
-                    .setIndex(getCurrentIndex())
-                    .build())
                 .setStatus(PrepareResponse.Status.OPTIMISTIC_LOCK_FAILURE)
                 .build();
           }
@@ -298,9 +243,6 @@ public class SetService extends AbstractSetService {
         case CONTAINS:
           if (!set.contains(element)) {
             return PrepareResponse.newBuilder()
-                .setMetadata(Metadata.newBuilder()
-                    .setIndex(getCurrentIndex())
-                    .build())
                 .setStatus(PrepareResponse.Status.OPTIMISTIC_LOCK_FAILURE)
                 .build();
           }
@@ -313,9 +255,6 @@ public class SetService extends AbstractSetService {
     }
     transactions.put(request.getTransactionId(), request.getTransaction());
     return PrepareResponse.newBuilder()
-        .setMetadata(Metadata.newBuilder()
-            .setIndex(getCurrentIndex())
-            .build())
         .setStatus(PrepareResponse.Status.OK)
         .build();
   }
@@ -336,9 +275,6 @@ public class SetService extends AbstractSetService {
     DistributedSetTransaction transaction = transactions.remove(request.getTransactionId());
     if (transaction == null) {
       return CommitResponse.newBuilder()
-          .setMetadata(Metadata.newBuilder()
-              .setIndex(getCurrentIndex())
-              .build())
           .setStatus(CommitResponse.Status.UNKNOWN_TRANSACTION_ID)
           .build();
     }
@@ -357,9 +293,6 @@ public class SetService extends AbstractSetService {
       lockedElements.remove(update.getValue());
     }
     return CommitResponse.newBuilder()
-        .setMetadata(Metadata.newBuilder()
-            .setIndex(getCurrentIndex())
-            .build())
         .setStatus(CommitResponse.Status.OK)
         .build();
   }
@@ -369,9 +302,6 @@ public class SetService extends AbstractSetService {
     DistributedSetTransaction transaction = transactions.remove(request.getTransactionId());
     if (transaction == null) {
       return RollbackResponse.newBuilder()
-          .setMetadata(Metadata.newBuilder()
-              .setIndex(getCurrentIndex())
-              .build())
           .setStatus(RollbackResponse.Status.UNKNOWN_TRANSACTION_ID)
           .build();
     }
@@ -380,9 +310,6 @@ public class SetService extends AbstractSetService {
       lockedElements.remove(update.getValue());
     }
     return RollbackResponse.newBuilder()
-        .setMetadata(Metadata.newBuilder()
-            .setIndex(getCurrentIndex())
-            .build())
         .setStatus(RollbackResponse.Status.OK)
         .build();
   }

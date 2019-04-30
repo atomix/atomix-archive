@@ -3,6 +3,7 @@ syntax = "proto3";
 package atomix.map;
 
 import "protocol.proto";
+import "headers.proto";
 import "google/protobuf/duration.proto";
 
 option java_package = "io.atomix.grpc.map";
@@ -24,100 +25,143 @@ message CreateRequest {
 }
 
 message CreateResponse {
-    uint64 session_id = 1;
+    atomix.headers.SessionHeaders headers = 1;
 }
 
 message KeepAliveRequest {
-    uint64 session_id = 1;
-    uint64 event_index = 2;
-    uint64 command_sequence = 3;
+    MapId id = 1;
+    atomix.headers.SessionHeaders headers = 2;
 }
 
 message KeepAliveResponse {
+    atomix.headers.SessionHeaders headers = 1;
 }
 
 message CloseRequest {
-    uint64 session_id = 1;
-    bool delete = 2;
+    MapId id = 1;
+    atomix.headers.SessionHeaders headers = 2;
 }
 
 message CloseResponse {
+
+}
+
+message ExistsRequest {
+    MapId id = 1;
+    atomix.headers.SessionQueryHeaders headers = 2;
+    repeated string keys = 3;
+}
+
+message ExistsResponse {
+    atomix.headers.SessionResponseHeaders headers = 1;
+    bool contains_key = 2;
 }
 
 message SizeRequest {
-    uint64 session_id = 1;
+    MapId id = 1;
+    atomix.headers.SessionQueryHeaders headers = 2;
 }
 
 message SizeResponse {
-    uint32 size = 1;
+    atomix.headers.SessionResponseHeaders headers = 1;
+    int32 size = 2;
 }
 
 message PutRequest {
-    uint64 session_id = 1;
-    string key = 2;
-    bytes value = 3;
+    MapId id = 1;
+    atomix.headers.SessionCommandHeaders headers = 2;
+    string key = 3;
+    bytes value = 4;
+    int64 version = 5;
+    int64 ttl = 6;
 }
 
 message PutResponse {
-    uint64 version = 1;
+    atomix.headers.SessionResponseHeaders headers = 1;
+    ResponseStatus status = 2;
+    bytes previous_value = 3;
+    int64 previous_version = 4;
 }
 
 message ReplaceRequest {
-    uint64 session_id = 1;
-    string key = 2;
-    bytes value = 3;
-    uint64 version = 4;
+    MapId id = 1;
+    atomix.headers.SessionCommandHeaders headers = 2;
+    string key = 3;
+    bytes previous_value = 4;
+    int64 previous_version = 5;
+    bytes new_value = 6;
+    int64 ttl = 7;
 }
 
 message ReplaceResponse {
-    bool succeeded = 1;
+    atomix.headers.SessionResponseHeaders headers = 1;
+    ResponseStatus status = 2;
+    bytes previous_value = 3;
+    int64 previous_version = 4;
 }
 
 message GetRequest {
-    uint64 session_id = 1;
-    string key = 2;
+    MapId id = 1;
+    atomix.headers.SessionQueryHeaders headers = 2;
+    string key = 3;
 }
 
 message GetResponse {
-    bytes value = 1;
-    uint64 version = 2;
+    atomix.headers.SessionResponseHeaders headers = 1;
+    bytes value = 2;
+    int64 version = 3;
 }
 
 message RemoveRequest {
-    uint64 session_id = 1;
-    string key = 2;
-    bytes value = 3;
-    uint64 version = 4;
+    MapId id = 1;
+    atomix.headers.SessionCommandHeaders headers = 2;
+    string key = 3;
+    bytes value = 4;
+    int64 version = 5;
 }
 
 message RemoveResponse {
-    bool succeeded = 1;
+    atomix.headers.SessionResponseHeaders headers = 1;
+    ResponseStatus status = 2;
+    bytes previous_value = 3;
+    int64 previous_version = 4;
 }
 
 message ClearRequest {
-    uint64 session_id = 1;
+    MapId id = 1;
+    atomix.headers.SessionCommandHeaders headers = 2;
 }
 
 message ClearResponse {
+    atomix.headers.SessionResponseHeaders headers = 1;
 }
 
-message ListenRequest {
-    uint64 session_id = 1;
+message EventRequest {
+    MapId id = 1;
+    atomix.headers.SessionCommandHeaders headers = 2;
 }
 
-// Map event
-message MapEvent {
-    uint64 session_id = 1;
+message EventResponse {
+    atomix.headers.SessionResponseHeaders headers = 1;
     Type type = 2;
     string key = 3;
-    bytes value = 4;
-    uint64 version = 5;
+    bytes old_value = 4;
+    int64 old_version = 5;
+    bytes new_value = 6;
+    int64 new_version = 7;
 
     enum Type {
-        INSERT = 0;
-        UPDATE = 1;
-        REMOVE = 2;
+        INSERTED = 0;
+        UPDATED = 1;
+        REMOVED = 2;
     }
+}
+
+enum ResponseStatus {
+    OK = 0;
+    NOOP = 1;
+    WRITE_LOCK = 2;
+    PRECONDITION_FAILED = 3;
 }
 
 // Map service
@@ -131,6 +175,8 @@ service MapService {
 
     rpc Size (SizeRequest) returns (SizeResponse) {}
 
+    rpc Exists (ExistsRequest) returns (ExistsResponse) {}
+
     rpc Put (PutRequest) returns (PutResponse) {}
 
     rpc Replace (ReplaceRequest) returns (ReplaceResponse) {}
@@ -141,6 +187,6 @@ service MapService {
 
     rpc Clear (ClearRequest) returns (ClearResponse) {}
 
-    rpc Listen (ListenRequest) returns (stream MapEvent) {}
+    rpc Events (EventRequest) returns (stream EventResponse) {}
 
 }

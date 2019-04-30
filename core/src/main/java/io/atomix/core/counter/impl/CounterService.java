@@ -20,7 +20,6 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.concurrent.atomic.AtomicLong;
 
-import io.atomix.core.impl.Metadata;
 import io.atomix.primitive.partition.PartitionId;
 import io.atomix.primitive.partition.PartitionManagementService;
 import io.atomix.primitive.service.PrimitiveService;
@@ -54,9 +53,6 @@ public class CounterService extends AbstractCounterService {
   @Override
   public SetResponse set(SetRequest request) {
     return SetResponse.newBuilder()
-        .setMetadata(Metadata.newBuilder()
-            .setIndex(getCurrentIndex())
-            .build())
         .setPreviousValue(counter.getAndSet(request.getValue()))
         .build();
   }
@@ -64,9 +60,6 @@ public class CounterService extends AbstractCounterService {
   @Override
   public GetResponse get(GetRequest request) {
     return GetResponse.newBuilder()
-        .setMetadata(Metadata.newBuilder()
-            .setIndex(getCurrentIndex())
-            .build())
         .setValue(counter.get())
         .build();
   }
@@ -74,9 +67,6 @@ public class CounterService extends AbstractCounterService {
   @Override
   public CheckAndSetResponse checkAndSet(CheckAndSetRequest request) {
     return CheckAndSetResponse.newBuilder()
-        .setMetadata(Metadata.newBuilder()
-            .setIndex(getCurrentIndex())
-            .build())
         .setSucceeded(counter.compareAndSet(request.getExpect(), request.getUpdate()))
         .build();
   }
@@ -90,9 +80,6 @@ public class CounterService extends AbstractCounterService {
       previousValue = counter.getAndAdd(request.getDelta());
     }
     return IncrementResponse.newBuilder()
-        .setMetadata(Metadata.newBuilder()
-            .setIndex(getCurrentIndex())
-            .build())
         .setPreviousValue(previousValue)
         .setNextValue(counter.get())
         .build();
@@ -107,9 +94,6 @@ public class CounterService extends AbstractCounterService {
       previousValue = counter.getAndAdd(-request.getDelta());
     }
     return DecrementResponse.newBuilder()
-        .setMetadata(Metadata.newBuilder()
-            .setIndex(getCurrentIndex())
-            .build())
         .setPreviousValue(previousValue)
         .setNextValue(counter.get())
         .build();

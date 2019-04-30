@@ -21,6 +21,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import io.atomix.primitive.client.PrimitiveClient;
 import io.atomix.primitive.client.impl.DefaultPrimitiveClient;
 import io.atomix.primitive.partition.PartitionGroup;
+import io.atomix.primitive.service.impl.RequestContext;
 import io.atomix.primitive.service.impl.ServiceId;
 import io.atomix.primitive.session.ManagedSessionIdService;
 import io.atomix.primitive.session.SessionId;
@@ -46,10 +47,11 @@ public class ReplicatedSessionIdService implements ManagedSessionIdService {
   public CompletableFuture<SessionId> nextSessionId() {
     return client.execute(
         SessionIdGeneratorOperations.NEXT,
+        RequestContext.newBuilder().build(),
         NextRequest.newBuilder().build(),
         NextRequest::toByteString,
         NextResponse::parseFrom)
-        .thenApply(response -> SessionId.from(response.getSessionId()));
+        .thenApply(response -> SessionId.from(response.getRight().getSessionId()));
   }
 
   @Override

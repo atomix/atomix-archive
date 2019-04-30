@@ -2,8 +2,6 @@ syntax = "proto3";
 
 package atomix.set.service;
 
-import "google/protobuf/empty.proto";
-import "atomix/metadata.proto";
 import "atomix/primitive/service.proto";
 
 option java_package = "io.atomix.core.set.impl";
@@ -47,8 +45,7 @@ message SizeRequest {
 }
 
 message SizeResponse {
-    atomix.metadata.Metadata metadata = 1;
-    int32 size = 2;
+    int32 size = 1;
 }
 
 message ContainsRequest {
@@ -56,8 +53,7 @@ message ContainsRequest {
 }
 
 message ContainsResponse {
-    atomix.metadata.Metadata metadata = 1;
-    bool contains = 2;
+    bool contains = 1;
 }
 
 message AddRequest {
@@ -65,9 +61,8 @@ message AddRequest {
 }
 
 message AddResponse {
-    atomix.metadata.Metadata metadata = 1;
-    UpdateStatus status = 2;
-    bool added = 3;
+    UpdateStatus status = 1;
+    bool added = 2;
 }
 
 message RemoveRequest {
@@ -75,16 +70,14 @@ message RemoveRequest {
 }
 
 message RemoveResponse {
-    atomix.metadata.Metadata metadata = 1;
-    UpdateStatus status = 2;
-    bool removed = 3;
+    UpdateStatus status = 1;
+    bool removed = 2;
 }
 
 message ClearRequest {
 }
 
 message ClearResponse {
-    atomix.metadata.Metadata metadata = 1;
 }
 
 message ListenRequest {
@@ -92,9 +85,8 @@ message ListenRequest {
 }
 
 message ListenResponse {
-    atomix.metadata.Metadata metadata = 1;
-    Type type = 2;
-    string value = 3;
+    Type type = 1;
+    string value = 2;
 
     enum Type {
         ADDED = 0;
@@ -107,15 +99,13 @@ message UnlistenRequest {
 }
 
 message UnlistenResponse {
-    atomix.metadata.Metadata metadata = 1;
 }
 
 message IterateRequest {
 }
 
 message IterateResponse {
-    atomix.metadata.Metadata metadata = 1;
-    string value = 2;
+    string value = 1;
 }
 
 enum UpdateStatus {
@@ -130,8 +120,7 @@ message PrepareRequest {
 }
 
 message PrepareResponse {
-    atomix.metadata.Metadata metadata = 1;
-    Status status = 2;
+    Status status = 1;
 
     enum Status {
         OK = 0;
@@ -146,8 +135,7 @@ message CommitRequest {
 }
 
 message CommitResponse {
-    atomix.metadata.Metadata metadata = 1;
-    Status status = 2;
+    Status status = 1;
 
     enum Status {
         OK = 0;
@@ -162,8 +150,7 @@ message RollbackRequest {
 }
 
 message RollbackResponse {
-    atomix.metadata.Metadata metadata = 1;
-    Status status = 2;
+    Status status = 1;
 
     enum Status {
         OK = 0;

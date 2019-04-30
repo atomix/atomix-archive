@@ -84,29 +84,40 @@ message ServiceResponse {
     bytes response = 1;
 }
 
-message SessionMetadata {
-    uint64 session_id = 1;
-    uint64 sequence_number = 2;
-    uint64 index = 3;
-}
-
 message CommandRequest {
-    string name = 1;
-    bytes command = 2;
+    RequestContext context = 1;
+    string name = 2;
+    bytes command = 3;
 }
 
 message CommandResponse {
-    uint64 index = 1;
+    ResponseContext context = 1;
     bytes output = 2;
 }
 
 message QueryRequest {
-    int64 index = 1;
+    RequestContext context = 1;
     string name = 2;
     bytes query = 3;
 }
 
 message QueryResponse {
-    uint64 index = 1;
+    ResponseContext context = 1;
     bytes output = 2;
+}
+
+message RequestContext {
+    uint64 index = 1;
+}
+
+message ResponseContext {
+    uint64 index = 1;
+}
+
+message StreamResponse {
+    StreamContext context = 1;
+    bytes output = 2;
+}
+message StreamContext {
+    uint64 index = 1;
 }

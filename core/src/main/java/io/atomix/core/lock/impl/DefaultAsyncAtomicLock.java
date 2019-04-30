@@ -44,8 +44,8 @@ public class DefaultAsyncAtomicLock extends ManagedAsyncPrimitive<LockProxy> imp
         .setTimeout(-1)
         .build())
         .thenApply(response -> {
-          lock.set(response.getMetadata().getIndex());
-          return new Version(response.getMetadata().getIndex());
+          lock.set(response.getIndex());
+          return new Version(response.getIndex());
         });
   }
 
@@ -62,8 +62,8 @@ public class DefaultAsyncAtomicLock extends ManagedAsyncPrimitive<LockProxy> imp
         .build())
         .thenApply(response -> {
           if (response.getAcquired()) {
-            lock.set(response.getMetadata().getIndex());
-            return Optional.of(new Version(response.getMetadata().getIndex()));
+            lock.set(response.getIndex());
+            return Optional.of(new Version(response.getIndex()));
           }
           return Optional.empty();
         });
@@ -80,8 +80,8 @@ public class DefaultAsyncAtomicLock extends ManagedAsyncPrimitive<LockProxy> imp
           timer.cancel();
           if (!future.isDone()) {
             if (response.getAcquired()) {
-              lock.set(response.getMetadata().getIndex());
-              future.complete(Optional.of(new Version(response.getMetadata().getIndex())));
+              lock.set(response.getIndex());
+              future.complete(Optional.of(new Version(response.getIndex())));
             } else {
               future.complete(Optional.empty());
             }

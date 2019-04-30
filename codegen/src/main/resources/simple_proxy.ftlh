@@ -17,15 +17,19 @@ package ${proxyClass.packageName};
 
 import io.atomix.primitive.PrimitiveManagementService;
 import io.atomix.primitive.service.impl.ServiceId;
+import io.atomix.primitive.service.impl.RequestContext;
+import io.atomix.primitive.service.impl.ResponseContext;
 import io.atomix.primitive.partition.PartitionId;
 import io.atomix.primitive.proxy.SimplePrimitiveProxy;
 <#if hasStreams>
 import io.atomix.utils.stream.StreamHandler;
 import io.atomix.utils.stream.FutureStreamHandler;
+import io.atomix.primitive.service.impl.StreamContext;
 </#if>
 import io.atomix.utils.concurrent.ThreadContext;
 
 import java.util.concurrent.CompletableFuture;
+import org.apache.commons.lang3.tuple.Pair;
 <#list operations as operation>
 <#if operation.operationsClass.packageName != proxyClass.packageName>
 import ${operation.operationsClass.packageName}.${operation.operationsClass.className};
@@ -56,10 +60,12 @@ public class ${proxyClass.className} extends SimplePrimitiveProxy {
      * @return the response future
      */
     public CompletableFuture<Void> ${operation.methodName}(
+            RequestContext context,
             ${operation.requestClass.className} request,
-            StreamHandler<${operation.responseClass.className}> handler) {
+            StreamHandler<Pair<StreamContext, ${operation.responseClass.className}>> handler) {
         return getClient().execute(
             ${operation.operationsClass.className}.${operation.constantName},
+            context,
             request,
             ${operation.requestClass.className}::toByteString,
             handler,
@@ -72,12 +78,14 @@ public class ${proxyClass.className} extends SimplePrimitiveProxy {
      * @param request the request object
      * @return the response object
      */
-    public CompletableFuture<${operation.responseClass.className}> ${operation.methodName}(${operation.requestClass.className} request) {
-        CompletableFuture<${operation.responseClass.className}> future = new CompletableFuture<>();
+    public CompletableFuture<Pair<ResponseContext, ${operation.responseClass.className}>> ${operation.methodName}(RequestContext context, ${operation.requestClass.className} request) {
+        CompletableFuture<Pair<ResponseContext, ${operation.responseClass.className}>> future = new CompletableFuture<>();
         getClient().execute(
             ${operation.operationsClass.className}.${operation.constantName},
+            context,
             request,
-            new FutureStreamHandler<>(future),
+            new TranscodingStreamHandler<>(new FutureStreamHandler<>(future),
+                response -> Pair.of(ResponseContext.newBuilder().setIndex(response.getLeft().getIndex()).build(), response.getRight())),
             ${operation.requestClass.className}::toByteString,
             ${operation.responseClass.className}::parseFrom);
         return future;
@@ -89,9 +97,10 @@ public class ${proxyClass.className} extends SimplePrimitiveProxy {
      * @param request the request object
      * @return the response object
      */
-    public CompletableFuture<${operation.responseClass.className}> ${operation.methodName}(${operation.requestClass.className} request) {
+    public CompletableFuture<Pair<ResponseContext, ${operation.responseClass.className}>> ${operation.methodName}(RequestContext context, ${operation.requestClass.className} request) {
         return getClient().execute(
             ${operation.operationsClass.className}.${operation.constantName},
+            context,
             request,
             ${operation.requestClass.className}::toByteString,
             ${operation.responseClass.className}::parseFrom);

@@ -2,7 +2,6 @@ syntax = "proto3";
 
 package atomix.map.service;
 
-import "atomix/metadata.proto";
 import "atomix/primitive/service.proto";
 
 option java_package = "io.atomix.core.map.impl";
@@ -65,8 +64,7 @@ message ContainsKeyRequest {
 }
 
 message ContainsKeyResponse {
-    atomix.metadata.Metadata metadata = 1;
-    bool contains_key = 2;
+    bool contains_key = 1;
 }
 
 message SizeRequest {
@@ -74,8 +72,7 @@ message SizeRequest {
 }
 
 message SizeResponse {
-    atomix.metadata.Metadata metadata = 1;
-    int32 size = 2;
+    int32 size = 1;
 }
 
 message PutRequest {
@@ -86,10 +83,9 @@ message PutRequest {
 }
 
 message PutResponse {
-    atomix.metadata.Metadata metadata = 1;
-    UpdateStatus status = 2;
-    bytes previous_value = 3;
-    int64 previous_version = 4;
+    UpdateStatus status = 1;
+    bytes previous_value = 2;
+    int64 previous_version = 3;
 }
 
 message ReplaceRequest {
@@ -101,10 +97,9 @@ message ReplaceRequest {
 }
 
 message ReplaceResponse {
-    atomix.metadata.Metadata metadata = 1;
-    UpdateStatus status = 2;
-    bytes previous_value = 3;
-    int64 previous_version = 4;
+    UpdateStatus status = 1;
+    bytes previous_value = 2;
+    int64 previous_version = 3;
 }
 
 message GetRequest {
@@ -112,9 +107,8 @@ message GetRequest {
 }
 
 message GetResponse {
-    atomix.metadata.Metadata metadata = 1;
-    bytes value = 2;
-    int64 version = 3;
+    bytes value = 1;
+    int64 version = 2;
 }
 
 message RemoveRequest {
@@ -124,17 +118,15 @@ message RemoveRequest {
 }
 
 message RemoveResponse {
-    atomix.metadata.Metadata metadata = 1;
-    UpdateStatus status = 2;
-    bytes previous_value = 3;
-    int64 previous_version = 4;
+    UpdateStatus status = 1;
+    bytes previous_value = 2;
+    int64 previous_version = 3;
 }
 
 message ClearRequest {
 }
 
 message ClearResponse {
-    atomix.metadata.Metadata metadata = 1;
 }
 
 message ListenRequest {
@@ -142,13 +134,12 @@ message ListenRequest {
 }
 
 message ListenResponse {
-    atomix.metadata.Metadata metadata = 1;
-    Type type = 2;
-    string key = 3;
-    bytes old_value = 4;
-    int64 old_version = 5;
-    bytes new_value = 6;
-    int64 new_version = 7;
+    Type type = 1;
+    string key = 2;
+    bytes old_value = 3;
+    int64 old_version = 4;
+    bytes new_value = 5;
+    int64 new_version = 6;
 
     enum Type {
         INSERTED = 0;
@@ -162,7 +153,6 @@ message UnlistenRequest {
 }
 
 message UnlistenResponse {
-    atomix.metadata.Metadata metadata = 1;
 }
 
 enum UpdateStatus {
@@ -178,8 +168,7 @@ message PrepareRequest {
 }
 
 message PrepareResponse {
-    atomix.metadata.Metadata metadata = 1;
-    Status status = 2;
+    Status status = 1;
 
     enum Status {
         OK = 0;
@@ -194,8 +183,7 @@ message CommitRequest {
 }
 
 message CommitResponse {
-    atomix.metadata.Metadata metadata = 1;
-    Status status = 2;
+    Status status = 1;
 
     enum Status {
         OK = 0;
@@ -210,8 +198,7 @@ message RollbackRequest {
 }
 
 message RollbackResponse {
-    atomix.metadata.Metadata metadata = 1;
-    Status status = 2;
+    Status status = 1;
 
     enum Status {
         OK = 0;

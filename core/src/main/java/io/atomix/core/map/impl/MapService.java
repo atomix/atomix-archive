@@ -13,7 +13,6 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
-import io.atomix.core.impl.Metadata;
 import io.atomix.primitive.partition.PartitionId;
 import io.atomix.primitive.partition.PartitionManagementService;
 import io.atomix.primitive.service.PrimitiveService;
@@ -58,9 +57,6 @@ public class MapService extends AbstractMapService {
   @Override
   public SizeResponse size(SizeRequest request) {
     return SizeResponse.newBuilder()
-        .setMetadata(Metadata.newBuilder()
-            .setIndex(getCurrentIndex())
-            .build())
         .setSize(map.size())
         .build();
   }
@@ -69,17 +65,11 @@ public class MapService extends AbstractMapService {
   public ContainsKeyResponse containsKey(ContainsKeyRequest request) {
     if (request.getKeysCount() == 0) {
       return ContainsKeyResponse.newBuilder()
-          .setMetadata(Metadata.newBuilder()
-              .setIndex(getCurrentIndex())
-              .build())
           .setContainsKey(false)
           .build();
     } else if (request.getKeysCount() == 1) {
       AtomicMapEntryValue value = map.get(request.getKeys(0));
       return ContainsKeyResponse.newBuilder()
-          .setMetadata(Metadata.newBuilder()
-              .setIndex(getCurrentIndex())
-              .build())
           .setContainsKey(value != null && value.getType() != AtomicMapEntryValue.Type.TOMBSTONE)
           .build();
     } else {
@@ -92,9 +82,6 @@ public class MapService extends AbstractMapService {
         }
       }
       return ContainsKeyResponse.newBuilder()
-          .setMetadata(Metadata.newBuilder()
-              .setIndex(getCurrentIndex())
-              .build())
           .setContainsKey(containsKeys)
           .build();
     }
@@ -104,9 +91,6 @@ public class MapService extends AbstractMapService {
   public PutResponse put(PutRequest request) {
     if (isLocked(request.getKey())) {
       return PutResponse.newBuilder()
-          .setMetadata(Metadata.newBuilder()
-              .setIndex(getCurrentIndex())
-              .build())
           .setStatus(UpdateStatus.WRITE_LOCK)
           .build();
     }
@@ -132,17 +116,11 @@ public class MapService extends AbstractMapService {
           .build());
 
       return PutResponse.newBuilder()
-          .setMetadata(Metadata.newBuilder()
-              .setIndex(getCurrentIndex())
-              .build())
           .setStatus(UpdateStatus.OK)
           .build();
     } else {
       if (oldValue.getValue().equals(request.getValue())) {
         return PutResponse.newBuilder()
-            .setMetadata(Metadata.newBuilder()
-                .setIndex(getCurrentIndex())
-                .build())
             .setStatus(UpdateStatus.NOOP)
             .setPreviousValue(oldValue.getValue())
             .setPreviousVersion(oldValue.getVersion())
@@ -170,9 +148,6 @@ public class MapService extends AbstractMapService {
           .build());
 
       return PutResponse.newBuilder()
-          .setMetadata(Metadata.newBuilder()
-              .setIndex(getCurrentIndex())
-              .build())
           .setStatus(UpdateStatus.OK)
           .setPreviousValue(oldValue.getValue())
           .setPreviousVersion(oldValue.getVersion())
@@ -184,9 +159,6 @@ public class MapService extends AbstractMapService {
   public ReplaceResponse replace(ReplaceRequest request) {
     if (isLocked(request.getKey())) {
       return ReplaceResponse.newBuilder()
-          .setMetadata(Metadata.newBuilder()
-              .setIndex(getCurrentIndex())
-              .build())
           .setStatus(UpdateStatus.WRITE_LOCK)
           .build();
     }
@@ -213,16 +185,10 @@ public class MapService extends AbstractMapService {
             .build());
 
         return ReplaceResponse.newBuilder()
-            .setMetadata(Metadata.newBuilder()
-                .setIndex(getCurrentIndex())
-                .build())
             .setStatus(UpdateStatus.OK)
             .build();
       } else {
         return ReplaceResponse.newBuilder()
-            .setMetadata(Metadata.newBuilder()
-                .setIndex(getCurrentIndex())
-                .build())
             .setStatus(UpdateStatus.PRECONDITION_FAILED)
             .build();
       }
@@ -248,18 +214,12 @@ public class MapService extends AbstractMapService {
             .build());
 
         return ReplaceResponse.newBuilder()
-            .setMetadata(Metadata.newBuilder()
-                .setIndex(getCurrentIndex())
-                .build())
             .setStatus(UpdateStatus.OK)
             .setPreviousValue(oldValue.getValue())
             .setPreviousVersion(oldValue.getVersion())
             .build();
       } else {
         return ReplaceResponse.newBuilder()
-            .setMetadata(Metadata.newBuilder()
-                .setIndex(getCurrentIndex())
-                .build())
             .setStatus(UpdateStatus.PRECONDITION_FAILED)
             .build();
       }
@@ -271,27 +231,17 @@ public class MapService extends AbstractMapService {
     AtomicMapEntryValue value = map.get(request.getKey());
     if (value != null && value.getType() != AtomicMapEntryValue.Type.TOMBSTONE) {
       return GetResponse.newBuilder()
-          .setMetadata(Metadata.newBuilder()
-              .setIndex(getCurrentIndex())
-              .build())
           .setValue(value.getValue())
           .setVersion(value.getVersion())
           .build();
     }
-    return GetResponse.newBuilder()
-        .setMetadata(Metadata.newBuilder()
-            .setIndex(getCurrentIndex())
-            .build())
-        .build();
+    return GetResponse.newBuilder().build();
   }
 
   @Override
   public RemoveResponse remove(RemoveRequest request) {
     if (isLocked(request.getKey())) {
       return RemoveResponse.newBuilder()
-          .setMetadata(Metadata.newBuilder()
-              .setIndex(getCurrentIndex())
-              .build())
           .setStatus(UpdateStatus.WRITE_LOCK)
           .build();
     }
@@ -319,18 +269,12 @@ public class MapService extends AbstractMapService {
           .build());
 
       return RemoveResponse.newBuilder()
-          .setMetadata(Metadata.newBuilder()
-              .setIndex(getCurrentIndex())
-              .build())
           .setStatus(UpdateStatus.OK)
           .setPreviousValue(value.getValue())
           .setPreviousVersion(value.getVersion())
           .build();
     }
     return RemoveResponse.newBuilder()
-        .setMetadata(Metadata.newBuilder()
-            .setIndex(getCurrentIndex())
-            .build())
         .setStatus(UpdateStatus.NOOP)
         .build();
   }
@@ -344,11 +288,7 @@ public class MapService extends AbstractMapService {
         .setOldVersion(value.getVersion())
         .build()));
     map.clear();
-    return ClearResponse.newBuilder()
-        .setMetadata(Metadata.newBuilder()
-            .setIndex(getCurrentIndex())
-            .build())
-        .build();
+    return ClearResponse.newBuilder().build();
   }
 
   @Override
@@ -359,11 +299,7 @@ public class MapService extends AbstractMapService {
   @Override
   public UnlistenResponse unlisten(UnlistenRequest request) {
     streams.remove(new StreamId(getCurrentSession().sessionId(), request.getStreamId()));
-    return UnlistenResponse.newBuilder()
-        .setMetadata(Metadata.newBuilder()
-            .setIndex(getCurrentIndex())
-            .build())
-        .build();
+    return UnlistenResponse.newBuilder().build();
   }
 
   @Override
@@ -377,9 +313,6 @@ public class MapService extends AbstractMapService {
       if (update.getType() == AtomicMapUpdate.Type.VERSION_MATCH && key == null) {
         if (update.getVersion() > currentVersion) {
           return PrepareResponse.newBuilder()
-              .setMetadata(Metadata.newBuilder()
-                  .setIndex(getCurrentIndex())
-                  .build())
               .setStatus(PrepareResponse.Status.OPTIMISTIC_LOCK_FAILURE)
               .build();
         } else {
@@ -391,9 +324,6 @@ public class MapService extends AbstractMapService {
       // conflict with a concurrent transaction.
       if (preparedKeys.contains(key)) {
         return PrepareResponse.newBuilder()
-            .setMetadata(Metadata.newBuilder()
-                .setIndex(getCurrentIndex())
-                .build())
             .setStatus(PrepareResponse.Status.CONCURRENT_TRANSACTION)
             .build();
       }
@@ -407,9 +337,6 @@ public class MapService extends AbstractMapService {
         // If the value is null, ensure the version is equal to the transaction version.
         if (update.getType() != AtomicMapUpdate.Type.PUT_IF_ABSENT && update.getVersion() != request.getTransaction().getVersion()) {
           return PrepareResponse.newBuilder()
-              .setMetadata(Metadata.newBuilder()
-                  .setIndex(getCurrentIndex())
-                  .build())
               .setStatus(PrepareResponse.Status.OPTIMISTIC_LOCK_FAILURE)
               .build();
         }
@@ -417,9 +344,6 @@ public class MapService extends AbstractMapService {
         // If the value is non-null, compare the current version with the record version.
         if (existingValue.getVersion() > update.getVersion()) {
           return PrepareResponse.newBuilder()
-              .setMetadata(Metadata.newBuilder()
-                  .setIndex(getCurrentIndex())
-                  .build())
               .setStatus(PrepareResponse.Status.OPTIMISTIC_LOCK_FAILURE)
               .build();
         }
@@ -435,9 +359,6 @@ public class MapService extends AbstractMapService {
 
     activeTransactions.put(request.getTransactionId(), request.getTransaction());
     return PrepareResponse.newBuilder()
-        .setMetadata(Metadata.newBuilder()
-            .setIndex(getCurrentIndex())
-            .build())
         .setStatus(PrepareResponse.Status.OK)
         .build();
   }
@@ -460,9 +381,6 @@ public class MapService extends AbstractMapService {
     AtomicMapTransaction transaction = activeTransactions.remove(request.getTransactionId());
     if (transaction == null) {
       return CommitResponse.newBuilder()
-          .setMetadata(Metadata.newBuilder()
-              .setIndex(getCurrentIndex())
-              .build())
           .setStatus(CommitResponse.Status.UNKNOWN_TRANSACTION_ID)
           .build();
     }
@@ -489,9 +407,6 @@ public class MapService extends AbstractMapService {
       String key = update.getKey();
       if (!preparedKeys.remove(key)) {
         return CommitResponse.newBuilder()
-            .setMetadata(Metadata.newBuilder()
-                .setIndex(getCurrentIndex())
-                .build())
             .setStatus(CommitResponse.Status.FAILURE_DURING_COMMIT)
             .build();
       }
@@ -560,9 +475,6 @@ public class MapService extends AbstractMapService {
       onEvent(event);
     }
     return CommitResponse.newBuilder()
-        .setMetadata(Metadata.newBuilder()
-            .setIndex(getCurrentIndex())
-            .build())
         .setStatus(CommitResponse.Status.OK)
         .build();
   }
@@ -572,9 +484,6 @@ public class MapService extends AbstractMapService {
     AtomicMapTransaction transaction = activeTransactions.remove(request.getTransactionId());
     if (transaction == null) {
       return RollbackResponse.newBuilder()
-          .setMetadata(Metadata.newBuilder()
-              .setIndex(getCurrentIndex())
-              .build())
           .setStatus(RollbackResponse.Status.UNKNOWN_TRANSACTION_ID)
           .build();
     } else {
@@ -585,9 +494,6 @@ public class MapService extends AbstractMapService {
       });
       discardTombstones();
       return RollbackResponse.newBuilder()
-          .setMetadata(Metadata.newBuilder()
-              .setIndex(getCurrentIndex())
-              .build())
           .setStatus(RollbackResponse.Status.OK)
           .build();
     }

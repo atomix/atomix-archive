@@ -16,61 +16,73 @@
 package io.atomix.grpc.impl;
 
 import java.util.Map;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 
-import com.google.protobuf.ByteString;
+import com.google.common.io.BaseEncoding;
 import io.atomix.core.Atomix;
-import io.atomix.core.log.AsyncDistributedLog;
-import io.atomix.core.log.DistributedLog;
-import io.atomix.core.log.DistributedLogType;
-import io.atomix.core.log.Record;
 import io.atomix.grpc.log.ConsumeRequest;
 import io.atomix.grpc.log.LogId;
 import io.atomix.grpc.log.LogRecord;
 import io.atomix.grpc.log.LogServiceGrpc;
 import io.atomix.grpc.log.ProduceRequest;
 import io.atomix.grpc.log.ProduceResponse;
-import io.atomix.utils.concurrent.Futures;
+import io.atomix.primitive.log.LogClient;
+import io.atomix.primitive.partition.PartitionId;
+import io.atomix.protocols.log.DistributedLogProtocol;
 import io.grpc.stub.StreamObserver;
 
 /**
  * Log service implementation.
  */
 public class LogServiceImpl extends LogServiceGrpc.LogServiceImplBase {
-  private final PrimitiveExecutor<DistributedLog<byte[]>, AsyncDistributedLog<byte[]>> executor;
+  private final Atomix atomix;
 
   public LogServiceImpl(Atomix atomix) {
-    this.executor = new PrimitiveExecutor<>(atomix, DistributedLogType.instance(), DistributedLog::async);
+    this.atomix = atomix;
+  }
+
+  /**
+   * Returns a new client for the given log.
+   *
+   * @param id the log ID
+   * @return the log client
+   */
+  private LogClient getClient(LogId id) {
+    return DistributedLogProtocol.builder(id.getLog().getGroup()).build()
+        .newClient(atomix.getPartitionService());
   }
 
   @Override
   public StreamObserver<ProduceRequest> produce(StreamObserver<ProduceResponse> responseObserver) {
-    Map<LogId, CompletableFuture<AsyncDistributedLog<byte[]>>> logs = new ConcurrentHashMap<>();
+    Map<LogId, LogClient> clients = new ConcurrentHashMap<>();
     return new StreamObserver<ProduceRequest>() {
       @Override
       public void onNext(ProduceRequest request) {
-        if (executor.isValidRequest(request, ProduceResponse::getDefaultInstance, responseObserver)) {
-          logs.computeIfAbsent(request.getId(), executor::getPrimitive)
-              .whenComplete((log, error) -> {
-                if (error == null) {
-                  if (request.getPartition() == 0) {
-                    log.produce(request.getValue().toByteArray())
-                        .whenComplete((produceResult, produceError) -> {
-                          if (produceError != null) {
-                            responseObserver.onError(produceError);
-                          }
-                        });
-                  } else {
-                    log.getPartition(request.getPartition()).produce(request.getValue().toByteArray())
-                        .whenComplete((produceResult, produceError) -> {
-                          if (produceError != null) {
-                            responseObserver.onError(produceError);
-                          }
-                        });
-                  }
-                } else {
+        LogClient client = clients.get(request.getId());
+        if (client == null) {
+          client = clients.computeIfAbsent(request.getId(), LogServiceImpl.this::getClient);
+        }
+
+        if (request.getPartition() != 0) {
+          client.getPartition(PartitionId.newBuilder()
+              .setGroup(request.getId().getLog().getGroup())
+              .setPartition(request.getPartition())
+              .build())
+              .producer()
+              .append(request.getValue().toByteArray())
+              .whenComplete((response, error) -> {
+                if (error != null) {
+                  responseObserver.onError(error);
+                }
+              });
+        } else {
+          byte[] bytes = request.getValue().toByteArray();
+          client.getPartition(BaseEncoding.base16().encode(bytes))
+              .producer()
+              .append(bytes)
+              .whenComplete((response, error) -> {
+                if (error != null) {
                   responseObserver.onError(error);
                 }
               });
@@ -78,42 +90,39 @@ public class LogServiceImpl extends LogServiceGrpc.LogServiceImplBase {
       }
 
       @Override
-      public void onError(Throwable t) {
-        Futures.allOf(logs.values().stream())
-            .thenAccept(logs -> Futures.allOf(logs.map(AsyncDistributedLog::close)))
-            .whenComplete((r, e) -> responseObserver.onCompleted());
+      public void onError(Throwable error) {
+        responseObserver.onError(error);
       }
 
       @Override
       public void onCompleted() {
-        Futures.allOf(logs.values().stream())
-            .thenAccept(logs -> Futures.allOf(logs.map(AsyncDistributedLog::close)))
-            .whenComplete((r, e) -> responseObserver.onCompleted());
+        responseObserver.onCompleted();
       }
     };
   }
 
   @Override
   public void consume(ConsumeRequest request, StreamObserver<LogRecord> responseObserver) {
-    if (executor.isValidRequest(request, LogRecord::getDefaultInstance, responseObserver)) {
-      Consumer<Record<byte[]>> consumer = record -> {
-        responseObserver.onNext(LogRecord.newBuilder()
-            .setOffset(record.offset())
-            .setTimestamp(record.timestamp())
-            .setValue(ByteString.copyFrom(record.value()))
-            .build());
-      };
-      executor.getPrimitive(request.getId()).whenComplete((log, error) -> {
-        if (error == null) {
-          if (request.getPartition() == 0) {
-            log.consume(consumer);
-          } else {
-            log.getPartition(request.getPartition()).consume(consumer);
-          }
-        } else {
-          responseObserver.onError(error);
-        }
-      });
+    Consumer<io.atomix.primitive.log.LogRecord> consumer = record -> {
+      responseObserver.onNext(LogRecord.newBuilder()
+          .setOffset(record.getIndex())
+          .setTimestamp(record.getTimestamp())
+          .setValue(record.getValue())
+          .build());
+    };
+
+    if (request.getPartition() != 0) {
+      getClient(request.getId())
+          .getPartition(PartitionId.newBuilder()
+              .setGroup(request.getId().getLog().getGroup())
+              .setPartition(request.getPartition())
+              .build())
+          .consumer()
+          .consume(consumer);
+    } else {
+      getClient(request.getId())
+          .getPartitions()
+          .forEach(partition -> partition.consumer().consume(consumer));
     }
   }
 }

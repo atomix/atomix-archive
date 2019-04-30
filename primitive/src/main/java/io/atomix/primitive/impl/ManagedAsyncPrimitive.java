@@ -47,26 +47,26 @@ public abstract class ManagedAsyncPrimitive<P extends SessionEnabledPrimitivePro
   }
 
   protected <T, U> CompletableFuture<U> execute(
-      CommandFunction<P, T, U> function,
+      SessionCommandFunction<P, T, U> function,
       T request) {
     return executor.execute(function, request);
   }
 
   protected <T, U> CompletableFuture<Long> execute(
-      CommandStreamFunction<P, T, U> function,
+      SessionCommandStreamFunction<P, T, U> function,
       T request,
       StreamHandler<U> handler) {
     return executor.execute(function, request, handler);
   }
 
   protected <T, U> CompletableFuture<U> execute(
-      QueryFunction<P, T, U> function,
+      SessionQueryFunction<P, T, U> function,
       T request) {
     return executor.execute(function, request);
   }
 
   protected <T, U> CompletableFuture<Void> execute(
-      QueryStreamFunction<P, T, U> function,
+      SessionQueryStreamFunction<P, T, U> function,
       T request,
       StreamHandler<U> handler) {
     return executor.execute(function, request, handler);

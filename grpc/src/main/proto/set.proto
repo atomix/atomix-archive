@@ -3,6 +3,7 @@ syntax = "proto3";
 package atomix.set;
 
 import "protocol.proto";
+import "headers.proto";
 import "google/protobuf/duration.proto";
 
 option java_package = "io.atomix.grpc.set";
@@ -24,100 +25,133 @@ message CreateRequest {
 }
 
 message CreateResponse {
-    uint64 session_id = 1;
+    atomix.headers.SessionHeaders headers = 1;
 }
 
 message KeepAliveRequest {
-    uint64 session_id = 1;
-    uint64 event_index = 2;
-    uint64 command_sequence = 3;
+    SetId id = 1;
+    atomix.headers.SessionHeaders headers = 2;
 }
 
 message KeepAliveResponse {
+    atomix.headers.SessionHeaders headers = 1;
 }
 
 message CloseRequest {
-    uint64 session_id = 1;
-    bool delete = 2;
+    SetId id = 1;
+    atomix.headers.SessionHeaders headers = 2;
 }
 
 message CloseResponse {
-}
 
-message AddRequest {
-    uint64 session_id = 1;
-    repeated bytes values = 2;
-}
-
-message AddResponse {
-    bool added = 1;
-}
-
-message RemoveRequest {
-    uint64 session_id = 1;
-    repeated bytes values = 2;
-}
-
-message RemoveResponse {
-    bool removed = 1;
-}
-
-message ContainsRequest {
-    uint64 session_id = 1;
-    repeated bytes values = 2;
-}
-
-message ContainsResponse {
-    bool contains = 1;
 }
 
 message SizeRequest {
-    uint64 session_id = 1;
+    SetId id = 1;
+    atomix.headers.SessionQueryHeaders headers = 2;
 }
 
 message SizeResponse {
-    uint32 size = 1;
+    atomix.headers.SessionResponseHeaders headers = 1;
+    int32 size = 2;
+}
+
+message ContainsRequest {
+    SetId id = 1;
+    atomix.headers.SessionQueryHeaders headers = 2;
+    repeated string values = 3;
+}
+
+message ContainsResponse {
+    atomix.headers.SessionResponseHeaders headers = 1;
+    bool contains = 2;
+}
+
+message AddRequest {
+    SetId id = 1;
+    atomix.headers.SessionCommandHeaders headers = 2;
+    repeated string values = 3;
+}
+
+message AddResponse {
+    atomix.headers.SessionResponseHeaders headers = 1;
+    ResponseStatus status = 2;
+    bool added = 3;
+}
+
+message RemoveRequest {
+    SetId id = 1;
+    atomix.headers.SessionCommandHeaders headers = 2;
+    repeated string values = 3;
+}
+
+message RemoveResponse {
+    atomix.headers.SessionResponseHeaders headers = 1;
+    ResponseStatus status = 2;
+    bool removed = 3;
 }
 
 message ClearRequest {
-    uint64 session_id = 1;
+    SetId id = 1;
+    atomix.headers.SessionCommandHeaders headers = 2;
 }
 
 message ClearResponse {
+    atomix.headers.SessionResponseHeaders headers = 1;
 }
 
-// Set event
-message SetEvent {
-    uint64 session_id = 1;
-    Type type = 2;
-    bytes value = 3;
+message EventRequest {
+    SetId id = 1;
+    atomix.headers.SessionCommandHeaders headers = 2;
+}
 
-    // Set event type
+message EventResponse {
+    atomix.headers.SessionResponseHeaders headers = 1;
+    Type type = 2;
+    string value = 3;
+
     enum Type {
         ADDED = 0;
         REMOVED = 1;
     }
 }
 
+message IterateRequest {
+    SetId id = 1;
+    atomix.headers.SessionQueryHeaders headers = 2;
+}
+
+message IterateResponse {
+    atomix.headers.SessionResponseHeaders headers = 1;
+    string value = 2;
+}
+
+enum ResponseStatus {
+    OK = 0;
+    NOOP = 1;
+    WRITE_LOCK = 2;
+}
+
 // Set service
 service SetService {
 
-    rpc Create (CreateRequest) returns (CreateResponse) {}
+    rpc Create(CreateRequest) returns (CreateResponse) {}
 
-    rpc KeepAlive (KeepAliveRequest) returns (KeepAliveResponse) {}
+    rpc KeepAlive(KeepAliveRequest) returns (KeepAliveResponse) {}
 
-    rpc Close (CloseRequest) returns (CloseResponse) {}
+    rpc Close(CloseRequest) returns (CloseResponse) {}
 
-    rpc Add (AddRequest) returns (AddResponse) {}
+    rpc Size(SizeRequest) returns (SizeResponse) {}
 
-    rpc Remove (RemoveRequest) returns (RemoveResponse) {}
+    rpc Contains(ContainsRequest) returns (ContainsResponse) {}
 
-    rpc Contains (ContainsRequest) returns (ContainsResponse) {}
+    rpc Add(AddRequest) returns (AddResponse) {}
 
-    rpc Size (SizeRequest) returns (SizeResponse) {}
+    rpc Remove(RemoveRequest) returns (RemoveResponse) {}
 
-    rpc Clear (ClearRequest) returns (ClearResponse) {}
+    rpc Clear(ClearRequest) returns (ClearResponse) {}
 
-    rpc Listen (stream SetId) returns (stream SetEvent) {}
+    rpc Listen(EventRequest) returns (stream EventResponse) {}
 
+    rpc Iterate(IterateRequest) returns (stream IterateResponse) {}
 }

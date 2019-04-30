@@ -14,6 +14,9 @@ import io.atomix.primitive.service.impl.CommandResponse;
 import io.atomix.primitive.service.impl.DefaultServiceExecutor;
 import io.atomix.primitive.service.impl.QueryRequest;
 import io.atomix.primitive.service.impl.QueryResponse;
+import io.atomix.primitive.service.impl.ResponseContext;
+import io.atomix.primitive.service.impl.StreamContext;
+import io.atomix.primitive.service.impl.StreamResponse;
 import io.atomix.primitive.util.ByteArrayDecoder;
 import io.atomix.utils.stream.StreamHandler;
 
@@ -46,16 +49,18 @@ public abstract class SimplePrimitiveService extends AbstractPrimitiveService im
     CommandId commandId = new CommandId(command.value().getName());
     byte[] output = executor.apply(commandId, command.map(r -> r.getCommand().toByteArray()));
     return CompletableFuture.completedFuture(CommandResponse.newBuilder()
-        .setIndex(getCurrentIndex())
+        .setContext(ResponseContext.newBuilder()
+            .setIndex(getCurrentIndex())
+            .build())
         .setOutput(ByteString.copyFrom(output))
         .build());
   }
 
   @Override
   public CompletableFuture<Void> apply(Command<byte[]> command, StreamHandler<byte[]> handler) {
-    return applyCommand(command.map(bytes -> ByteArrayDecoder.decode(bytes, CommandRequest::parseFrom)), new StreamHandler<CommandResponse>() {
+    return applyCommand(command.map(bytes -> ByteArrayDecoder.decode(bytes, CommandRequest::parseFrom)), new StreamHandler<StreamResponse>() {
       @Override
-      public void next(CommandResponse response) {
+      public void next(StreamResponse response) {
         handler.next(response.toByteArray());
       }
 
@@ -71,13 +76,15 @@ public abstract class SimplePrimitiveService extends AbstractPrimitiveService im
     });
   }
 
-  private CompletableFuture<Void> applyCommand(Command<CommandRequest> command, StreamHandler<CommandResponse> handler) {
+  private CompletableFuture<Void> applyCommand(Command<CommandRequest> command, StreamHandler<StreamResponse> handler) {
     CommandId commandId = new CommandId(command.value().getName());
     executor.apply(commandId, command.map(r -> r.getCommand().toByteArray()), new StreamHandler<byte[]>() {
       @Override
       public void next(byte[] value) {
-        handler.next(CommandResponse.newBuilder()
-            .setIndex(getCurrentIndex())
+        handler.next(StreamResponse.newBuilder()
+            .setContext(StreamContext.newBuilder()
+                .setIndex(getCurrentIndex())
+                .build())
             .setOutput(ByteString.copyFrom(value))
             .build());
       }
@@ -103,8 +110,8 @@ public abstract class SimplePrimitiveService extends AbstractPrimitiveService im
 
   private CompletableFuture<QueryResponse> applyQuery(Query<QueryRequest> query) {
     CompletableFuture<QueryResponse> future = new CompletableFuture<>();
-    if (query.value().getIndex() > getCurrentIndex()) {
-      indexQueries.computeIfAbsent(query.value().getIndex(), index -> new LinkedList<>())
+    if (query.value().getContext().getIndex() > getCurrentIndex()) {
+      indexQueries.computeIfAbsent(query.value().getContext().getIndex(), index -> new LinkedList<>())
           .add(() -> applyQuery(query, future));
     } else {
       applyQuery(query, future);
@@ -116,16 +123,18 @@ public abstract class SimplePrimitiveService extends AbstractPrimitiveService im
     QueryId queryId = new QueryId(request.value().getName());
     byte[] output = executor.apply(queryId, request.map(r -> r.getQuery().toByteArray()));
     future.complete(QueryResponse.newBuilder()
-        .setIndex(getCurrentIndex())
+        .setContext(ResponseContext.newBuilder()
+            .setIndex(getCurrentIndex())
+            .build())
         .setOutput(ByteString.copyFrom(output))
         .build());
   }
 
   @Override
   public CompletableFuture<Void> apply(Query<byte[]> query, StreamHandler<byte[]> handler) {
-    return applyQuery(query.map(bytes -> ByteArrayDecoder.decode(bytes, QueryRequest::parseFrom)), new StreamHandler<QueryResponse>() {
+    return applyQuery(query.map(bytes -> ByteArrayDecoder.decode(bytes, QueryRequest::parseFrom)), new StreamHandler<StreamResponse>() {
       @Override
-      public void next(QueryResponse response) {
+      public void next(StreamResponse response) {
         handler.next(response.toByteArray());
       }
 
@@ -141,10 +150,10 @@ public abstract class SimplePrimitiveService extends AbstractPrimitiveService im
     });
   }
 
-  private CompletableFuture<Void> applyQuery(Query<QueryRequest> query, StreamHandler<QueryResponse> handler) {
+  private CompletableFuture<Void> applyQuery(Query<QueryRequest> query, StreamHandler<StreamResponse> handler) {
     CompletableFuture<Void> future = new CompletableFuture<>();
-    if (query.value().getIndex() > getCurrentIndex()) {
-      indexQueries.computeIfAbsent(query.value().getIndex(), index -> new LinkedList<>())
+    if (query.value().getContext().getIndex() > getCurrentIndex()) {
+      indexQueries.computeIfAbsent(query.value().getContext().getIndex(), index -> new LinkedList<>())
           .add(() -> applyQuery(query, handler, future));
     } else {
       applyQuery(query, handler, future);
@@ -152,13 +161,15 @@ public abstract class SimplePrimitiveService extends AbstractPrimitiveService im
     return future;
   }
 
-  private void applyQuery(Query<QueryRequest> query, StreamHandler<QueryResponse> handler, CompletableFuture<Void> future) {
+  private void applyQuery(Query<QueryRequest> query, StreamHandler<StreamResponse> handler, CompletableFuture<Void> future) {
     QueryId queryId = new QueryId(query.value().getName());
     executor.apply(queryId, query.map(r -> r.getQuery().toByteArray()), new StreamHandler<byte[]>() {
       @Override
       public void next(byte[] value) {
-        handler.next(QueryResponse.newBuilder()
-            .setIndex(getCurrentIndex())
+        handler.next(StreamResponse.newBuilder()
+            .setContext(StreamContext.newBuilder()
+                .setIndex(getCurrentIndex())
+                .build())
             .setOutput(ByteString.copyFrom(value))
             .build());
       }

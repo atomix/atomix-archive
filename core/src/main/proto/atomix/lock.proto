@@ -2,8 +2,6 @@ syntax = "proto3";
 
 package atomix.lock.service;
 
-import "google/protobuf/empty.proto";
-import "atomix/metadata.proto";
 import "atomix/primitive/service.proto";
 
 option java_package = "io.atomix.core.lock.impl";
@@ -28,7 +26,7 @@ message LockRequest {
 }
 
 message LockResponse {
-    atomix.metadata.Metadata metadata = 1;
+    int64 index = 1;
     bool acquired = 2;
 }
 
@@ -37,7 +35,6 @@ message UnlockRequest {
 }
 
 message UnlockResponse {
-    atomix.metadata.Metadata metadata = 1;
 }
 
 message IsLockedRequest {
@@ -45,8 +42,7 @@ message IsLockedRequest {
 }
 
 message IsLockedResponse {
-    atomix.metadata.Metadata metadata = 1;
-    bool locked = 2;
+    bool locked = 1;
 }
 
 // Lock service

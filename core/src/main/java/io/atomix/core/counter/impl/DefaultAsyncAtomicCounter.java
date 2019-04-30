@@ -20,7 +20,6 @@ import java.util.concurrent.CompletableFuture;
 
 import io.atomix.core.counter.AsyncAtomicCounter;
 import io.atomix.core.counter.AtomicCounter;
-import io.atomix.primitive.PrimitiveType;
 import io.atomix.primitive.impl.SimpleAsyncPrimitive;
 
 /**
@@ -33,19 +32,19 @@ public class DefaultAsyncAtomicCounter extends SimpleAsyncPrimitive<CounterProxy
 
   @Override
   public CompletableFuture<Long> get() {
-    return getProxy().get(GetRequest.newBuilder().build())
+    return execute(CounterProxy::get, GetRequest.newBuilder().build())
         .thenApply(response -> response.getValue());
   }
 
   @Override
   public CompletableFuture<Void> set(long value) {
-    return getProxy().set(SetRequest.newBuilder().setValue(value).build())
+    return execute(CounterProxy::set, SetRequest.newBuilder().setValue(value).build())
         .thenApply(response -> null);
   }
 
   @Override
   public CompletableFuture<Boolean> compareAndSet(long expectedValue, long updateValue) {
-    return getProxy().checkAndSet(CheckAndSetRequest.newBuilder()
+    return execute(CounterProxy::checkAndSet, CheckAndSetRequest.newBuilder()
         .setExpect(expectedValue)
         .setUpdate(updateValue)
         .build())
@@ -54,7 +53,7 @@ public class DefaultAsyncAtomicCounter extends SimpleAsyncPrimitive<CounterProxy
 
   @Override
   public CompletableFuture<Long> addAndGet(long delta) {
-    return getProxy().increment(IncrementRequest.newBuilder()
+    return execute(CounterProxy::increment, IncrementRequest.newBuilder()
         .setDelta(delta)
         .build())
         .thenApply(response -> response.getNextValue());
@@ -62,7 +61,7 @@ public class DefaultAsyncAtomicCounter extends SimpleAsyncPrimitive<CounterProxy
 
   @Override
   public CompletableFuture<Long> getAndAdd(long delta) {
-    return getProxy().increment(IncrementRequest.newBuilder()
+    return execute(CounterProxy::increment, IncrementRequest.newBuilder()
         .setDelta(delta)
         .build())
         .thenApply(response -> response.getPreviousValue());
@@ -70,25 +69,25 @@ public class DefaultAsyncAtomicCounter extends SimpleAsyncPrimitive<CounterProxy
 
   @Override
   public CompletableFuture<Long> incrementAndGet() {
-    return getProxy().increment(IncrementRequest.newBuilder().build())
+    return execute(CounterProxy::increment, IncrementRequest.newBuilder().build())
         .thenApply(response -> response.getNextValue());
   }
 
   @Override
   public CompletableFuture<Long> getAndIncrement() {
-    return getProxy().increment(IncrementRequest.newBuilder().build())
+    return execute(CounterProxy::increment, IncrementRequest.newBuilder().build())
         .thenApply(response -> response.getPreviousValue());
   }
 
   @Override
   public CompletableFuture<Long> decrementAndGet() {
-    return getProxy().decrement(DecrementRequest.newBuilder().build())
+    return execute(CounterProxy::decrement, DecrementRequest.newBuilder().build())
         .thenApply(response -> response.getNextValue());
   }
 
   @Override
   public CompletableFuture<Long> getAndDecrement() {
-    return getProxy().decrement(DecrementRequest.newBuilder().build())
+    return execute(CounterProxy::decrement, DecrementRequest.newBuilder().build())
         .thenApply(response -> response.getPreviousValue());
   }
 
