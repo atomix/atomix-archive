@@ -63,7 +63,7 @@ public class DefaultAtomicMapBuilder<K, V> extends AtomicMapBuilder<K, V> {
               value -> serializer.encode(value),
               bytes -> serializer.decode(bytes));
         })
-        .thenApply(map -> {
+        .<AsyncAtomicMap<K, V>>thenApply(map -> {
           if (config.getCacheConfig().isEnabled()) {
             return new CachingAsyncAtomicMap<>(map, config.getCacheConfig());
           }

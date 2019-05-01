@@ -50,7 +50,7 @@ import io.atomix.utils.time.Versioned;
  * @param <V1> value type of this map
  */
 public class TranscodingAsyncAtomicMap<K1, V1, K2, V2> extends DelegatingAsyncPrimitive implements AsyncAtomicMap<K1, V1> {
-
+  private static final byte[] EMPTY = new byte[0];
   private final AsyncAtomicMap<K2, V2> backingMap;
   protected final Function<K1, K2> keyEncoder;
   protected final Function<K2, K1> keyDecoder;

@@ -460,21 +460,21 @@ public class DelegatingAsyncDistributedMap<K, V> extends DelegatingAsyncPrimitiv
     @Override
     public void event(AtomicMapEvent<K, V> event) {
       switch (event.type()) {
-        case INSERT:
+        case INSERTED:
           mapListener.event(new MapEvent<>(
               MapEvent.Type.INSERT,
               event.key(),
               Versioned.valueOrNull(event.newValue()),
               Versioned.valueOrNull(event.oldValue())));
           break;
-        case UPDATE:
+        case UPDATED:
           mapListener.event(new MapEvent<>(
               MapEvent.Type.UPDATE,
               event.key(),
               Versioned.valueOrNull(event.newValue()),
               Versioned.valueOrNull(event.oldValue())));
           break;
-        case REMOVE:
+        case REMOVED:
           mapListener.event(new MapEvent<>(
               MapEvent.Type.REMOVE,
               event.key(),

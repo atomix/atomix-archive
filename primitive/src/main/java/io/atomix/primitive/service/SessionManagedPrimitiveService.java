@@ -7,11 +7,14 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.Collection;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
+import com.google.common.collect.Streams;
 import com.google.protobuf.ByteString;
 import io.atomix.primitive.PrimitiveException;
 import io.atomix.primitive.operation.CommandId;
@@ -246,9 +249,17 @@ public abstract class SessionManagedPrimitiveService extends AbstractPrimitiveSe
 
   @Override
   public CompletableFuture<byte[]> apply(Command<byte[]> command) {
-    return applySessionRequest(
-        command.map(bytes -> ByteArrayDecoder.decode(bytes, SessionRequest::parseFrom)))
-        .thenApply(SessionResponse::toByteArray);
+    // Run tasks scheduled to execute prior to this command.
+    scheduler.runScheduledTasks(command.timestamp());
+
+    try {
+      return applySessionRequest(
+          command.map(bytes -> ByteArrayDecoder.decode(bytes, SessionRequest::parseFrom)))
+          .thenApply(SessionResponse::toByteArray);
+    } finally {
+      // Run tasks pending to be executed after this command.
+      scheduler.runPendingTasks();
+    }
   }
 
   private CompletableFuture<SessionResponse> applySessionRequest(Command<SessionRequest> command) {
@@ -389,8 +400,16 @@ public abstract class SessionManagedPrimitiveService extends AbstractPrimitiveSe
     // Set the current session for usage in the service.
     setCurrentSession(session);
 
-    // Run tasks scheduled to execute prior to this command.
-    scheduler.runScheduledTasks(command.timestamp());
+    // Create stream contexts prior to executing the command to ensure we're
+    // sending the stream state prior to this command.
+    List<SessionStreamContext> streams = session.getStreams()
+        .stream()
+        .map(stream -> SessionStreamContext.newBuilder()
+            .setStreamId(stream.id().streamId())
+            .setIndex(stream.getLastIndex())
+            .setSequence(stream.getCurrentSequence())
+            .build())
+        .collect(Collectors.toList());
 
     // Create the operation and apply it.
     OperationExecutor operation = executor.getExecutor(new CommandId<>(command.value().getName()));
@@ -405,9 +424,6 @@ public abstract class SessionManagedPrimitiveService extends AbstractPrimitiveSe
       session.setLastApplied(getCurrentIndex());
       future.completeExceptionally(e);
       return;
-    } finally {
-      // Run tasks pending to execute after this command.
-      scheduler.runPendingTasks();
     }
 
     long sequenceNumber = command.value().getContext().getSequenceNumber();
@@ -419,14 +435,7 @@ public abstract class SessionManagedPrimitiveService extends AbstractPrimitiveSe
         .setContext(SessionResponseContext.newBuilder()
             .setIndex(getCurrentIndex())
             .setSequence(session.getCommandSequence())
-            .addAllStreams(session.getStreams()
-                .stream()
-                .map(stream -> SessionStreamContext.newBuilder()
-                    .setStreamId(stream.id().streamId())
-                    .setIndex(stream.getLastIndex())
-                    .setSequence(stream.getCurrentSequence())
-                    .build())
-                .collect(Collectors.toList()))
+            .addAllStreams(streams)
             .build())
         .setOutput(ByteString.copyFrom(output))
         .build());
@@ -496,9 +505,6 @@ public abstract class SessionManagedPrimitiveService extends AbstractPrimitiveSe
     // Set the current session for usage in the service.
     setCurrentSession(session);
 
-    // Run tasks scheduled to execute prior to this command.
-    scheduler.runScheduledTasks(command.timestamp());
-
     // Create the operation and apply it.
     long sequenceNumber = command.value().getContext().getSequenceNumber();
 
@@ -516,20 +522,32 @@ public abstract class SessionManagedPrimitiveService extends AbstractPrimitiveSe
             .setStream(response)
             .build()));
 
+    // Create stream contexts prior to executing the command to ensure we're
+    // sending the stream state prior to this command.
+    List<SessionStreamContext> streams = Streams.concat(
+        Stream.of(SessionStreamContext.newBuilder()
+            .setStreamId(stream.id().streamId())
+            .setIndex(getCurrentIndex())
+            .build()),
+        session.getStreams()
+            .stream()
+            .map(s -> SessionStreamContext.newBuilder()
+                .setStreamId(s.id().streamId())
+                .setIndex(s.getLastIndex())
+                .setSequence(s.getCurrentSequence())
+                .build()))
+        .collect(Collectors.toList());
+
     // Initialize the stream handler with the session response.
     SessionCommandResponse response = SessionCommandResponse.newBuilder()
         .setContext(SessionResponseContext.newBuilder()
             .setIndex(getCurrentIndex())
             .setSequence(sequenceNumber)
-            .addAllStreams(session.getStreams().stream()
-                .map(s -> SessionStreamContext.newBuilder()
-                    .setStreamId(s.id().streamId())
-                    .setIndex(s.getLastIndex())
-                    .setSequence(s.getCurrentSequence())
-                    .build())
-                .collect(Collectors.toList()))
+            .addAllStreams(streams)
             .build())
         .build();
+
+    // Immediately send the command response/context on the stream.
     handler.next(SessionResponse.newBuilder()
         .setCommand(response)
         .build());
@@ -539,9 +557,6 @@ public abstract class SessionManagedPrimitiveService extends AbstractPrimitiveSe
       operation.execute(codec.decode(command.value().getInput().toByteArray()), stream);
     } catch (Exception e) {
       future.completeExceptionally(e);
-    } finally {
-      // Run tasks pending to be executed after this command.
-      scheduler.runPendingTasks();
     }
 
     // Update the session's sequence number and last applied index.
@@ -605,8 +620,22 @@ public abstract class SessionManagedPrimitiveService extends AbstractPrimitiveSe
       CompletableFuture<SessionQueryResponse> future) {
     setCurrentSession(session);
 
+    // Create stream contexts prior to executing the command to ensure we're
+    // sending the stream state prior to this command.
+    List<SessionStreamContext> streams = session.getStreams()
+        .stream()
+        .map(stream -> SessionStreamContext.newBuilder()
+            .setStreamId(stream.id().streamId())
+            .setIndex(stream.getLastIndex())
+            .setSequence(stream.getCurrentSequence())
+            .build())
+        .collect(Collectors.toList());
+
+    // Get the query executor.
     QueryId<?, ?> queryId = new QueryId<>(query.value().getName());
     OperationExecutor operation = executor.getExecutor(queryId);
+
+    // Execute the query.
     byte[] output;
     try {
       output = operation.execute(query.value().getInput().toByteArray());
@@ -615,18 +644,12 @@ public abstract class SessionManagedPrimitiveService extends AbstractPrimitiveSe
       return;
     }
 
+    // Complete the query future to send the response.
     future.complete(SessionQueryResponse.newBuilder()
         .setContext(SessionResponseContext.newBuilder()
             .setIndex(getCurrentIndex())
             .setSequence(session.getCommandSequence())
-            .addAllStreams(session.getStreams()
-                .stream()
-                .map(stream -> SessionStreamContext.newBuilder()
-                    .setStreamId(stream.id().streamId())
-                    .setIndex(stream.getLastIndex())
-                    .setSequence(stream.getCurrentSequence())
-                    .build())
-                .collect(Collectors.toList()))
+            .addAllStreams(streams)
             .build())
         .setOutput(ByteString.copyFrom(output))
         .build());

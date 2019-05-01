@@ -97,6 +97,7 @@ message PutResponse {
     UpdateStatus status = 1;
     bytes previous_value = 2;
     int64 previous_version = 3;
+    int64 new_version = 4;
 }
 
 message ReplaceRequest {
@@ -111,6 +112,7 @@ message ReplaceResponse {
     UpdateStatus status = 1;
     bytes previous_value = 2;
     int64 previous_version = 3;
+    int64 new_version = 4;
 }
 
 message GetRequest {

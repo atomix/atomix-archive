@@ -132,6 +132,8 @@ public class MapService extends AbstractMapService {
           || (request.getVersion() > 0 && request.getVersion() != oldValue.getVersion())) {
         return PutResponse.newBuilder()
             .setStatus(UpdateStatus.PRECONDITION_FAILED)
+            .setPreviousValue(oldValue.getValue())
+            .setPreviousVersion(oldValue.getVersion())
             .build();
       }
     }
@@ -186,35 +188,12 @@ public class MapService extends AbstractMapService {
 
     AtomicMapEntryValue oldValue = map.get(request.getKey());
     if (oldValue == null || oldValue.getType() == AtomicMapEntryValue.Type.TOMBSTONE) {
-      if (request.getPreviousValue().isEmpty() && request.getPreviousVersion() == 0) {
-        AtomicMapEntryValue newValue = AtomicMapEntryValue.newBuilder()
-            .setType(AtomicMapEntryValue.Type.VALUE)
-            .setValue(request.getNewValue())
-            .setVersion(getCurrentIndex())
-            .setTtl(request.getTtl())
-            .setCreated(getCurrentTimestamp())
-            .build();
-        map.put(request.getKey(), newValue);
-
-        scheduleTtl(request.getKey(), newValue);
-
-        onEvent(ListenResponse.newBuilder()
-            .setType(ListenResponse.Type.INSERTED)
-            .setKey(request.getKey())
-            .setNewValue(newValue.getValue())
-            .setNewVersion(newValue.getVersion())
-            .build());
-
-        return ReplaceResponse.newBuilder()
-            .setStatus(UpdateStatus.OK)
-            .build();
-      } else {
-        return ReplaceResponse.newBuilder()
-            .setStatus(UpdateStatus.PRECONDITION_FAILED)
-            .build();
-      }
+      return ReplaceResponse.newBuilder()
+          .setStatus(UpdateStatus.PRECONDITION_FAILED)
+          .build();
     } else {
-      if ((!request.getPreviousValue().isEmpty() && request.getPreviousValue().equals(oldValue.getValue()))
+      if ((request.getPreviousValue().isEmpty() && request.getPreviousVersion() == 0)
+          || (!request.getPreviousValue().isEmpty() && request.getPreviousValue().equals(oldValue.getValue()))
           || (request.getPreviousVersion() != 0 && request.getPreviousVersion() == oldValue.getVersion())) {
         AtomicMapEntryValue newValue = AtomicMapEntryValue.newBuilder()
             .setType(AtomicMapEntryValue.Type.VALUE)

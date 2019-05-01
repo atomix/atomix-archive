@@ -34,27 +34,6 @@ public abstract class DistributedMapBuilder<K, V>
     super(DistributedMapType.instance(), name, config, managementService);
   }
 
-  /**
-   * Enables null values in the map.
-   *
-   * @return this builder
-   */
-  public DistributedMapBuilder<K, V> withNullValues() {
-    config.setNullValues();
-    return this;
-  }
-
-  /**
-   * Sets whether null values are allowed.
-   *
-   * @param nullValues whether null values are allowed
-   * @return this builder
-   */
-  public DistributedMapBuilder<K, V> withNullValues(boolean nullValues) {
-    config.setNullValues(nullValues);
-    return this;
-  }
-
   @Override
   public DistributedMapBuilder<K, V> withProtocol(ProxyProtocol protocol) {
     return withProtocol((PrimitiveProtocol) protocol);

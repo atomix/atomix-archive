@@ -75,31 +75,31 @@ public class DistributedSetTest extends AbstractPrimitiveTest {
 
     assertTrue(set.add("foo"));
     event = listener.event();
-    assertEquals(CollectionEvent.Type.ADD, event.type());
+    assertEquals(CollectionEvent.Type.ADDED, event.type());
     assertEquals("foo", event.element());
 
     assertTrue(set.add("bar"));
     event = listener.event();
-    assertEquals(CollectionEvent.Type.ADD, event.type());
+    assertEquals(CollectionEvent.Type.ADDED, event.type());
     assertEquals("bar", event.element());
 
     assertTrue(set.addAll(Arrays.asList("foo", "bar", "baz")));
     event = listener.event();
-    assertEquals(CollectionEvent.Type.ADD, event.type());
+    assertEquals(CollectionEvent.Type.ADDED, event.type());
     assertEquals("baz", event.element());
     assertFalse(listener.eventReceived());
 
     assertTrue(set.remove("foo"));
     event = listener.event();
-    assertEquals(CollectionEvent.Type.REMOVE, event.type());
+    assertEquals(CollectionEvent.Type.REMOVED, event.type());
     assertEquals("foo", event.element());
 
     assertTrue(set.removeAll(Arrays.asList("foo", "bar", "baz")));
     event = listener.event();
-    assertEquals(CollectionEvent.Type.REMOVE, event.type());
+    assertEquals(CollectionEvent.Type.REMOVED, event.type());
     assertTrue(event.element().equals("bar") || event.element().equals("baz"));
     event = listener.event();
-    assertEquals(CollectionEvent.Type.REMOVE, event.type());
+    assertEquals(CollectionEvent.Type.REMOVED, event.type());
     assertTrue(event.element().equals("bar") || event.element().equals("baz"));
   }
 

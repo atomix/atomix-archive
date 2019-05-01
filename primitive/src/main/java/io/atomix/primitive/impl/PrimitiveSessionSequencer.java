@@ -15,7 +15,7 @@
  */
 package io.atomix.primitive.impl;
 
-import java.util.ArrayDeque;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.Map;
@@ -97,11 +97,11 @@ final class PrimitiveSessionSequencer {
    * and the next response in the sequence of responses is checked to determine whether the event can be
    * completed.
    *
-   * @param context   The publish request.
+   * @param context  The publish request.
    * @param callback The callback to sequence.
    */
   public void sequenceStream(SessionStreamContext context, Runnable callback) {
-    streams.computeIfAbsent(context.getStreamId(), id -> new StreamSequencer())
+    streams.computeIfAbsent(context.getStreamId(), StreamSequencer::new)
         .sequenceEvent(context, callback);
   }
 
@@ -203,6 +203,15 @@ final class PrimitiveSessionSequencer {
   }
 
   /**
+   * Returns the collection of stream sequencers.
+   *
+   * @return the collection of stream sequencer
+   */
+  public Collection<StreamSequencer> streams() {
+    return streams.values();
+  }
+
+  /**
    * Closes the given stream.
    *
    * @param streamId the stream ID
@@ -236,17 +245,40 @@ final class PrimitiveSessionSequencer {
   /**
    * Stream sequencer.
    */
-  private class StreamSequencer {
+  public class StreamSequencer {
+    private final long streamId;
     private long streamIndex;
     private long streamSequence;
     private long completeSequence;
     private final Queue<EventCallback> eventCallbacks = new LinkedList<>();
     private Runnable closeCallback;
 
+    StreamSequencer(long streamId) {
+      this.streamId = streamId;
+    }
+
+    /**
+     * Returns the stream ID.
+     *
+     * @return the stream ID
+     */
+    public long streamId() {
+      return streamId;
+    }
+
+    /**
+     * Returns the highest sequence number received in order on the stream.
+     *
+     * @return the highest sequence number received in order on the stream
+     */
+    public long getStreamSequence() {
+      return streamSequence;
+    }
+
     /**
      * Sequences the given event.
      *
-     * @param context the stream context
+     * @param context  the stream context
      * @param callback the callback to execute
      */
     void sequenceEvent(SessionStreamContext context, Runnable callback) {
@@ -287,7 +319,7 @@ final class PrimitiveSessionSequencer {
         }
         eventCallback = eventCallbacks.peek();
       }
-      return false;
+      return completeSequence == context.getSequence();
     }
 
     /**
@@ -298,7 +330,7 @@ final class PrimitiveSessionSequencer {
       while (eventCallback != null) {
         log.trace("Completing {}", eventCallback.event);
         eventCallback.run();
-        completeSequence = eventCallback.event.getIndex();
+        completeSequence = eventCallback.event.getSequence();
         eventCallback = eventCallbacks.poll();
       }
       if (closeCallback != null) {

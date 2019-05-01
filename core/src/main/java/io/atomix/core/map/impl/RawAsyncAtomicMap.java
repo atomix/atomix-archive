@@ -108,12 +108,17 @@ public class RawAsyncAtomicMap extends SessionEnabledAsyncPrimitive<MapProxy, As
 
           // If the response was empty, add the value only if the key is empty.
           if (response.getVersion() == 0) {
-            return putIfAbsent(key, computedValue)
+            return execute(MapProxy::put, PutRequest.newBuilder()
+                .setKey(key)
+                .setValue(ByteString.copyFrom(computedValue))
+                .setVersion(MapService.VERSION_EMPTY)
+                .build())
                 .thenCompose(result -> {
-                  if (result != null) {
+                  if (result.getStatus() == UpdateStatus.WRITE_LOCK
+                      || result.getStatus() == UpdateStatus.PRECONDITION_FAILED) {
                     return Futures.exceptionalFuture(new PrimitiveException.ConcurrentModification());
                   }
-                  return CompletableFuture.completedFuture(new Versioned<>(response.getValue().toByteArray(), response.getVersion()));
+                  return CompletableFuture.completedFuture(new Versioned<>(computedValue, result.getNewVersion()));
                 });
           }
           // If the computed value is null, remove the value if the version has not changed.
@@ -123,18 +128,23 @@ public class RawAsyncAtomicMap extends SessionEnabledAsyncPrimitive<MapProxy, As
                   if (!succeeded) {
                     return Futures.exceptionalFuture(new PrimitiveException.ConcurrentModification());
                   }
-                  return CompletableFuture.completedFuture(new Versioned<>(response.getValue().toByteArray(), response.getVersion()));
+                  return CompletableFuture.completedFuture(null);
                 });
           }
           // If both the current value and the computed value are non-empty, update the value
           // if the key has not changed.
           else {
-            return replace(key, response.getVersion(), computedValue)
-                .thenCompose(succeeded -> {
-                  if (!succeeded) {
+            return execute(MapProxy::replace, ReplaceRequest.newBuilder()
+                .setKey(key)
+                .setPreviousVersion(response.getVersion())
+                .setNewValue(ByteString.copyFrom(computedValue))
+                .build())
+                .thenCompose(result -> {
+                  if (result.getStatus() == UpdateStatus.WRITE_LOCK
+                      || result.getStatus() == UpdateStatus.PRECONDITION_FAILED) {
                     return Futures.exceptionalFuture(new PrimitiveException.ConcurrentModification());
                   }
-                  return CompletableFuture.completedFuture(new Versioned<>(response.getValue().toByteArray(), response.getVersion()));
+                  return CompletableFuture.completedFuture(new Versioned<>(computedValue, result.getNewVersion()));
                 });
           }
         });
@@ -170,7 +180,7 @@ public class RawAsyncAtomicMap extends SessionEnabledAsyncPrimitive<MapProxy, As
           if (response.getStatus() == UpdateStatus.WRITE_LOCK) {
             throw new PrimitiveException.ConcurrentModification();
           }
-          if (!response.getPreviousValue().isEmpty()) {
+          if (response.getStatus() == UpdateStatus.PRECONDITION_FAILED) {
             return new Versioned<>(response.getPreviousValue().toByteArray(), response.getPreviousVersion());
           }
           return null;
@@ -243,6 +253,8 @@ public class RawAsyncAtomicMap extends SessionEnabledAsyncPrimitive<MapProxy, As
         .thenApply(response -> {
           if (response.getStatus() == UpdateStatus.WRITE_LOCK) {
             throw new PrimitiveException.ConcurrentModification();
+          } else if (response.getStatus() == UpdateStatus.PRECONDITION_FAILED) {
+            return null;
           } else if (response.getStatus() == UpdateStatus.OK) {
             return new Versioned<>(response.getPreviousValue().toByteArray(), response.getPreviousVersion());
           }
@@ -415,11 +427,15 @@ public class RawAsyncAtomicMap extends SessionEnabledAsyncPrimitive<MapProxy, As
     public synchronized CompletableFuture<Void> addListener(CollectionEventListener<Map.Entry<String, Versioned<byte[]>>> listener, Executor executor) {
       AtomicMapEventListener<String, byte[]> mapListener = event -> {
         switch (event.type()) {
-          case INSERT:
-            listener.event(new CollectionEvent<>(CollectionEvent.Type.ADD, Maps.immutableEntry(event.key(), event.newValue())));
+          case INSERTED:
+            listener.event(new CollectionEvent<>(CollectionEvent.Type.ADDED, Maps.immutableEntry(event.key(), event.newValue())));
             break;
-          case REMOVE:
-            listener.event(new CollectionEvent<>(CollectionEvent.Type.REMOVE, Maps.immutableEntry(event.key(), event.oldValue())));
+          case UPDATED:
+            listener.event(new CollectionEvent<>(CollectionEvent.Type.REMOVED, Maps.immutableEntry(event.key(), event.oldValue())));
+            listener.event(new CollectionEvent<>(CollectionEvent.Type.ADDED, Maps.immutableEntry(event.key(), event.newValue())));
+            break;
+          case REMOVED:
+            listener.event(new CollectionEvent<>(CollectionEvent.Type.REMOVED, Maps.immutableEntry(event.key(), event.oldValue())));
             break;
           default:
             break;
@@ -498,11 +514,11 @@ public class RawAsyncAtomicMap extends SessionEnabledAsyncPrimitive<MapProxy, As
     public synchronized CompletableFuture<Void> addListener(CollectionEventListener<String> listener, Executor executor) {
       AtomicMapEventListener<String, byte[]> mapListener = event -> {
         switch (event.type()) {
-          case INSERT:
-            listener.event(new CollectionEvent<>(CollectionEvent.Type.ADD, event.key()));
+          case INSERTED:
+            listener.event(new CollectionEvent<>(CollectionEvent.Type.ADDED, event.key()));
             break;
-          case REMOVE:
-            listener.event(new CollectionEvent<>(CollectionEvent.Type.REMOVE, event.key()));
+          case REMOVED:
+            listener.event(new CollectionEvent<>(CollectionEvent.Type.REMOVED, event.key()));
             break;
           default:
             break;
@@ -556,11 +572,15 @@ public class RawAsyncAtomicMap extends SessionEnabledAsyncPrimitive<MapProxy, As
     public synchronized CompletableFuture<Void> addListener(CollectionEventListener<Versioned<byte[]>> listener, Executor executor) {
       AtomicMapEventListener<String, byte[]> mapListener = event -> {
         switch (event.type()) {
-          case INSERT:
-            listener.event(new CollectionEvent<>(CollectionEvent.Type.ADD, event.newValue()));
+          case INSERTED:
+            listener.event(new CollectionEvent<>(CollectionEvent.Type.ADDED, event.newValue()));
             break;
-          case REMOVE:
-            listener.event(new CollectionEvent<>(CollectionEvent.Type.REMOVE, event.oldValue()));
+          case UPDATED:
+            listener.event(new CollectionEvent<>(CollectionEvent.Type.REMOVED, event.oldValue()));
+            listener.event(new CollectionEvent<>(CollectionEvent.Type.ADDED, event.newValue()));
+            break;
+          case REMOVED:
+            listener.event(new CollectionEvent<>(CollectionEvent.Type.REMOVED, event.oldValue()));
             break;
           default:
             break;

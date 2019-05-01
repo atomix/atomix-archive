@@ -540,7 +540,11 @@ final class PrimitiveSessionExecutor<P extends SessionEnabledPrimitiveProxy> {
     @Override
     public void accept(SessionResponseContext response, Throwable error) {
       if (error == null) {
-        sequencer.sequenceResponse(id, response, () -> future.complete(response.getStreams(0).getStreamId()));
+        // Sequence the response and complete the future with the requested stream ID.
+        sequencer.sequenceResponse(id, response, () -> response.getStreamsList().stream()
+            .filter(s -> s.getIndex() == response.getIndex())
+            .findFirst()
+            .ifPresent(s -> future.complete(s.getStreamId())));
       } else {
         future.completeExceptionally(error);
       }
@@ -622,7 +626,10 @@ final class PrimitiveSessionExecutor<P extends SessionEnabledPrimitiveProxy> {
     @Override
     public void accept(SessionResponseContext response, Throwable error) {
       if (error == null) {
-        future.complete(null);
+        sequence(response, () -> {
+          state.setResponseIndex(response.getIndex());
+          future.complete(null);
+        });
       } else {
         future.completeExceptionally(error);
       }

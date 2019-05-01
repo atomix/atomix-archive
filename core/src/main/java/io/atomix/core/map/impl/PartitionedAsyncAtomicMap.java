@@ -11,10 +11,16 @@ import java.util.function.Predicate;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import io.atomix.core.collection.AsyncDistributedCollection;
+import io.atomix.core.collection.CollectionEvent;
+import io.atomix.core.collection.CollectionEventListener;
+import io.atomix.core.collection.impl.UnsupportedAsyncDistributedCollection;
+import io.atomix.core.iterator.AsyncIterator;
+import io.atomix.core.iterator.impl.PartitionedAsyncIterator;
 import io.atomix.core.map.AsyncAtomicMap;
 import io.atomix.core.map.AtomicMap;
 import io.atomix.core.map.AtomicMapEventListener;
 import io.atomix.core.set.AsyncDistributedSet;
+import io.atomix.core.set.impl.UnsupportedAsyncDistributedSet;
 import io.atomix.core.transaction.TransactionId;
 import io.atomix.core.transaction.TransactionLog;
 import io.atomix.primitive.PartitionedAsyncPrimitive;
@@ -93,17 +99,17 @@ public class PartitionedAsyncAtomicMap
 
   @Override
   public AsyncDistributedSet<String> keySet() {
-    throw new UnsupportedOperationException();
+    return new KeySet();
   }
 
   @Override
   public AsyncDistributedCollection<Versioned<byte[]>> values() {
-    throw new UnsupportedOperationException();
+    return new Values();
   }
 
   @Override
   public AsyncDistributedSet<Map.Entry<String, Versioned<byte[]>>> entrySet() {
-    throw new UnsupportedOperationException();
+    return new EntrySet();
   }
 
   @Override
@@ -178,5 +184,208 @@ public class PartitionedAsyncAtomicMap
   @Override
   public AtomicMap<String, byte[]> sync(Duration operationTimeout) {
     return new BlockingAtomicMap<>(this, operationTimeout.toMillis());
+  }
+
+  private class EntrySet extends UnsupportedAsyncDistributedSet<Map.Entry<String, Versioned<byte[]>>> {
+    private final Map<CollectionEventListener<Map.Entry<String, Versioned<byte[]>>>, AtomicMapEventListener<String, byte[]>> eventListeners = Maps.newIdentityHashMap();
+
+    @Override
+    public String name() {
+      return PartitionedAsyncAtomicMap.this.name();
+    }
+
+    @Override
+    public CompletableFuture<Boolean> add(Map.Entry<String, Versioned<byte[]>> element) {
+      return getPartition(element.getKey()).entrySet().add(element);
+    }
+
+    @Override
+    public CompletableFuture<Boolean> remove(Map.Entry<String, Versioned<byte[]>> element) {
+      return PartitionedAsyncAtomicMap.this.remove(element.getKey(), element.getValue().version());
+    }
+
+    @Override
+    public CompletableFuture<Integer> size() {
+      return PartitionedAsyncAtomicMap.this.size();
+    }
+
+    @Override
+    public CompletableFuture<Boolean> isEmpty() {
+      return PartitionedAsyncAtomicMap.this.isEmpty();
+    }
+
+    @Override
+    public CompletableFuture<Void> clear() {
+      return PartitionedAsyncAtomicMap.this.clear();
+    }
+
+    @Override
+    public CompletableFuture<Boolean> contains(Map.Entry<String, Versioned<byte[]>> element) {
+      return get(element.getKey()).thenApply(result -> result != null && result.equals(element.getValue()));
+    }
+
+    @Override
+    public synchronized CompletableFuture<Void> addListener(CollectionEventListener<Map.Entry<String, Versioned<byte[]>>> listener, Executor executor) {
+      AtomicMapEventListener<String, byte[]> mapListener = event -> {
+        switch (event.type()) {
+          case INSERTED:
+            listener.event(new CollectionEvent<>(CollectionEvent.Type.ADDED, Maps.immutableEntry(event.key(), event.newValue())));
+            break;
+          case UPDATED:
+            listener.event(new CollectionEvent<>(CollectionEvent.Type.REMOVED, Maps.immutableEntry(event.key(), event.oldValue())));
+            listener.event(new CollectionEvent<>(CollectionEvent.Type.ADDED, Maps.immutableEntry(event.key(), event.newValue())));
+            break;
+          case REMOVED:
+            listener.event(new CollectionEvent<>(CollectionEvent.Type.REMOVED, Maps.immutableEntry(event.key(), event.oldValue())));
+            break;
+          default:
+            break;
+        }
+      };
+      if (eventListeners.putIfAbsent(listener, mapListener) == null) {
+        return PartitionedAsyncAtomicMap.this.addListener(mapListener, executor);
+      }
+      return CompletableFuture.completedFuture(null);
+    }
+
+    @Override
+    public synchronized CompletableFuture<Void> removeListener(CollectionEventListener<Map.Entry<String, Versioned<byte[]>>> listener) {
+      AtomicMapEventListener<String, byte[]> mapListener = eventListeners.remove(listener);
+      if (mapListener != null) {
+        return PartitionedAsyncAtomicMap.this.removeListener(mapListener);
+      }
+      return CompletableFuture.completedFuture(null);
+    }
+
+    @Override
+    public AsyncIterator<Map.Entry<String, Versioned<byte[]>>> iterator() {
+      return new PartitionedAsyncIterator<>(getPartitions().stream().map(map -> map.entrySet().iterator()).iterator());
+    }
+  }
+
+  private class KeySet extends UnsupportedAsyncDistributedSet<String> {
+    private final Map<CollectionEventListener<String>, AtomicMapEventListener<String, byte[]>> eventListeners = Maps.newIdentityHashMap();
+
+    @Override
+    public String name() {
+      return PartitionedAsyncAtomicMap.this.name();
+    }
+
+    @Override
+    public CompletableFuture<Boolean> remove(String element) {
+      return PartitionedAsyncAtomicMap.this.remove(element)
+          .thenApply(value -> value != null);
+    }
+
+    @Override
+    public CompletableFuture<Integer> size() {
+      return PartitionedAsyncAtomicMap.this.size();
+    }
+
+    @Override
+    public CompletableFuture<Boolean> isEmpty() {
+      return PartitionedAsyncAtomicMap.this.isEmpty();
+    }
+
+    @Override
+    public CompletableFuture<Void> clear() {
+      return PartitionedAsyncAtomicMap.this.clear();
+    }
+
+    @Override
+    public CompletableFuture<Boolean> contains(String element) {
+      return containsKey(element);
+    }
+
+    @Override
+    public synchronized CompletableFuture<Void> addListener(CollectionEventListener<String> listener, Executor executor) {
+      AtomicMapEventListener<String, byte[]> mapListener = event -> {
+        switch (event.type()) {
+          case INSERTED:
+            listener.event(new CollectionEvent<>(CollectionEvent.Type.ADDED, event.key()));
+            break;
+          case REMOVED:
+            listener.event(new CollectionEvent<>(CollectionEvent.Type.REMOVED, event.key()));
+            break;
+          default:
+            break;
+        }
+      };
+      if (eventListeners.putIfAbsent(listener, mapListener) == null) {
+        return PartitionedAsyncAtomicMap.this.addListener(mapListener, executor);
+      }
+      return CompletableFuture.completedFuture(null);
+    }
+
+    @Override
+    public synchronized CompletableFuture<Void> removeListener(CollectionEventListener<String> listener) {
+      AtomicMapEventListener<String, byte[]> mapListener = eventListeners.remove(listener);
+      if (mapListener != null) {
+        return PartitionedAsyncAtomicMap.this.removeListener(mapListener);
+      }
+      return CompletableFuture.completedFuture(null);
+    }
+
+    @Override
+    public AsyncIterator<String> iterator() {
+      return new PartitionedAsyncIterator<>(getPartitions().stream().map(map -> map.keySet().iterator()).iterator());
+    }
+  }
+
+  private class Values extends UnsupportedAsyncDistributedCollection<Versioned<byte[]>> {
+    private final Map<CollectionEventListener<Versioned<byte[]>>, AtomicMapEventListener<String, byte[]>> eventListeners = Maps.newIdentityHashMap();
+
+    @Override
+    public String name() {
+      return PartitionedAsyncAtomicMap.this.name();
+    }
+
+    @Override
+    public CompletableFuture<Integer> size() {
+      return PartitionedAsyncAtomicMap.this.size();
+    }
+
+    @Override
+    public CompletableFuture<Boolean> isEmpty() {
+      return PartitionedAsyncAtomicMap.this.isEmpty();
+    }
+
+    @Override
+    public synchronized CompletableFuture<Void> addListener(CollectionEventListener<Versioned<byte[]>> listener, Executor executor) {
+      AtomicMapEventListener<String, byte[]> mapListener = event -> {
+        switch (event.type()) {
+          case INSERTED:
+            listener.event(new CollectionEvent<>(CollectionEvent.Type.ADDED, event.newValue()));
+            break;
+          case UPDATED:
+            listener.event(new CollectionEvent<>(CollectionEvent.Type.REMOVED, event.oldValue()));
+            listener.event(new CollectionEvent<>(CollectionEvent.Type.ADDED, event.newValue()));
+            break;
+          case REMOVED:
+            listener.event(new CollectionEvent<>(CollectionEvent.Type.REMOVED, event.oldValue()));
+            break;
+          default:
+            break;
+        }
+      };
+      if (eventListeners.putIfAbsent(listener, mapListener) == null) {
+        return PartitionedAsyncAtomicMap.this.addListener(mapListener, executor);
+      }
+      return CompletableFuture.completedFuture(null);
+    }
+
+    @Override
+    public synchronized CompletableFuture<Void> removeListener(CollectionEventListener<Versioned<byte[]>> listener) {
+      AtomicMapEventListener<String, byte[]> mapListener = eventListeners.remove(listener);
+      if (mapListener != null) {
+        return PartitionedAsyncAtomicMap.this.removeListener(mapListener);
+      }
+      return CompletableFuture.completedFuture(null);
+    }
+
+    @Override
+    public AsyncIterator<Versioned<byte[]>> iterator() {
+      return new PartitionedAsyncIterator<>(getPartitions().stream().map(map -> map.values().iterator()).iterator());
+    }
   }
 }
