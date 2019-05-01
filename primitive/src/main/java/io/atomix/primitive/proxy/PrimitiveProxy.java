@@ -1,5 +1,7 @@
 package io.atomix.primitive.proxy;
 
+import java.util.concurrent.CompletableFuture;
+
 import io.atomix.primitive.PrimitiveManagementService;
 import io.atomix.primitive.partition.PartitionId;
 import io.atomix.primitive.service.ServiceType;
@@ -37,6 +39,13 @@ public interface PrimitiveProxy {
    * @return the proxy thread context
    */
   ThreadContext context();
+
+  /**
+   * Deletes the primitive.
+   *
+   * @return a future to be completed once the primitive has been deleted
+   */
+  CompletableFuture<Void> delete();
 
   /**
    * Proxy context.

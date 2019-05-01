@@ -6,6 +6,7 @@ import com.google.protobuf.Message;
 import io.atomix.primitive.operation.CommandId;
 import io.atomix.primitive.operation.QueryId;
 import io.atomix.primitive.partition.PartitionClient;
+import io.atomix.primitive.service.impl.DeleteRequest;
 import io.atomix.primitive.service.impl.ServiceId;
 import io.atomix.primitive.service.impl.ServiceRequest;
 import io.atomix.primitive.service.impl.ServiceResponse;
@@ -50,6 +51,16 @@ public class DefaultSessionClient implements SessionClient {
         .setCloseSession(request)
         .build())
         .thenApply(response -> response.getCloseSession());
+  }
+
+  @Override
+  public CompletableFuture<Void> delete() {
+    return client.command(ServiceRequest.newBuilder()
+        .setId(serviceId)
+        .setDelete(DeleteRequest.newBuilder().build())
+        .build()
+        .toByteArray())
+        .thenApply(v -> null);
   }
 
   @Override
@@ -176,24 +187,24 @@ public class DefaultSessionClient implements SessionClient {
   private CompletableFuture<SessionResponse> command(SessionRequest request) {
     return client.command(ServiceRequest.newBuilder()
         .setId(serviceId)
-        .setRequest(request.toByteString())
+        .setCommand(request.toByteString())
         .build()
         .toByteArray())
         .thenApply(response -> ByteArrayDecoder.decode(response, ServiceResponse::parseFrom))
-        .thenApply(response -> ByteBufferDecoder.decode(response.getResponse().asReadOnlyByteBuffer(), SessionResponse::parseFrom));
+        .thenApply(response -> ByteBufferDecoder.decode(response.getCommand().asReadOnlyByteBuffer(), SessionResponse::parseFrom));
   }
 
   private CompletableFuture<Void> command(SessionRequest request, StreamHandler<SessionResponse> handler) {
     return client.command(ServiceRequest.newBuilder()
             .setId(serviceId)
-            .setRequest(request.toByteString())
+            .setCommand(request.toByteString())
             .build()
             .toByteArray(),
         new StreamHandler<byte[]>() {
           @Override
           public void next(byte[] response) {
             ServiceResponse serviceResponse = ByteArrayDecoder.decode(response, ServiceResponse::parseFrom);
-            SessionResponse sessionResponse = ByteBufferDecoder.decode(serviceResponse.getResponse().asReadOnlyByteBuffer(), SessionResponse::parseFrom);
+            SessionResponse sessionResponse = ByteBufferDecoder.decode(serviceResponse.getCommand().asReadOnlyByteBuffer(), SessionResponse::parseFrom);
             handler.next(sessionResponse);
           }
 
@@ -212,24 +223,24 @@ public class DefaultSessionClient implements SessionClient {
   private CompletableFuture<SessionResponse> query(SessionRequest request) {
     return client.query(ServiceRequest.newBuilder()
         .setId(serviceId)
-        .setRequest(request.toByteString())
+        .setQuery(request.toByteString())
         .build()
         .toByteArray())
         .thenApply(response -> ByteArrayDecoder.decode(response, ServiceResponse::parseFrom))
-        .thenApply(response -> ByteBufferDecoder.decode(response.getResponse().asReadOnlyByteBuffer(), SessionResponse::parseFrom));
+        .thenApply(response -> ByteBufferDecoder.decode(response.getQuery().asReadOnlyByteBuffer(), SessionResponse::parseFrom));
   }
 
   private CompletableFuture<Void> query(SessionRequest request, StreamHandler<SessionResponse> handler) {
     return client.query(ServiceRequest.newBuilder()
             .setId(serviceId)
-            .setRequest(request.toByteString())
+            .setQuery(request.toByteString())
             .build()
             .toByteArray(),
         new StreamHandler<byte[]>() {
           @Override
           public void next(byte[] response) {
             ServiceResponse serviceResponse = ByteArrayDecoder.decode(response, ServiceResponse::parseFrom);
-            SessionResponse sessionResponse = ByteBufferDecoder.decode(serviceResponse.getResponse().asReadOnlyByteBuffer(), SessionResponse::parseFrom);
+            SessionResponse sessionResponse = ByteBufferDecoder.decode(serviceResponse.getQuery().asReadOnlyByteBuffer(), SessionResponse::parseFrom);
             handler.next(sessionResponse);
           }
 

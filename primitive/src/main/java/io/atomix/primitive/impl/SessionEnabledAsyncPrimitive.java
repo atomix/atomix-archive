@@ -26,7 +26,6 @@ import io.atomix.primitive.PrimitiveState;
 import io.atomix.primitive.proxy.SessionEnabledPrimitiveProxy;
 import io.atomix.primitive.session.impl.CloseSessionRequest;
 import io.atomix.primitive.session.impl.OpenSessionRequest;
-import io.atomix.utils.concurrent.Futures;
 import io.atomix.utils.stream.StreamHandler;
 
 /**
@@ -116,6 +115,6 @@ public abstract class SessionEnabledAsyncPrimitive<P extends SessionEnabledPrimi
 
   @Override
   public CompletableFuture<Void> delete() {
-    return Futures.exceptionalFuture(new UnsupportedOperationException());
+    return getProxy().delete();
   }
 }

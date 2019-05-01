@@ -7,7 +7,6 @@ import io.atomix.primitive.AsyncPrimitive;
 import io.atomix.primitive.proxy.PrimitiveProxy;
 import io.atomix.primitive.service.impl.RequestContext;
 import io.atomix.primitive.service.impl.StreamContext;
-import io.atomix.utils.concurrent.Futures;
 import io.atomix.utils.stream.StreamHandler;
 import org.apache.commons.lang3.tuple.Pair;
 
@@ -82,6 +81,6 @@ public abstract class SimpleAsyncPrimitive<P extends PrimitiveProxy> implements 
 
   @Override
   public CompletableFuture<Void> delete() {
-    return Futures.exceptionalFuture(new UnsupportedOperationException());
+    return proxy.delete();
   }
 }

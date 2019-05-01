@@ -15,19 +15,26 @@
  */
 package io.atomix.primitive.proxy;
 
-import io.atomix.primitive.client.PrimitiveClient;
-import io.atomix.primitive.client.impl.DefaultPrimitiveClient;
+import java.util.concurrent.CompletableFuture;
+
+import io.atomix.primitive.service.ServiceClient;
+import io.atomix.primitive.service.impl.DefaultServiceClient;
 
 /**
  * Base class for primitive proxies.
  */
-public abstract class SimplePrimitiveProxy extends AbstractPrimitiveProxy<PrimitiveClient> {
+public abstract class SimplePrimitiveProxy extends AbstractPrimitiveProxy<ServiceClient> {
   protected SimplePrimitiveProxy(Context context) {
     super(context);
   }
 
   @Override
-  protected PrimitiveClient createClient() {
-    return new DefaultPrimitiveClient(serviceId(), getPartitionClient());
+  protected ServiceClient createClient() {
+    return new DefaultServiceClient(serviceId(), getPartitionClient());
+  }
+
+  @Override
+  public CompletableFuture<Void> delete() {
+    return getClient().delete();
   }
 }

@@ -68,4 +68,9 @@ public abstract class SessionEnabledPrimitiveProxy extends AbstractPrimitiveProx
   public CompletableFuture<CloseSessionResponse> closeSession(CloseSessionRequest request) {
     return getClient().closeSession(request);
   }
+
+  @Override
+  public CompletableFuture<Void> delete() {
+    return getClient().delete();
+  }
 }

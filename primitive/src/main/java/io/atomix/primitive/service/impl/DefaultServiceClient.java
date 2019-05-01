@@ -1,13 +1,15 @@
-package io.atomix.primitive.client.impl;
+package io.atomix.primitive.service.impl;
 
 import java.util.concurrent.CompletableFuture;
 
 import com.google.protobuf.Message;
-import io.atomix.primitive.client.PrimitiveClient;
+import io.atomix.primitive.service.ServiceClient;
 import io.atomix.primitive.operation.OperationId;
 import io.atomix.primitive.partition.PartitionClient;
 import io.atomix.primitive.service.impl.CommandRequest;
 import io.atomix.primitive.service.impl.CommandResponse;
+import io.atomix.primitive.service.impl.CreateRequest;
+import io.atomix.primitive.service.impl.DeleteRequest;
 import io.atomix.primitive.service.impl.QueryRequest;
 import io.atomix.primitive.service.impl.QueryResponse;
 import io.atomix.primitive.service.impl.RequestContext;
@@ -27,13 +29,33 @@ import org.apache.commons.lang3.tuple.Pair;
 /**
  * Default primitive client.
  */
-public class DefaultPrimitiveClient implements PrimitiveClient {
+public class DefaultServiceClient implements ServiceClient {
   private final ServiceId serviceId;
   private final PartitionClient client;
 
-  public DefaultPrimitiveClient(ServiceId serviceId, PartitionClient client) {
+  public DefaultServiceClient(ServiceId serviceId, PartitionClient client) {
     this.serviceId = serviceId;
     this.client = client;
+  }
+
+  @Override
+  public CompletableFuture<Void> create() {
+    return client.command(ServiceRequest.newBuilder()
+        .setId(serviceId)
+        .setCreate(CreateRequest.newBuilder().build())
+        .build()
+        .toByteArray())
+        .thenApply(v -> null);
+  }
+
+  @Override
+  public CompletableFuture<Void> delete() {
+    return client.command(ServiceRequest.newBuilder()
+        .setId(serviceId)
+        .setDelete(DeleteRequest.newBuilder().build())
+        .build()
+        .toByteArray())
+        .thenApply(v -> null);
   }
 
   @Override
@@ -61,7 +83,7 @@ public class DefaultPrimitiveClient implements PrimitiveClient {
       ByteBufferDecoder<U> decoder) {
     return client.command(ServiceRequest.newBuilder()
         .setId(serviceId)
-        .setRequest(CommandRequest.newBuilder()
+        .setCommand(CommandRequest.newBuilder()
             .setName(operation.id())
             .setCommand(ByteStringEncoder.encode(request, encoder))
             .setContext(context)
@@ -70,7 +92,7 @@ public class DefaultPrimitiveClient implements PrimitiveClient {
         .build()
         .toByteArray())
         .thenApply(response -> ByteArrayDecoder.decode(response, ServiceResponse::parseFrom))
-        .thenApply(response -> ByteBufferDecoder.decode(response.getResponse().asReadOnlyByteBuffer(), CommandResponse::parseFrom))
+        .thenApply(response -> ByteBufferDecoder.decode(response.getCommand().asReadOnlyByteBuffer(), CommandResponse::parseFrom))
         .thenApply(response -> Pair.of(response.getContext(), ByteBufferDecoder.decode(response.getOutput().asReadOnlyByteBuffer(), decoder)));
   }
 
@@ -82,7 +104,7 @@ public class DefaultPrimitiveClient implements PrimitiveClient {
       ByteBufferDecoder<U> decoder) {
     return client.query(ServiceRequest.newBuilder()
         .setId(serviceId)
-        .setRequest(QueryRequest.newBuilder()
+        .setQuery(QueryRequest.newBuilder()
             .setName(operation.id())
             .setQuery(ByteStringEncoder.encode(request, encoder))
             .setContext(context)
@@ -91,7 +113,7 @@ public class DefaultPrimitiveClient implements PrimitiveClient {
         .build()
         .toByteArray())
         .thenApply(response -> ByteArrayDecoder.decode(response, ServiceResponse::parseFrom))
-        .thenApply(response -> ByteBufferDecoder.decode(response.getResponse().asReadOnlyByteBuffer(), QueryResponse::parseFrom))
+        .thenApply(response -> ByteBufferDecoder.decode(response.getQuery().asReadOnlyByteBuffer(), QueryResponse::parseFrom))
         .thenApply(response -> Pair.of(response.getContext(), ByteBufferDecoder.decode(response.getOutput().asReadOnlyByteBuffer(), decoder)));
   }
 
@@ -122,7 +144,7 @@ public class DefaultPrimitiveClient implements PrimitiveClient {
       ByteBufferDecoder<U> decoder) {
     return client.command(ServiceRequest.newBuilder()
         .setId(serviceId)
-        .setRequest(CommandRequest.newBuilder()
+        .setCommand(CommandRequest.newBuilder()
             .setName(operation.id())
             .setCommand(ByteStringEncoder.encode(request, encoder))
             .setContext(context)
@@ -133,7 +155,7 @@ public class DefaultPrimitiveClient implements PrimitiveClient {
       @Override
       public void next(byte[] value) {
         ServiceResponse serviceResponse = ByteArrayDecoder.decode(value, ServiceResponse::parseFrom);
-        StreamResponse streamResponse = ByteBufferDecoder.decode(serviceResponse.getResponse().asReadOnlyByteBuffer(), StreamResponse::parseFrom);
+        StreamResponse streamResponse = ByteBufferDecoder.decode(serviceResponse.getCommand().asReadOnlyByteBuffer(), StreamResponse::parseFrom);
         U response = ByteBufferDecoder.decode(streamResponse.getOutput().asReadOnlyByteBuffer(), decoder);
         handler.next(Pair.of(streamResponse.getContext(), response));
       }
@@ -159,7 +181,7 @@ public class DefaultPrimitiveClient implements PrimitiveClient {
       ByteBufferDecoder<U> decoder) {
     return client.query(ServiceRequest.newBuilder()
         .setId(serviceId)
-        .setRequest(QueryRequest.newBuilder()
+        .setQuery(QueryRequest.newBuilder()
             .setName(operation.id())
             .setQuery(ByteStringEncoder.encode(request, encoder))
             .setContext(context)
@@ -170,7 +192,7 @@ public class DefaultPrimitiveClient implements PrimitiveClient {
       @Override
       public void next(byte[] value) {
         ServiceResponse serviceResponse = ByteArrayDecoder.decode(value, ServiceResponse::parseFrom);
-        StreamResponse streamResponse = ByteBufferDecoder.decode(serviceResponse.getResponse().asReadOnlyByteBuffer(), StreamResponse::parseFrom);
+        StreamResponse streamResponse = ByteBufferDecoder.decode(serviceResponse.getQuery().asReadOnlyByteBuffer(), StreamResponse::parseFrom);
         U response = ByteBufferDecoder.decode(streamResponse.getOutput().asReadOnlyByteBuffer(), decoder);
         handler.next(Pair.of(streamResponse.getContext(), response));
       }

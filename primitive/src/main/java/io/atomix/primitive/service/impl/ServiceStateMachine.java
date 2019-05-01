@@ -23,21 +23,19 @@ import org.slf4j.Logger;
  * Service state machine.
  */
 public class ServiceStateMachine implements StateMachine {
-  private final String name;
-  private final String type;
+  private final ServiceId serviceId;
   private final StateMachine stateMachine;
   private final Logger log;
   private final TreeMap<Long, Long> snapshotIndexes = new TreeMap<>();
   private Context context;
   private long index;
 
-  public ServiceStateMachine(String name, String type, StateMachine stateMachine) {
-    this.name = name;
-    this.type = type;
+  public ServiceStateMachine(ServiceId serviceId, StateMachine stateMachine) {
+    this.serviceId = serviceId;
     this.stateMachine = stateMachine;
     this.log = ContextualLoggerFactory.getLogger(getClass(), LoggerContext.builder(PrimitiveService.class)
-        .add("name", name)
-        .add("type", type)
+        .add("name", serviceId.getName())
+        .add("type", serviceId.getType())
         .build());
   }
 
@@ -119,7 +117,7 @@ public class ServiceStateMachine implements StateMachine {
      * @return the service name
      */
     public String getName() {
-      return name;
+      return serviceId.getName();
     }
 
     /**
@@ -128,7 +126,7 @@ public class ServiceStateMachine implements StateMachine {
      * @return the service type
      */
     public String getType() {
-      return type;
+      return serviceId.getType();
     }
 
     @Override

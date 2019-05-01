@@ -18,8 +18,8 @@ package io.atomix.primitive.session.impl;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import io.atomix.primitive.client.PrimitiveClient;
-import io.atomix.primitive.client.impl.DefaultPrimitiveClient;
+import io.atomix.primitive.service.ServiceClient;
+import io.atomix.primitive.service.impl.DefaultServiceClient;
 import io.atomix.primitive.partition.PartitionService;
 import io.atomix.primitive.service.impl.RequestContext;
 import io.atomix.primitive.service.impl.ServiceId;
@@ -36,7 +36,7 @@ public class ReplicatedSessionIdService implements ManagedSessionIdService {
   private static final String PRIMITIVE_NAME = "session-id";
 
   private final PartitionService partitionService;
-  private PrimitiveClient client;
+  private ServiceClient client;
   private final AtomicBoolean started = new AtomicBoolean();
 
   public ReplicatedSessionIdService(PartitionService partitionService) {
@@ -56,7 +56,7 @@ public class ReplicatedSessionIdService implements ManagedSessionIdService {
 
   @Override
   public CompletableFuture<SessionIdService> start() {
-    this.client = new DefaultPrimitiveClient(
+    this.client = new DefaultServiceClient(
         ServiceId.newBuilder()
             .setType(SessionIdGeneratorType.instance().name())
             .setName(PRIMITIVE_NAME)

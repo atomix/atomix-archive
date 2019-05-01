@@ -16,8 +16,8 @@ import io.atomix.primitive.service.Query;
 import io.atomix.primitive.service.ServiceType;
 import io.atomix.primitive.service.StateMachine;
 import io.atomix.primitive.util.ByteArrayDecoder;
-import io.atomix.utils.stream.StreamHandler;
 import io.atomix.utils.concurrent.Futures;
+import io.atomix.utils.stream.StreamHandler;
 
 /**
  * Default state machine.
@@ -55,14 +55,14 @@ public class ServiceManagerStateMachine implements StateMachine {
     services.clear();
     while (input.available() > 0) {
       ServiceId serviceId = ServiceId.parseDelimitedFrom(input);
-      services.put(serviceId.getName(), newService(serviceId.getName(), serviceId.getType()));
+      services.put(serviceId.getName(), newService(serviceId));
     }
   }
 
-  private ServiceStateMachine newService(String name, String type) {
-    ServiceType serviceType = managementService.getServiceTypes().getServiceType(type);
+  private ServiceStateMachine newService(ServiceId serviceId) {
+    ServiceType serviceType = managementService.getServiceTypes().getServiceType(serviceId.getType());
     ServiceStateMachine service = new ServiceStateMachine(
-        name, type, serviceType.newService(partitionId, managementService));
+        serviceId, serviceType.newService(partitionId, managementService));
     service.init(context);
     return service;
   }
@@ -81,10 +81,28 @@ public class ServiceManagerStateMachine implements StateMachine {
   public CompletableFuture<byte[]> apply(Command<byte[]> command) {
     Command<ServiceRequest> serviceCommand = command.map(bytes -> ByteArrayDecoder.decode(bytes, ServiceRequest::parseFrom));
     ServiceId id = serviceCommand.value().getId();
-    ServiceStateMachine service = services.computeIfAbsent(id.getName(), name -> newService(id.getName(), id.getType()));
-    return service.apply(serviceCommand.map(request -> request.getRequest().toByteArray()))
+    ServiceStateMachine service = services.computeIfAbsent(id.getName(), name -> newService(id));
+
+    // If the service is being created, just return an empty response.
+    if (serviceCommand.value().hasCreate()) {
+      return CompletableFuture.completedFuture(ServiceResponse.newBuilder()
+          .setCreate(CreateResponse.newBuilder().build())
+          .build()
+          .toByteArray());
+    }
+
+    // If the service is being deleted, remove the service and return an empty response.
+    if (serviceCommand.value().hasDelete()) {
+      services.remove(id.getName());
+      return CompletableFuture.completedFuture(ServiceResponse.newBuilder()
+          .setDelete(DeleteResponse.newBuilder().build())
+          .build()
+          .toByteArray());
+    }
+
+    return service.apply(serviceCommand.map(request -> request.getCommand().toByteArray()))
         .thenApply(response -> ServiceResponse.newBuilder()
-            .setResponse(ByteString.copyFrom(response))
+            .setCommand(ByteString.copyFrom(response))
             .build()
             .toByteArray());
   }
@@ -93,12 +111,12 @@ public class ServiceManagerStateMachine implements StateMachine {
   public CompletableFuture<Void> apply(Command<byte[]> command, StreamHandler<byte[]> handler) {
     Command<ServiceRequest> serviceCommand = command.map(bytes -> ByteArrayDecoder.decode(bytes, ServiceRequest::parseFrom));
     ServiceId id = serviceCommand.value().getId();
-    ServiceStateMachine service = services.computeIfAbsent(id.getName(), name -> newService(id.getName(), id.getType()));
-    return service.apply(serviceCommand.map(request -> request.getRequest().toByteArray()), new StreamHandler<byte[]>() {
+    ServiceStateMachine service = services.computeIfAbsent(id.getName(), name -> newService(id));
+    return service.apply(serviceCommand.map(request -> request.getCommand().toByteArray()), new StreamHandler<byte[]>() {
       @Override
       public void next(byte[] response) {
         handler.next(ServiceResponse.newBuilder()
-            .setResponse(ByteString.copyFrom(response))
+            .setCommand(ByteString.copyFrom(response))
             .build()
             .toByteArray());
       }
@@ -121,11 +139,11 @@ public class ServiceManagerStateMachine implements StateMachine {
     ServiceId id = serviceQuery.value().getId();
     ServiceStateMachine service = services.get(id.getName());
     if (service == null) {
-      return Futures.exceptionalFuture(new PrimitiveException.UnknownService());
+      service = newService(id);
     }
-    return service.apply(serviceQuery.map(request -> request.getRequest().toByteArray()))
+    return service.apply(serviceQuery.map(request -> request.getQuery().toByteArray()))
         .thenApply(response -> ServiceResponse.newBuilder()
-            .setResponse(ByteString.copyFrom(response))
+            .setQuery(ByteString.copyFrom(response))
             .build()
             .toByteArray());
   }
@@ -138,11 +156,11 @@ public class ServiceManagerStateMachine implements StateMachine {
     if (service == null) {
       return Futures.exceptionalFuture(new PrimitiveException.UnknownService());
     }
-    return service.apply(serviceQuery.map(request -> request.getRequest().toByteArray()), new StreamHandler<byte[]>() {
+    return service.apply(serviceQuery.map(request -> request.getQuery().toByteArray()), new StreamHandler<byte[]>() {
       @Override
       public void next(byte[] response) {
         handler.next(ServiceResponse.newBuilder()
-            .setResponse(ByteString.copyFrom(response))
+            .setQuery(ByteString.copyFrom(response))
             .build()
             .toByteArray());
       }

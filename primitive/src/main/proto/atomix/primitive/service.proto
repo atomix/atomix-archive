@@ -67,21 +67,39 @@ message ServiceSession {
     int64 last_applied = 9;
 }
 
-message ListenRequest {
-    int64 session_id = 1;
-}
-
-message UnlistenRequest {
-    int64 session_id = 1;
-}
-
 message ServiceRequest {
     ServiceId id = 1;
-    bytes request = 2;
+    oneof request {
+        CreateRequest create = 2;
+        DeleteRequest delete = 3;
+        bytes command = 4;
+        bytes query = 5;
+    }
 }
 
 message ServiceResponse {
-    bytes response = 1;
+    oneof response {
+        CreateResponse create = 1;
+        DeleteResponse delete = 2;
+        bytes command = 3;
+        bytes query = 4;
+    }
+}
+
+message CreateRequest {
+
+}
+
+message CreateResponse {
+
+}
+
+message DeleteRequest {
+
+}
+
+message DeleteResponse {
+
 }
 
 message CommandRequest {
