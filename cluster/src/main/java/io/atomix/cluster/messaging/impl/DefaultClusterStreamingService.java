@@ -14,11 +14,11 @@ import io.atomix.cluster.MemberId;
 import io.atomix.cluster.messaging.ClusterStreamingService;
 import io.atomix.cluster.messaging.ManagedClusterStreamingService;
 import io.atomix.cluster.messaging.MessagingService;
+import io.atomix.utils.stream.EncodingStreamHandler;
 import io.atomix.utils.stream.StreamFunction;
 import io.atomix.utils.stream.StreamHandler;
 import io.atomix.utils.concurrent.Futures;
 import io.atomix.utils.stream.TranscodingStreamFunction;
-import io.atomix.utils.stream.TranscodingStreamHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -53,7 +53,7 @@ public class DefaultClusterStreamingService implements ManagedClusterStreamingSe
       return Futures.exceptionalFuture(CONNECT_EXCEPTION);
     }
     return messagingService.sendStreamAsync(member.address(), type)
-        .thenApply(stream -> new TranscodingStreamHandler<>(stream, encoder));
+        .thenApply(stream -> new EncodingStreamHandler<>(stream, encoder));
   }
 
   @Override
@@ -85,7 +85,7 @@ public class DefaultClusterStreamingService implements ManagedClusterStreamingSe
       return Futures.exceptionalFuture(CONNECT_EXCEPTION);
     }
     return messagingService.sendAndReceiveStream(
-        member.address(), type, encoder.apply(message), new TranscodingStreamHandler<>(handler, decoder), timeout);
+        member.address(), type, encoder.apply(message), new EncodingStreamHandler<>(handler, decoder), timeout);
   }
 
   @Override
@@ -101,8 +101,8 @@ public class DefaultClusterStreamingService implements ManagedClusterStreamingSe
       return Futures.exceptionalFuture(CONNECT_EXCEPTION);
     }
     return messagingService.sendStreamAndReceiveStream(
-        member.address(), type, new TranscodingStreamHandler<>(handler, decoder), timeout)
-        .thenApply(h -> new TranscodingStreamHandler<>(h, encoder));
+        member.address(), type, new EncodingStreamHandler<>(handler, decoder), timeout)
+        .thenApply(h -> new EncodingStreamHandler<>(h, encoder));
   }
 
   @Override
@@ -123,7 +123,7 @@ public class DefaultClusterStreamingService implements ManagedClusterStreamingSe
       BiConsumer<M, StreamHandler<R>> handler,
       Function<R, byte[]> encoder) {
     messagingService.registerStreamingHandler(type, (address, payload, stream) ->
-        handler.accept(decoder.apply(payload), new TranscodingStreamHandler<>(stream, encoder)));
+        handler.accept(decoder.apply(payload), new EncodingStreamHandler<>(stream, encoder)));
     return CompletableFuture.completedFuture(null);
   }
 
@@ -134,7 +134,7 @@ public class DefaultClusterStreamingService implements ManagedClusterStreamingSe
       Function<StreamHandler<R>, StreamHandler<M>> handler,
       Function<R, byte[]> encoder) {
     messagingService.registerStreamingStreamHandler(type, (address, stream) ->
-        new TranscodingStreamHandler<>(handler.apply(new TranscodingStreamHandler<>(stream, encoder)), decoder));
+        new EncodingStreamHandler<>(handler.apply(new EncodingStreamHandler<>(stream, encoder)), decoder));
     return CompletableFuture.completedFuture(null);
   }
 

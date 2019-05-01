@@ -43,8 +43,8 @@ import io.atomix.primitive.service.ServiceOperationRegistry;
 import io.atomix.primitive.service.SessionManagedPrimitiveService;
 import io.atomix.primitive.session.Session;
 import io.atomix.primitive.session.SessionId;
-import io.atomix.utils.stream.StreamHandler;
 import io.atomix.utils.concurrent.Scheduled;
+import io.atomix.utils.stream.StreamHandler;
 
 import static com.google.common.base.Throwables.throwIfUnchecked;
 
@@ -120,6 +120,7 @@ public class PrimaryElectorService extends SessionManagedPrimitiveService {
         GetTermResponse::toByteArray);
     registry.register(
         PrimaryElectorOperations.STREAM_EVENTS,
+        PrimaryElectorOperations.EVENT_STREAM,
         this::stream,
         PrimaryElectionEvent::toByteArray);
   }

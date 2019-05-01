@@ -24,11 +24,13 @@ import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 
 import io.atomix.primitive.PrimitiveException;
-import io.atomix.primitive.operation.OperationId;
-import io.atomix.primitive.service.impl.DefaultServiceExecutor;
+import io.atomix.primitive.service.PrimitiveService;
+import io.atomix.primitive.service.impl.ServiceCodec;
 import io.atomix.primitive.session.Session;
 import io.atomix.primitive.session.SessionId;
+import io.atomix.primitive.session.SessionStreamHandler;
 import io.atomix.primitive.session.StreamId;
+import io.atomix.primitive.operation.StreamType;
 import io.atomix.utils.concurrent.Futures;
 import io.atomix.utils.misc.TimestampPrinter;
 import org.slf4j.Logger;
@@ -42,7 +44,8 @@ public class PrimitiveSession implements Session {
   private final Logger log;
   private final SessionId sessionId;
   private final long timeout;
-  private final DefaultServiceExecutor executor;
+  private final ServiceCodec codec;
+  private final PrimitiveService.Context context;
   private volatile State state = State.CLOSED;
   private volatile long lastUpdated;
   private volatile long commandSequence;
@@ -58,12 +61,14 @@ public class PrimitiveSession implements Session {
       SessionId sessionId,
       long timeout,
       long lastUpdated,
-      DefaultServiceExecutor executor) {
+      ServiceCodec codec,
+      PrimitiveService.Context context) {
     this.sessionId = sessionId;
     this.timeout = timeout;
     this.lastUpdated = lastUpdated;
-    this.executor = executor;
-    this.log = executor.getLogger();
+    this.codec = codec;
+    this.context = context;
+    this.log = context.getLogger();
   }
 
   @Override
@@ -273,34 +278,41 @@ public class PrimitiveSession implements Session {
     return future != null ? future : Futures.exceptionalFuture(new PrimitiveException.CommandFailure());
   }
 
-  /**
-   * Adds a stream to the session.
-   *
-   * @param streamId    the stream ID
-   * @param operationId the stream operation ID
-   * @return the stream
-   */
-  public <T> PrimitiveSessionStream<T> addStream(long streamId, OperationId<?, T> operationId) {
-    return new PrimitiveSessionStream<>(new StreamId(sessionId, streamId), operationId, streams, executor);
-  }
-
-  /**
-   * Returns a stream by ID.
-   *
-   * @param streamId the stream ID
-   * @return the stream
-   */
+  @Override
   public <T> PrimitiveSessionStream<T> getStream(long streamId) {
     return streams.getStream(streamId);
   }
 
+  @Override
+  public <T> PrimitiveSessionStream<T> getStream(StreamId streamId) {
+    return streams.getStream(streamId.streamId());
+  }
+
   /**
-   * Returns the collection of open streams.
+   * Returns the collection of all streams currently registered with the session.
    *
-   * @return the collection of open streams
+   * @return the collection of all streams currently registered with the session
    */
+  @SuppressWarnings("unchecked")
   public Collection<PrimitiveSessionStream> getStreams() {
     return streams.getStreams();
+  }
+
+  @Override
+  @SuppressWarnings("unchecked")
+  public <T> Collection<SessionStreamHandler<T>> getStreams(StreamType<T> streamType) {
+    return (Collection) streams.getStreams(streamType);
+  }
+
+  /**
+   * Adds a stream to the session.
+   *
+   * @param streamId the stream ID
+   * @param type     the stream type
+   * @return the stream
+   */
+  public <T> PrimitiveSessionStream<T> addStream(long streamId, StreamType<T> type) {
+    return new PrimitiveSessionStream<>(new StreamId(sessionId, streamId), type, codec.getStream(type), streams, context);
   }
 
   /**
@@ -309,11 +321,11 @@ public class PrimitiveSession implements Session {
    * @return the last stream index
    */
   public long getStreamIndex() {
-    return getStreams()
+    return streams.getStreams()
         .stream()
         .mapToLong(stream -> stream.getLastIndex())
         .max()
-        .orElse(executor.getIndex());
+        .orElse(context.getIndex());
   }
 
   /**

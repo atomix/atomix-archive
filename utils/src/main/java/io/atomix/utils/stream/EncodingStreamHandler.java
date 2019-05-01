@@ -7,11 +7,11 @@ import io.atomix.utils.stream.StreamHandler;
 /**
  * Transcoding stream handler.
  */
-public class TranscodingStreamHandler<T, U> implements StreamHandler<T> {
+public class EncodingStreamHandler<T, U> implements StreamHandler<T> {
   private final StreamHandler<U> handler;
   private final Function<T, U> transcoder;
 
-  public TranscodingStreamHandler(StreamHandler<U> handler, Function<T, U> transcoder) {
+  public EncodingStreamHandler(StreamHandler<U> handler, Function<T, U> transcoder) {
     this.handler = handler;
     this.transcoder = transcoder;
   }

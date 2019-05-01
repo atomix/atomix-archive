@@ -23,8 +23,11 @@ import io.atomix.primitive.partition.PartitionId;
 import io.atomix.primitive.proxy.SimplePrimitiveProxy;
 <#if hasStreams>
 import io.atomix.utils.stream.StreamHandler;
-import io.atomix.utils.stream.FutureStreamHandler;
 import io.atomix.primitive.service.impl.StreamContext;
+</#if>
+<#if hasAsyncs>
+import io.atomix.utils.stream.FutureStreamHandler;
+import io.atomix.utils.stream.EncodingStreamHandler;
 </#if>
 import io.atomix.utils.concurrent.ThreadContext;
 
@@ -84,7 +87,7 @@ public class ${proxyClass.className} extends SimplePrimitiveProxy {
             ${operation.operationsClass.className}.${operation.constantName},
             context,
             request,
-            new TranscodingStreamHandler<>(new FutureStreamHandler<>(future),
+            new EncodingStreamHandler<>(new FutureStreamHandler<>(future),
                 response -> Pair.of(ResponseContext.newBuilder().setIndex(response.getLeft().getIndex()).build(), response.getRight())),
             ${operation.requestClass.className}::toByteString,
             ${operation.responseClass.className}::parseFrom);

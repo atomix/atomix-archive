@@ -19,7 +19,6 @@ import io.atomix.primitive.session.SessionId;
 import io.atomix.primitive.service.SessionManagedPrimitiveService;
 import io.atomix.primitive.service.ServiceOperationRegistry;
 <#if hasStreams>
-import io.atomix.primitive.session.SessionStreamHandler;
 import io.atomix.utils.stream.StreamHandler;
 </#if>
 
@@ -49,6 +48,7 @@ public abstract class ${serviceClass.className} extends SessionManagedPrimitiveS
         <#if operation.async>
         registry.register(
             ${operation.operationsClass.className}.${operation.constantName},
+            ${operation.operationsClass.className}.${operation.constantName}_STREAM,
             (request, handler) -> ${operation.methodName}(request).whenComplete((response, error) -> {
               if (error == null) {
                   handler.next(response);
@@ -59,11 +59,11 @@ public abstract class ${serviceClass.className} extends SessionManagedPrimitiveS
             }),
             ${operation.requestClass.className}::parseFrom,
             ${operation.responseClass.className}::toByteArray);
-        <#else>
-        <#if operation.type == "COMMAND" && operation.stream>
+        <#elseif operation.stream>
         registry.register(
             ${operation.operationsClass.className}.${operation.constantName},
-            (request, handler) -> ${operation.methodName}(request, (SessionStreamHandler<${operation.responseClass.className}>) handler),
+            ${operation.operationsClass.className}.${operation.constantName}_STREAM,
+            this::${operation.methodName},
             ${operation.requestClass.className}::parseFrom,
             ${operation.responseClass.className}::toByteArray);
         <#else>
@@ -73,24 +73,11 @@ public abstract class ${serviceClass.className} extends SessionManagedPrimitiveS
             ${operation.requestClass.className}::parseFrom,
             ${operation.responseClass.className}::toByteArray);
         </#if>
-        </#if>
         </#list>
     }
 
     <#list operations as operation>
-    <#if operation.stream>
-    /**
-     * Atomix generated method ${operation.methodName}.
-     *
-     * @param request the request object
-     * @param handler the response stream
-     */
-    <#if operation.type == "COMMAND">
-    public abstract void ${operation.methodName}(${operation.requestClass.className} request, SessionStreamHandler<${operation.responseClass.className}> handler);
-    <#else>
-    public abstract void ${operation.methodName}(${operation.requestClass.className} request, StreamHandler<${operation.responseClass.className}> handler);
-    </#if>
-    <#elseif operation.async>
+    <#if operation.async>
     /**
      * Atomix generated method ${operation.methodName}.
      *
@@ -98,6 +85,14 @@ public abstract class ${serviceClass.className} extends SessionManagedPrimitiveS
      * @return the response object
      */
     public abstract CompletableFuture<${operation.responseClass.className}> ${operation.methodName}(${operation.requestClass.className} request);
+    <#elseif operation.stream>
+    /**
+     * Atomix generated method ${operation.methodName}.
+     *
+     * @param request the request object
+     * @param handler the response stream
+     */
+    public abstract void ${operation.methodName}(${operation.requestClass.className} request, StreamHandler<${operation.responseClass.className}> handler);
     <#else>
     /**
      * Atomix generated method ${operation.methodName}.

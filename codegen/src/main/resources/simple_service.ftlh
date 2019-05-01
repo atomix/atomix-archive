@@ -48,6 +48,7 @@ public abstract class ${serviceClass.className} extends SimplePrimitiveService {
         <#if operation.async>
         registry.register(
             ${operation.operationsClass.className}.${operation.constantName},
+            ${operation.operationsClass.className}.${operation.constantName}_STREAM,
             (request, handler) -> ${operation.methodName}(request).whenComplete((response, error) -> {
               if (error == null) {
                   handler.next(response);
@@ -56,6 +57,13 @@ public abstract class ${serviceClass.className} extends SimplePrimitiveService {
                   handler.error(error);
               }
             }),
+            ${operation.requestClass.className}::parseFrom,
+            ${operation.responseClass.className}::toByteArray);
+        <#elseif operation.stream>
+        registry.register(
+            ${operation.operationsClass.className}.${operation.constantName},
+            ${operation.operationsClass.className}.${operation.constantName}_STREAM,
+            this::${operation.methodName},
             ${operation.requestClass.className}::parseFrom,
             ${operation.responseClass.className}::toByteArray);
         <#else>
@@ -69,15 +77,7 @@ public abstract class ${serviceClass.className} extends SimplePrimitiveService {
     }
 
     <#list operations as operation>
-    <#if operation.stream>
-    /**
-     * Atomix generated method ${operation.methodName}.
-     *
-     * @param request the request object
-     * @param handler the response stream
-     */
-    public abstract void ${operation.methodName}(${operation.requestClass.className} request, StreamHandler<${operation.responseClass.className}> handler);
-    <#elseif operation.async>
+    <#if operation.async>
     /**
      * Atomix generated method ${operation.methodName}.
      *
@@ -85,6 +85,14 @@ public abstract class ${serviceClass.className} extends SimplePrimitiveService {
      * @return the response object
      */
     public abstract CompletableFuture<${operation.responseClass.className}> ${operation.methodName}(${operation.requestClass.className} request);
+    <#elseif operation.stream>
+    /**
+     * Atomix generated method ${operation.methodName}.
+     *
+     * @param request the request object
+     * @param handler the response stream
+     */
+    public abstract void ${operation.methodName}(${operation.requestClass.className} request, StreamHandler<${operation.responseClass.className}> handler);
     <#else>
     /**
      * Atomix generated method ${operation.methodName}.

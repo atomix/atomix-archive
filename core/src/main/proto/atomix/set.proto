@@ -11,15 +11,8 @@ option java_multiple_files = true;
 // Distributed set snapshot
 message DistributedSetSnapshot {
     repeated string values = 1;
-    repeated DistributedSetListener listeners = 2;
-    repeated string locked_elements = 4;
-    map<string, DistributedSetTransaction> transactions = 5;
-}
-
-// Distributed set listener.
-message DistributedSetListener {
-    uint64 session_id = 1;
-    uint64 stream_id = 2;
+    repeated string locked_elements = 2;
+    map<string, DistributedSetTransaction> transactions = 3;
 }
 
 // Distributed set transaction

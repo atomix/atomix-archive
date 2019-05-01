@@ -273,7 +273,7 @@ public class PrimitiveServiceGenerator {
     operation.setResponseClass(buildMessageClassDescriptor(outputType.getRight(), outputType.getLeft()));
     operation.setOperationsClass(buildOperationsClassDescriptor(serviceDescriptor, fileDescriptor));
     operation.setAsync(isAsyncMethod(methodDescriptor));
-    operation.setStream(methodDescriptor.getServerStreaming());
+    operation.setStream(isStreamMethod(methodDescriptor));
     operation.setType(getOperationType(methodDescriptor));
     operation.setName(getOperationName(methodDescriptor));
     operation.setConstantName(getOperationConstant(methodDescriptor));
@@ -309,6 +309,16 @@ public class PrimitiveServiceGenerator {
    */
   private boolean isAsyncMethod(DescriptorProtos.MethodDescriptorProto methodDescriptor) {
     return methodDescriptor.getOptions().getExtension(PrimitiveServiceProto.operation).getAsync();
+  }
+
+  /**
+   * Returns a boolean indicating whether the given method is a streaming method.
+   *
+   * @param methodDescriptor tne method descriptor
+   * @return indicates whether the given method is a streaming method
+   */
+  private boolean isStreamMethod(DescriptorProtos.MethodDescriptorProto methodDescriptor) {
+    return methodDescriptor.getServerStreaming();
   }
 
   /**

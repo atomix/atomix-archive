@@ -15,6 +15,10 @@
  */
 package io.atomix.primitive.session;
 
+import java.util.Collection;
+
+import io.atomix.primitive.operation.StreamType;
+
 /**
  * Provides session context for session-managed state machines.
  */
@@ -33,6 +37,31 @@ public interface Session {
    * @return The session state.
    */
   State getState();
+
+  /**
+   * Returns a stream by ID.
+   *
+   * @param streamId the stream ID
+   * @return the stream
+   */
+  default <T> SessionStreamHandler<T> getStream(long streamId) {
+    return getStream(new StreamId(sessionId(), streamId));
+  }
+
+  /**
+   * Returns a stream by ID.
+   *
+   * @param streamId the stream ID
+   * @return the stream
+   */
+  <T> SessionStreamHandler<T> getStream(StreamId streamId);
+
+  /**
+   * Returns the collection of open streams of the given type.
+   *
+   * @return the collection of open streams of the given type
+   */
+  <T> Collection<SessionStreamHandler<T>> getStreams(StreamType<T> streamType);
 
   /**
    * Session state enums.

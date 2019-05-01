@@ -34,8 +34,8 @@ import io.atomix.core.transaction.TransactionLog;
 import io.atomix.primitive.PrimitiveManagementService;
 import io.atomix.primitive.impl.SessionEnabledAsyncPrimitive;
 import io.atomix.utils.concurrent.Futures;
+import io.atomix.utils.stream.EncodingStreamHandler;
 import io.atomix.utils.stream.StreamHandler;
-import io.atomix.utils.stream.TranscodingStreamHandler;
 
 /**
  * Raw async distributed set.
@@ -162,7 +162,7 @@ public class RawAsyncDistributedSet extends SessionEnabledAsyncPrimitive<SetProx
     execute(
         SetProxy::iterate,
         IterateRequest.newBuilder().build(),
-        new TranscodingStreamHandler<>(iterator, response -> response.getValue()));
+        new EncodingStreamHandler<>(iterator, response -> response.getValue()));
     return iterator;
   }
 

@@ -419,7 +419,7 @@ final class PrimitiveSessionExecutor<P extends SessionEnabledPrimitiveProxy> {
 
     @Override
     protected void send() {
-      function.execute(proxy, context, request);
+      function.execute(proxy, context, request).whenComplete(this);
     }
 
     @Override
@@ -540,7 +540,7 @@ final class PrimitiveSessionExecutor<P extends SessionEnabledPrimitiveProxy> {
     @Override
     public void accept(SessionResponseContext response, Throwable error) {
       if (error == null) {
-        sequencer.sequenceResponse(id, response, () -> future.complete(null));
+        sequencer.sequenceResponse(id, response, () -> future.complete(response.getStreams(0).getStreamId()));
       } else {
         future.completeExceptionally(error);
       }

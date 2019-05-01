@@ -12,12 +12,16 @@ import io.atomix.primitive.operation.QueryId;
 import io.atomix.primitive.service.impl.CommandRequest;
 import io.atomix.primitive.service.impl.CommandResponse;
 import io.atomix.primitive.service.impl.DefaultServiceExecutor;
+import io.atomix.primitive.service.impl.DefaultServiceScheduler;
 import io.atomix.primitive.service.impl.QueryRequest;
 import io.atomix.primitive.service.impl.QueryResponse;
 import io.atomix.primitive.service.impl.ResponseContext;
+import io.atomix.primitive.service.impl.ServiceCodec;
 import io.atomix.primitive.service.impl.StreamContext;
 import io.atomix.primitive.service.impl.StreamResponse;
 import io.atomix.primitive.util.ByteArrayDecoder;
+import io.atomix.utils.concurrent.Futures;
+import io.atomix.utils.stream.EncodingStreamHandler;
 import io.atomix.utils.stream.StreamHandler;
 
 /**
@@ -25,12 +29,14 @@ import io.atomix.utils.stream.StreamHandler;
  */
 public abstract class SimplePrimitiveService extends AbstractPrimitiveService implements PrimitiveService {
   private DefaultServiceExecutor executor;
+  private DefaultServiceScheduler scheduler;
   private final Map<Long, List<Runnable>> indexQueries = new HashMap<>();
 
   @Override
   public void init(StateMachine.Context context) {
-    this.executor = new DefaultServiceExecutor(context);
-    super.init(executor, executor, executor);
+    this.executor = new DefaultServiceExecutor(context, new ServiceCodec());
+    this.scheduler = new DefaultServiceScheduler(executor);
+    super.init(executor, scheduler, scheduler);
     configure(executor);
   }
 
@@ -46,8 +52,22 @@ public abstract class SimplePrimitiveService extends AbstractPrimitiveService im
   }
 
   private CompletableFuture<CommandResponse> applyCommand(Command<CommandRequest> command) {
-    CommandId commandId = new CommandId(command.value().getName());
-    byte[] output = executor.apply(commandId, command.map(r -> r.getCommand().toByteArray()));
+    // Run tasks scheduled to execute prior to this command.
+    scheduler.runScheduledTasks(command.timestamp());
+
+    CommandId<?, ?> commandId = new CommandId<>(command.value().getName());
+    OperationExecutor operation = executor.getExecutor(commandId);
+
+    byte[] output;
+    try {
+      output = operation.execute(command.value().getCommand().toByteArray());
+    } catch (Exception e) {
+      return Futures.exceptionalFuture(e);
+    } finally {
+      // Run tasks pending to be executed after this command.
+      scheduler.runPendingTasks();
+    }
+
     return CompletableFuture.completedFuture(CommandResponse.newBuilder()
         .setContext(ResponseContext.newBuilder()
             .setIndex(getCurrentIndex())
@@ -77,28 +97,24 @@ public abstract class SimplePrimitiveService extends AbstractPrimitiveService im
   }
 
   private CompletableFuture<Void> applyCommand(Command<CommandRequest> command, StreamHandler<StreamResponse> handler) {
-    CommandId commandId = new CommandId(command.value().getName());
-    executor.apply(commandId, command.map(r -> r.getCommand().toByteArray()), new StreamHandler<byte[]>() {
-      @Override
-      public void next(byte[] value) {
-        handler.next(StreamResponse.newBuilder()
-            .setContext(StreamContext.newBuilder()
-                .setIndex(getCurrentIndex())
-                .build())
-            .setOutput(ByteString.copyFrom(value))
-            .build());
-      }
+    // Run tasks scheduled to execute prior to this command.
+    scheduler.runScheduledTasks(command.timestamp());
 
-      @Override
-      public void complete() {
-        handler.complete();
-      }
-
-      @Override
-      public void error(Throwable error) {
-        handler.error(error);
-      }
-    });
+    CommandId<?, ?> commandId = new CommandId<>(command.value().getName());
+    OperationExecutor operation = executor.getExecutor(commandId);
+    try {
+      operation.execute(
+          command.value().getCommand().toByteArray(),
+          new EncodingStreamHandler<byte[], StreamResponse>(handler, value -> StreamResponse.newBuilder()
+              .setContext(StreamContext.newBuilder()
+                  .setIndex(getCurrentIndex())
+                  .build())
+              .setOutput(ByteString.copyFrom(value))
+              .build()));
+    } finally {
+      // Run tasks pending to be executed after this command.
+      scheduler.runPendingTasks();
+    }
     return CompletableFuture.completedFuture(null);
   }
 
@@ -120,8 +136,17 @@ public abstract class SimplePrimitiveService extends AbstractPrimitiveService im
   }
 
   private void applyQuery(Query<QueryRequest> request, CompletableFuture<QueryResponse> future) {
-    QueryId queryId = new QueryId(request.value().getName());
-    byte[] output = executor.apply(queryId, request.map(r -> r.getQuery().toByteArray()));
+    QueryId<?, ?> queryId = new QueryId<>(request.value().getName());
+    OperationExecutor operation = executor.getExecutor(queryId);
+
+    byte[] output;
+    try {
+      output = operation.execute(request.value().getQuery().toByteArray());
+    } catch (Exception e) {
+      future.completeExceptionally(e);
+      return;
+    }
+
     future.complete(QueryResponse.newBuilder()
         .setContext(ResponseContext.newBuilder()
             .setIndex(getCurrentIndex())
@@ -162,28 +187,16 @@ public abstract class SimplePrimitiveService extends AbstractPrimitiveService im
   }
 
   private void applyQuery(Query<QueryRequest> query, StreamHandler<StreamResponse> handler, CompletableFuture<Void> future) {
-    QueryId queryId = new QueryId(query.value().getName());
-    executor.apply(queryId, query.map(r -> r.getQuery().toByteArray()), new StreamHandler<byte[]>() {
-      @Override
-      public void next(byte[] value) {
-        handler.next(StreamResponse.newBuilder()
+    QueryId<?, ?> queryId = new QueryId<>(query.value().getName());
+    OperationExecutor operation = executor.getExecutor(queryId);
+    operation.execute(
+        query.value().getQuery().toByteArray(),
+        new EncodingStreamHandler<byte[], StreamResponse>(handler, value -> StreamResponse.newBuilder()
             .setContext(StreamContext.newBuilder()
                 .setIndex(getCurrentIndex())
                 .build())
             .setOutput(ByteString.copyFrom(value))
-            .build());
-      }
-
-      @Override
-      public void complete() {
-        handler.complete();
-      }
-
-      @Override
-      public void error(Throwable error) {
-        handler.error(error);
-      }
-    });
+            .build()));
     future.complete(null);
   }
 }

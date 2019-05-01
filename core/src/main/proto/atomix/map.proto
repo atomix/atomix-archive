@@ -10,17 +10,10 @@ option java_multiple_files = true;
 
 // Atomic map snapshot
 message AtomicMapSnapshot {
-    repeated AtomicMapListener listeners = 1;
-    repeated string prepared_keys = 2;
-    map<string, AtomicMapEntryValue> entries = 3;
-    map<string, AtomicMapTransaction> transactions = 4;
-    int64 version = 5;
-}
-
-// Atomic map listener.
-message AtomicMapListener {
-    uint64 session_id = 1;
-    uint64 stream_id = 2;
+    repeated string prepared_keys = 1;
+    map<string, AtomicMapEntryValue> entries = 2;
+    map<string, AtomicMapTransaction> transactions = 3;
+    int64 version = 4;
 }
 
 // Atomic map entry value

@@ -4,20 +4,13 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.Arrays;
-import java.util.LinkedHashMap;
-import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.stream.Collectors;
 
 import com.google.protobuf.ByteString;
 import io.atomix.primitive.partition.PartitionId;
 import io.atomix.primitive.partition.PartitionManagementService;
 import io.atomix.primitive.service.PrimitiveService;
 import io.atomix.primitive.service.ServiceType;
-import io.atomix.primitive.session.Session;
-import io.atomix.primitive.session.SessionId;
-import io.atomix.primitive.session.SessionStreamHandler;
-import io.atomix.primitive.session.StreamId;
 import io.atomix.utils.stream.StreamHandler;
 
 /**
@@ -45,7 +38,6 @@ public class ValueService extends AbstractValueService {
 
   private AtomicLong version = new AtomicLong();
   private byte[] value = new byte[0];
-  private Map<StreamId, StreamHandler<ListenResponse>> streams = new LinkedHashMap<>();
 
   @Override
   public SetResponse set(SetRequest request) {
@@ -63,14 +55,13 @@ public class ValueService extends AbstractValueService {
     this.value = nextValue;
     long previousVersion = version.getAndIncrement();
 
-    ListenResponse event = ListenResponse.newBuilder()
+    onEvent(ListenResponse.newBuilder()
         .setType(ListenResponse.Type.UPDATED)
         .setPreviousValue(ByteString.copyFrom(previousValue))
         .setPreviousVersion(previousVersion)
         .setNewValue(request.getValue())
         .setNewVersion(version.get())
-        .build();
-    streams.values().forEach(stream -> stream.next(event));
+        .build());
 
     return SetResponse.newBuilder()
         .setVersion(version.get())
@@ -97,14 +88,13 @@ public class ValueService extends AbstractValueService {
         long previousVersion = version.getAndIncrement();
         this.value = nextValue;
 
-        ListenResponse event = ListenResponse.newBuilder()
+        onEvent(ListenResponse.newBuilder()
             .setType(ListenResponse.Type.UPDATED)
             .setPreviousValue(ByteString.copyFrom(previousValue))
             .setPreviousVersion(previousVersion)
             .setNewValue(request.getUpdate())
             .setNewVersion(version.get())
-            .build();
-        streams.values().forEach(stream -> stream.next(event));
+            .build());
 
         return CheckAndSetResponse.newBuilder()
             .setSucceeded(true)
@@ -123,14 +113,13 @@ public class ValueService extends AbstractValueService {
         long previousVersion = version.getAndIncrement();
         this.value = nextValue;
 
-        ListenResponse event = ListenResponse.newBuilder()
+        onEvent(ListenResponse.newBuilder()
             .setType(ListenResponse.Type.UPDATED)
             .setPreviousValue(ByteString.copyFrom(previousValue))
             .setPreviousVersion(previousVersion)
             .setNewValue(request.getUpdate())
             .setNewVersion(version.get())
-            .build();
-        streams.values().forEach(stream -> stream.next(event));
+            .build());
 
         return CheckAndSetResponse.newBuilder()
             .setSucceeded(true)
@@ -146,25 +135,24 @@ public class ValueService extends AbstractValueService {
   }
 
   @Override
-  public void listen(ListenRequest request, SessionStreamHandler<ListenResponse> handler) {
-    streams.put(handler.id(), handler);
+  public void listen(ListenRequest request, StreamHandler<ListenResponse> handler) {
+    // Keep the stream open.
   }
 
   @Override
   public UnlistenResponse unlisten(UnlistenRequest request) {
-    streams.remove(new StreamId(getCurrentSession().sessionId(), request.getStreamId()));
-    return UnlistenResponse.newBuilder()
-        .build();
+    // Complete the stream.
+    StreamHandler<ListenResponse> stream = getCurrentSession().getStream(request.getStreamId());
+    if (stream != null) {
+      stream.complete();
+    }
+    return UnlistenResponse.newBuilder().build();
   }
 
-  @Override
-  protected void onExpire(Session session) {
-    getStreams(session.sessionId()).forEach(stream -> streams.remove(stream.id()));
-  }
-
-  @Override
-  protected void onClose(Session session) {
-    getStreams(session.sessionId()).forEach(stream -> streams.remove(stream.id()));
+  private void onEvent(ListenResponse event) {
+    getSessions()
+        .forEach(session -> session.getStreams(ValueOperations.LISTEN_STREAM)
+            .forEach(stream -> stream.next(event)));
   }
 
   @Override
@@ -172,12 +160,6 @@ public class ValueService extends AbstractValueService {
     AtomicValueSnapshot.newBuilder()
         .setValue(ByteString.copyFrom(value))
         .setVersion(version.get())
-        .addAllListeners(streams.keySet().stream()
-            .map(streamId -> AtomicValueListener.newBuilder()
-                .setSessionId(streamId.sessionId().id())
-                .setStreamId(streamId.streamId())
-                .build())
-            .collect(Collectors.toList()))
         .build()
         .writeTo(output);
   }
@@ -187,10 +169,5 @@ public class ValueService extends AbstractValueService {
     AtomicValueSnapshot snapshot = AtomicValueSnapshot.parseFrom(input);
     value = snapshot.getValue().toByteArray();
     version.set(snapshot.getVersion());
-    streams = new LinkedHashMap<>();
-    snapshot.getListenersList().forEach(listener -> {
-      StreamId streamId = new StreamId(SessionId.from(listener.getSessionId()), listener.getStreamId());
-      streams.put(streamId, getStream(streamId));
-    });
   }
 }

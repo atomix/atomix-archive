@@ -30,8 +30,8 @@ import io.atomix.primitive.PrimitiveException;
 import io.atomix.primitive.PrimitiveManagementService;
 import io.atomix.primitive.impl.SessionEnabledAsyncPrimitive;
 import io.atomix.utils.concurrent.Futures;
+import io.atomix.utils.stream.EncodingStreamHandler;
 import io.atomix.utils.stream.StreamHandler;
-import io.atomix.utils.stream.TranscodingStreamHandler;
 import io.atomix.utils.time.Versioned;
 
 /**
@@ -446,7 +446,7 @@ public class RawAsyncAtomicMap extends SessionEnabledAsyncPrimitive<MapProxy, As
       execute(
           MapProxy::entries,
           EntriesRequest.newBuilder().build(),
-          new TranscodingStreamHandler<>(iterator, response -> Maps.immutableEntry(
+          new EncodingStreamHandler<>(iterator, response -> Maps.immutableEntry(
               response.getKey(),
               new Versioned<>(response.getValue().toByteArray(), response.getVersion()))));
       return iterator;
@@ -529,7 +529,7 @@ public class RawAsyncAtomicMap extends SessionEnabledAsyncPrimitive<MapProxy, As
       execute(
           MapProxy::keys,
           KeysRequest.newBuilder().build(),
-          new TranscodingStreamHandler<>(iterator, KeysResponse::getKey));
+          new EncodingStreamHandler<>(iterator, KeysResponse::getKey));
       return iterator;
     }
   }
@@ -587,7 +587,7 @@ public class RawAsyncAtomicMap extends SessionEnabledAsyncPrimitive<MapProxy, As
       execute(
           MapProxy::entries,
           EntriesRequest.newBuilder().build(),
-          new TranscodingStreamHandler<>(
+          new EncodingStreamHandler<>(
               iterator,
               response -> new Versioned<>(response.getValue().toByteArray(), response.getVersion())));
       return iterator;

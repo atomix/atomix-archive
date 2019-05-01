@@ -4,12 +4,12 @@ import java.util.LinkedList;
 import java.util.Queue;
 
 import com.google.protobuf.ByteString;
-import io.atomix.primitive.operation.OperationId;
 import io.atomix.primitive.operation.OperationType;
-import io.atomix.primitive.service.impl.DefaultServiceExecutor;
+import io.atomix.primitive.service.PrimitiveService;
+import io.atomix.primitive.service.impl.StreamCodec;
 import io.atomix.primitive.session.SessionStreamHandler;
 import io.atomix.primitive.session.StreamId;
-import io.atomix.primitive.util.ByteArrayEncoder;
+import io.atomix.primitive.operation.StreamType;
 import io.atomix.utils.stream.StreamHandler;
 
 import static com.google.common.base.Preconditions.checkState;
@@ -19,10 +19,10 @@ import static com.google.common.base.Preconditions.checkState;
  */
 public class PrimitiveSessionStream<T> implements SessionStreamHandler<T> {
   private final StreamId streamId;
-  private final OperationId<?, T> operationId;
+  private final StreamType<T> streamType;
+  private final StreamCodec<T> codec;
   private final PrimitiveStreamRegistry registry;
-  private final DefaultServiceExecutor executor;
-  private final ByteArrayEncoder<T> encoder;
+  private final PrimitiveService.Context context;
   private StreamHandler<SessionStreamResponse> handler;
   private long currentSequence;
   private long completeSequence;
@@ -32,33 +32,26 @@ public class PrimitiveSessionStream<T> implements SessionStreamHandler<T> {
 
   public PrimitiveSessionStream(
       StreamId streamId,
-      OperationId<?, T> operationId,
+      StreamType<T> streamType,
+      StreamCodec<T> codec,
       PrimitiveStreamRegistry registry,
-      DefaultServiceExecutor executor) {
+      PrimitiveService.Context context) {
     this.streamId = streamId;
-    this.operationId = operationId;
+    this.streamType = streamType;
+    this.codec = codec;
     this.registry = registry;
-    this.executor = executor;
-    this.encoder = executor.encoder(operationId);
+    this.context = context;
     registry.register(this);
   }
 
-  /**
-   * Returns the stream ID.
-   *
-   * @return the stream ID
-   */
+  @Override
   public StreamId id() {
     return streamId;
   }
 
-  /**
-   * Returns the stream operation ID.
-   *
-   * @return the stream operation ID
-   */
-  public OperationId<?, T> operationId() {
-    return operationId;
+  @Override
+  public StreamType<T> type() {
+    return streamType;
   }
 
   /**
@@ -103,7 +96,7 @@ public class PrimitiveSessionStream<T> implements SessionStreamHandler<T> {
    * @return the last index enqueued in the stream
    */
   public long getLastIndex() {
-    return !events.isEmpty() ? lastIndex : executor.getIndex();
+    return !events.isEmpty() ? lastIndex : context.getIndex();
   }
 
   /**
@@ -122,7 +115,7 @@ public class PrimitiveSessionStream<T> implements SessionStreamHandler<T> {
     }
 
     // If the event is being published during a read operation, throw an exception.
-    checkState(executor.getOperationType() == OperationType.COMMAND, "session events can only be published during command execution");
+    checkState(context.getOperationType() == OperationType.COMMAND, "session events can only be published during command execution");
 
     // If the client acked a sequence number greater than the current event sequence number since we know the
     // client must have received it from another server.
@@ -131,8 +124,8 @@ public class PrimitiveSessionStream<T> implements SessionStreamHandler<T> {
       return;
     }
 
-    lastIndex = executor.getIndex();
-    EventHolder event = new EventHolder(sequence, lastIndex, ByteArrayEncoder.encode(value, encoder));
+    lastIndex = context.getIndex();
+    EventHolder event = new EventHolder(sequence, lastIndex, codec.encode(value));
     events.add(event);
     sendEvent(event);
   }
@@ -169,7 +162,7 @@ public class PrimitiveSessionStream<T> implements SessionStreamHandler<T> {
     if (event != null) {
       return event.index - 1;
     }
-    return executor.getIndex();
+    return context.getIndex();
   }
 
   /**

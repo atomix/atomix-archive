@@ -12,13 +12,6 @@ option java_multiple_files = true;
 message AtomicValueSnapshot {
     int64 version = 1;
     bytes value = 2;
-    repeated AtomicValueListener listeners = 3;
-}
-
-// Atomic value listener.
-message AtomicValueListener {
-    uint64 session_id = 1;
-    uint64 stream_id = 2;
 }
 
 message GetRequest {

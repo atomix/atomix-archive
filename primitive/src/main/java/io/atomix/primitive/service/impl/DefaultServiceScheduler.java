@@ -9,6 +9,7 @@ import java.util.Queue;
 import java.util.concurrent.Executor;
 
 import io.atomix.primitive.operation.OperationType;
+import io.atomix.primitive.service.PrimitiveService;
 import io.atomix.utils.concurrent.Scheduled;
 import io.atomix.utils.concurrent.Scheduler;
 import org.slf4j.Logger;
@@ -21,15 +22,16 @@ import static com.google.common.base.Preconditions.checkState;
  * Service scheduler.
  */
 public class DefaultServiceScheduler implements Scheduler, Executor {
+  private final PrimitiveService.Context context;
   private final Logger log;
   private final Queue<Runnable> tasks = new LinkedList<>();
   private final List<ScheduledTask> scheduledTasks = new ArrayList<>();
   private final List<ScheduledTask> complete = new ArrayList<>();
-  private OperationType operationType;
   private long timestamp;
 
-  public DefaultServiceScheduler(Logger log) {
-    this.log = log;
+  public DefaultServiceScheduler(PrimitiveService.Context context) {
+    this.context = context;
+    this.log = context.getLogger();
   }
 
   @Override
@@ -65,31 +67,16 @@ public class DefaultServiceScheduler implements Scheduler, Executor {
    * @param message the message to print if the current operation does not match the given type
    */
   private void checkOperation(OperationType type, String message) {
-    checkState(operationType == type, message);
+    checkState(context.getOperationId().type() == type, message);
   }
 
   /**
-   * Prepares a query for execution.
-   */
-  protected void startQuery() {
-    this.operationType = OperationType.QUERY;
-  }
-
-  /**
-   * Executes tasks after an operation.
-   */
-  protected void completeQuery() {
-
-  }
-
-  /**
-   * Prepares a command for execution and advances the scheduler's clock.
+   * Runs tasks scheduled prior to the given timestamp.
    *
-   * @param timestamp the updated timestamp
+   * @param timestamp the timestamp to which to advance the executor
    */
-  protected void startCommand(long timestamp) {
+  public void runScheduledTasks(long timestamp) {
     this.timestamp = timestamp;
-    this.operationType = OperationType.COMMAND;
     if (!scheduledTasks.isEmpty()) {
       // Iterate through scheduled tasks until we reach a task that has not met its scheduled time.
       // The tasks list is sorted by time on insertion.
@@ -98,7 +85,6 @@ public class DefaultServiceScheduler implements Scheduler, Executor {
         ScheduledTask task = iterator.next();
         if (task.isRunnable(timestamp)) {
           this.timestamp = task.time;
-          this.operationType = OperationType.COMMAND;
           log.trace("Executing scheduled task {}", task);
           task.execute();
           complete.add(task);
@@ -117,9 +103,9 @@ public class DefaultServiceScheduler implements Scheduler, Executor {
   }
 
   /**
-   * Executes tasks after an operation.
+   * Executes pending tasks.
    */
-  protected void completeCommand() {
+  public void runPendingTasks() {
     // Execute any tasks that were queue during execution of the command.
     if (!tasks.isEmpty()) {
       for (Runnable task : tasks) {

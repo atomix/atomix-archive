@@ -177,7 +177,7 @@ final class PrimitiveSessionSequencer {
     // Iterate through all streams in the response context and complete streams up to the stream sequence number.
     boolean complete = true;
     for (SessionStreamContext stream : response.getStreamsList()) {
-      complete = !complete || completeStream(stream);
+      complete = complete && completeStream(stream);
     }
 
     // If after completing pending events the eventIndex is greater than or equal to the response's eventIndex, complete the response.
@@ -197,7 +197,7 @@ final class PrimitiveSessionSequencer {
   private boolean completeStream(SessionStreamContext stream) {
     StreamSequencer sequencer = streams.get(stream.getStreamId());
     if (sequencer == null) {
-      return false;
+      return stream.getSequence() == 0;
     }
     return sequencer.completeStream(stream);
   }

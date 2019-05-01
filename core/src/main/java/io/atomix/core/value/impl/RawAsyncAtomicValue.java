@@ -20,6 +20,7 @@ import io.atomix.utils.time.Versioned;
  * Raw asynchronous atomic value.
  */
 public class RawAsyncAtomicValue extends SessionEnabledAsyncPrimitive<ValueProxy, AsyncAtomicValue<byte[]>> implements AsyncAtomicValue<byte[]> {
+  private static final Versioned<byte[]> EMPTY = new Versioned<>(null, 0);
   private final Set<AtomicValueEventListener<byte[]>> eventListeners = new CopyOnWriteArraySet<>();
   private volatile long streamId;
 
@@ -62,7 +63,7 @@ public class RawAsyncAtomicValue extends SessionEnabledAsyncPrimitive<ValueProxy
           if (!response.getValue().isEmpty()) {
             return new Versioned<>(response.getValue().toByteArray(), response.getVersion());
           }
-          return null;
+          return EMPTY;
         });
   }
 
@@ -75,7 +76,7 @@ public class RawAsyncAtomicValue extends SessionEnabledAsyncPrimitive<ValueProxy
           if (!response.getPreviousValue().isEmpty()) {
             return new Versioned<>(response.getPreviousValue().toByteArray(), response.getPreviousVersion());
           }
-          return null;
+          return EMPTY;
         });
   }
 
@@ -97,8 +98,8 @@ public class RawAsyncAtomicValue extends SessionEnabledAsyncPrimitive<ValueProxy
         public void next(ListenResponse response) {
           eventListeners.forEach(l -> l.event(new AtomicValueEvent<>(
               AtomicValueEvent.Type.UPDATE,
-              response.getPreviousVersion() != 0 ? new Versioned<>(response.getPreviousValue().toByteArray(), response.getPreviousVersion()) : null,
-              response.getNewVersion() != 0 ? new Versioned<>(response.getNewValue().toByteArray(), response.getNewVersion()) : null)));
+              response.getNewVersion() != 0 ? new Versioned<>(response.getNewValue().toByteArray(), response.getNewVersion()) : null,
+              response.getPreviousVersion() != 0 ? new Versioned<>(response.getPreviousValue().toByteArray(), response.getPreviousVersion()) : null)));
         }
 
         @Override

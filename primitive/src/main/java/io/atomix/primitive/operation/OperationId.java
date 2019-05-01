@@ -15,6 +15,8 @@
  */
 package io.atomix.primitive.operation;
 
+import java.util.Objects;
+
 /**
  * Operation ID.
  */
@@ -41,4 +43,17 @@ public abstract class OperationId<T, U> {
    */
   public abstract OperationType type();
 
+  @Override
+  public int hashCode() {
+    return Objects.hash(id(), type());
+  }
+
+  @Override
+  public boolean equals(Object object) {
+    if (object.getClass() == getClass()) {
+      OperationId that = (OperationId) object;
+      return this.id.equals(that.id) && this.type().equals(that.type());
+    }
+    return false;
+  }
 }

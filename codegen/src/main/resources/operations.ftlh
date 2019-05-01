@@ -17,6 +17,9 @@ package ${operationsClass.packageName};
 
 import io.atomix.primitive.operation.CommandId;
 import io.atomix.primitive.operation.QueryId;
+<#if hasAsyncs || hasStreams>
+import io.atomix.primitive.operation.StreamType;
+</#if>
 
 <#list operations as operation>
 <#if operation.operationsClass.packageName != proxyClass.packageName>
@@ -43,6 +46,11 @@ public final class ${operationsClass.className} {
     <#list operations as operation>
     <#if operation.type == "QUERY">
     public static final QueryId<${operation.requestClass.className}, ${operation.responseClass.className}> ${operation.constantName} = new QueryId<>("${operation.name}");
+    </#if>
+    </#list>
+    <#list operations as operation>
+    <#if operation.async || operation.stream>
+    public static final StreamType<${operation.responseClass.className}> ${operation.constantName}_STREAM = new StreamType<>("${operation.name}");
     </#if>
     </#list>
 

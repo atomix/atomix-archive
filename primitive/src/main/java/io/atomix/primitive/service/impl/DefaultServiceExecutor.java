@@ -8,39 +8,40 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 
 import io.atomix.primitive.PrimitiveException;
-import io.atomix.primitive.operation.CommandId;
 import io.atomix.primitive.operation.OperationId;
 import io.atomix.primitive.operation.OperationType;
-import io.atomix.primitive.operation.QueryId;
-import io.atomix.primitive.service.Command;
+import io.atomix.primitive.service.OperationExecutor;
 import io.atomix.primitive.service.PrimitiveService;
-import io.atomix.primitive.service.Query;
 import io.atomix.primitive.service.ServiceOperationRegistry;
 import io.atomix.primitive.service.StateMachine;
+import io.atomix.primitive.operation.StreamType;
 import io.atomix.primitive.util.ByteArrayDecoder;
 import io.atomix.primitive.util.ByteArrayEncoder;
+import io.atomix.utils.stream.EncodingStreamHandler;
 import io.atomix.utils.stream.StreamHandler;
 import org.slf4j.Logger;
 
 import static com.google.common.base.Preconditions.checkNotNull;
-import static io.atomix.primitive.util.ByteArrayDecoder.decode;
-import static io.atomix.primitive.util.ByteArrayEncoder.encode;
 
-public class DefaultServiceExecutor extends DefaultServiceScheduler implements ServiceOperationRegistry, PrimitiveService.Context {
+public class DefaultServiceExecutor implements ServiceOperationRegistry, PrimitiveService.Context {
   private final StateMachine.Context context;
-  private final Map<String, Function<byte[], byte[]>> operations = new HashMap<>();
-  private final Map<String, BiConsumer<byte[], StreamHandler<byte[]>>> streamOperations = new HashMap<>();
-  private final Map<String, ByteArrayEncoder> encoders = new HashMap<>();
+  private final ServiceCodec codec;
+  private final Map<OperationId, StreamType> streamTypes = new HashMap<>();
+  private final Map<OperationId, OperationExecutor> operations = new HashMap<>();
   private OperationId operationId;
 
-  public DefaultServiceExecutor(StateMachine.Context context) {
-    super(context.getLogger());
+  public DefaultServiceExecutor(StateMachine.Context context, ServiceCodec codec) {
     this.context = context;
+    this.codec = codec;
   }
 
   @Override
   public OperationId getOperationId() {
     return operationId;
+  }
+
+  void setOperationId(OperationId operationId) {
+    this.operationId = operationId;
   }
 
   @Override
@@ -64,240 +65,209 @@ public class DefaultServiceExecutor extends DefaultServiceScheduler implements S
   }
 
   /**
-   * Applies the given command to the service.
-   *
-   * @param commandId the command ID
-   * @param command     the command
-   * @return the command result
-   */
-  public byte[] apply(CommandId commandId, Command<byte[]> command) {
-    getLogger().trace("Executing {}", command);
-    startCommand(commandId, command.timestamp());
-    try {
-      return apply(commandId, command.value());
-    } finally {
-      completeCommand();
-    }
-  }
-
-  /**
-   * Applies the given command to the service.
-   *
-   * @param commandId the command ID
-   * @param command     the command
-   * @param handler     the stream handler
-   */
-  public void apply(CommandId commandId, Command<byte[]> command, StreamHandler<byte[]> handler) {
-    getLogger().trace("Executing {}", command);
-    startCommand(commandId, command.timestamp());
-    try {
-      apply(commandId, command.value(), handler);
-    } finally {
-      completeCommand();
-    }
-  }
-
-  protected void startCommand(CommandId commandId, long timestamp) {
-    operationId = commandId;
-    startCommand(timestamp);
-  }
-
-  @Override
-  protected void completeCommand() {
-    operationId = null;
-  }
-
-  /**
-   * Applies the given query to the service.
-   *
-   * @param queryId the query ID
-   * @param query       the query
-   * @return the query result
-   */
-  public byte[] apply(QueryId queryId, Query<byte[]> query) {
-    getLogger().trace("Executing {}", query);
-    startQuery(queryId);
-    try {
-      return apply(queryId, query.value());
-    } finally {
-      completeQuery();
-    }
-  }
-
-  /**
-   * Applies the given query to the service.
-   *
-   * @param queryId the query ID
-   * @param query       the query
-   * @param handler     the stream handler
-   */
-  public void apply(QueryId queryId, Query<byte[]> query, StreamHandler<byte[]> handler) {
-    getLogger().trace("Executing {}", query);
-    startQuery(queryId);
-    try {
-      apply(queryId, query.value(), handler);
-    } finally {
-      completeQuery();
-    }
-  }
-
-  protected void startQuery(QueryId queryId) {
-    this.operationId = queryId;
-  }
-
-  @Override
-  protected void completeQuery() {
-    operationId = null;
-  }
-
-  /**
-   * Applies the given value to the given operation.
+   * Returns the stream type for the given operation.
    *
    * @param operationId the operation ID
-   * @param value       the operation value
-   * @return the operation result
+   * @param <T> the stream type
+   * @return the stream type for the given operation
    */
-  private byte[] apply(OperationId operationId, byte[] value) {
-    // Look up the registered callback for the operation.
-    Function<byte[], byte[]> operation = operations.get(operationId.id());
-
-    if (operation == null) {
-      throw new IllegalStateException("Unknown state machine operation: " + operationId);
-    } else {
-      // Execute the operation. If the operation return value is a Future, await the result,
-      // otherwise immediately complete the execution future.
-      try {
-        return operation.apply(value);
-      } catch (Exception e) {
-        getLogger().warn("State machine operation failed: {}", e.getMessage());
-        throw new PrimitiveException.ServiceException(e);
-      }
-    }
+  public <T> StreamType<T> getStreamType(OperationId<?, T> operationId) {
+    return streamTypes.get(operationId);
   }
 
   /**
-   * Applies the given value to the given operation.
+   * Returns the executor for the given operation.
    *
    * @param operationId the operation ID
-   * @param value       the operation value
-   * @param handler     the stream handler
-   */
-  private void apply(OperationId operationId, byte[] value, StreamHandler<byte[]> handler) {
-    // Look up the registered callback for the operation.
-    BiConsumer<byte[], StreamHandler<byte[]>> operation = streamOperations.get(operationId.id());
-
-    if (operation == null) {
-      throw new IllegalStateException("Unknown state machine operation: " + operationId);
-    } else {
-      // Execute the operation. If the operation return value is a Future, await the result,
-      // otherwise immediately complete the execution future.
-      try {
-        operation.accept(value, handler);
-      } catch (Exception e) {
-        getLogger().warn("State machine operation failed: {}", e.getMessage());
-        throw new PrimitiveException.ServiceException(e);
-      }
-    }
-  }
-
-  private void handle(OperationId operationId, Function<byte[], byte[]> callback) {
-    checkNotNull(operationId, "operationId cannot be null");
-    checkNotNull(callback, "callback cannot be null");
-    operations.put(operationId.id(), callback);
-    getLogger().trace("Registered operation callback {}", operationId);
-  }
-
-  @Override
-  public void register(OperationId operationId, Runnable callback) {
-    checkNotNull(operationId, "operationId cannot be null");
-    checkNotNull(callback, "callback cannot be null");
-    handle(operationId, commit -> {
-      callback.run();
-      return null;
-    });
-  }
-
-  @Override
-  public <R> void register(OperationId operationId, Supplier<R> callback, ByteArrayEncoder<R> encoder) {
-    checkNotNull(operationId, "operationId cannot be null");
-    checkNotNull(callback, "callback cannot be null");
-    handle(operationId, commit -> encode(callback.get(), encoder));
-  }
-
-  @Override
-  public <T> void register(OperationId operationId, Consumer<T> callback, ByteArrayDecoder<T> decoder) {
-    checkNotNull(operationId, "operationId cannot be null");
-    checkNotNull(callback, "callback cannot be null");
-    handle(operationId, bytes -> {
-      callback.accept(decode(bytes, decoder));
-      return null;
-    });
-  }
-
-  @Override
-  public <T, R> void register(OperationId operationId, Function<T, R> callback, ByteArrayDecoder<T> decoder, ByteArrayEncoder<R> encoder) {
-    checkNotNull(operationId, "operationId cannot be null");
-    checkNotNull(callback, "callback cannot be null");
-    handle(operationId, bytes -> encode(callback.apply(decode(bytes, decoder)), encoder));
-  }
-
-  @Override
-  public <R> void register(OperationId operationId, Consumer<StreamHandler<R>> callback, ByteArrayEncoder<R> encoder) {
-    checkNotNull(operationId, "operationId cannot be null");
-    checkNotNull(callback, "callback cannot be null");
-    encoders.put(operationId.id(), encoder);
-    streamOperations.put(operationId.id(), (bytes, handler) -> callback.accept(new StreamHandler<R>() {
-      @Override
-      public void next(R value) {
-        handler.next(encode(value, encoder));
-      }
-
-      @Override
-      public void complete() {
-        handler.complete();
-      }
-
-      @Override
-      public void error(Throwable error) {
-        handler.error(error);
-      }
-    }));
-    getLogger().trace("Registered operation callback {}", operationId);
-  }
-
-  @Override
-  public <T, R> void register(OperationId operationId, BiConsumer<T, StreamHandler<R>> callback, ByteArrayDecoder<T> decoder, ByteArrayEncoder<R> encoder) {
-    checkNotNull(operationId, "operationId cannot be null");
-    checkNotNull(callback, "callback cannot be null");
-    encoders.put(operationId.id(), encoder);
-    streamOperations.put(operationId.id(), (bytes, handler) -> callback.accept(decode(bytes, decoder), new StreamHandler<R>() {
-      @Override
-      public void next(R value) {
-        handler.next(encode(value, encoder));
-      }
-
-      @Override
-      public void complete() {
-        handler.complete();
-      }
-
-      @Override
-      public void error(Throwable error) {
-        handler.error(error);
-      }
-    }));
-    getLogger().trace("Registered operation callback {}", operationId);
-  }
-
-  /**
-   * Returns the encoder for the given operation.
-   *
-   * @param operationId the operation ID
-   * @param <T>         the operation type
-   * @return the operation encoder
+   * @param <T>         the request type
+   * @param <U>         the response type
+   * @return the operation executor
    */
   @SuppressWarnings("unchecked")
-  public <T> ByteArrayEncoder<T> encoder(OperationId operationId) {
-    return encoders.get(operationId.id());
+  public <T, U> OperationExecutor<T, U> getExecutor(OperationId<T, U> operationId) {
+    return operations.get(operationId);
+  }
+
+  @Override
+  public void register(OperationId<Void, Void> operationId, Runnable callback) {
+    checkNotNull(operationId, "operationId cannot be null");
+    checkNotNull(callback, "callback cannot be null");
+    operations.put(operationId, new UnaryOperationExecutor<>(
+        operationId,
+        request -> {
+          callback.run();
+          return null;
+        },
+        codec.register(operationId)));
+  }
+
+  @Override
+  public <R> void register(OperationId<Void, R> operationId, Supplier<R> callback, ByteArrayEncoder<R> encoder) {
+    checkNotNull(operationId, "operationId cannot be null");
+    checkNotNull(callback, "callback cannot be null");
+    operations.put(operationId, new UnaryOperationExecutor<>(
+        operationId,
+        request -> callback.get(),
+        codec.register(operationId, encoder)));
+  }
+
+  @Override
+  @SuppressWarnings("unchecked")
+  public <T> void register(OperationId<T, Void> operationId, Consumer<T> callback, ByteArrayDecoder<T> decoder) {
+    checkNotNull(operationId, "operationId cannot be null");
+    checkNotNull(callback, "callback cannot be null");
+    operations.put(operationId, new UnaryOperationExecutor<>(
+        operationId,
+        request -> {
+          callback.accept(request);
+          return null;
+        },
+        codec.register(operationId, decoder)));
+  }
+
+  @Override
+  @SuppressWarnings("unchecked")
+  public <T, R> void register(
+      OperationId<T, R> operationId,
+      Function<T, R> callback,
+      ByteArrayDecoder<T> decoder,
+      ByteArrayEncoder<R> encoder) {
+    checkNotNull(operationId, "operationId cannot be null");
+    checkNotNull(callback, "callback cannot be null");
+    operations.put(operationId, new UnaryOperationExecutor<>(
+        operationId,
+        callback,
+        codec.register(operationId, decoder, encoder)));
+  }
+
+  @Override
+  @SuppressWarnings("unchecked")
+  public <R> void register(
+      OperationId<Void, R> operationId,
+      StreamType<R> streamType,
+      Consumer<StreamHandler<R>> callback,
+      ByteArrayEncoder<R> encoder) {
+    checkNotNull(operationId, "operationId cannot be null");
+    checkNotNull(streamType, "streamType cannot be null");
+    checkNotNull(callback, "callback cannot be null");
+    codec.register(streamType, encoder);
+    streamTypes.put(operationId, streamType);
+    operations.put(operationId, new StreamOperationExecutor<>(
+        operationId,
+        (request, handler) -> callback.accept(handler),
+        codec.register(operationId, encoder)));
+    context.getLogger().trace("Registered streaming operation callback {}", operationId);
+  }
+
+  @Override
+  @SuppressWarnings("unchecked")
+  public <T, R> void register(
+      OperationId<T, R> operationId,
+      StreamType<R> streamType,
+      BiConsumer<T, StreamHandler<R>> callback,
+      ByteArrayDecoder<T> decoder,
+      ByteArrayEncoder<R> encoder) {
+    checkNotNull(operationId, "operationId cannot be null");
+    checkNotNull(streamType, "streamType cannot be null");
+    checkNotNull(callback, "callback cannot be null");
+    streamTypes.put(operationId, streamType);
+    codec.register(streamType, encoder);
+    operations.put(operationId, new StreamOperationExecutor<>(
+        operationId,
+        callback,
+        codec.register(operationId, decoder, encoder)));
+    context.getLogger().trace("Registered streaming operation callback {}", operationId);
+  }
+
+  private class UnaryOperationExecutor<T, U> implements OperationExecutor<T, U> {
+    private final OperationId<T, U> operationId;
+    private final Function<T, U> function;
+    private final OperationCodec<T, U> operationCodec;
+
+    UnaryOperationExecutor(
+        OperationId<T, U> operationId,
+        Function<T, U> function,
+        OperationCodec<T, U> operationCodec) {
+      this.operationId = operationId;
+      this.function = function;
+      this.operationCodec = operationCodec;
+    }
+
+    @Override
+    public byte[] execute(byte[] request) {
+      return operationCodec.encode(execute(operationCodec.decode(request)));
+    }
+
+    @Override
+    public void execute(byte[] request, StreamHandler<byte[]> handler) {
+      execute(operationCodec.decode(request), new EncodingStreamHandler<>(handler, operationCodec::encode));
+    }
+
+    @Override
+    public U execute(T request) {
+      context.getLogger().trace("Executing {}", request);
+      setOperationId(operationId);
+      try {
+        return function.apply(request);
+      } catch (Exception e) {
+        context.getLogger().warn("State machine operation failed: {}", e.getMessage());
+        throw new PrimitiveException.ServiceException(e);
+      }
+    }
+
+    @Override
+    public void execute(T request, StreamHandler<U> handler) {
+      context.getLogger().trace("Executing {}", operationId);
+      setOperationId(operationId);
+      try {
+        function.apply(request);
+        handler.complete();
+      } catch (Exception e) {
+        context.getLogger().warn("State machine operation failed: {}", e.getMessage());
+        handler.error(e);
+      }
+    }
+  }
+
+  private class StreamOperationExecutor<T, U> implements OperationExecutor<T, U> {
+    private final OperationId<T, U> operationId;
+    private final BiConsumer<T, StreamHandler<U>> function;
+    private final OperationCodec<T, U> operationCodec;
+
+    StreamOperationExecutor(
+        OperationId<T, U> operationId,
+        BiConsumer<T, StreamHandler<U>> function,
+        OperationCodec<T, U> operationCodec) {
+      this.operationId = operationId;
+      this.function = function;
+      this.operationCodec = operationCodec;
+    }
+
+    @Override
+    public byte[] execute(byte[] request) {
+      return operationCodec.encode(execute(operationCodec.decode(request)));
+    }
+
+    @Override
+    public void execute(byte[] request, StreamHandler<byte[]> handler) {
+      execute(operationCodec.decode(request), new EncodingStreamHandler<>(handler, operationCodec::encode));
+    }
+
+    @Override
+    public U execute(T request) {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public void execute(T request, StreamHandler<U> handler) {
+      context.getLogger().trace("Executing {}", operationId);
+      setOperationId(operationId);
+      try {
+        function.accept(request, handler);
+      } catch (Exception e) {
+        context.getLogger().warn("State machine operation failed: {}", e.getMessage());
+        throw new PrimitiveException.ServiceException(e);
+      }
+    }
   }
 }

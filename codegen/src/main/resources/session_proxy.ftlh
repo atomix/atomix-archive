@@ -29,11 +29,10 @@ import io.atomix.primitive.session.impl.SessionQueryContext;
 <#if hasStreams>
 import io.atomix.primitive.session.impl.SessionStreamContext;
 import io.atomix.utils.stream.StreamHandler;
+</#if>
+<#if hasAsyncs>
 import io.atomix.utils.stream.FutureStreamHandler;
-import io.atomix.utils.stream.TranscodingStreamHandler;
-<#elseif hasAsyncs>
-import io.atomix.primitive.session.impl.SessionStreamContext;
-import io.atomix.utils.stream.StreamHandler;
+import io.atomix.utils.stream.EncodingStreamHandler;
 </#if>
 import io.atomix.utils.concurrent.ThreadContext;
 
@@ -103,25 +102,11 @@ public class ${proxyClass.className} extends SessionEnabledPrimitiveProxy {
             ${operation.operationsClass.className}.${operation.constantName},
             context,
             request,
-            new StreamHandler<Pair<SessionStreamContext, LockResponse>>() {
-                @Override
-                public void next(Pair<SessionStreamContext, LockResponse> response) {
-                    future.complete(Pair.of(SessionResponseContext.newBuilder()
-                        .setIndex(response.getLeft().getIndex())
-                        .addStreams(response.getLeft())
-                        .build(), response.getRight()));
-                }
-
-                @Override
-                public void complete() {
-                    future.complete(null);
-                }
-
-                @Override
-                public void error(Throwable error) {
-                    future.completeExceptionally(error);
-                }
-            },
+            new EncodingStreamHandler<>(new FutureStreamHandler<>(future),
+                response -> Pair.of(SessionResponseContext.newBuilder()
+                    .setIndex(response.getLeft().getIndex())
+                    .addStreams(response.getLeft())
+                    .build(), response.getRight())),
             ${operation.requestClass.className}::toByteString,
             ${operation.responseClass.className}::parseFrom);
         return future;

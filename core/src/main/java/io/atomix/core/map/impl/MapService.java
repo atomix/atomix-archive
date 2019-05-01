@@ -7,20 +7,14 @@ import java.time.Duration;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
-import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.stream.Collectors;
 
 import io.atomix.primitive.partition.PartitionId;
 import io.atomix.primitive.partition.PartitionManagementService;
 import io.atomix.primitive.service.PrimitiveService;
 import io.atomix.primitive.service.ServiceType;
-import io.atomix.primitive.session.Session;
-import io.atomix.primitive.session.SessionId;
-import io.atomix.primitive.session.SessionStreamHandler;
-import io.atomix.primitive.session.StreamId;
 import io.atomix.utils.concurrent.Scheduled;
 import io.atomix.utils.stream.StreamHandler;
 
@@ -52,7 +46,6 @@ public class MapService extends AbstractMapService {
   private Map<String, AtomicMapEntryValue> map = new ConcurrentHashMap<>();
   private Set<String> preparedKeys = new HashSet<>();
   private Map<String, AtomicMapTransaction> activeTransactions = new HashMap<>();
-  private Map<StreamId, StreamHandler<ListenResponse>> streams = new LinkedHashMap<>();
   private long currentVersion;
   private Map<String, Scheduled> timers = new HashMap<>();
 
@@ -354,13 +347,17 @@ public class MapService extends AbstractMapService {
   }
 
   @Override
-  public void listen(ListenRequest request, SessionStreamHandler<ListenResponse> handler) {
-    streams.put(handler.id(), handler);
+  public void listen(ListenRequest request, StreamHandler<ListenResponse> handler) {
+    // Keep the stream open.
   }
 
   @Override
   public UnlistenResponse unlisten(UnlistenRequest request) {
-    streams.remove(new StreamId(getCurrentSession().sessionId(), request.getStreamId()));
+    // Close the stream.
+    StreamHandler<ListenRequest> stream = getCurrentSession().getStream(request.getStreamId());
+    if (stream != null) {
+      stream.complete();
+    }
     return UnlistenResponse.newBuilder().build();
   }
 
@@ -604,7 +601,9 @@ public class MapService extends AbstractMapService {
    * @param event the event to publish
    */
   protected void onEvent(ListenResponse event) {
-    streams.values().forEach(stream -> stream.next(event));
+    getSessions()
+        .forEach(session -> session.getStreams(MapOperations.LISTEN_STREAM)
+            .forEach(stream -> stream.next(event)));
   }
 
   /**
@@ -640,24 +639,8 @@ public class MapService extends AbstractMapService {
   }
 
   @Override
-  protected void onExpire(Session session) {
-    streams.keySet().removeIf(streamId -> streamId.sessionId().equals(session.sessionId()));
-  }
-
-  @Override
-  protected void onClose(Session session) {
-    streams.keySet().removeIf(streamId -> streamId.sessionId().equals(session.sessionId()));
-  }
-
-  @Override
   public void backup(OutputStream output) throws IOException {
     AtomicMapSnapshot.newBuilder()
-        .addAllListeners(streams.keySet().stream()
-            .map(streamId -> AtomicMapListener.newBuilder()
-                .setSessionId(streamId.sessionId().id())
-                .setStreamId(streamId.streamId())
-                .build())
-            .collect(Collectors.toList()))
         .addAllPreparedKeys(preparedKeys)
         .putAllEntries(map)
         .putAllTransactions(activeTransactions)
@@ -669,11 +652,6 @@ public class MapService extends AbstractMapService {
   @Override
   public void restore(InputStream input) throws IOException {
     AtomicMapSnapshot snapshot = AtomicMapSnapshot.parseFrom(input);
-    streams = new LinkedHashMap<>();
-    snapshot.getListenersList().forEach(listener -> {
-      StreamId streamId = new StreamId(SessionId.from(listener.getSessionId()), listener.getStreamId());
-      streams.put(streamId, getStream(streamId));
-    });
     preparedKeys = new HashSet<>(snapshot.getPreparedKeysList());
     map = new ConcurrentHashMap<>(snapshot.getEntriesMap());
     activeTransactions = new HashMap<>(snapshot.getTransactionsMap());

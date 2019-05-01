@@ -105,7 +105,7 @@ public class DefaultSessionClient implements SessionClient {
             } else {
               handler.next(Pair.of(
                   response.getStream().getContext(),
-                  ByteBufferDecoder.decode(response.getCommand().getOutput().asReadOnlyByteBuffer(), decoder)));
+                  ByteBufferDecoder.decode(response.getStream().getValue().asReadOnlyByteBuffer(), decoder)));
             }
           }
 
@@ -151,7 +151,7 @@ public class DefaultSessionClient implements SessionClient {
             } else {
               handler.next(Pair.of(
                   response.getStream().getContext(),
-                  ByteBufferDecoder.decode(response.getQuery().getOutput().asReadOnlyByteBuffer(), decoder)));
+                  ByteBufferDecoder.decode(response.getStream().getValue().asReadOnlyByteBuffer(), decoder)));
             }
           }
 
