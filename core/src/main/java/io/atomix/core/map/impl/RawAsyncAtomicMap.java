@@ -1,6 +1,7 @@
 package io.atomix.core.map.impl;
 
 import java.time.Duration;
+import java.util.Collection;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -9,26 +10,34 @@ import java.util.function.BiFunction;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
+import com.google.common.collect.Maps;
 import com.google.protobuf.ByteString;
 import io.atomix.core.collection.AsyncDistributedCollection;
+import io.atomix.core.collection.CollectionEvent;
+import io.atomix.core.collection.CollectionEventListener;
+import io.atomix.core.collection.impl.UnsupportedAsyncDistributedCollection;
+import io.atomix.core.iterator.AsyncIterator;
+import io.atomix.core.iterator.impl.StreamHandlerIterator;
 import io.atomix.core.map.AsyncAtomicMap;
 import io.atomix.core.map.AtomicMap;
 import io.atomix.core.map.AtomicMapEvent;
 import io.atomix.core.map.AtomicMapEventListener;
 import io.atomix.core.set.AsyncDistributedSet;
+import io.atomix.core.set.impl.UnsupportedAsyncDistributedSet;
 import io.atomix.core.transaction.TransactionId;
 import io.atomix.core.transaction.TransactionLog;
 import io.atomix.primitive.PrimitiveException;
 import io.atomix.primitive.PrimitiveManagementService;
-import io.atomix.primitive.impl.ManagedAsyncPrimitive;
+import io.atomix.primitive.impl.SessionEnabledAsyncPrimitive;
 import io.atomix.utils.concurrent.Futures;
 import io.atomix.utils.stream.StreamHandler;
+import io.atomix.utils.stream.TranscodingStreamHandler;
 import io.atomix.utils.time.Versioned;
 
 /**
  * Raw asynchronous atomic map.
  */
-public class RawAsyncAtomicMap extends ManagedAsyncPrimitive<MapProxy> implements AsyncAtomicMap<String, byte[]> {
+public class RawAsyncAtomicMap extends SessionEnabledAsyncPrimitive<MapProxy, AsyncAtomicMap<String, byte[]>> implements AsyncAtomicMap<String, byte[]> {
   private final Map<AtomicMapEventListener<String, byte[]>, Executor> eventListeners = new ConcurrentHashMap<>();
   private volatile long streamId;
 
@@ -74,8 +83,61 @@ public class RawAsyncAtomicMap extends ManagedAsyncPrimitive<MapProxy> implement
       String key,
       Predicate<? super byte[]> condition,
       BiFunction<? super String, ? super byte[], ? extends byte[]> remappingFunction) {
-    // TODO: Implement compute methods
-    return Futures.exceptionalFuture(new UnsupportedOperationException());
+    return execute(MapProxy::get, GetRequest.newBuilder().setKey(key).build())
+        .thenCompose(response -> {
+          byte[] currentValue = response.getVersion() > 0 ? response.getValue().toByteArray() : null;
+          if (!condition.test(currentValue)) {
+            return CompletableFuture.completedFuture(
+                response.getVersion() > 0
+                    ? new Versioned<>(response.getValue().toByteArray(), response.getVersion())
+                    : null);
+          }
+
+          // Compute the new value.
+          byte[] computedValue;
+          try {
+            computedValue = remappingFunction.apply(key, currentValue);
+          } catch (Exception e) {
+            return Futures.exceptionalFuture(e);
+          }
+
+          // If both the old and new value are null, return a null result.
+          if (currentValue == null && computedValue == null) {
+            return CompletableFuture.completedFuture(null);
+          }
+
+          // If the response was empty, add the value only if the key is empty.
+          if (response.getVersion() == 0) {
+            return putIfAbsent(key, computedValue)
+                .thenCompose(result -> {
+                  if (result != null) {
+                    return Futures.exceptionalFuture(new PrimitiveException.ConcurrentModification());
+                  }
+                  return CompletableFuture.completedFuture(new Versioned<>(response.getValue().toByteArray(), response.getVersion()));
+                });
+          }
+          // If the computed value is null, remove the value if the version has not changed.
+          else if (computedValue == null) {
+            return remove(key, response.getVersion())
+                .thenCompose(succeeded -> {
+                  if (!succeeded) {
+                    return Futures.exceptionalFuture(new PrimitiveException.ConcurrentModification());
+                  }
+                  return CompletableFuture.completedFuture(new Versioned<>(response.getValue().toByteArray(), response.getVersion()));
+                });
+          }
+          // If both the current value and the computed value are non-empty, update the value
+          // if the key has not changed.
+          else {
+            return replace(key, response.getVersion(), computedValue)
+                .thenCompose(succeeded -> {
+                  if (!succeeded) {
+                    return Futures.exceptionalFuture(new PrimitiveException.ConcurrentModification());
+                  }
+                  return CompletableFuture.completedFuture(new Versioned<>(response.getValue().toByteArray(), response.getVersion()));
+                });
+          }
+        });
   }
 
   @Override
@@ -84,6 +146,25 @@ public class RawAsyncAtomicMap extends ManagedAsyncPrimitive<MapProxy> implement
         .setKey(key)
         .setValue(ByteString.copyFrom(value))
         .setTtl(ttl.toMillis())
+        .build())
+        .thenApply(response -> {
+          if (response.getStatus() == UpdateStatus.WRITE_LOCK) {
+            throw new PrimitiveException.ConcurrentModification();
+          }
+          if (!response.getPreviousValue().isEmpty()) {
+            return new Versioned<>(response.getPreviousValue().toByteArray(), response.getPreviousVersion());
+          }
+          return null;
+        });
+  }
+
+  @Override
+  public CompletableFuture<Versioned<byte[]>> putIfAbsent(String key, byte[] value, Duration ttl) {
+    return execute(MapProxy::put, PutRequest.newBuilder()
+        .setKey(key)
+        .setValue(ByteString.copyFrom(value))
+        .setTtl(ttl.toMillis())
+        .setVersion(MapService.VERSION_EMPTY)
         .build())
         .thenApply(response -> {
           if (response.getStatus() == UpdateStatus.WRITE_LOCK) {
@@ -118,25 +199,17 @@ public class RawAsyncAtomicMap extends ManagedAsyncPrimitive<MapProxy> implement
 
   @Override
   public AsyncDistributedSet<String> keySet() {
-    // TODO: Implement key set
-    throw new UnsupportedOperationException();
+    return new KeySet();
   }
 
   @Override
   public AsyncDistributedCollection<Versioned<byte[]>> values() {
-    // TODO: Implement values
-    throw new UnsupportedOperationException();
+    return new Values();
   }
 
   @Override
   public AsyncDistributedSet<Map.Entry<String, Versioned<byte[]>>> entrySet() {
-    // TODO: Implement entry set
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public CompletableFuture<Versioned<byte[]>> putIfAbsent(String key, byte[] value, Duration ttl) {
-    return Futures.exceptionalFuture(new UnsupportedOperationException());
+    return new EntrySet();
   }
 
   @Override
@@ -289,5 +362,235 @@ public class RawAsyncAtomicMap extends ManagedAsyncPrimitive<MapProxy> implement
   @Override
   public AtomicMap<String, byte[]> sync(Duration operationTimeout) {
     return new BlockingAtomicMap<>(this, operationTimeout.toMillis());
+  }
+
+  private class EntrySet extends UnsupportedAsyncDistributedSet<Map.Entry<String, Versioned<byte[]>>> {
+    private final Map<CollectionEventListener<Map.Entry<String, Versioned<byte[]>>>, AtomicMapEventListener<String, byte[]>> eventListeners = Maps.newIdentityHashMap();
+
+    @Override
+    public String name() {
+      return RawAsyncAtomicMap.this.name();
+    }
+
+    @Override
+    public CompletableFuture<Boolean> add(Map.Entry<String, Versioned<byte[]>> element) {
+      return execute(MapProxy::put, PutRequest.newBuilder()
+          .setKey(element.getKey())
+          .setValue(ByteString.copyFrom(element.getValue().value()))
+          .build())
+          .thenApply(response -> {
+            if (response.getStatus() == UpdateStatus.WRITE_LOCK) {
+              throw new PrimitiveException.ConcurrentModification();
+            }
+            return response.getStatus() != UpdateStatus.NOOP;
+          });
+    }
+
+    @Override
+    public CompletableFuture<Boolean> remove(Map.Entry<String, Versioned<byte[]>> element) {
+      return RawAsyncAtomicMap.this.remove(element.getKey(), element.getValue().version());
+    }
+
+    @Override
+    public CompletableFuture<Integer> size() {
+      return RawAsyncAtomicMap.this.size();
+    }
+
+    @Override
+    public CompletableFuture<Boolean> isEmpty() {
+      return RawAsyncAtomicMap.this.isEmpty();
+    }
+
+    @Override
+    public CompletableFuture<Void> clear() {
+      return RawAsyncAtomicMap.this.clear();
+    }
+
+    @Override
+    public CompletableFuture<Boolean> contains(Map.Entry<String, Versioned<byte[]>> element) {
+      return get(element.getKey()).thenApply(result -> result != null && result.equals(element.getValue()));
+    }
+
+    @Override
+    public synchronized CompletableFuture<Void> addListener(CollectionEventListener<Map.Entry<String, Versioned<byte[]>>> listener, Executor executor) {
+      AtomicMapEventListener<String, byte[]> mapListener = event -> {
+        switch (event.type()) {
+          case INSERT:
+            listener.event(new CollectionEvent<>(CollectionEvent.Type.ADD, Maps.immutableEntry(event.key(), event.newValue())));
+            break;
+          case REMOVE:
+            listener.event(new CollectionEvent<>(CollectionEvent.Type.REMOVE, Maps.immutableEntry(event.key(), event.oldValue())));
+            break;
+          default:
+            break;
+        }
+      };
+      if (eventListeners.putIfAbsent(listener, mapListener) == null) {
+        return RawAsyncAtomicMap.this.addListener(mapListener, executor);
+      }
+      return CompletableFuture.completedFuture(null);
+    }
+
+    @Override
+    public synchronized CompletableFuture<Void> removeListener(CollectionEventListener<Map.Entry<String, Versioned<byte[]>>> listener) {
+      AtomicMapEventListener<String, byte[]> mapListener = eventListeners.remove(listener);
+      if (mapListener != null) {
+        return RawAsyncAtomicMap.this.removeListener(mapListener);
+      }
+      return CompletableFuture.completedFuture(null);
+    }
+
+    @Override
+    public AsyncIterator<Map.Entry<String, Versioned<byte[]>>> iterator() {
+      StreamHandlerIterator<Map.Entry<String, Versioned<byte[]>>> iterator = new StreamHandlerIterator<>();
+      execute(
+          MapProxy::entries,
+          EntriesRequest.newBuilder().build(),
+          new TranscodingStreamHandler<>(iterator, response -> Maps.immutableEntry(
+              response.getKey(),
+              new Versioned<>(response.getValue().toByteArray(), response.getVersion()))));
+      return iterator;
+    }
+  }
+
+  private class KeySet extends UnsupportedAsyncDistributedSet<String> {
+    private final Map<CollectionEventListener<String>, AtomicMapEventListener<String, byte[]>> eventListeners = Maps.newIdentityHashMap();
+
+    @Override
+    public String name() {
+      return RawAsyncAtomicMap.this.name();
+    }
+
+    @Override
+    public CompletableFuture<Boolean> remove(String element) {
+      return RawAsyncAtomicMap.this.remove(element)
+          .thenApply(value -> value != null);
+    }
+
+    @Override
+    public CompletableFuture<Integer> size() {
+      return RawAsyncAtomicMap.this.size();
+    }
+
+    @Override
+    public CompletableFuture<Boolean> isEmpty() {
+      return RawAsyncAtomicMap.this.isEmpty();
+    }
+
+    @Override
+    public CompletableFuture<Void> clear() {
+      return RawAsyncAtomicMap.this.clear();
+    }
+
+    @Override
+    public CompletableFuture<Boolean> contains(String element) {
+      return containsKey(element);
+    }
+
+    @Override
+    @SuppressWarnings("unchecked")
+    public CompletableFuture<Boolean> containsAll(Collection<? extends String> c) {
+      return execute(MapProxy::containsKey, ContainsKeyRequest.newBuilder().addAllKeys((Iterable<String>) c).build())
+          .thenApply(response -> response.getContainsKey());
+    }
+
+    @Override
+    public synchronized CompletableFuture<Void> addListener(CollectionEventListener<String> listener, Executor executor) {
+      AtomicMapEventListener<String, byte[]> mapListener = event -> {
+        switch (event.type()) {
+          case INSERT:
+            listener.event(new CollectionEvent<>(CollectionEvent.Type.ADD, event.key()));
+            break;
+          case REMOVE:
+            listener.event(new CollectionEvent<>(CollectionEvent.Type.REMOVE, event.key()));
+            break;
+          default:
+            break;
+        }
+      };
+      if (eventListeners.putIfAbsent(listener, mapListener) == null) {
+        return RawAsyncAtomicMap.this.addListener(mapListener, executor);
+      }
+      return CompletableFuture.completedFuture(null);
+    }
+
+    @Override
+    public synchronized CompletableFuture<Void> removeListener(CollectionEventListener<String> listener) {
+      AtomicMapEventListener<String, byte[]> mapListener = eventListeners.remove(listener);
+      if (mapListener != null) {
+        return RawAsyncAtomicMap.this.removeListener(mapListener);
+      }
+      return CompletableFuture.completedFuture(null);
+    }
+
+    @Override
+    public AsyncIterator<String> iterator() {
+      StreamHandlerIterator<String> iterator = new StreamHandlerIterator<>();
+      execute(
+          MapProxy::keys,
+          KeysRequest.newBuilder().build(),
+          new TranscodingStreamHandler<>(iterator, KeysResponse::getKey));
+      return iterator;
+    }
+  }
+
+  private class Values extends UnsupportedAsyncDistributedCollection<Versioned<byte[]>> {
+    private final Map<CollectionEventListener<Versioned<byte[]>>, AtomicMapEventListener<String, byte[]>> eventListeners = Maps.newIdentityHashMap();
+
+    @Override
+    public String name() {
+      return RawAsyncAtomicMap.this.name();
+    }
+
+    @Override
+    public CompletableFuture<Integer> size() {
+      return RawAsyncAtomicMap.this.size();
+    }
+
+    @Override
+    public CompletableFuture<Boolean> isEmpty() {
+      return RawAsyncAtomicMap.this.isEmpty();
+    }
+
+    @Override
+    public synchronized CompletableFuture<Void> addListener(CollectionEventListener<Versioned<byte[]>> listener, Executor executor) {
+      AtomicMapEventListener<String, byte[]> mapListener = event -> {
+        switch (event.type()) {
+          case INSERT:
+            listener.event(new CollectionEvent<>(CollectionEvent.Type.ADD, event.newValue()));
+            break;
+          case REMOVE:
+            listener.event(new CollectionEvent<>(CollectionEvent.Type.REMOVE, event.oldValue()));
+            break;
+          default:
+            break;
+        }
+      };
+      if (eventListeners.putIfAbsent(listener, mapListener) == null) {
+        return RawAsyncAtomicMap.this.addListener(mapListener, executor);
+      }
+      return CompletableFuture.completedFuture(null);
+    }
+
+    @Override
+    public synchronized CompletableFuture<Void> removeListener(CollectionEventListener<Versioned<byte[]>> listener) {
+      AtomicMapEventListener<String, byte[]> mapListener = eventListeners.remove(listener);
+      if (mapListener != null) {
+        return RawAsyncAtomicMap.this.removeListener(mapListener);
+      }
+      return CompletableFuture.completedFuture(null);
+    }
+
+    @Override
+    public AsyncIterator<Versioned<byte[]>> iterator() {
+      StreamHandlerIterator<Versioned<byte[]>> iterator = new StreamHandlerIterator<>();
+      execute(
+          MapProxy::entries,
+          EntriesRequest.newBuilder().build(),
+          new TranscodingStreamHandler<>(
+              iterator,
+              response -> new Versioned<>(response.getValue().toByteArray(), response.getVersion())));
+      return iterator;
+    }
   }
 }

@@ -15,15 +15,31 @@
  */
 package io.atomix.core.impl;
 
+import java.time.Duration;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.BiFunction;
+import java.util.function.Function;
+import java.util.function.Predicate;
+import java.util.stream.Collectors;
+
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.io.BaseEncoding;
 import io.atomix.cluster.ClusterMembershipEvent;
 import io.atomix.cluster.ClusterMembershipEventListener;
 import io.atomix.cluster.MemberId;
 import io.atomix.core.iterator.AsyncIterator;
 import io.atomix.core.map.AsyncAtomicMap;
-import io.atomix.core.map.AtomicMapConfig;
 import io.atomix.core.map.AtomicMapType;
+import io.atomix.core.map.impl.MapProxy;
+import io.atomix.core.map.impl.MapService;
+import io.atomix.core.map.impl.PartitionedAsyncAtomicMap;
+import io.atomix.core.map.impl.RawAsyncAtomicMap;
+import io.atomix.core.map.impl.TranscodingAsyncAtomicMap;
 import io.atomix.core.transaction.ManagedTransactionService;
 import io.atomix.core.transaction.ParticipantInfo;
 import io.atomix.core.transaction.TransactionException;
@@ -36,25 +52,19 @@ import io.atomix.primitive.PrimitiveBuilder;
 import io.atomix.primitive.PrimitiveManagementService;
 import io.atomix.primitive.PrimitiveType;
 import io.atomix.primitive.partition.PartitionGroup;
+import io.atomix.primitive.partition.PartitionId;
+import io.atomix.primitive.partition.Partitioner;
 import io.atomix.primitive.protocol.PrimitiveProtocol;
 import io.atomix.primitive.protocol.ProxyCompatibleBuilder;
-import io.atomix.primitive.protocol.ProxyProtocol;
+import io.atomix.primitive.proxy.PrimitiveProxy;
 import io.atomix.utils.concurrent.Futures;
 import io.atomix.utils.serializer.Namespace;
 import io.atomix.utils.serializer.Namespaces;
 import io.atomix.utils.serializer.Serializer;
 import io.atomix.utils.time.Versioned;
+import org.apache.commons.lang3.tuple.Pair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.util.Map;
-import java.util.Set;
-import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.function.BiFunction;
-import java.util.function.Function;
-import java.util.function.Predicate;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
@@ -206,7 +216,7 @@ public class CoreTransactionService implements ManagedTransactionService {
   /**
    * Recovers and completes the given transaction.
    *
-   * @param transactionId the transaction identifier
+   * @param transactionId   the transaction identifier
    * @param transactionInfo the transaction info
    */
   private void recoverTransaction(TransactionId transactionId, TransactionInfo transactionInfo) {
@@ -371,15 +381,28 @@ public class CoreTransactionService implements ManagedTransactionService {
   @Override
   @SuppressWarnings("unchecked")
   public CompletableFuture<TransactionService> start() {
-    PrimitiveProtocol protocol = managementService.getPartitionService().getSystemPartitionGroup().newProtocol();
-    return AtomicMapType.<TransactionId, TransactionInfo>instance()
-        .newBuilder("atomix-transactions", new AtomicMapConfig(), managementService)
-        .withSerializer(SERIALIZER)
-        .withProtocol((ProxyProtocol) protocol)
-        .withCacheEnabled()
-        .buildAsync()
+    Map<PartitionId, RawAsyncAtomicMap> partitions = managementService.getPartitionService()
+        .getSystemPartitionGroup()
+        .getPartitions()
+        .stream()
+        .map(partition -> {
+          MapProxy proxy = new MapProxy(new PrimitiveProxy.Context(
+              "atomix-transactions", MapService.TYPE, partition.id(), managementService));
+          return Pair.of(partition.id(), new RawAsyncAtomicMap(proxy, Duration.ofSeconds(30), managementService));
+        }).collect(Collectors.toMap(Pair::getKey, Pair::getValue));
+    return Futures.allOf(partitions.values().stream().map(RawAsyncAtomicMap::connect))
+        .thenApply(v -> new TranscodingAsyncAtomicMap<TransactionId, TransactionInfo, String, byte[]>(
+            new PartitionedAsyncAtomicMap(
+                "atomix-transactions",
+                AtomicMapType.instance(),
+                (Map) partitions,
+                Partitioner.MURMUR3),
+            key -> BaseEncoding.base16().encode(SERIALIZER.encode(key)),
+            string -> SERIALIZER.decode(BaseEncoding.base16().decode(string)),
+            SERIALIZER::encode,
+            SERIALIZER::decode))
         .thenApply(transactions -> {
-          this.transactions = transactions.async();
+          this.transactions = transactions;
           managementService.getMembershipService().addListener(clusterEventListener);
           LOGGER.info("Started");
           started.set(true);

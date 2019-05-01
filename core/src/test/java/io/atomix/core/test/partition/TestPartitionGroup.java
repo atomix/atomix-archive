@@ -37,14 +37,12 @@ import io.atomix.primitive.protocol.ProxyProtocol;
 import io.atomix.protocols.raft.MultiRaftProtocol;
 import io.atomix.raft.RaftClient;
 import io.atomix.raft.impl.DefaultRaftClient;
-import io.atomix.utils.concurrent.BlockingAwareThreadPoolContextFactory;
-import io.atomix.utils.concurrent.ThreadContextFactory;
+import io.atomix.utils.concurrent.Futures;
 import io.atomix.utils.logging.ContextualLoggerFactory;
 import io.atomix.utils.logging.LoggerContext;
 import io.atomix.utils.serializer.Namespace;
 import io.atomix.utils.serializer.Namespaces;
 import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
 
@@ -91,11 +89,8 @@ public class TestPartitionGroup implements ManagedPartitionGroup {
     }
   }
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(TestPartitionGroup.class);
-
   private final String name;
   private final TestPartitionGroupConfig config;
-  private final ThreadContextFactory threadContextFactory;
   private final Map<PartitionId, TestPartition> partitions = Maps.newConcurrentMap();
   private final List<PartitionId> sortedPartitionIds = Lists.newCopyOnWriteArrayList();
 
@@ -105,26 +100,22 @@ public class TestPartitionGroup implements ManagedPartitionGroup {
         .build());
     this.name = config.getName();
     this.config = config;
-    this.threadContextFactory = new BlockingAwareThreadPoolContextFactory(
-        "raft-partition-group-" + name + "-%d", 4, log);
 
-    buildPartitions(config, threadContextFactory).forEach(p -> {
+    buildPartitions(config).forEach(p -> {
       this.partitions.put(p.id(), p);
       this.sortedPartitionIds.add(p.id());
     });
     Collections.sort(sortedPartitionIds, Comparator.comparingInt(PartitionId::getPartition));
   }
 
-  private static Collection<TestPartition> buildPartitions(
-      TestPartitionGroupConfig config,
-      ThreadContextFactory threadContextFactory) {
+  private static Collection<TestPartition> buildPartitions(TestPartitionGroupConfig config) {
     List<TestPartition> partitions = new ArrayList<>(config.getPartitions());
     for (int i = 0; i < config.getPartitions(); i++) {
       partitions.add(new TestPartition(
           PartitionId.newBuilder()
               .setGroup(config.getName())
               .setPartition(i + 1)
-              .build(), threadContextFactory));
+              .build()));
     }
     return partitions;
   }
@@ -175,7 +166,8 @@ public class TestPartitionGroup implements ManagedPartitionGroup {
 
   @Override
   public CompletableFuture<ManagedPartitionGroup> join(PartitionManagementService managementService) {
-    return CompletableFuture.completedFuture(null);
+    return Futures.allOf(partitions.values().stream().map(partition -> partition.join(managementService)))
+        .thenApply(v -> this);
   }
 
   @Override
@@ -185,8 +177,8 @@ public class TestPartitionGroup implements ManagedPartitionGroup {
 
   @Override
   public CompletableFuture<Void> close() {
-    threadContextFactory.close();
-    return CompletableFuture.completedFuture(null);
+    return Futures.allOf(partitions.values().stream().map(partition -> partition.close()))
+        .thenApply(v -> null);
   }
 
   @Override

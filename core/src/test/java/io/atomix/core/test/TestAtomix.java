@@ -24,7 +24,7 @@ import io.atomix.core.AtomixRegistry;
 import io.atomix.core.test.messaging.TestBroadcastServiceFactory;
 import io.atomix.core.test.messaging.TestMessagingServiceFactory;
 import io.atomix.core.test.messaging.TestUnicastServiceFactory;
-import io.atomix.protocols.raft.partition.RaftPartitionGroup;
+import io.atomix.core.test.partition.TestPartitionGroup;
 import io.atomix.utils.net.Address;
 
 /**
@@ -38,8 +38,8 @@ public class TestAtomix extends Atomix {
             .setNodeConfig(new MemberConfig()
                 .setId(memberId)
                 .setAddress(address)))
-        .setManagementGroup(RaftPartitionGroup.builder("system").build().config())
-        .addPartitionGroup(RaftPartitionGroup.builder("raft").build().config());
+        .setManagementGroup(TestPartitionGroup.builder("system").build().config())
+        .addPartitionGroup(TestPartitionGroup.builder("test").build().config());
   }
 
   TestAtomix(

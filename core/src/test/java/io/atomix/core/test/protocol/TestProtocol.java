@@ -29,10 +29,11 @@ public class TestProtocol implements ProxyProtocol {
   /**
    * Returns a new test protocol builder.
    *
+   * @param group the partition group
    * @return a new test protocol builder
    */
-  public static TestProtocolBuilder builder() {
-    return new TestProtocolBuilder(new TestProtocolConfig());
+  public static TestProtocolBuilder builder(String group) {
+    return new TestProtocolBuilder(new TestProtocolConfig().setGroup(group));
   }
 
   /**

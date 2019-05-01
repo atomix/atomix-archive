@@ -21,6 +21,7 @@ import java.util.function.Consumer;
 
 import com.google.common.base.MoreObjects;
 import io.atomix.primitive.AsyncPrimitive;
+import io.atomix.primitive.ManagedAsyncPrimitive;
 import io.atomix.primitive.PrimitiveState;
 import io.atomix.primitive.PrimitiveType;
 
@@ -29,7 +30,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
 /**
  * Base class for primitive delegates.
  */
-public abstract class DelegatingAsyncPrimitive<T extends AsyncPrimitive> implements AsyncPrimitive {
+public abstract class DelegatingAsyncPrimitive<T extends AsyncPrimitive> implements AsyncPrimitive, ManagedAsyncPrimitive<T> {
   private final T primitive;
 
   public DelegatingAsyncPrimitive(T primitive) {
@@ -73,6 +74,12 @@ public abstract class DelegatingAsyncPrimitive<T extends AsyncPrimitive> impleme
   @Override
   public CompletableFuture<Void> close() {
     return primitive.close();
+  }
+
+  @Override
+  @SuppressWarnings("unchecked")
+  public CompletableFuture<T> connect() {
+    return ((ManagedAsyncPrimitive) primitive).connect().thenApply(v -> this);
   }
 
   @Override

@@ -30,6 +30,8 @@ import io.atomix.utils.stream.StreamHandler;
 public class MapService extends AbstractMapService {
   public static final Type TYPE = new Type();
 
+  static final int VERSION_EMPTY = -1;
+
   /**
    * Map service type.
    */
@@ -89,6 +91,7 @@ public class MapService extends AbstractMapService {
 
   @Override
   public PutResponse put(PutRequest request) {
+    // If the key is locked, reject the request with a WRITE_LOCK error.
     if (isLocked(request.getKey())) {
       return PutResponse.newBuilder()
           .setStatus(UpdateStatus.WRITE_LOCK)
@@ -97,6 +100,15 @@ public class MapService extends AbstractMapService {
 
     AtomicMapEntryValue oldValue = map.get(request.getKey());
     if (oldValue == null || oldValue.getType() == AtomicMapEntryValue.Type.TOMBSTONE) {
+
+      // If the version is positive then reject the request.
+      if (request.getVersion() > 0) {
+        return PutResponse.newBuilder()
+            .setStatus(UpdateStatus.PRECONDITION_FAILED)
+            .build();
+      }
+
+      // Create a new entry value and set it in the map.
       AtomicMapEntryValue newValue = AtomicMapEntryValue.newBuilder()
           .setType(AtomicMapEntryValue.Type.VALUE)
           .setValue(request.getValue())
@@ -106,8 +118,10 @@ public class MapService extends AbstractMapService {
           .build();
       map.put(request.getKey(), newValue);
 
+      // Schedule the timeout for the value if necessary.
       scheduleTtl(request.getKey(), newValue);
 
+      // Publish an event to listener streams.
       onEvent(ListenResponse.newBuilder()
           .setType(ListenResponse.Type.INSERTED)
           .setKey(request.getKey())
@@ -119,44 +133,58 @@ public class MapService extends AbstractMapService {
           .setStatus(UpdateStatus.OK)
           .build();
     } else {
-      if (oldValue.getValue().equals(request.getValue())) {
+      // If the version is -1 then reject the request.
+      // If the version is positive then compare the version to the current version.
+      if (request.getVersion() == VERSION_EMPTY
+          || (request.getVersion() > 0 && request.getVersion() != oldValue.getVersion())) {
         return PutResponse.newBuilder()
-            .setStatus(UpdateStatus.NOOP)
-            .setPreviousValue(oldValue.getValue())
-            .setPreviousVersion(oldValue.getVersion())
+            .setStatus(UpdateStatus.PRECONDITION_FAILED)
             .build();
       }
+    }
 
-      AtomicMapEntryValue newValue = AtomicMapEntryValue.newBuilder()
-          .setType(AtomicMapEntryValue.Type.VALUE)
-          .setValue(request.getValue())
-          .setVersion(getCurrentIndex())
-          .setTtl(request.getTtl())
-          .setCreated(getCurrentTimestamp())
-          .build();
-      map.put(request.getKey(), newValue);
-
-      scheduleTtl(request.getKey(), newValue);
-
-      onEvent(ListenResponse.newBuilder()
-          .setType(ListenResponse.Type.UPDATED)
-          .setKey(request.getKey())
-          .setOldValue(oldValue.getValue())
-          .setOldVersion(oldValue.getVersion())
-          .setNewValue(newValue.getValue())
-          .setNewVersion(newValue.getVersion())
-          .build());
-
+    // If the value is equal to the current value, return a no-op.
+    if (oldValue.getValue().equals(request.getValue())) {
       return PutResponse.newBuilder()
-          .setStatus(UpdateStatus.OK)
+          .setStatus(UpdateStatus.NOOP)
           .setPreviousValue(oldValue.getValue())
           .setPreviousVersion(oldValue.getVersion())
           .build();
     }
+
+    // Create a new entry value and set it in the map.
+    AtomicMapEntryValue newValue = AtomicMapEntryValue.newBuilder()
+        .setType(AtomicMapEntryValue.Type.VALUE)
+        .setValue(request.getValue())
+        .setVersion(getCurrentIndex())
+        .setTtl(request.getTtl())
+        .setCreated(getCurrentTimestamp())
+        .build();
+    map.put(request.getKey(), newValue);
+
+    // Schedule the timeout for the value if necessary.
+    scheduleTtl(request.getKey(), newValue);
+
+    // Publish an event to listener streams.
+    onEvent(ListenResponse.newBuilder()
+        .setType(ListenResponse.Type.UPDATED)
+        .setKey(request.getKey())
+        .setOldValue(oldValue.getValue())
+        .setOldVersion(oldValue.getVersion())
+        .setNewValue(newValue.getValue())
+        .setNewVersion(newValue.getVersion())
+        .build());
+
+    return PutResponse.newBuilder()
+        .setStatus(UpdateStatus.OK)
+        .setPreviousValue(oldValue.getValue())
+        .setPreviousVersion(oldValue.getVersion())
+        .build();
   }
 
   @Override
   public ReplaceResponse replace(ReplaceRequest request) {
+    // If the key is locked, reject the request with a WRITE_LOCK error.
     if (isLocked(request.getKey())) {
       return ReplaceResponse.newBuilder()
           .setStatus(UpdateStatus.WRITE_LOCK)
@@ -240,6 +268,7 @@ public class MapService extends AbstractMapService {
 
   @Override
   public RemoveResponse remove(RemoveRequest request) {
+    // If the key is locked, reject the request with a WRITE_LOCK error.
     if (isLocked(request.getKey())) {
       return RemoveResponse.newBuilder()
           .setStatus(UpdateStatus.WRITE_LOCK)
@@ -248,6 +277,13 @@ public class MapService extends AbstractMapService {
 
     AtomicMapEntryValue value = map.get(request.getKey());
     if (value != null && value.getType() != AtomicMapEntryValue.Type.TOMBSTONE) {
+      // If the request version is set, compare the version to the current entry version.
+      if (request.getVersion() > 0 && request.getVersion() != value.getVersion()) {
+        return RemoveResponse.newBuilder()
+            .setStatus(UpdateStatus.PRECONDITION_FAILED)
+            .build();
+      }
+
       // If no transactions are active, remove the value from the map. Otherwise, update its type to TOMBSTONE.
       if (activeTransactions.isEmpty()) {
         map.remove(request.getKey());
@@ -289,6 +325,32 @@ public class MapService extends AbstractMapService {
         .build()));
     map.clear();
     return ClearResponse.newBuilder().build();
+  }
+
+  @Override
+  public void keys(KeysRequest request, StreamHandler<KeysResponse> handler) {
+    map.forEach((key, value) -> {
+      if (value.getType() == AtomicMapEntryValue.Type.VALUE) {
+        handler.next(KeysResponse.newBuilder()
+            .setKey(key)
+            .build());
+      }
+    });
+    handler.complete();
+  }
+
+  @Override
+  public void entries(EntriesRequest request, StreamHandler<EntriesResponse> handler) {
+    map.forEach((key, value) -> {
+      if (value.getType() == AtomicMapEntryValue.Type.VALUE) {
+        handler.next(EntriesResponse.newBuilder()
+            .setKey(key)
+            .setValue(value.getValue())
+            .setVersion(value.getVersion())
+            .build());
+      }
+    });
+    handler.complete();
   }
 
   @Override
@@ -579,12 +641,12 @@ public class MapService extends AbstractMapService {
 
   @Override
   protected void onExpire(Session session) {
-    getStreams(session.sessionId()).forEach(stream -> streams.remove(stream.id()));
+    streams.keySet().removeIf(streamId -> streamId.sessionId().equals(session.sessionId()));
   }
 
   @Override
   protected void onClose(Session session) {
-    getStreams(session.sessionId()).forEach(stream -> streams.remove(stream.id()));
+    streams.keySet().removeIf(streamId -> streamId.sessionId().equals(session.sessionId()));
   }
 
   @Override

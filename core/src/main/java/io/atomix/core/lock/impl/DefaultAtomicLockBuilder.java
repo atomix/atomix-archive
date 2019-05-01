@@ -21,6 +21,7 @@ import io.atomix.core.lock.AsyncAtomicLock;
 import io.atomix.core.lock.AtomicLock;
 import io.atomix.core.lock.AtomicLockBuilder;
 import io.atomix.core.lock.AtomicLockConfig;
+import io.atomix.primitive.ManagedAsyncPrimitive;
 import io.atomix.primitive.PrimitiveManagementService;
 
 /**
@@ -37,6 +38,7 @@ public class DefaultAtomicLockBuilder extends AtomicLockBuilder {
     return managementService.getPrimitiveRegistry().createPrimitive(name, type)
         .thenApply(v -> newSingletonProxy(LockService.TYPE, LockProxy::new))
         .thenApply(proxy -> new DefaultAsyncAtomicLock(proxy, config.getSessionTimeout(), managementService))
+        .thenCompose(ManagedAsyncPrimitive::connect)
         .thenApply(AsyncAtomicLock::sync);
   }
 }

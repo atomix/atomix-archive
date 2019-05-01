@@ -25,6 +25,7 @@ import io.atomix.core.set.AsyncDistributedSet;
 import io.atomix.core.set.DistributedSet;
 import io.atomix.core.set.DistributedSetBuilder;
 import io.atomix.core.set.DistributedSetConfig;
+import io.atomix.primitive.ManagedAsyncPrimitive;
 import io.atomix.primitive.PrimitiveManagementService;
 import io.atomix.primitive.partition.PartitionId;
 import io.atomix.primitive.partition.Partitioner;
@@ -51,6 +52,7 @@ public class DefaultDistributedSetBuilder<E> extends DistributedSetBuilder<E> {
                 new RawAsyncDistributedSet(entry.getValue(), config.getSessionTimeout(), managementService)))
             .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue)))
         .thenApply(partitions -> new PartitionedAsyncDistributedSet(name, type, partitions, Partitioner.MURMUR3))
+        .thenCompose(ManagedAsyncPrimitive::connect)
         .thenApply(rawSet -> {
           Serializer serializer = serializer();
           return new TranscodingAsyncDistributedSet<E, String>(

@@ -25,6 +25,7 @@ import io.atomix.core.map.AsyncAtomicMap;
 import io.atomix.core.map.AtomicMap;
 import io.atomix.core.map.AtomicMapBuilder;
 import io.atomix.core.map.AtomicMapConfig;
+import io.atomix.primitive.ManagedAsyncPrimitive;
 import io.atomix.primitive.PrimitiveManagementService;
 import io.atomix.primitive.partition.PartitionId;
 import io.atomix.primitive.partition.Partitioner;
@@ -52,6 +53,7 @@ public class DefaultAtomicMapBuilder<K, V> extends AtomicMapBuilder<K, V> {
                 new RawAsyncAtomicMap(entry.getValue(), config.getSessionTimeout(), managementService)))
             .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue)))
         .thenApply(partitions -> new PartitionedAsyncAtomicMap(name, type, partitions, Partitioner.MURMUR3))
+        .thenCompose(ManagedAsyncPrimitive::connect)
         .thenApply(rawMap -> {
           Serializer serializer = serializer();
           return new TranscodingAsyncAtomicMap<K, V, String, byte[]>(

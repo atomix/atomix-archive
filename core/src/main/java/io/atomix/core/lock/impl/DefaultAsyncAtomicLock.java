@@ -24,14 +24,14 @@ import io.atomix.core.lock.AsyncAtomicLock;
 import io.atomix.core.lock.AtomicLock;
 import io.atomix.primitive.PrimitiveManagementService;
 import io.atomix.primitive.PrimitiveState;
-import io.atomix.primitive.impl.ManagedAsyncPrimitive;
+import io.atomix.primitive.impl.SessionEnabledAsyncPrimitive;
 import io.atomix.utils.concurrent.Scheduled;
 import io.atomix.utils.time.Version;
 
 /**
  * Raft lock.
  */
-public class DefaultAsyncAtomicLock extends ManagedAsyncPrimitive<LockProxy> implements AsyncAtomicLock {
+public class DefaultAsyncAtomicLock extends SessionEnabledAsyncPrimitive<LockProxy, AsyncAtomicLock> implements AsyncAtomicLock {
   private final AtomicLong lock = new AtomicLong();
 
   public DefaultAsyncAtomicLock(LockProxy proxy, Duration timeout, PrimitiveManagementService managementService) {

@@ -32,7 +32,7 @@ import io.atomix.core.set.DistributedSet;
 import io.atomix.core.transaction.TransactionId;
 import io.atomix.core.transaction.TransactionLog;
 import io.atomix.primitive.PrimitiveManagementService;
-import io.atomix.primitive.impl.ManagedAsyncPrimitive;
+import io.atomix.primitive.impl.SessionEnabledAsyncPrimitive;
 import io.atomix.utils.concurrent.Futures;
 import io.atomix.utils.stream.StreamHandler;
 import io.atomix.utils.stream.TranscodingStreamHandler;
@@ -40,7 +40,7 @@ import io.atomix.utils.stream.TranscodingStreamHandler;
 /**
  * Raw async distributed set.
  */
-public class RawAsyncDistributedSet extends ManagedAsyncPrimitive<SetProxy> implements AsyncDistributedSet<String> {
+public class RawAsyncDistributedSet extends SessionEnabledAsyncPrimitive<SetProxy, AsyncDistributedSet<String>> implements AsyncDistributedSet<String> {
   private final Map<CollectionEventListener<String>, Executor> eventListeners = Maps.newConcurrentMap();
   private volatile long streamId;
 

@@ -75,6 +75,24 @@ message SizeResponse {
     int32 size = 1;
 }
 
+message KeysRequest {
+
+}
+
+message KeysResponse {
+    string key = 1;
+}
+
+message EntriesRequest {
+
+}
+
+message EntriesResponse {
+    string key = 1;
+    bytes value = 2;
+    int64 version = 3;
+}
+
 message PutRequest {
     string key = 1;
     bytes value = 2;
@@ -211,6 +229,18 @@ service MapService {
     rpc Size(SizeRequest) returns (SizeResponse) {
         option (atomix.primitive.service.operation) = {
             name: "size"
+            type: QUERY
+        };
+    }
+    rpc Keys(KeysRequest) returns (stream KeysResponse) {
+        option (atomix.primitive.service.operation) = {
+            name: "keys"
+            type: QUERY
+        };
+    }
+    rpc Entries(EntriesRequest) returns (stream EntriesResponse) {
+        option (atomix.primitive.service.operation) = {
+            name: "entries"
             type: QUERY
         };
     }

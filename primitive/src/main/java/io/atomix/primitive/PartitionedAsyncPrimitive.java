@@ -38,7 +38,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
 /**
  * Partitioned primitive proxy.
  */
-public abstract class PartitionedAsyncPrimitive<P extends AsyncPrimitive> implements AsyncPrimitive {
+public abstract class PartitionedAsyncPrimitive<P extends AsyncPrimitive> implements AsyncPrimitive, ManagedAsyncPrimitive<P> {
   private final String name;
   private final PrimitiveType type;
   private final List<PartitionId> partitionIds = new CopyOnWriteArrayList<>();
@@ -54,7 +54,7 @@ public abstract class PartitionedAsyncPrimitive<P extends AsyncPrimitive> implem
     this.type = checkNotNull(type, "type cannot be null");
     partitions.forEach((partitionId, partition) -> {
       partitionIds.add(partitionId);
-      partitions.put(partitionId, partition);
+      this.partitions.put(partitionId, partition);
     });
     Collections.sort(partitionIds, Comparator.comparingInt(PartitionId::getPartition));
     this.partitioner = checkNotNull(partitioner, "partitioner cannot be null");
@@ -129,6 +129,16 @@ public abstract class PartitionedAsyncPrimitive<P extends AsyncPrimitive> implem
   @Override
   public void removeStateChangeListener(Consumer<PrimitiveState> listener) {
     stateChangeListeners.remove(listener);
+  }
+
+  @Override
+  @SuppressWarnings("unchecked")
+  public CompletableFuture<P> connect() {
+    return Futures.allOf(partitions.values()
+        .stream()
+        .map(partition -> ((ManagedAsyncPrimitive<P>) partition).connect())
+        .collect(Collectors.toList()))
+        .thenApply(v -> (P) this);
   }
 
   @Override

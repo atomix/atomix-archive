@@ -21,6 +21,7 @@ import io.atomix.core.value.AsyncAtomicValue;
 import io.atomix.core.value.AtomicValue;
 import io.atomix.core.value.AtomicValueBuilder;
 import io.atomix.core.value.AtomicValueConfig;
+import io.atomix.primitive.ManagedAsyncPrimitive;
 import io.atomix.primitive.PrimitiveManagementService;
 import io.atomix.utils.serializer.Serializer;
 
@@ -40,6 +41,7 @@ public class DefaultAtomicValueBuilder<V> extends AtomicValueBuilder<V> {
     return managementService.getPrimitiveRegistry().createPrimitive(name, type)
         .thenApply(v -> newSingletonProxy(ValueService.TYPE, ValueProxy::new))
         .thenApply(proxy -> new RawAsyncAtomicValue(proxy, config.getSessionTimeout(), managementService))
+        .thenCompose(ManagedAsyncPrimitive::connect)
         .thenApply(rawValue -> {
           Serializer serializer = serializer();
           return new TranscodingAsyncAtomicValue<V, byte[]>(

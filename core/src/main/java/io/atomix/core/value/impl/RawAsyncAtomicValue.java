@@ -12,14 +12,14 @@ import io.atomix.core.value.AtomicValue;
 import io.atomix.core.value.AtomicValueEvent;
 import io.atomix.core.value.AtomicValueEventListener;
 import io.atomix.primitive.PrimitiveManagementService;
-import io.atomix.primitive.impl.ManagedAsyncPrimitive;
+import io.atomix.primitive.impl.SessionEnabledAsyncPrimitive;
 import io.atomix.utils.stream.StreamHandler;
 import io.atomix.utils.time.Versioned;
 
 /**
  * Raw asynchronous atomic value.
  */
-public class RawAsyncAtomicValue extends ManagedAsyncPrimitive<ValueProxy> implements AsyncAtomicValue<byte[]> {
+public class RawAsyncAtomicValue extends SessionEnabledAsyncPrimitive<ValueProxy, AsyncAtomicValue<byte[]>> implements AsyncAtomicValue<byte[]> {
   private final Set<AtomicValueEventListener<byte[]>> eventListeners = new CopyOnWriteArraySet<>();
   private volatile long streamId;
 

@@ -23,6 +23,7 @@ import java.util.stream.Collectors;
 
 import io.atomix.core.test.TestAtomixFactory;
 import io.atomix.core.test.protocol.TestProtocol;
+import io.atomix.core.test.protocol.TestStateMachine;
 import io.atomix.primitive.protocol.ProxyProtocol;
 import org.junit.After;
 import org.junit.Before;
@@ -70,7 +71,7 @@ public abstract class AbstractPrimitiveTest {
   public void setupTest() throws Exception {
     members = new ArrayList<>();
     atomixFactory = new TestAtomixFactory();
-    protocol = TestProtocol.builder()
+    protocol = TestProtocol.builder("test")
         .withNumPartitions(3)
         .build();
   }
@@ -83,5 +84,6 @@ public abstract class AbstractPrimitiveTest {
     } catch (Exception e) {
       // Do nothing
     }
+    TestStateMachine.destroyInstances();
   }
 }

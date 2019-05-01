@@ -21,6 +21,7 @@ import io.atomix.core.value.AsyncDistributedValue;
 import io.atomix.core.value.DistributedValue;
 import io.atomix.core.value.DistributedValueBuilder;
 import io.atomix.core.value.DistributedValueConfig;
+import io.atomix.primitive.ManagedAsyncPrimitive;
 import io.atomix.primitive.PrimitiveManagementService;
 import io.atomix.utils.serializer.Serializer;
 
@@ -40,6 +41,7 @@ public class DefaultDistributedValueBuilder<V> extends DistributedValueBuilder<V
     return managementService.getPrimitiveRegistry().createPrimitive(name, type)
         .thenApply(v -> newSingletonProxy(ValueService.TYPE, ValueProxy::new))
         .thenApply(proxy -> new RawAsyncAtomicValue(proxy, config.getSessionTimeout(), managementService))
+        .thenCompose(ManagedAsyncPrimitive::connect)
         .thenApply(rawValue -> {
           Serializer serializer = serializer();
           return new TranscodingAsyncAtomicValue<V, byte[]>(

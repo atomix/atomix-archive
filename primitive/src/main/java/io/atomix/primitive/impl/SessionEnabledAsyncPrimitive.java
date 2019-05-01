@@ -19,6 +19,8 @@ import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 
+import io.atomix.primitive.AsyncPrimitive;
+import io.atomix.primitive.ManagedAsyncPrimitive;
 import io.atomix.primitive.PrimitiveManagementService;
 import io.atomix.primitive.PrimitiveState;
 import io.atomix.primitive.proxy.SessionEnabledPrimitiveProxy;
@@ -30,14 +32,16 @@ import io.atomix.utils.stream.StreamHandler;
 /**
  * Session enabled asynchronous primitive.
  */
-public abstract class ManagedAsyncPrimitive<P extends SessionEnabledPrimitiveProxy> extends SimpleAsyncPrimitive<P> {
+public abstract class SessionEnabledAsyncPrimitive<P extends SessionEnabledPrimitiveProxy, T extends AsyncPrimitive>
+    extends SimpleAsyncPrimitive<P>
+    implements ManagedAsyncPrimitive<T> {
   private final Duration timeout;
   private final PrimitiveManagementService managementService;
   private PrimitiveSessionState state;
   private PrimitiveSessionSequencer sequencer;
   private PrimitiveSessionExecutor<P> executor;
 
-  public ManagedAsyncPrimitive(
+  public SessionEnabledAsyncPrimitive(
       P proxy,
       Duration timeout,
       PrimitiveManagementService managementService) {
@@ -80,28 +84,26 @@ public abstract class ManagedAsyncPrimitive<P extends SessionEnabledPrimitivePro
     return state.getState();
   }
 
-  /**
-   * Connects the primitive.
-   *
-   * @return a future to be completed once the primitive has been connected
-   */
-  public CompletableFuture<Void> connect() {
+  @Override
+  @SuppressWarnings("unchecked")
+  public CompletableFuture<T> connect() {
     return managementService.getSessionIdService().nextSessionId()
         .thenCompose(sessionId -> getProxy().openSession(OpenSessionRequest.newBuilder()
             .setSessionId(sessionId.id())
             .setTimeout(timeout.toMillis())
-            .build()).thenApply(response -> {
-          ManagedPrimitiveContext context = new ManagedPrimitiveContext(
-              managementService.getMembershipService().getLocalMember().id(),
-              sessionId,
-              name(),
-              type(),
-              timeout);
-          state = new PrimitiveSessionState(sessionId, timeout.toMillis());
-          sequencer = new PrimitiveSessionSequencer(state, context);
-          executor = new PrimitiveSessionExecutor<>(getProxy(), state, context, sequencer);
-          return null;
-        }));
+            .build())
+            .thenApply(response -> {
+              ManagedPrimitiveContext context = new ManagedPrimitiveContext(
+                  managementService.getMembershipService().getLocalMember().id(),
+                  sessionId,
+                  name(),
+                  type(),
+                  timeout);
+              state = new PrimitiveSessionState(sessionId, timeout.toMillis());
+              sequencer = new PrimitiveSessionSequencer(state, context);
+              executor = new PrimitiveSessionExecutor<>(getProxy(), state, context, sequencer);
+              return (T) this;
+            }));
   }
 
   @Override

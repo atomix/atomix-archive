@@ -17,16 +17,16 @@ package io.atomix.core.test.partition;
 
 import java.util.Collection;
 import java.util.Collections;
+import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
 import io.atomix.cluster.MemberId;
 import io.atomix.core.test.protocol.TestPartitionClient;
-import io.atomix.core.test.protocol.TestStateMachineContext;
+import io.atomix.core.test.protocol.TestStateMachine;
 import io.atomix.primitive.partition.Partition;
 import io.atomix.primitive.partition.PartitionClient;
 import io.atomix.primitive.partition.PartitionId;
-import io.atomix.primitive.service.impl.ServiceManagerStateMachine;
-import io.atomix.utils.concurrent.ThreadContextFactory;
+import io.atomix.primitive.partition.PartitionManagementService;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
 
@@ -35,23 +35,10 @@ import static com.google.common.base.MoreObjects.toStringHelper;
  */
 public class TestPartition implements Partition {
   private final PartitionId partitionId;
-  private final ThreadContextFactory threadContextFactory;
-  private final PartitionClient client;
+  private volatile PartitionClient client;
 
-  public TestPartition(
-      PartitionId partitionId,
-      ThreadContextFactory threadContextFactory) {
+  public TestPartition(PartitionId partitionId) {
     this.partitionId = partitionId;
-    this.threadContextFactory = threadContextFactory;
-    ServiceManagerStateMachine stateMachine = new ServiceManagerStateMachine(
-        PartitionId.newBuilder()
-            .setGroup("test")
-            .setPartition(1)
-            .build(),
-        null);
-    TestStateMachineContext context = new TestStateMachineContext();
-    stateMachine.init(context);
-    this.client = new TestPartitionClient(stateMachine, context);
   }
 
   @Override
@@ -88,6 +75,15 @@ public class TestPartition implements Partition {
   @Override
   public PartitionClient getClient() {
     return client;
+  }
+
+  CompletableFuture<Void> join(PartitionManagementService managementService) {
+    this.client = new TestPartitionClient(TestStateMachine.getInstance(partitionId, managementService));
+    return CompletableFuture.completedFuture(null);
+  }
+
+  CompletableFuture<Void> close() {
+    return CompletableFuture.completedFuture(null);
   }
 
   @Override

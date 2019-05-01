@@ -6,7 +6,7 @@ import java.time.Duration;
  * Managed primitive configuration.
  */
 public abstract class ManagedPrimitiveConfig<C extends ManagedPrimitiveConfig<C>> extends PrimitiveConfig<C> {
-  private Duration sessionTimeout;
+  private Duration sessionTimeout = Duration.ofSeconds(30);
 
   /**
    * Returns the primitive session timeout.
