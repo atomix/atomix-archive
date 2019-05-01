@@ -74,7 +74,7 @@ public class DefaultAsyncAtomicLock extends SessionEnabledAsyncPrimitive<LockPro
     CompletableFuture<Optional<Version>> future = new CompletableFuture<>();
     Scheduled timer = getProxy().context().schedule(timeout, () -> future.complete(Optional.empty()));
     execute(LockProxy::lock, LockRequest.newBuilder()
-        .setTimeout(0)
+        .setTimeout(timeout.toMillis())
         .build())
         .thenAccept(response -> {
           timer.cancel();
@@ -113,7 +113,7 @@ public class DefaultAsyncAtomicLock extends SessionEnabledAsyncPrimitive<LockPro
     return execute(LockProxy::unlock, UnlockRequest.newBuilder()
         .setIndex(version.value())
         .build())
-        .thenApply(response -> null);
+        .thenApply(response -> response.getSucceeded());
   }
 
   @Override

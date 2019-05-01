@@ -2,6 +2,7 @@ package io.atomix.primitive.service.impl;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -10,11 +11,11 @@ import java.util.function.Supplier;
 import io.atomix.primitive.PrimitiveException;
 import io.atomix.primitive.operation.OperationId;
 import io.atomix.primitive.operation.OperationType;
+import io.atomix.primitive.operation.StreamType;
 import io.atomix.primitive.service.OperationExecutor;
 import io.atomix.primitive.service.PrimitiveService;
 import io.atomix.primitive.service.ServiceOperationRegistry;
 import io.atomix.primitive.service.StateMachine;
-import io.atomix.primitive.operation.StreamType;
 import io.atomix.primitive.util.ByteArrayDecoder;
 import io.atomix.primitive.util.ByteArrayEncoder;
 import io.atomix.utils.stream.EncodingStreamHandler;
@@ -68,7 +69,7 @@ public class DefaultServiceExecutor implements ServiceOperationRegistry, Primiti
    * Returns the stream type for the given operation.
    *
    * @param operationId the operation ID
-   * @param <T> the stream type
+   * @param <T>         the stream type
    * @return the stream type for the given operation
    */
   public <T> StreamType<T> getStreamType(OperationId<?, T> operationId) {
@@ -138,6 +139,25 @@ public class DefaultServiceExecutor implements ServiceOperationRegistry, Primiti
         operationId,
         callback,
         codec.register(operationId, decoder, encoder)));
+  }
+
+  @Override
+  public <T, R> void register(
+      OperationId<T, R> operationId,
+      StreamType<R> streamType,
+      Function<T, CompletableFuture<R>> callback,
+      ByteArrayDecoder<T> decoder,
+      ByteArrayEncoder<R> encoder) {
+    checkNotNull(operationId, "operationId cannot be null");
+    checkNotNull(streamType, "streamType cannot be null");
+    checkNotNull(callback, "callback cannot be null");
+    streamTypes.put(operationId, streamType);
+    codec.register(streamType, encoder);
+    operations.put(operationId, new AsyncOperationExecutor<>(
+        operationId,
+        callback,
+        codec.register(operationId, decoder, encoder)));
+    context.getLogger().trace("Registered streaming operation callback {}", operationId);
   }
 
   @Override
@@ -225,6 +245,55 @@ public class DefaultServiceExecutor implements ServiceOperationRegistry, Primiti
       } catch (Exception e) {
         context.getLogger().warn("State machine operation failed: {}", e.getMessage());
         handler.error(e);
+      }
+    }
+  }
+
+  private class AsyncOperationExecutor<T, U> implements OperationExecutor<T, U> {
+    private final OperationId<T, U> operationId;
+    private final Function<T, CompletableFuture<U>> function;
+    private final OperationCodec<T, U> operationCodec;
+
+    AsyncOperationExecutor(
+        OperationId<T, U> operationId,
+        Function<T, CompletableFuture<U>> function,
+        OperationCodec<T, U> operationCodec) {
+      this.operationId = operationId;
+      this.function = function;
+      this.operationCodec = operationCodec;
+    }
+
+    @Override
+    public byte[] execute(byte[] request) {
+      return operationCodec.encode(execute(operationCodec.decode(request)));
+    }
+
+    @Override
+    public void execute(byte[] request, StreamHandler<byte[]> handler) {
+      execute(operationCodec.decode(request), new EncodingStreamHandler<>(handler, operationCodec::encode));
+    }
+
+    @Override
+    public U execute(T request) {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public void execute(T request, StreamHandler<U> handler) {
+      context.getLogger().trace("Executing {}", operationId);
+      setOperationId(operationId);
+      try {
+        function.apply(request).whenComplete((response, error) -> {
+          if (error == null) {
+            handler.next(response);
+            handler.complete();
+          } else {
+            handler.error(error);
+          }
+        });
+      } catch (Exception e) {
+        context.getLogger().warn("State machine operation failed: {}", e.getMessage());
+        throw new PrimitiveException.ServiceException(e);
       }
     }
   }

@@ -5,6 +5,7 @@ import java.util.concurrent.CompletableFuture;
 import com.google.protobuf.Message;
 import io.atomix.primitive.operation.CommandId;
 import io.atomix.primitive.operation.QueryId;
+import io.atomix.primitive.operation.StreamType;
 import io.atomix.primitive.partition.PartitionClient;
 import io.atomix.primitive.service.impl.DeleteRequest;
 import io.atomix.primitive.service.impl.ServiceId;
@@ -92,8 +93,103 @@ public class DefaultSessionClient implements SessionClient {
   }
 
   @Override
+  public <T extends Message, U extends Message> CompletableFuture<Pair<SessionResponseContext, U>> execute(
+      CommandId<T, U> command,
+      StreamType<U> streamType,
+      SessionCommandContext context,
+      T request,
+      ByteStringEncoder<T> encoder,
+      ByteBufferDecoder<U> decoder) {
+    CompletableFuture<Pair<SessionResponseContext, U>> future = new CompletableFuture<>();
+    command(
+        SessionRequest.newBuilder()
+            .setCommand(SessionCommandRequest.newBuilder()
+                .setContext(context)
+                .setName(command.id())
+                .setInput(ByteStringEncoder.encode(request, encoder))
+                .build())
+            .build(),
+        new StreamHandler<SessionResponse>() {
+          private SessionResponseContext responseContext;
+
+          @Override
+          public void next(SessionResponse response) {
+            if (response.hasCommand()) {
+              responseContext = response.getCommand().getContext();
+            } else {
+              future.complete(Pair.of(responseContext, ByteBufferDecoder.decode(response.getStream().getValue().asReadOnlyByteBuffer(), decoder)));
+            }
+          }
+
+          @Override
+          public void complete() {
+            future.completeExceptionally(new IllegalStateException());
+          }
+
+          @Override
+          public void error(Throwable error) {
+            future.completeExceptionally(error);
+          }
+        })
+        .whenComplete((result, error) -> {
+          if (error != null) {
+            future.completeExceptionally(error);
+          }
+        });
+    return future;
+  }
+
+  @Override
+  public <T extends Message, U extends Message> CompletableFuture<Pair<SessionResponseContext, U>> execute(
+      QueryId<T, U> query,
+      StreamType<U> streamType,
+      SessionQueryContext context,
+      T request,
+      ByteStringEncoder<T> encoder,
+      ByteBufferDecoder<U> decoder) {
+    CompletableFuture<Pair<SessionResponseContext, U>> future = new CompletableFuture<>();
+    query(
+        SessionRequest.newBuilder()
+            .setQuery(SessionQueryRequest.newBuilder()
+                .setContext(context)
+                .setName(query.id())
+                .setInput(ByteStringEncoder.encode(request, encoder))
+                .build())
+            .build(),
+        new StreamHandler<SessionResponse>() {
+          private SessionResponseContext responseContext;
+
+          @Override
+          public void next(SessionResponse response) {
+            if (response.hasQuery()) {
+              responseContext = response.getQuery().getContext();
+            } else {
+              future.complete(Pair.of(responseContext, ByteBufferDecoder.decode(response.getStream().getValue().asReadOnlyByteBuffer(), decoder)));
+            }
+          }
+
+          @Override
+          public void complete() {
+            future.completeExceptionally(new IllegalStateException());
+          }
+
+          @Override
+          public void error(Throwable error) {
+            future.completeExceptionally(error);
+          }
+        })
+        .whenComplete((result, error) -> {
+          if (error != null) {
+            future.completeExceptionally(error);
+          }
+        });
+    return future;
+  }
+
+  @Override
   public <T extends Message, U extends Message> CompletableFuture<SessionResponseContext> execute(
       CommandId<T, U> command,
+      StreamType<U> streamType,
       SessionCommandContext context,
       T request,
       StreamHandler<Pair<SessionStreamContext, U>> handler,
@@ -141,6 +237,7 @@ public class DefaultSessionClient implements SessionClient {
   @Override
   public <T extends Message, U extends Message> CompletableFuture<SessionResponseContext> execute(
       QueryId<T, U> query,
+      StreamType<U> streamType,
       SessionQueryContext context,
       T request,
       StreamHandler<Pair<SessionStreamContext, U>> handler,

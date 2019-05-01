@@ -25,10 +25,6 @@ import io.atomix.primitive.proxy.SimplePrimitiveProxy;
 import io.atomix.utils.stream.StreamHandler;
 import io.atomix.primitive.service.impl.StreamContext;
 </#if>
-<#if hasAsyncs>
-import io.atomix.utils.stream.FutureStreamHandler;
-import io.atomix.utils.stream.EncodingStreamHandler;
-</#if>
 import io.atomix.utils.concurrent.ThreadContext;
 
 import java.util.concurrent.CompletableFuture;
@@ -82,16 +78,13 @@ public class ${proxyClass.className} extends SimplePrimitiveProxy {
      * @return the response object
      */
     public CompletableFuture<Pair<ResponseContext, ${operation.responseClass.className}>> ${operation.methodName}(RequestContext context, ${operation.requestClass.className} request) {
-        CompletableFuture<Pair<ResponseContext, ${operation.responseClass.className}>> future = new CompletableFuture<>();
-        getClient().execute(
+        return getClient().execute(
             ${operation.operationsClass.className}.${operation.constantName},
+            ${operation.operationsClass.className}.${operation.constantName}_STREAM,
             context,
             request,
-            new EncodingStreamHandler<>(new FutureStreamHandler<>(future),
-                response -> Pair.of(ResponseContext.newBuilder().setIndex(response.getLeft().getIndex()).build(), response.getRight())),
             ${operation.requestClass.className}::toByteString,
             ${operation.responseClass.className}::parseFrom);
-        return future;
     }
     <#else>
     /**

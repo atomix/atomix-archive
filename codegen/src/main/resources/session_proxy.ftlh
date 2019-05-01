@@ -30,10 +30,6 @@ import io.atomix.primitive.session.impl.SessionQueryContext;
 import io.atomix.primitive.session.impl.SessionStreamContext;
 import io.atomix.utils.stream.StreamHandler;
 </#if>
-<#if hasAsyncs>
-import io.atomix.utils.stream.FutureStreamHandler;
-import io.atomix.utils.stream.EncodingStreamHandler;
-</#if>
 import io.atomix.utils.concurrent.ThreadContext;
 
 import java.util.concurrent.CompletableFuture;
@@ -77,6 +73,7 @@ public class ${proxyClass.className} extends SessionEnabledPrimitiveProxy {
             StreamHandler<Pair<SessionStreamContext, ${operation.responseClass.className}>> handler) {
         return getClient().execute(
             ${operation.operationsClass.className}.${operation.constantName},
+            ${operation.operationsClass.className}.${operation.constantName}_STREAM,
             context,
             request,
             handler,
@@ -97,19 +94,13 @@ public class ${proxyClass.className} extends SessionEnabledPrimitiveProxy {
             SessionCommandContext context,
             </#if>
             ${operation.requestClass.className} request) {
-        CompletableFuture<Pair<SessionResponseContext, ${operation.responseClass.className}>> future = new CompletableFuture<>();
-        getClient().execute(
+        return getClient().execute(
             ${operation.operationsClass.className}.${operation.constantName},
+            ${operation.operationsClass.className}.${operation.constantName}_STREAM,
             context,
             request,
-            new EncodingStreamHandler<>(new FutureStreamHandler<>(future),
-                response -> Pair.of(SessionResponseContext.newBuilder()
-                    .setIndex(response.getLeft().getIndex())
-                    .addStreams(response.getLeft())
-                    .build(), response.getRight())),
             ${operation.requestClass.className}::toByteString,
             ${operation.responseClass.className}::parseFrom);
-        return future;
     }
     <#else>
     /**

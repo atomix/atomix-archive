@@ -49,14 +49,7 @@ public abstract class ${serviceClass.className} extends SimplePrimitiveService {
         registry.register(
             ${operation.operationsClass.className}.${operation.constantName},
             ${operation.operationsClass.className}.${operation.constantName}_STREAM,
-            (request, handler) -> ${operation.methodName}(request).whenComplete((response, error) -> {
-              if (error == null) {
-                  handler.next(response);
-                  handler.complete();
-              } else {
-                  handler.error(error);
-              }
-            }),
+            this::${operation.methodName},
             ${operation.requestClass.className}::parseFrom,
             ${operation.responseClass.className}::toByteArray);
         <#elseif operation.stream>

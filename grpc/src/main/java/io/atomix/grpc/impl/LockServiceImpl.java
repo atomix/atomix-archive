@@ -173,7 +173,7 @@ public class LockServiceImpl extends LockServiceGrpc.LockServiceImplBase {
                             .collect(Collectors.toList()))
                         .build())
                     .build())
-                .setUnlocked(true)
+                .setUnlocked(response.getRight().getSucceeded())
                 .build()));
   }
 

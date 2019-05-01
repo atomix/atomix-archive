@@ -127,12 +127,13 @@ public class LockService extends AbstractLockService {
       // If the commit's session does not match the current lock holder, preserve the existing lock.
       // If the current lock ID does not match the requested lock ID, preserve the existing lock.
       // However, ensure the associated lock request is removed from the queue.
-      if (!lock.session.equals(getCurrentSession().sessionId())
-          || (request.getIndex() != 0 && lock.index != request.getIndex())) {
+      if ((request.getIndex() == 0 && !lock.session.equals(getCurrentSession().sessionId()))
+          || (request.getIndex() > 0 && lock.index != request.getIndex())) {
         Iterator<LockHolder> iterator = queue.iterator();
         while (iterator.hasNext()) {
           LockHolder lock = iterator.next();
-          if (lock.session.equals(getCurrentSession().sessionId()) && lock.index == request.getIndex()) {
+          if ((request.getIndex() == 0 && lock.session.equals(getCurrentSession().sessionId()))
+              || (request.getIndex() > 0 && lock.index == request.getIndex())) {
             iterator.remove();
             Scheduled timer = timers.remove(lock.index);
             if (timer != null) {
@@ -140,7 +141,9 @@ public class LockService extends AbstractLockService {
             }
           }
         }
-        return UnlockResponse.newBuilder().build();
+        return UnlockResponse.newBuilder()
+            .setSucceeded(false)
+            .build();
       }
 
       // The lock has been released. Populate the lock from the queue.
@@ -164,7 +167,9 @@ public class LockService extends AbstractLockService {
         lock = queue.poll();
       }
     }
-    return UnlockResponse.newBuilder().build();
+    return UnlockResponse.newBuilder()
+        .setSucceeded(true)
+        .build();
   }
 
   @Override

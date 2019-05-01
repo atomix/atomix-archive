@@ -16,6 +16,7 @@
 
 package io.atomix.primitive.service;
 
+import java.util.concurrent.CompletableFuture;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -108,6 +109,17 @@ public interface ServiceOperationRegistry {
    * @throws NullPointerException if the {@code operationId} or {@code callback} is null
    */
   <T, R> void register(OperationId<T, R> operationId, Function<T, R> callback, ByteArrayDecoder<T> decoder, ByteArrayEncoder<R> encoder);
+
+  /**
+   * Registers an asynchronous operation callback.
+   *
+   * @param operationId the operation identifier
+   * @param callback    the operation callback
+   * @param decoder     the operation decoder
+   * @param encoder     the response encoder
+   * @throws NullPointerException if the {@code operationId} or {@code callback} is null
+   */
+  <T, R> void register(OperationId<T, R> operationId, StreamType<R> streamType, Function<T, CompletableFuture<R>> callback, ByteArrayDecoder<T> decoder, ByteArrayEncoder<R> encoder);
 
   /**
    * Registers an operation callback.
