@@ -143,7 +143,6 @@ public class DefaultPartitionService implements ManagedPartitionService {
                   .newPartitionGroup(systemGroupMembership.config());
             }
 
-            systemElectionService = new DefaultPrimaryElectionService(systemGroup);
             electionService = new HashBasedPrimaryElectionService(clusterMembershipService, groupMembershipService, communicationService);
             return electionService.start()
                 .thenCompose(s -> {
@@ -163,13 +162,16 @@ public class DefaultPartitionService implements ManagedPartitionService {
             return Futures.exceptionalFuture(new ConfigurationException("No system partition group found"));
           }
         })
-        .thenCompose(v -> systemElectionService.start()
-            .thenApply(v2 -> new DefaultPartitionManagementService(
-                clusterMembershipService,
-                communicationService,
-                streamingService,
-                serviceTypeRegistry,
-                systemElectionService)))
+        .thenCompose(systemGroup -> {
+          systemElectionService = new DefaultPrimaryElectionService(clusterMembershipService, systemGroup);
+          return systemElectionService.start()
+              .thenApply(v2 -> new DefaultPartitionManagementService(
+                  clusterMembershipService,
+                  communicationService,
+                  streamingService,
+                  serviceTypeRegistry,
+                  systemElectionService));
+        })
         .thenCompose(managementService -> {
           this.partitionManagementService = (PartitionManagementService) managementService;
           List<CompletableFuture> futures = groupMembershipService.getMemberships().stream()

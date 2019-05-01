@@ -187,7 +187,13 @@ public class PrimitiveFactory<P extends PrimitiveProxy, I extends Message> {
    * @return the primitive
    */
   public P getPrimitive(String name, PartitionId partitionId) {
-    return primitiveFactory.apply(new PrimitiveProxy.Context(name, serviceType, partitionId, managementService));
+    return primitiveFactory.apply(new PrimitiveProxy.Context(
+        name,
+        serviceType,
+        managementService.getPartitionService()
+            .getPartitionGroup(partitionId.getGroup())
+            .getPartition(partitionId),
+        managementService.getThreadFactory()));
   }
 
   /**

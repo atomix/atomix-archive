@@ -324,7 +324,23 @@ public class DefaultServiceExecutor implements ServiceOperationRegistry, Primiti
 
     @Override
     public U execute(T request) {
-      throw new UnsupportedOperationException();
+      execute(request, new StreamHandler<U>() {
+        @Override
+        public void next(U value) {
+
+        }
+
+        @Override
+        public void complete() {
+
+        }
+
+        @Override
+        public void error(Throwable error) {
+
+        }
+      });
+      return null;
     }
 
     @Override

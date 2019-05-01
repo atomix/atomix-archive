@@ -18,6 +18,8 @@ import io.atomix.primitive.util.ByteStringEncoder;
 import io.atomix.utils.stream.StreamHandler;
 import org.apache.commons.lang3.tuple.Pair;
 
+import static com.google.common.base.Preconditions.checkNotNull;
+
 /**
  * Default session client.
  */
@@ -26,8 +28,8 @@ public class DefaultSessionClient implements SessionClient {
   private final PartitionClient client;
 
   public DefaultSessionClient(ServiceId serviceId, PartitionClient client) {
-    this.serviceId = serviceId;
-    this.client = client;
+    this.serviceId = checkNotNull(serviceId);
+    this.client = checkNotNull(client);
   }
 
   @Override

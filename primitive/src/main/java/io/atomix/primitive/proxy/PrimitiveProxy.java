@@ -2,10 +2,11 @@ package io.atomix.primitive.proxy;
 
 import java.util.concurrent.CompletableFuture;
 
-import io.atomix.primitive.PrimitiveManagementService;
+import io.atomix.primitive.partition.Partition;
 import io.atomix.primitive.partition.PartitionId;
 import io.atomix.primitive.service.ServiceType;
 import io.atomix.utils.concurrent.ThreadContext;
+import io.atomix.utils.concurrent.ThreadContextFactory;
 
 /**
  * Primitive proxy.
@@ -53,18 +54,14 @@ public interface PrimitiveProxy {
   class Context {
     private final String name;
     private final ServiceType type;
-    private final PartitionId partitionId;
-    private final PrimitiveManagementService managementService;
+    private final Partition partition;
+    private final ThreadContextFactory threadFactory;
 
-    public Context(
-        String name,
-        ServiceType type,
-        PartitionId partitionId,
-        PrimitiveManagementService managementService) {
+    public Context(String name, ServiceType type, Partition partition, ThreadContextFactory threadFactory) {
       this.name = name;
       this.type = type;
-      this.partitionId = partitionId;
-      this.managementService = managementService;
+      this.partition = partition;
+      this.threadFactory = threadFactory;
     }
 
     /**
@@ -86,21 +83,21 @@ public interface PrimitiveProxy {
     }
 
     /**
-     * Returns the partition ID.
+     * Returns the partition.
      *
-     * @return the partition ID
+     * @return the partition
      */
-    public PartitionId partitionId() {
-      return partitionId;
+    public Partition partition() {
+      return partition;
     }
 
     /**
-     * Returns the primitive management service.
+     * Returns the primitive thread factory.
      *
-     * @return the primitive management service
+     * @return the primitive thread factory
      */
-    public PrimitiveManagementService managementService() {
-      return managementService;
+    public ThreadContextFactory threadFactory() {
+      return threadFactory;
     }
   }
 }

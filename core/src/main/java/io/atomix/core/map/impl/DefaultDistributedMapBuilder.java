@@ -67,7 +67,7 @@ public class DefaultDistributedMapBuilder<K, V> extends DistributedMapBuilder<K,
           }
           return map;
         })
-        .thenApply(map -> {
+        .<AsyncAtomicMap<K, V>>thenApply(map -> {
           if (config.isReadOnly()) {
             return new UnmodifiableAsyncAtomicMap<>(map);
           }

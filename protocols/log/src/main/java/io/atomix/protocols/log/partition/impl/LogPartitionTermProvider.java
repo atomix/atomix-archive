@@ -1,5 +1,6 @@
 package io.atomix.protocols.log.partition.impl;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -37,11 +38,11 @@ public class LogPartitionTermProvider implements TermProvider {
   private Term toTerm(PrimaryTerm primaryTerm) {
     long term = primaryTerm.getTerm();
     String leader = primaryTerm.getPrimary().getMemberId();
-    List<String> followers = primaryTerm.getCandidatesList()
+    List<String> followers = replicationFactor > 0 ? primaryTerm.getCandidatesList()
         .subList(1, Math.min(primaryTerm.getCandidatesList().size(), replicationFactor))
         .stream()
         .map(GroupMember::getMemberId)
-        .collect(Collectors.toList());
+        .collect(Collectors.toList()) : Collections.emptyList();
     return new Term(term, leader, followers);
   }
 

@@ -26,7 +26,7 @@ import io.atomix.primitive.partition.PrimaryElectionEvent;
 public final class PrimaryElectorOperations {
   public static final CommandId<EnterRequest, EnterResponse> ENTER = new CommandId<>("enter");
   public static final QueryId<GetTermRequest, GetTermResponse> GET_TERM = new QueryId<>("getTerm");
-  public static final CommandId<Void, PrimaryElectionEvent> STREAM_EVENTS = new CommandId<>("stream");
+  public static final CommandId<ListenRequest, PrimaryElectionEvent> STREAM_EVENTS = new CommandId<>("stream");
   public static final StreamType<PrimaryElectionEvent> EVENT_STREAM = new StreamType<>("event");
 
   private PrimaryElectorOperations() {

@@ -140,7 +140,7 @@ public class CorePrimitiveRegistry implements ManagedPrimitiveRegistry {
     Map<PartitionId, RawAsyncAtomicMap> partitions = partitionService.getSystemPartitionGroup().getPartitions().stream()
         .map(partition -> {
           MapProxy proxy = new MapProxy(new PrimitiveProxy.Context(
-              "primitives", MapService.TYPE, partition.id(), new PartialPrimitiveManagementService()));
+              "primitives", MapService.TYPE, partition, threadFactory));
           return Pair.of(partition.id(), new RawAsyncAtomicMap(proxy, Duration.ofSeconds(30), new PartialPrimitiveManagementService()));
         }).collect(Collectors.toMap(Pair::getKey, Pair::getValue));
     return new PartitionedAsyncAtomicMap(

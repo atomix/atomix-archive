@@ -387,7 +387,7 @@ public class CoreTransactionService implements ManagedTransactionService {
         .stream()
         .map(partition -> {
           MapProxy proxy = new MapProxy(new PrimitiveProxy.Context(
-              "atomix-transactions", MapService.TYPE, partition.id(), managementService));
+              "atomix-transactions", MapService.TYPE, partition, managementService.getThreadFactory()));
           return Pair.of(partition.id(), new RawAsyncAtomicMap(proxy, Duration.ofSeconds(30), managementService));
         }).collect(Collectors.toMap(Pair::getKey, Pair::getValue));
     return Futures.allOf(partitions.values().stream().map(RawAsyncAtomicMap::connect))

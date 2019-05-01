@@ -221,7 +221,11 @@ public abstract class PrimitiveBuilder<B extends PrimitiveBuilder<B, C, P>, C ex
    * @return the proxy
    */
   protected <P extends PrimitiveProxy> P newProxy(ServiceType serviceType, PartitionId partitionId, Function<PrimitiveProxy.Context, P> factory) {
-    return factory.apply(new PrimitiveProxy.Context(name, serviceType, partitionId, managementService));
+    return factory.apply(new PrimitiveProxy.Context(
+        name,
+        serviceType,
+        managementService.getPartitionService().getPartitionGroup(partitionId.getGroup()).getPartition(partitionId),
+        managementService.getThreadFactory()));
   }
 
   /**

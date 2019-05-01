@@ -19,6 +19,8 @@ import io.atomix.utils.logging.ContextualLoggerFactory;
 import io.atomix.utils.logging.LoggerContext;
 import org.slf4j.Logger;
 
+import static com.google.common.base.Preconditions.checkNotNull;
+
 /**
  * Service state machine.
  */
@@ -108,7 +110,7 @@ public class ServiceStateMachine implements StateMachine {
     private final StateMachine.Context parent;
 
     private Context(StateMachine.Context parent) {
-      this.parent = parent;
+      this.parent = checkNotNull(parent);
     }
 
     /**

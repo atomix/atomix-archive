@@ -23,7 +23,6 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
-import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -37,12 +36,14 @@ import com.google.common.collect.Lists;
 import io.atomix.primitive.partition.GroupMember;
 import io.atomix.primitive.partition.MemberGroupId;
 import io.atomix.primitive.partition.PartitionId;
+import io.atomix.primitive.partition.PartitionManagementService;
 import io.atomix.primitive.partition.PrimaryElectionEvent;
 import io.atomix.primitive.partition.PrimaryTerm;
+import io.atomix.primitive.service.PrimitiveService;
 import io.atomix.primitive.service.ServiceOperationRegistry;
+import io.atomix.primitive.service.ServiceType;
 import io.atomix.primitive.service.SessionManagedPrimitiveService;
 import io.atomix.primitive.session.Session;
-import io.atomix.primitive.session.SessionId;
 import io.atomix.utils.concurrent.Scheduled;
 import io.atomix.utils.stream.StreamHandler;
 
@@ -55,10 +56,28 @@ import static com.google.common.base.Throwables.throwIfUnchecked;
  * such that primaries are evenly distributed across the cluster.
  */
 public class PrimaryElectorService extends SessionManagedPrimitiveService {
+  public static final Type TYPE = new Type();
+
+  /**
+   * Map service type.
+   */
+  public static class Type implements ServiceType {
+    private static final String NAME = "primary-elector";
+
+    @Override
+    public String name() {
+      return NAME;
+    }
+
+    @Override
+    public PrimitiveService newService(PartitionId partitionId, PartitionManagementService managementService) {
+      return new PrimaryElectorService();
+    }
+  }
+
   private static final Duration REBALANCE_DURATION = Duration.ofSeconds(15);
 
   private Map<PartitionId, ElectionState> elections = new HashMap<>();
-  private Map<SessionId, StreamHandler<PrimaryElectionEvent>> streams = new LinkedHashMap<>();
   private Scheduled rebalanceTimer;
 
   @Override
@@ -88,7 +107,6 @@ public class PrimaryElectorService extends SessionManagedPrimitiveService {
   @Override
   public void restore(InputStream input) throws IOException {
     PrimaryElectorSnapshot snapshot = PrimaryElectorSnapshot.parseFrom(input);
-    streams = new LinkedHashMap<>();
     elections = new HashMap<>();
     snapshot.getElectionsList().forEach(election ->
         elections.put(election.getPartitionId(), new ElectionState(
@@ -122,18 +140,21 @@ public class PrimaryElectorService extends SessionManagedPrimitiveService {
         PrimaryElectorOperations.STREAM_EVENTS,
         PrimaryElectorOperations.EVENT_STREAM,
         this::stream,
+        ListenRequest::parseFrom,
         PrimaryElectionEvent::toByteArray);
   }
 
-  private void stream(StreamHandler<PrimaryElectionEvent> handler) {
-    streams.put(getCurrentSession().sessionId(), handler);
+  private void stream(ListenRequest request, StreamHandler<PrimaryElectionEvent> handler) {
+    // Keep the stream open.
   }
 
   private void notifyTermChange(PartitionId partitionId, PrimaryTerm term) {
-    streams.values().forEach(stream -> stream.next(PrimaryElectionEvent.newBuilder()
-        .setPartitionId(partitionId)
-        .setTerm(term)
-        .build()));
+    getSessions()
+        .forEach(session -> session.getStreams(PrimaryElectorOperations.EVENT_STREAM)
+            .forEach(stream -> stream.next(PrimaryElectionEvent.newBuilder()
+                .setPartitionId(partitionId)
+                .setTerm(term)
+                .build())));
   }
 
   /**
@@ -254,7 +275,6 @@ public class PrimaryElectorService extends SessionManagedPrimitiveService {
   }
 
   private void onSessionEnd(Session session) {
-    streams.remove(session.sessionId().id());
     Set<PartitionId> partitions = elections.keySet();
     partitions.forEach(partitionId -> {
       PrimaryTerm oldTerm = term(partitionId);

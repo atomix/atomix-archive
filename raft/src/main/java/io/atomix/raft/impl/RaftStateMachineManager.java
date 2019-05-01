@@ -641,7 +641,7 @@ public class RaftStateMachineManager implements RaftStateMachine.Context, AutoCl
     RaftQuery query = new RaftQuery(
         lastIndex,
         lastTimestamp,
-        entry.entry().getCommand().getValue().toByteArray());
+        entry.entry().getQuery().getValue().toByteArray());
     return stateMachine.apply(query)
         .thenApply(OperationResult::succeeded)
         .exceptionally(OperationResult::failed);
@@ -655,7 +655,7 @@ public class RaftStateMachineManager implements RaftStateMachine.Context, AutoCl
     RaftQuery query = new RaftQuery(
         lastIndex,
         lastTimestamp,
-        entry.entry().getCommand().getValue().toByteArray());
+        entry.entry().getQuery().getValue().toByteArray());
     return stateMachine.apply(query, handler);
   }
 

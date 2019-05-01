@@ -27,8 +27,10 @@ import io.atomix.primitive.partition.PartitionClient;
 import io.atomix.primitive.partition.PartitionId;
 import io.atomix.primitive.partition.PartitionManagementService;
 import io.atomix.primitive.partition.PrimaryElection;
+import io.atomix.primitive.service.impl.ServiceManagerStateMachine;
 import io.atomix.protocols.log.partition.impl.LogPartitionClient;
 import io.atomix.protocols.log.partition.impl.LogPartitionServer;
+import io.atomix.protocols.log.partition.impl.LogPartitionSession;
 import io.atomix.utils.concurrent.Futures;
 import io.atomix.utils.concurrent.ThreadContextFactory;
 
@@ -44,6 +46,7 @@ public class LogPartition implements Partition {
   private PrimaryElection election;
   private LogPartitionServer server;
   private LogPartitionClient client;
+  private LogPartitionSession session;
 
   public LogPartition(
       PartitionId partitionId,
@@ -102,7 +105,7 @@ public class LogPartition implements Partition {
 
   @Override
   public PartitionClient getClient() {
-    throw new UnsupportedOperationException();
+    return client;
   }
 
   /**
@@ -111,7 +114,7 @@ public class LogPartition implements Partition {
    * @return the log partition client
    */
   public LogSession getSession() {
-    return client;
+    return session;
   }
 
   /**
@@ -124,8 +127,18 @@ public class LogPartition implements Partition {
         managementService,
         config,
         threadContextFactory);
-    client = new LogPartitionClient(this, managementService, config, threadContextFactory);
-    return server.start().thenCompose(v -> client.start()).thenApply(v -> this);
+    return server.start()
+        .thenCompose(v -> {
+          session = new LogPartitionSession(this, managementService, config, threadContextFactory);
+          return session.start();
+        }).thenApply(v -> {
+          client = new LogPartitionClient(
+              session,
+              new ServiceManagerStateMachine(id(), managementService),
+              threadContextFactory.createContext(),
+              threadContextFactory.createContext());
+          return this;
+        });
   }
 
   /**
@@ -133,20 +146,20 @@ public class LogPartition implements Partition {
    */
   CompletableFuture<Partition> connect(PartitionManagementService managementService) {
     election = managementService.getElectionService().getElectionFor(partitionId);
-    client = new LogPartitionClient(this, managementService, config, threadContextFactory);
-    return client.start().thenApply(v -> this);
+    session = new LogPartitionSession(this, managementService, config, threadContextFactory);
+    return session.start().thenApply(v -> this);
   }
 
   /**
    * Closes the log partition.
    */
   public CompletableFuture<Void> close() {
-    if (client == null) {
+    if (session == null) {
       return CompletableFuture.completedFuture(null);
     }
 
     CompletableFuture<Void> future = new CompletableFuture<>();
-    client.stop().whenComplete((clientResult, clientError) -> {
+    session.stop().whenComplete((clientResult, clientError) -> {
       if (server != null) {
         server.stop().whenComplete((serverResult, serverError) -> {
           future.complete(null);

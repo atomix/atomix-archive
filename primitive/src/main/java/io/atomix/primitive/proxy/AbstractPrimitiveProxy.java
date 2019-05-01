@@ -1,6 +1,5 @@
 package io.atomix.primitive.proxy;
 
-import io.atomix.primitive.PrimitiveManagementService;
 import io.atomix.primitive.partition.Partition;
 import io.atomix.primitive.partition.PartitionClient;
 import io.atomix.primitive.partition.PartitionId;
@@ -19,7 +18,7 @@ public abstract class AbstractPrimitiveProxy<T> implements PrimitiveProxy {
 
   protected AbstractPrimitiveProxy(Context context) {
     this.context = context;
-    this.threadContext = context.managementService().getThreadFactory().createContext();
+    this.threadContext = context.threadFactory().createContext();
     this.serviceId = ServiceId.newBuilder()
         .setName(context.name())
         .setType(type().name())
@@ -69,7 +68,7 @@ public abstract class AbstractPrimitiveProxy<T> implements PrimitiveProxy {
 
   @Override
   public PartitionId partitionId() {
-    return context.partitionId();
+    return context.partition().id();
   }
 
   /**
@@ -78,9 +77,7 @@ public abstract class AbstractPrimitiveProxy<T> implements PrimitiveProxy {
    * @return the proxy partition
    */
   protected Partition getPartition() {
-    return context.managementService().getPartitionService()
-        .getPartitionGroup(partitionId().getGroup())
-        .getPartition(partitionId());
+    return context.partition();
   }
 
   /**
@@ -90,14 +87,5 @@ public abstract class AbstractPrimitiveProxy<T> implements PrimitiveProxy {
    */
   protected PartitionClient getPartitionClient() {
     return getPartition().getClient();
-  }
-
-  /**
-   * Returns the primitive management service.
-   *
-   * @return the primitive management service
-   */
-  protected PrimitiveManagementService getManagementService() {
-    return context.managementService();
   }
 }

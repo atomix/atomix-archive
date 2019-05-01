@@ -447,6 +447,7 @@ public class DistributedLogServerContext implements Managed<Void> {
     if (compactTimer != null) {
       compactTimer.cancel();
     }
+    role.close();
     journal.close();
     started.set(false);
     return termProvider.leave().exceptionally(throwable -> {

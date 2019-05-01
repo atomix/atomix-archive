@@ -85,7 +85,7 @@ public class CorePrimitivesService implements ManagedPrimitivesService {
         communicationService,
         new DefaultPrimitiveTypeRegistry(registry.getTypes(PrimitiveType.class)),
         threadContextFactory);
-    this.sessionIdService = new ReplicatedSessionIdService(partitionService);
+    this.sessionIdService = new ReplicatedSessionIdService(partitionService.getSystemPartitionGroup());
     this.managementService = new CorePrimitiveManagementService(
         membershipService,
         communicationService,

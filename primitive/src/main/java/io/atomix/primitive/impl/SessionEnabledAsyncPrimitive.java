@@ -160,7 +160,7 @@ public abstract class SessionEnabledAsyncPrimitive<P extends SessionEnabledPrimi
     Duration delay = Duration.ofMillis(
         Math.max(Math.max((long) (timeout.toMillis() * TIMEOUT_FACTOR) - delta,
             timeout.toMillis() - MIN_TIMEOUT_DELTA - delta), 0));
-    getProxy().context().schedule(delay, () -> {
+    keepAliveTimer = getProxy().context().schedule(delay, () -> {
       if (open.get()) {
         keepAlive(lastKeepAliveTime);
       }
@@ -172,6 +172,7 @@ public abstract class SessionEnabledAsyncPrimitive<P extends SessionEnabledPrimi
     if (!open.compareAndSet(true, false)) {
       return Futures.exceptionalFuture(new IllegalStateException());
     }
+    keepAliveTimer.cancel();
     return getProxy().closeSession(CloseSessionRequest.newBuilder()
         .setSessionId(state.getSessionId().id())
         .build())
@@ -180,6 +181,6 @@ public abstract class SessionEnabledAsyncPrimitive<P extends SessionEnabledPrimi
 
   @Override
   public CompletableFuture<Void> delete() {
-    return getProxy().delete();
+    return close().thenCompose(v -> getProxy().delete());
   }
 }

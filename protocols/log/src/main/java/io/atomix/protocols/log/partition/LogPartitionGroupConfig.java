@@ -27,11 +27,12 @@ import static com.google.common.base.Preconditions.checkNotNull;
  */
 public class LogPartitionGroupConfig extends PartitionGroupConfig<LogPartitionGroupConfig> {
   private static final int DEFAULT_PARTITIONS = 7;
+  private static final int DEFAULT_REPLICATION_FACTOR = 2;
 
   private String memberGroupStrategy = MemberGroupStrategy.NODE_AWARE.name();
   private LogStorageConfig storageConfig = new LogStorageConfig();
   private LogCompactionConfig compactionConfig = new LogCompactionConfig();
-  private int replicationFactor;
+  private int replicationFactor = DEFAULT_REPLICATION_FACTOR;
 
   @Override
   public PartitionGroup.Type getType() {

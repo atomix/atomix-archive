@@ -45,3 +45,7 @@ message GetTermRequest {
 message GetTermResponse {
     atomix.primitive.partition.PrimaryTerm term = 1;
 }
+
+message ListenRequest {
+    atomix.primitive.partition.PartitionId partition_id = 1;
+}

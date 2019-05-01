@@ -15,23 +15,20 @@
  */
 package io.atomix.primitive.partition.impl;
 
-import java.util.Random;
-import java.util.Set;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
-import com.google.common.collect.Sets;
+import io.atomix.primitive.PrimitiveException;
 import io.atomix.primitive.partition.GroupMember;
 import io.atomix.primitive.partition.ManagedPrimaryElection;
 import io.atomix.primitive.partition.PartitionId;
 import io.atomix.primitive.partition.PrimaryElection;
 import io.atomix.primitive.partition.PrimaryElectionEvent;
-import io.atomix.primitive.partition.PrimaryElectionService;
 import io.atomix.primitive.partition.PrimaryTerm;
-import io.atomix.primitive.session.SessionClient;
-import io.atomix.primitive.session.impl.SessionCommandContext;
-import io.atomix.primitive.session.impl.SessionQueryContext;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -40,64 +37,50 @@ import static com.google.common.base.Preconditions.checkNotNull;
  */
 public class DefaultPrimaryElection implements ManagedPrimaryElection {
   private final PartitionId partitionId;
-  private final long sessionId = new Random(System.currentTimeMillis()).nextLong();
-  private final SessionClient client;
-  private final PrimaryElectionService service;
-  private final Set<Consumer<PrimaryElectionEvent>> listeners = Sets.newCopyOnWriteArraySet();
-  private final Consumer<PrimaryElectionEvent> eventListener;
+  private final PrimaryElector elector;
   private final AtomicBoolean started = new AtomicBoolean();
+  private final Map<Consumer<PrimaryElectionEvent>, Consumer<PrimaryElectionEvent>> eventListeners = new ConcurrentHashMap<>();
 
-  public DefaultPrimaryElection(PartitionId partitionId, SessionClient client, PrimaryElectionService service) {
+  DefaultPrimaryElection(PartitionId partitionId, PrimaryElector elector) {
     this.partitionId = checkNotNull(partitionId);
-    this.client = client;
-    this.service = service;
-    this.eventListener = event -> {
-      if (event.getPartitionId().equals(partitionId)) {
-        listeners.forEach(l -> l.accept(event));
-      }
-    };
-    service.addListener(eventListener);
+    this.elector = elector;
   }
 
   @Override
   public CompletableFuture<PrimaryTerm> enter(GroupMember member) {
-    return client.execute(
-        PrimaryElectorOperations.ENTER,
-        SessionCommandContext.newBuilder()
-            .setSessionId(sessionId)
-            .build(),
-        EnterRequest.newBuilder()
-            .setPartitionId(partitionId)
-            .setMember(member)
-            .build(),
-        EnterRequest::toByteString,
-        EnterResponse::parseFrom)
-        .thenApply(response -> response.getRight().getTerm());
+    return elector.enter(partitionId, member);
   }
 
   @Override
   public CompletableFuture<PrimaryTerm> getTerm() {
-    return client.execute(
-        PrimaryElectorOperations.GET_TERM,
-        SessionQueryContext.newBuilder()
-            .setSessionId(sessionId)
-            .build(),
-        GetTermRequest.newBuilder()
-            .setPartitionId(partitionId)
-            .build(),
-        GetTermRequest::toByteString,
-        GetTermResponse::parseFrom)
-        .thenApply(response -> response.getRight().getTerm());
+    return elector.getTerm(partitionId);
   }
 
   @Override
   public synchronized void addListener(Consumer<PrimaryElectionEvent> listener) {
-    listeners.add(checkNotNull(listener));
+    Consumer<PrimaryElectionEvent> eventListener = event -> {
+      if (event.getPartitionId().equals(partitionId)) {
+        listener.accept(event);
+      }
+    };
+    eventListeners.put(listener, eventListener);
+    try {
+      elector.addListener(eventListener).get(30, TimeUnit.SECONDS);
+    } catch (Exception e) {
+      throw new PrimitiveException.Timeout();
+    }
   }
 
   @Override
   public synchronized void removeListener(Consumer<PrimaryElectionEvent> listener) {
-    listeners.remove(checkNotNull(listener));
+    Consumer<PrimaryElectionEvent> eventListener = eventListeners.remove(listener);
+    if (eventListener != null) {
+      try {
+        elector.removeListener(eventListener).get(30, TimeUnit.SECONDS);
+      } catch (Exception e) {
+        throw new PrimitiveException.Timeout();
+      }
+    }
   }
 
   @Override
@@ -113,7 +96,6 @@ public class DefaultPrimaryElection implements ManagedPrimaryElection {
 
   @Override
   public CompletableFuture<Void> stop() {
-    service.removeListener(eventListener);
     started.set(false);
     return CompletableFuture.completedFuture(null);
   }
