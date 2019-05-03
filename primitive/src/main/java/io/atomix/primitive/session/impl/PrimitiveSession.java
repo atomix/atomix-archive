@@ -15,6 +15,7 @@
  */
 package io.atomix.primitive.session.impl;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.LinkedList;
@@ -24,13 +25,13 @@ import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 
 import io.atomix.primitive.PrimitiveException;
+import io.atomix.primitive.operation.StreamType;
 import io.atomix.primitive.service.PrimitiveService;
 import io.atomix.primitive.service.impl.ServiceCodec;
 import io.atomix.primitive.session.Session;
 import io.atomix.primitive.session.SessionId;
 import io.atomix.primitive.session.SessionStreamHandler;
 import io.atomix.primitive.session.StreamId;
-import io.atomix.primitive.operation.StreamType;
 import io.atomix.utils.concurrent.Futures;
 import io.atomix.utils.misc.TimestampPrinter;
 import org.slf4j.Logger;
@@ -333,7 +334,6 @@ public class PrimitiveSession implements Session {
    */
   public void open() {
     setState(State.OPEN);
-    streams.getStreams().forEach(stream -> stream.complete());
   }
 
   /**
@@ -341,7 +341,7 @@ public class PrimitiveSession implements Session {
    */
   public void expire() {
     setState(State.EXPIRED);
-    streams.getStreams().forEach(stream -> stream.complete());
+    new ArrayList<>(streams.getStreams()).forEach(stream -> stream.complete());
   }
 
   /**
@@ -349,7 +349,7 @@ public class PrimitiveSession implements Session {
    */
   public void close() {
     setState(State.CLOSED);
-    streams.getStreams().forEach(stream -> stream.complete());
+    new ArrayList<>(streams.getStreams()).forEach(stream -> stream.complete());
   }
 
   @Override

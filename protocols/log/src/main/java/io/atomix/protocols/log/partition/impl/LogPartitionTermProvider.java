@@ -39,7 +39,7 @@ public class LogPartitionTermProvider implements TermProvider {
     long term = primaryTerm.getTerm();
     String leader = primaryTerm.getPrimary().getMemberId();
     List<String> followers = replicationFactor > 0 ? primaryTerm.getCandidatesList()
-        .subList(1, Math.min(primaryTerm.getCandidatesList().size(), replicationFactor))
+        .subList(1, Math.min(primaryTerm.getCandidatesList().size(), replicationFactor + 1))
         .stream()
         .map(GroupMember::getMemberId)
         .collect(Collectors.toList()) : Collections.emptyList();
@@ -47,18 +47,19 @@ public class LogPartitionTermProvider implements TermProvider {
   }
 
   @Override
-  public void addListener(Consumer<Term> listener) {
+  public CompletableFuture<Void> addListener(Consumer<Term> listener) {
     Consumer<PrimaryElectionEvent> primaryElectionListener = event -> listener.accept(toTerm(event.getTerm()));
     eventListeners.put(listener, primaryElectionListener);
-    election.addListener(primaryElectionListener);
+    return election.addListener(primaryElectionListener);
   }
 
   @Override
-  public void removeListener(Consumer<Term> listener) {
+  public CompletableFuture<Void> removeListener(Consumer<Term> listener) {
     Consumer<PrimaryElectionEvent> primaryElectionListener = eventListeners.remove(listener);
     if (primaryElectionListener != null) {
-      election.removeListener(primaryElectionListener);
+      return election.removeListener(primaryElectionListener);
     }
+    return CompletableFuture.completedFuture(null);
   }
 
   @Override

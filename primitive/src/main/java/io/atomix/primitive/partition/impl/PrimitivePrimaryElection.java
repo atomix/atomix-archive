@@ -18,10 +18,8 @@ package io.atomix.primitive.partition.impl;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
-import io.atomix.primitive.PrimitiveException;
 import io.atomix.primitive.partition.GroupMember;
 import io.atomix.primitive.partition.PartitionId;
 import io.atomix.primitive.partition.PrimaryElection;
@@ -54,29 +52,22 @@ public class PrimitivePrimaryElection implements PrimaryElection {
   }
 
   @Override
-  public synchronized void addListener(Consumer<PrimaryElectionEvent> listener) {
+  public synchronized CompletableFuture<Void> addListener(Consumer<PrimaryElectionEvent> listener) {
     Consumer<PrimaryElectionEvent> eventListener = event -> {
       if (event.getPartitionId().equals(partitionId)) {
         listener.accept(event);
       }
     };
     eventListeners.put(listener, eventListener);
-    try {
-      elector.addListener(eventListener).get(30, TimeUnit.SECONDS);
-    } catch (Exception e) {
-      throw new PrimitiveException.Timeout();
-    }
+    return elector.addListener(eventListener);
   }
 
   @Override
-  public synchronized void removeListener(Consumer<PrimaryElectionEvent> listener) {
+  public synchronized CompletableFuture<Void> removeListener(Consumer<PrimaryElectionEvent> listener) {
     Consumer<PrimaryElectionEvent> eventListener = eventListeners.remove(listener);
     if (eventListener != null) {
-      try {
-        elector.removeListener(eventListener).get(30, TimeUnit.SECONDS);
-      } catch (Exception e) {
-        throw new PrimitiveException.Timeout();
-      }
+      return elector.removeListener(eventListener);
     }
+    return CompletableFuture.completedFuture(null);
   }
 }

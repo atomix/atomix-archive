@@ -21,10 +21,13 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 
 import com.google.common.collect.Maps;
 import com.google.common.hash.Hashing;
@@ -34,7 +37,6 @@ import io.atomix.cluster.ClusterMembershipService;
 import io.atomix.cluster.Member;
 import io.atomix.cluster.MemberId;
 import io.atomix.cluster.messaging.ClusterCommunicationService;
-import io.atomix.primitive.event.AbstractListenable;
 import io.atomix.primitive.partition.GroupMember;
 import io.atomix.primitive.partition.PartitionGroupMembership;
 import io.atomix.primitive.partition.PartitionGroupMembershipEvent;
@@ -53,7 +55,7 @@ import org.slf4j.LoggerFactory;
 /**
  * Hash-based primary election.
  */
-public class HashBasedPrimaryElection extends AbstractListenable<PrimaryElectionEvent> implements PrimaryElection {
+public class HashBasedPrimaryElection implements PrimaryElection {
   private static final Logger LOGGER = LoggerFactory.getLogger(HashBasedPrimaryElection.class);
   private static final long BROADCAST_INTERVAL = 5000;
 
@@ -67,6 +69,7 @@ public class HashBasedPrimaryElection extends AbstractListenable<PrimaryElection
   private final PartitionGroupMembershipService groupMembershipService;
   private final ClusterCommunicationService communicationService;
   private final ClusterMembershipEventListener clusterMembershipEventListener = this::handleClusterMembershipEvent;
+  private final Set<Consumer<PrimaryElectionEvent>> listeners = new CopyOnWriteArraySet<>();
   private final Map<MemberId, Integer> counters = Maps.newConcurrentMap();
   private final String subject;
   private final ScheduledFuture<?> broadcastFuture;
@@ -110,6 +113,18 @@ public class HashBasedPrimaryElection extends AbstractListenable<PrimaryElection
   @Override
   public CompletableFuture<PrimaryTerm> getTerm() {
     return CompletableFuture.completedFuture(currentTerm);
+  }
+
+  @Override
+  public CompletableFuture<Void> addListener(Consumer<PrimaryElectionEvent> listener) {
+    listeners.add(listener);
+    return CompletableFuture.completedFuture(null);
+  }
+
+  @Override
+  public CompletableFuture<Void> removeListener(Consumer<PrimaryElectionEvent> listener) {
+    listeners.remove(listener);
+    return CompletableFuture.completedFuture(null);
   }
 
   /**
@@ -214,10 +229,10 @@ public class HashBasedPrimaryElection extends AbstractListenable<PrimaryElection
     if (!Objects.equals(currentTerm, newTerm)) {
       this.currentTerm = newTerm;
       LOGGER.debug("{} - Recomputed term for partition {}: {}", clusterMembershipService.getLocalMember().id(), partitionId, newTerm);
-      post(PrimaryElectionEvent.newBuilder()
+      listeners.forEach(l -> l.accept(PrimaryElectionEvent.newBuilder()
           .setPartitionId(partitionId)
           .setTerm(newTerm)
-          .build());
+          .build()));
       broadcastCounters();
     }
   }

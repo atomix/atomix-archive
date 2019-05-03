@@ -57,13 +57,15 @@ public class TestTermProvider implements TermProvider {
   }
 
   @Override
-  public void addListener(Consumer<Term> listener) {
+  public CompletableFuture<Void> addListener(Consumer<Term> listener) {
     context.listeners.add(listener);
+    return CompletableFuture.completedFuture(null);
   }
 
   @Override
-  public void removeListener(Consumer<Term> listener) {
+  public CompletableFuture<Void> removeListener(Consumer<Term> listener) {
     context.listeners.remove(listener);
+    return CompletableFuture.completedFuture(null);
   }
 
   public static class Context {

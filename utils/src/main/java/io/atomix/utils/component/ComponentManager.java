@@ -23,6 +23,8 @@ import com.google.common.graph.Graphs;
 import com.google.common.graph.ImmutableGraph;
 import com.google.common.graph.MutableGraph;
 import io.atomix.utils.concurrent.Futures;
+import io.atomix.utils.concurrent.SingleThreadContext;
+import io.atomix.utils.concurrent.ThreadContext;
 import io.atomix.utils.config.Config;
 import io.github.classgraph.ClassGraph;
 import io.github.classgraph.ClassInfo;
@@ -39,6 +41,7 @@ public class ComponentManager<C extends Config, M> {
   private final ClassLoader classLoader;
   private final Component.Scope scope;
   private final Map<Class, List<ComponentInstance>> components = new HashMap<>();
+  private final ThreadContext threadContext = new SingleThreadContext("atomix-component-manager");
   private MutableGraph<ComponentInstance> dependencyGraph;
   private final AtomicBoolean prepared = new AtomicBoolean();
 
@@ -77,7 +80,7 @@ public class ComponentManager<C extends Config, M> {
     }
 
     CompletableFuture<Void> future = new CompletableFuture<>();
-    start(future);
+    threadContext.execute(() -> start(future));
     return future.thenApply(v -> root);
   }
 
@@ -92,7 +95,7 @@ public class ComponentManager<C extends Config, M> {
     }
 
     CompletableFuture<Void> future = new CompletableFuture<>();
-    stop(future);
+    threadContext.execute(() -> stop(future));
     return future;
   }
 
@@ -213,13 +216,13 @@ public class ComponentManager<C extends Config, M> {
           return Futures.exceptionalFuture(e);
         }
       }).toArray(CompletableFuture[]::new))
-          .whenComplete((result, error) -> {
+          .whenCompleteAsync((result, error) -> {
             if (error == null) {
               start(iterator, future);
             } else {
               future.completeExceptionally(error);
             }
-          });
+          }, threadContext);
     } else {
       future.complete(null);
     }
@@ -249,13 +252,13 @@ public class ComponentManager<C extends Config, M> {
           return Futures.exceptionalFuture(e);
         }
       }).toArray(CompletableFuture[]::new))
-          .whenComplete((result, error) -> {
+          .whenCompleteAsync((result, error) -> {
             if (error == null) {
               stop(iterator, future);
             } else {
               future.completeExceptionally(error);
             }
-          });
+          }, threadContext);
     } else {
       future.complete(null);
     }

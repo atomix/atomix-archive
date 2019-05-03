@@ -33,6 +33,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
  */
 public class DistributedLogClient implements LogClient {
   private final List<PartitionId> partitionIds = new CopyOnWriteArrayList<>();
+  private final Map<Integer, LogSession> intPartitions = Maps.newConcurrentMap();
   private final Map<PartitionId, LogSession> partitions = Maps.newConcurrentMap();
   private final List<LogSession> sortedPartitions = new CopyOnWriteArrayList<>();
   private final Partitioner<String> partitioner;
@@ -44,6 +45,7 @@ public class DistributedLogClient implements LogClient {
     partitions.forEach((partitionId, partition) -> {
       this.partitionIds.add(partitionId);
       this.partitions.put(partitionId, partition);
+      this.intPartitions.put(partitionId.getPartition(), partition);
       this.sortedPartitions.add(partition);
     });
   }
@@ -56,6 +58,11 @@ public class DistributedLogClient implements LogClient {
   @Override
   public Collection<PartitionId> getPartitionIds() {
     return partitions.keySet();
+  }
+
+  @Override
+  public LogSession getPartition(int partitionId) {
+    return intPartitions.get(partitionId);
   }
 
   @Override

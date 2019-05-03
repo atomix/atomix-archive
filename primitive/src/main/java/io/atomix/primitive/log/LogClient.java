@@ -44,6 +44,14 @@ public interface LogClient {
    * @param partitionId the partition with the given identifier
    * @return the partition with the given identifier
    */
+  LogSession getPartition(int partitionId);
+
+  /**
+   * Returns the partition with the given identifier.
+   *
+   * @param partitionId the partition with the given identifier
+   * @return the partition with the given identifier
+   */
   LogSession getPartition(PartitionId partitionId);
 
   /**

@@ -28,7 +28,6 @@ import io.atomix.grpc.log.LogServiceGrpc;
 import io.atomix.grpc.log.ProduceRequest;
 import io.atomix.grpc.log.ProduceResponse;
 import io.atomix.primitive.log.LogClient;
-import io.atomix.primitive.partition.PartitionId;
 import io.atomix.protocols.log.DistributedLogProtocol;
 import io.grpc.stub.StreamObserver;
 
@@ -65,10 +64,7 @@ public class LogServiceImpl extends LogServiceGrpc.LogServiceImplBase {
         }
 
         if (request.getPartition() != 0) {
-          client.getPartition(PartitionId.newBuilder()
-              .setGroup(request.getId().getLog().getGroup())
-              .setPartition(request.getPartition())
-              .build())
+          client.getPartition(request.getPartition())
               .producer()
               .append(request.getValue().toByteArray())
               .whenComplete((response, error) -> {
@@ -113,10 +109,7 @@ public class LogServiceImpl extends LogServiceGrpc.LogServiceImplBase {
 
     if (request.getPartition() != 0) {
       getClient(request.getId())
-          .getPartition(PartitionId.newBuilder()
-              .setGroup(request.getId().getLog().getGroup())
-              .setPartition(request.getPartition())
-              .build())
+          .getPartition(request.getPartition())
           .consumer()
           .consume(consumer);
     } else {

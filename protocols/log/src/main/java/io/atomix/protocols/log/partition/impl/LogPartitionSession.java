@@ -69,7 +69,7 @@ public class LogPartitionSession implements LogSession, Managed<LogPartitionSess
       client = newClient();
       log.debug("Successfully started client for {}", partition.id());
     }
-    return CompletableFuture.completedFuture(this);
+    return client.connect().thenApply(v -> this);
   }
 
   private DistributedLogClient newClient() {

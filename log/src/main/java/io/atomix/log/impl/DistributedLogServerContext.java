@@ -35,13 +35,13 @@ import io.atomix.log.protocol.BackupRequest;
 import io.atomix.log.protocol.BackupResponse;
 import io.atomix.log.protocol.ConsumeRequest;
 import io.atomix.log.protocol.ConsumeResponse;
+import io.atomix.log.protocol.LogEntry;
 import io.atomix.log.protocol.LogServerProtocol;
 import io.atomix.log.protocol.ResetRequest;
 import io.atomix.log.roles.FollowerRole;
 import io.atomix.log.roles.LeaderRole;
 import io.atomix.log.roles.LogServerRole;
 import io.atomix.log.roles.NoneRole;
-import io.atomix.log.protocol.LogEntry;
 import io.atomix.storage.journal.JournalReader;
 import io.atomix.storage.journal.JournalSegment;
 import io.atomix.storage.journal.JournalWriter;
@@ -71,7 +71,8 @@ public class DistributedLogServerContext implements Managed<Void> {
   private final boolean closeOnStop;
   private String leader;
   private List<String> followers;
-  private LogServerRole role = new NoneRole(this);;
+  private LogServerRole role = new NoneRole(this);
+  ;
   private long currentTerm;
   private long commitIndex;
   private final SegmentedJournal<LogEntry> journal;
@@ -321,7 +322,8 @@ public class DistributedLogServerContext implements Managed<Void> {
   public CompletableFuture<Void> start() {
     registerListeners();
     compactTimer = threadContext.schedule(Duration.ofSeconds(30), this::compact);
-    return termProvider.join()
+    return termProvider.addListener(termChangeListener)
+        .thenComposeAsync(v -> termProvider.join(), threadContext)
         .thenComposeAsync(v -> termProvider.getTerm(), threadContext)
         .thenAcceptAsync(term -> changeRole(term), threadContext)
         .thenApply(v -> {
@@ -434,20 +436,20 @@ public class DistributedLogServerContext implements Managed<Void> {
   @Override
   public CompletableFuture<Void> stop() {
     unregisterListeners();
-    termProvider.removeListener(termChangeListener);
     if (compactTimer != null) {
       compactTimer.cancel();
     }
     role.close();
     journal.close();
     started.set(false);
-    return termProvider.leave().exceptionally(throwable -> {
-      log.error("Failed to leave term", throwable);
-      return null;
-    }).thenRunAsync(() -> {
-      if (closeOnStop) {
-        threadContextFactory.close();
-      }
-    });
+    return termProvider.removeListener(termChangeListener)
+        .thenComposeAsync(v -> termProvider.leave().exceptionally(throwable -> {
+          log.error("Failed to leave term", throwable);
+          return null;
+        })).thenRunAsync(() -> {
+          if (closeOnStop) {
+            threadContextFactory.close();
+          }
+        });
   }
 }

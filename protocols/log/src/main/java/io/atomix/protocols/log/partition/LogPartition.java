@@ -43,9 +43,10 @@ public class LogPartition implements Partition {
   private final PartitionId partitionId;
   private final LogPartitionGroupConfig config;
   private final ThreadContextFactory threadContextFactory;
+  private PartitionManagementService managementService;
   private PrimaryElection election;
   private LogPartitionServer server;
-  private LogPartitionClient client;
+  private volatile LogPartitionClient client;
   private LogPartitionSession session;
 
   public LogPartition(
@@ -105,6 +106,17 @@ public class LogPartition implements Partition {
 
   @Override
   public PartitionClient getClient() {
+    if (client == null) {
+      synchronized (this) {
+        if (client == null) {
+          client = new LogPartitionClient(
+              session,
+              new ServiceManagerStateMachine(id(), managementService),
+              threadContextFactory.createContext(),
+              threadContextFactory.createContext());
+        }
+      }
+    }
     return client;
   }
 
@@ -121,6 +133,7 @@ public class LogPartition implements Partition {
    * Joins the log partition.
    */
   CompletableFuture<Partition> join(PartitionManagementService managementService) {
+    this.managementService = managementService;
     election = managementService.getElectionService().getElectionFor(partitionId);
     server = new LogPartitionServer(
         this,
@@ -131,14 +144,7 @@ public class LogPartition implements Partition {
         .thenCompose(v -> {
           session = new LogPartitionSession(this, managementService, config, threadContextFactory);
           return session.start();
-        }).thenApply(v -> {
-          client = new LogPartitionClient(
-              session,
-              new ServiceManagerStateMachine(id(), managementService),
-              threadContextFactory.createContext(),
-              threadContextFactory.createContext());
-          return this;
-        });
+        }).thenApply(v -> this);
   }
 
   /**

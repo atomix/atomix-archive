@@ -2,6 +2,8 @@ package io.atomix.log;
 
 import java.util.List;
 
+import static com.google.common.base.MoreObjects.toStringHelper;
+
 /**
  * Distributed log term.
  */
@@ -41,5 +43,14 @@ public class Term {
    */
   public List<String> followers() {
     return followers;
+  }
+
+  @Override
+  public String toString() {
+    return toStringHelper(this)
+        .add("term", term)
+        .add("leader", leader)
+        .add("followers", followers)
+        .toString();
   }
 }

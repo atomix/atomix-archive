@@ -15,6 +15,7 @@
  */
 package io.atomix.log.roles;
 
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
@@ -52,7 +53,8 @@ class SynchronousReplicator implements Replicator {
 
     CompletableFuture<Void> future = new CompletableFuture<>();
     futures.put(operation.getIndex(), future);
-    for (String backup : context.followers()) {
+    Collection<String> followers = context.followers();
+    for (String backup : followers) {
       queues.computeIfAbsent(backup, BackupQueue::new).add(operation);
     }
     return future;
@@ -62,7 +64,9 @@ class SynchronousReplicator implements Replicator {
    * Completes futures.
    */
   private void completeFutures() {
-    long commitIndex = queues.values().stream()
+    long commitIndex = context.followers().stream()
+        .map(follower -> queues.get(follower))
+        .filter(queue -> queue != null)
         .map(queue -> queue.ackedIndex)
         .reduce(Math::min)
         .orElse(0L);

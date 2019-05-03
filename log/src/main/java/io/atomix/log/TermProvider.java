@@ -19,15 +19,17 @@ public interface TermProvider {
    * Adds a term change listener.
    *
    * @param listener the term change listener
+   * @return a future to be completed once the listener has been added
    */
-  void addListener(Consumer<Term> listener);
+  CompletableFuture<Void> addListener(Consumer<Term> listener);
 
   /**
    * Removes a term change listener.
    *
    * @param listener the term change listener
+   * @return a future to be completed once the listener has been removed
    */
-  void removeListener(Consumer<Term> listener);
+  CompletableFuture<Void> removeListener(Consumer<Term> listener);
 
   /**
    * Joins the term.
