@@ -292,7 +292,7 @@ public class NettyMessagingService implements MessagingService, Managed<ClusterC
     if (keepAlive) {
       return executeOnPooledConnection(address, type, c -> c.sendAndReceive(type, message, timeout).thenApply(ProtocolReply::payload), executor);
     } else {
-      return executeOnTransientConnection(address, c -> c.sendAndReceive(type, message, timeout).thenApply(ProtocolReply::payload), executor);
+      return executeOnTransientConnection(address, type, c -> c.sendAndReceive(type, message, timeout).thenApply(ProtocolReply::payload), executor);
     }
   }
 
@@ -536,6 +536,7 @@ public class NettyMessagingService implements MessagingService, Managed<ClusterC
    */
   private <T> CompletableFuture<T> executeOnTransientConnection(
       Address address,
+      String type,
       Function<ClientConnection, CompletableFuture<T>> callback,
       Executor executor) {
     CompletableFuture<T> future = new CompletableFuture<>();
@@ -550,18 +551,30 @@ public class NettyMessagingService implements MessagingService, Managed<ClusterC
       return future;
     }
 
-    openChannel(address).whenComplete((channel, channelError) -> {
-      if (channelError == null) {
-        callback.apply(getOrCreateClientConnection(channel)).whenComplete((result, sendError) -> {
+    channelPool.getChannelOrNull(address, type).whenComplete((poolChannel, poolChannelError) -> {
+      if (poolChannel != null) {
+        callback.apply(getOrCreateClientConnection(poolChannel)).whenComplete((result, sendError) -> {
           if (sendError == null) {
             executor.execute(() -> future.complete(result));
           } else {
             executor.execute(() -> future.completeExceptionally(sendError));
           }
-          channel.close();
         });
       } else {
-        executor.execute(() -> future.completeExceptionally(channelError));
+        openChannel(address).whenComplete((channel, channelError) -> {
+          if (channelError == null) {
+            callback.apply(getOrCreateClientConnection(channel)).whenComplete((result, sendError) -> {
+              if (sendError == null) {
+                executor.execute(() -> future.complete(result));
+              } else {
+                executor.execute(() -> future.completeExceptionally(sendError));
+              }
+              channel.close();
+            });
+          } else {
+            executor.execute(() -> future.completeExceptionally(channelError));
+          }
+        });
       }
     });
     return future;

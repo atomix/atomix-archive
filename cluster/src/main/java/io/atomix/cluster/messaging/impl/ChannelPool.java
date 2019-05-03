@@ -74,6 +74,20 @@ class ChannelPool {
   }
 
   /**
+   * Gets a channel if one has already been created.
+   *
+   * @param address     the address for which to get the channel
+   * @param messageType the message type for which to get the channel
+   * @return a future to be completed with a channel from the pool
+   */
+  CompletableFuture<Channel> getChannelOrNull(Address address, String messageType) {
+    List<CompletableFuture<Channel>> channelPool = getChannelPool(address);
+    int offset = getChannelOffset(messageType);
+    CompletableFuture<Channel> channelFuture = channelPool.get(offset);
+    return channelFuture != null ? channelFuture : CompletableFuture.completedFuture(null);
+  }
+
+  /**
    * Gets or creates a pooled channel to the given address for the given message type.
    *
    * @param address     the address for which to get the channel
