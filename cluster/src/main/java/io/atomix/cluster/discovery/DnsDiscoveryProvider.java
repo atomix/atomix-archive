@@ -15,17 +15,6 @@
  */
 package io.atomix.cluster.discovery;
 
-import com.google.common.base.Splitter;
-import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Maps;
-import com.google.common.collect.Sets;
-import io.atomix.cluster.BootstrapService;
-import io.atomix.cluster.Node;
-import io.atomix.cluster.NodeId;
-import io.atomix.utils.event.AbstractListenerManager;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import javax.naming.NamingEnumeration;
 import javax.naming.NamingException;
 import javax.naming.directory.DirContext;
@@ -39,15 +28,28 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
+import com.google.common.base.Splitter;
+import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Maps;
+import com.google.common.collect.Sets;
+import io.atomix.cluster.Node;
+import io.atomix.cluster.NodeId;
+import io.atomix.utils.component.Component;
+import io.atomix.utils.component.Managed;
+import io.atomix.utils.event.AbstractListenerManager;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import static com.google.common.base.Preconditions.checkNotNull;
 import static io.atomix.utils.concurrent.Threads.namedThreads;
 
 /**
  * Cluster membership provider that uses DNS SRV lookups.
  */
+@Component(DnsDiscoveryConfig.class)
 public class DnsDiscoveryProvider
     extends AbstractListenerManager<NodeDiscoveryEvent, NodeDiscoveryEventListener>
-    implements NodeDiscoveryProvider {
+    implements NodeDiscoveryProvider, Managed<DnsDiscoveryConfig> {
 
   public static final Type TYPE = new Type();
 
@@ -90,10 +92,13 @@ public class DnsDiscoveryProvider
   private final ScheduledExecutorService resolverScheduler = Executors.newSingleThreadScheduledExecutor(
       namedThreads("atomix-cluster-dns-resolver", LOGGER));
 
-  private final String service;
-  private final Duration resolutionInterval;
-  private final DnsDiscoveryConfig config;
+  private String service;
+  private Duration resolutionInterval;
+  private DnsDiscoveryConfig config;
   private final Map<NodeId, Node> nodes = Maps.newConcurrentMap();
+
+  private DnsDiscoveryProvider() {
+  }
 
   public DnsDiscoveryProvider(String service) {
     this(new DnsDiscoveryConfig().setService(service));
@@ -161,15 +166,18 @@ public class DnsDiscoveryProvider
   }
 
   @Override
-  public CompletableFuture<Void> join(BootstrapService bootstrap, Node localNode) {
+  public CompletableFuture<Void> start(DnsDiscoveryConfig config) {
     LOGGER.info("Joined");
+    this.config = checkNotNull(config, "config cannot be null");
+    this.service = checkNotNull(config.getService(), "service cannot be null");
+    this.resolutionInterval = checkNotNull(config.getResolutionInterval(), "resolutionInterval cannot be null");
     resolverScheduler.scheduleAtFixedRate(
         this::resolveNodes, 0, resolutionInterval.toMillis(), TimeUnit.MILLISECONDS);
     return CompletableFuture.completedFuture(null);
   }
 
   @Override
-  public CompletableFuture<Void> leave(Node localNode) {
+  public CompletableFuture<Void> stop() {
     LOGGER.info("Left");
     resolverScheduler.shutdownNow();
     return CompletableFuture.completedFuture(null);

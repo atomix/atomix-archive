@@ -15,11 +15,11 @@
  */
 package io.atomix.cluster.messaging.impl;
 
-import com.google.common.collect.Maps;
-import io.atomix.cluster.messaging.ManagedMessagingService;
-import io.atomix.utils.net.Address;
-
 import java.util.Map;
+
+import com.google.common.collect.Maps;
+import io.atomix.cluster.messaging.MessagingService;
+import io.atomix.utils.net.Address;
 
 /**
  * Test messaging service factory.
@@ -89,7 +89,7 @@ public class TestMessagingServiceFactory {
    * @param address the address for which to return a messaging service
    * @return the messaging service for the given address
    */
-  public ManagedMessagingService newMessagingService(Address address) {
+  public MessagingService newMessagingService(Address address) {
     return new TestMessagingService(address, services);
   }
 }

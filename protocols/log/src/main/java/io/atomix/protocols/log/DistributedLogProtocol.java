@@ -27,6 +27,7 @@ import io.atomix.primitive.protocol.LogProtocol;
 import io.atomix.primitive.protocol.PrimitiveProtocol;
 import io.atomix.protocols.log.impl.DistributedLogClient;
 import io.atomix.protocols.log.partition.LogPartition;
+import io.atomix.utils.component.Component;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -67,6 +68,7 @@ public class DistributedLogProtocol implements LogProtocol {
   /**
    * Log protocol type.
    */
+  @Component
   public static final class Type implements PrimitiveProtocol.Type<DistributedLogProtocolConfig> {
     private static final String NAME = "multi-log";
 

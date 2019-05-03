@@ -18,12 +18,14 @@ package io.atomix.core.value;
 import io.atomix.core.value.impl.DefaultAtomicValueBuilder;
 import io.atomix.primitive.PrimitiveManagementService;
 import io.atomix.primitive.PrimitiveType;
+import io.atomix.utils.component.Component;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
 
 /**
  * Atomic value primitive type.
  */
+@Component
 public class AtomicValueType<V> implements PrimitiveType<AtomicValueBuilder<V>, AtomicValueConfig, AtomicValue<V>> {
   private static final String NAME = "atomic-value";
   private static final AtomicValueType INSTANCE = new AtomicValueType();

@@ -18,12 +18,14 @@ package io.atomix.core.lock;
 import io.atomix.core.lock.impl.DefaultDistributedLockBuilder;
 import io.atomix.primitive.PrimitiveManagementService;
 import io.atomix.primitive.PrimitiveType;
+import io.atomix.utils.component.Component;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
 
 /**
  * Distributed lock primitive type.
  */
+@Component
 public class DistributedLockType implements PrimitiveType<DistributedLockBuilder, DistributedLockConfig, DistributedLock> {
   private static final String NAME = "lock";
   private static final DistributedLockType INSTANCE = new DistributedLockType();

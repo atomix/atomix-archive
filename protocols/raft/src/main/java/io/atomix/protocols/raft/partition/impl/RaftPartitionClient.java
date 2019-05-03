@@ -16,14 +16,18 @@
 package io.atomix.protocols.raft.partition.impl;
 
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.stream.Collectors;
 
 import io.atomix.cluster.MemberId;
+import io.atomix.primitive.PrimitiveException;
 import io.atomix.primitive.partition.PartitionClient;
 import io.atomix.protocols.raft.partition.RaftPartition;
 import io.atomix.raft.RaftClient;
+import io.atomix.raft.RaftException;
 import io.atomix.raft.protocol.RaftClientProtocol;
 import io.atomix.utils.Managed;
+import io.atomix.utils.concurrent.Futures;
 import io.atomix.utils.stream.StreamHandler;
 import io.atomix.utils.concurrent.ThreadContextFactory;
 import org.slf4j.Logger;
@@ -71,22 +75,41 @@ public class RaftPartitionClient implements PartitionClient, Managed<RaftPartiti
 
   @Override
   public CompletableFuture<byte[]> command(byte[] value) {
-    return client.write(value);
+    return Futures.transformExceptions(client.write(value), this::convertException);
   }
 
   @Override
   public CompletableFuture<Void> command(byte[] value, StreamHandler<byte[]> handler) {
-    return client.write(value, handler);
+    return Futures.transformExceptions(client.write(value, handler), this::convertException);
   }
 
   @Override
   public CompletableFuture<byte[]> query(byte[] value) {
-    return client.read(value);
+    return Futures.transformExceptions(client.read(value), this::convertException);
   }
 
   @Override
   public CompletableFuture<Void> query(byte[] value, StreamHandler<byte[]> handler) {
-    return client.read(value, handler);
+    return Futures.transformExceptions(client.read(value, handler), this::convertException);
+  }
+
+  private Throwable convertException(Throwable error) {
+    if (error instanceof CompletionException) {
+      error = error.getCause();
+    }
+    if (error instanceof RaftException.ApplicationException) {
+      return new PrimitiveException.ServiceException(error.getMessage());
+    } else if (error instanceof RaftException.CommandFailure) {
+      return new PrimitiveException.CommandFailure(error.getMessage());
+    } else if (error instanceof RaftException.QueryFailure) {
+      return new PrimitiveException.QueryFailure(error.getMessage());
+    } else if (error instanceof RaftException.UnknownSession) {
+      return new PrimitiveException.UnknownSession(error.getMessage());
+    } else if (error instanceof RaftException.UnknownService) {
+      return new PrimitiveException.UnknownService(error.getMessage());
+    } else {
+      return error;
+    }
   }
 
   @Override

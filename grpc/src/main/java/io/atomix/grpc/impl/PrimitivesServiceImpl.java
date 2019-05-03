@@ -23,7 +23,6 @@ import io.atomix.grpc.primitives.GetPrimitivesRequest;
 import io.atomix.grpc.primitives.GetPrimitivesResponse;
 import io.atomix.grpc.primitives.PrimitiveInfo;
 import io.atomix.grpc.primitives.PrimitivesServiceGrpc;
-import io.atomix.primitive.PrimitiveType;
 import io.grpc.stub.StreamObserver;
 
 /**
@@ -42,7 +41,7 @@ public class PrimitivesServiceImpl extends PrimitivesServiceGrpc.PrimitivesServi
     if (request.getType().equals("")) {
       primitives = atomix.getPrimitives();
     } else {
-      primitives = atomix.getPrimitives(atomix.getRegistry().getType(PrimitiveType.class, request.getType()));
+      primitives = atomix.getPrimitives(atomix.getPrimitiveType(request.getType()));
     }
     responseObserver.onNext(GetPrimitivesResponse.newBuilder()
         .addAllInfo(primitives.stream()

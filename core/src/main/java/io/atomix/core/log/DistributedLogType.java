@@ -18,12 +18,14 @@ package io.atomix.core.log;
 import io.atomix.core.log.impl.DefaultDistributedLogBuilder;
 import io.atomix.primitive.PrimitiveManagementService;
 import io.atomix.primitive.PrimitiveType;
+import io.atomix.utils.component.Component;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
 
 /**
  * Distributed log primitive type.
  */
+@Component
 public class DistributedLogType<T> implements PrimitiveType<DistributedLogBuilder<T>, DistributedLogConfig, DistributedLog<T>> {
   private static final String NAME = "log";
   private static final DistributedLogType INSTANCE = new DistributedLogType();

@@ -23,7 +23,6 @@ import com.google.common.base.MoreObjects;
 import io.atomix.primitive.AsyncPrimitive;
 import io.atomix.primitive.ManagedAsyncPrimitive;
 import io.atomix.primitive.PrimitiveState;
-import io.atomix.primitive.PrimitiveType;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -49,11 +48,6 @@ public abstract class DelegatingAsyncPrimitive<T extends AsyncPrimitive> impleme
   @Override
   public String name() {
     return primitive.name();
-  }
-
-  @Override
-  public PrimitiveType type() {
-    return primitive.type();
   }
 
   @Override

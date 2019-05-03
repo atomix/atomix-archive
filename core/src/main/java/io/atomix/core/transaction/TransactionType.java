@@ -15,8 +15,6 @@
  */
 package io.atomix.core.transaction;
 
-import io.atomix.core.impl.CoreTransactionService;
-import io.atomix.core.transaction.impl.DefaultTransactionBuilder;
 import io.atomix.primitive.PrimitiveManagementService;
 import io.atomix.primitive.PrimitiveType;
 
@@ -50,7 +48,7 @@ public class TransactionType implements PrimitiveType<TransactionBuilder, Transa
 
   @Override
   public TransactionBuilder newBuilder(String name, TransactionConfig config, PrimitiveManagementService managementService) {
-    return new DefaultTransactionBuilder(name, config, managementService, new CoreTransactionService(managementService));
+    throw new UnsupportedOperationException();
   }
 
   @Override

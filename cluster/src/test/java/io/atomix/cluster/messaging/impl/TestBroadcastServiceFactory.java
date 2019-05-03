@@ -15,10 +15,10 @@
  */
 package io.atomix.cluster.messaging.impl;
 
-import com.google.common.collect.Sets;
-import io.atomix.cluster.messaging.ManagedBroadcastService;
-
 import java.util.Set;
+
+import com.google.common.collect.Sets;
+import io.atomix.cluster.messaging.BroadcastService;
 
 /**
  * Test broadcast service factory.
@@ -31,7 +31,7 @@ public class TestBroadcastServiceFactory {
    *
    * @return the broadcast service for the given endpoint
    */
-  public ManagedBroadcastService newBroadcastService() {
+  public BroadcastService newBroadcastService() {
     return new TestBroadcastService(services);
   }
 }

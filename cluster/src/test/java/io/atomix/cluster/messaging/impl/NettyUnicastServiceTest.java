@@ -15,17 +15,17 @@
  */
 package io.atomix.cluster.messaging.impl;
 
-import io.atomix.cluster.messaging.ManagedUnicastService;
-import io.atomix.cluster.messaging.MessagingConfig;
+import java.io.IOException;
+import java.net.ServerSocket;
+
+import io.atomix.cluster.ClusterConfig;
+import io.atomix.cluster.MemberConfig;
 import io.atomix.utils.net.Address;
 import net.jodah.concurrentunit.ConcurrentTestCase;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.slf4j.Logger;
-
-import java.io.IOException;
-import java.net.ServerSocket;
 
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
@@ -37,8 +37,8 @@ import static org.slf4j.LoggerFactory.getLogger;
 public class NettyUnicastServiceTest extends ConcurrentTestCase {
   private static final Logger LOGGER = getLogger(NettyBroadcastServiceTest.class);
 
-  ManagedUnicastService service1;
-  ManagedUnicastService service2;
+  NettyUnicastService service1;
+  NettyUnicastService service2;
 
   Address address1;
   Address address2;
@@ -60,11 +60,11 @@ public class NettyUnicastServiceTest extends ConcurrentTestCase {
     address1 = Address.from("127.0.0.1", findAvailablePort(5001));
     address2 = Address.from("127.0.0.1", findAvailablePort(5002));
 
-    service1 = new NettyUnicastService(address1, new MessagingConfig());
-    service1.start().join();
+    service1 = new NettyUnicastService();
+    service1.start(new ClusterConfig().setNodeConfig(new MemberConfig().setAddress(address1))).join();
 
-    service2 = new NettyUnicastService(address2, new MessagingConfig());
-    service2.start().join();
+    service2 = new NettyUnicastService();
+    service2.start(new ClusterConfig().setNodeConfig(new MemberConfig().setAddress(address2))).join();
   }
 
   @After

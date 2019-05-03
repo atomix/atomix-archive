@@ -15,32 +15,41 @@
  */
 package io.atomix.core.test.messaging;
 
-import com.google.common.collect.Maps;
-import com.google.common.collect.Sets;
-import io.atomix.cluster.messaging.ManagedUnicastService;
-import io.atomix.cluster.messaging.UnicastService;
-import io.atomix.utils.net.Address;
-
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BiConsumer;
+
+import com.google.common.collect.Maps;
+import com.google.common.collect.Sets;
+import io.atomix.cluster.MemberService;
+import io.atomix.cluster.messaging.UnicastService;
+import io.atomix.utils.component.Component;
+import io.atomix.utils.component.Dependency;
+import io.atomix.utils.component.Managed;
+import io.atomix.utils.net.Address;
 
 /**
  * Test unicast service.
  */
-public class TestUnicastService implements ManagedUnicastService {
-  private final Address address;
-  private final Map<Address, TestUnicastService> services;
+@Component(scope = Component.Scope.TEST)
+public class TestUnicastService implements UnicastService, Managed {
+  @Dependency
+  private TestUnicastSubstrate substrate;
+
+  @Dependency
+  private MemberService memberService;
+
+  private Address address;
   private final Map<String, Map<BiConsumer<Address, byte[]>, Executor>> listeners = Maps.newConcurrentMap();
-  private final AtomicBoolean started = new AtomicBoolean();
   private final Set<Address> partitions = Sets.newConcurrentHashSet();
 
-  public TestUnicastService(Address address, Map<Address, TestUnicastService> services) {
-    this.address = address;
-    this.services = services;
+  @Override
+  public CompletableFuture start() {
+    this.address = memberService.getLocalMember().address();
+    substrate.register(address, this);
+    return CompletableFuture.completedFuture(null);
   }
 
   /**
@@ -82,7 +91,7 @@ public class TestUnicastService implements ManagedUnicastService {
       return;
     }
 
-    TestUnicastService service = services.get(address);
+    TestUnicastService service = substrate.get(address);
     if (service != null) {
       Map<BiConsumer<Address, byte[]>, Executor> listeners = service.listeners.get(subject);
       if (listeners != null) {
@@ -105,24 +114,5 @@ public class TestUnicastService implements ManagedUnicastService {
         this.listeners.remove(subject);
       }
     }
-  }
-
-  @Override
-  public CompletableFuture<UnicastService> start() {
-    services.put(address, this);
-    started.set(true);
-    return CompletableFuture.completedFuture(this);
-  }
-
-  @Override
-  public boolean isRunning() {
-    return started.get();
-  }
-
-  @Override
-  public CompletableFuture<Void> stop() {
-    services.remove(address);
-    started.set(false);
-    return CompletableFuture.completedFuture(null);
   }
 }

@@ -18,12 +18,14 @@ package io.atomix.core.counter;
 import io.atomix.core.counter.impl.DefaultAtomicCounterBuilder;
 import io.atomix.primitive.PrimitiveManagementService;
 import io.atomix.primitive.PrimitiveType;
+import io.atomix.utils.component.Component;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
 
 /**
  * Atomic counter primitive type.
  */
+@Component
 public class AtomicCounterType implements PrimitiveType<AtomicCounterBuilder, AtomicCounterConfig, AtomicCounter> {
   private static final String NAME = "atomic-counter";
   private static final AtomicCounterType INSTANCE = new AtomicCounterType();

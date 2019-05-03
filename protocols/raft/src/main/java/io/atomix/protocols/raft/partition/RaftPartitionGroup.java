@@ -50,6 +50,7 @@ import io.atomix.protocols.raft.MultiRaftProtocol;
 import io.atomix.raft.RaftClient;
 import io.atomix.raft.impl.DefaultRaftClient;
 import io.atomix.storage.StorageLevel;
+import io.atomix.utils.component.Component;
 import io.atomix.utils.concurrent.BlockingAwareThreadPoolContextFactory;
 import io.atomix.utils.concurrent.Futures;
 import io.atomix.utils.concurrent.ThreadContextFactory;
@@ -83,6 +84,7 @@ public class RaftPartitionGroup implements ManagedPartitionGroup {
   /**
    * Raft partition group type.
    */
+  @Component
   public static class Type implements PartitionGroup.Type<RaftPartitionGroupConfig> {
     private static final String NAME = "raft";
 

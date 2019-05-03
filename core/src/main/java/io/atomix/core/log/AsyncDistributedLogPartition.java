@@ -15,17 +15,22 @@
  */
 package io.atomix.core.log;
 
-import io.atomix.primitive.AsyncPrimitive;
-import io.atomix.primitive.DistributedPrimitive;
-
 import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
+
+import io.atomix.primitive.AsyncPrimitive;
+import io.atomix.primitive.DistributedPrimitive;
+import io.atomix.primitive.PrimitiveType;
 
 /**
  * Asynchronous distributed log partition.
  */
 public interface AsyncDistributedLogPartition<E> extends AsyncPrimitive {
+  @Override
+  default PrimitiveType type() {
+    return DistributedLogType.instance();
+  }
 
   /**
    * Returns the partition ID.

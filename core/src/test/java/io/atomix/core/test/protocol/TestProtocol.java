@@ -17,8 +17,7 @@ package io.atomix.core.test.protocol;
 
 import io.atomix.primitive.protocol.PrimitiveProtocol;
 import io.atomix.primitive.protocol.ProxyProtocol;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import io.atomix.utils.component.Component;
 
 /**
  * Test primitive protocol.
@@ -39,6 +38,7 @@ public class TestProtocol implements ProxyProtocol {
   /**
    * Multi-Raft protocol type.
    */
+  @Component(scope = Component.Scope.TEST)
   public static final class Type implements PrimitiveProtocol.Type<TestProtocolConfig> {
     private static final String NAME = "multi-raft";
 
@@ -57,8 +57,6 @@ public class TestProtocol implements ProxyProtocol {
       return new TestProtocol(config);
     }
   }
-
-  private static final Logger LOGGER = LoggerFactory.getLogger(TestProtocol.class);
 
   private final TestProtocolConfig config;
 

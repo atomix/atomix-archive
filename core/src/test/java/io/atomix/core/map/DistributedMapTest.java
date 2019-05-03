@@ -27,7 +27,6 @@ import java.util.stream.Collectors;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import io.atomix.core.AbstractPrimitiveTest;
-import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
 import org.junit.Test;
 
@@ -253,24 +252,6 @@ public class DistributedMapTest extends AbstractPrimitiveTest {
     DistributedMap<Key, Pair<String, Integer>> map = atomix()
         .<Key, Pair<String, Integer>>mapBuilder("testComplexTypes")
         .withProtocol(protocol())
-        .build();
-
-    map.put(new Key("foo"), Pair.of("foo", 1));
-    assertEquals("foo", map.get(new Key("foo")).getLeft());
-    assertEquals(Integer.valueOf(1), map.get(new Key("foo")).getRight());
-  }
-
-  /**
-   * Tests a map with complex types.
-   */
-  @Test
-  public void testRequiredComplexTypes() throws Throwable {
-    DistributedMap<Key, Pair<String, Integer>> map = atomix()
-        .<Key, Pair<String, Integer>>mapBuilder("testComplexTypes")
-        .withProtocol(protocol())
-        .withRegistrationRequired()
-        .withKeyType(Key.class)
-        .withValueType(ImmutablePair.class)
         .build();
 
     map.put(new Key("foo"), Pair.of("foo", 1));

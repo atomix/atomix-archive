@@ -92,7 +92,7 @@ public class AtomixConfigTest {
     assertEquals("truststore.jks", messaging.getTlsConfig().getTrustStore());
     assertEquals("bar", messaging.getTlsConfig().getTrustStorePassword());
 
-    RaftPartitionGroupConfig managementGroup = (RaftPartitionGroupConfig) config.getManagementGroup();
+    RaftPartitionGroupConfig managementGroup = (RaftPartitionGroupConfig) config.getSystemGroup();
     assertEquals(RaftPartitionGroup.TYPE, managementGroup.getType());
     assertEquals(1, managementGroup.getPartitions());
     assertEquals(new MemorySize(1024 * 1024 * 16), managementGroup.getStorageConfig().getSegmentSize());

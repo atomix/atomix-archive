@@ -71,7 +71,7 @@ public class DistributedLogServerContext implements Managed<Void> {
   private final boolean closeOnStop;
   private String leader;
   private List<String> followers;
-  private LogServerRole role;
+  private LogServerRole role = new NoneRole(this);;
   private long currentTerm;
   private long commitIndex;
   private final SegmentedJournal<LogEntry> journal;
@@ -342,28 +342,19 @@ public class DistributedLogServerContext implements Managed<Void> {
         followers = term.followers();
 
         if (Objects.equals(leader, serverId)) {
-          if (this.role == null) {
-            this.role = new LeaderRole(this);
-            log.debug("{} transitioning to {}", serverId, DistributedLogServer.Role.LEADER);
-          } else if (this.role.role() != DistributedLogServer.Role.LEADER) {
+          if (this.role.role() != DistributedLogServer.Role.LEADER) {
             this.role.close();
             this.role = new LeaderRole(this);
             log.debug("{} transitioning to {}", serverId, DistributedLogServer.Role.LEADER);
           }
         } else if (followers.contains(serverId)) {
-          if (this.role == null) {
-            this.role = new FollowerRole(this);
-            log.debug("{} transitioning to {}", serverId, DistributedLogServer.Role.FOLLOWER);
-          } else if (this.role.role() != DistributedLogServer.Role.FOLLOWER) {
+          if (this.role.role() != DistributedLogServer.Role.FOLLOWER) {
             this.role.close();
             this.role = new FollowerRole(this);
             log.debug("{} transitioning to {}", serverId, DistributedLogServer.Role.FOLLOWER);
           }
         } else {
-          if (this.role == null) {
-            this.role = new NoneRole(this);
-            log.debug("{} transitioning to {}", serverId, DistributedLogServer.Role.NONE);
-          } else if (this.role.role() != DistributedLogServer.Role.NONE) {
+          if (this.role.role() != DistributedLogServer.Role.NONE) {
             this.role.close();
             this.role = new NoneRole(this);
             log.debug("{} transitioning to {}", serverId, DistributedLogServer.Role.NONE);

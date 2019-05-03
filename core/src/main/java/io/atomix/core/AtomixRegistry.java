@@ -15,10 +15,12 @@
  */
 package io.atomix.core;
 
-import io.atomix.core.registry.ClasspathScanningRegistry;
-import io.atomix.utils.NamedType;
-
 import java.util.Collection;
+
+import io.atomix.core.registry.ComponentRegistry;
+import io.atomix.utils.NamedType;
+import io.atomix.utils.component.Component;
+import io.atomix.utils.component.ComponentManager;
 
 /**
  * Atomix registry.
@@ -40,8 +42,11 @@ public interface AtomixRegistry {
    * @param classLoader the registry class loader
    * @return the registry instance
    */
+  @SuppressWarnings("unchecked")
   static AtomixRegistry registry(ClassLoader classLoader) {
-    return ClasspathScanningRegistry.builder().withClassLoader(classLoader).build();
+    return new ComponentManager<AtomixConfig, ComponentRegistry>(
+        ComponentRegistry.class, classLoader, Component.Scope.RUNTIME)
+        .start(null).join();
   }
 
   /**

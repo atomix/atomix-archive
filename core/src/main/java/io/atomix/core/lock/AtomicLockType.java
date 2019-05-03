@@ -18,12 +18,14 @@ package io.atomix.core.lock;
 import io.atomix.core.lock.impl.DefaultAtomicLockBuilder;
 import io.atomix.primitive.PrimitiveManagementService;
 import io.atomix.primitive.PrimitiveType;
+import io.atomix.utils.component.Component;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
 
 /**
  * Atomic lock primitive type.
  */
+@Component
 public class AtomicLockType implements PrimitiveType<AtomicLockBuilder, AtomicLockConfig, AtomicLock> {
   private static final String NAME = "atomic-lock";
   private static final AtomicLockType INSTANCE = new AtomicLockType();

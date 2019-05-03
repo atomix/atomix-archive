@@ -44,6 +44,7 @@ import io.atomix.primitive.service.ServiceOperationRegistry;
 import io.atomix.primitive.service.ServiceType;
 import io.atomix.primitive.service.SessionManagedPrimitiveService;
 import io.atomix.primitive.session.Session;
+import io.atomix.utils.component.Component;
 import io.atomix.utils.concurrent.Scheduled;
 import io.atomix.utils.stream.StreamHandler;
 
@@ -61,6 +62,7 @@ public class PrimaryElectorService extends SessionManagedPrimitiveService {
   /**
    * Map service type.
    */
+  @Component
   public static class Type implements ServiceType {
     private static final String NAME = "primary-elector";
 

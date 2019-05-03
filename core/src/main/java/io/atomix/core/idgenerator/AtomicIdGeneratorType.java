@@ -18,12 +18,14 @@ package io.atomix.core.idgenerator;
 import io.atomix.core.idgenerator.impl.DelegatingAtomicIdGeneratorBuilder;
 import io.atomix.primitive.PrimitiveManagementService;
 import io.atomix.primitive.PrimitiveType;
+import io.atomix.utils.component.Component;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
 
 /**
  * Atomic ID generator primitive type.
  */
+@Component
 public class AtomicIdGeneratorType implements PrimitiveType<AtomicIdGeneratorBuilder, AtomicIdGeneratorConfig, AtomicIdGenerator> {
   private static final String NAME = "atomic-id-generator";
   private static final AtomicIdGeneratorType INSTANCE = new AtomicIdGeneratorType();

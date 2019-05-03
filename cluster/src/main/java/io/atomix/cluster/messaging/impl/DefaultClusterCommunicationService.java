@@ -15,61 +15,49 @@
  */
 package io.atomix.cluster.messaging.impl;
 
-import com.google.common.base.Objects;
-import com.google.common.collect.Maps;
-import io.atomix.cluster.ClusterMembershipService;
-import io.atomix.cluster.Member;
-import io.atomix.cluster.MemberId;
-import io.atomix.cluster.messaging.ClusterCommunicationService;
-import io.atomix.cluster.messaging.ManagedClusterCommunicationService;
-import io.atomix.cluster.messaging.MessagingService;
-import io.atomix.cluster.messaging.UnicastService;
-import io.atomix.utils.concurrent.Futures;
-import io.atomix.utils.net.Address;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.net.ConnectException;
 import java.time.Duration;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-import static com.google.common.base.Preconditions.checkNotNull;
+import com.google.common.base.Objects;
+import com.google.common.collect.Maps;
+import io.atomix.cluster.ClusterMembershipService;
+import io.atomix.cluster.Member;
+import io.atomix.cluster.MemberId;
+import io.atomix.cluster.messaging.ClusterCommunicationService;
+import io.atomix.cluster.messaging.MessagingService;
+import io.atomix.cluster.messaging.UnicastService;
+import io.atomix.utils.component.Component;
+import io.atomix.utils.component.Dependency;
+import io.atomix.utils.concurrent.Futures;
+import io.atomix.utils.net.Address;
 
 /**
  * Cluster communication service implementation.
  */
-public class DefaultClusterCommunicationService implements ManagedClusterCommunicationService {
-
-  private final Logger log = LoggerFactory.getLogger(getClass());
+@Component
+public class DefaultClusterCommunicationService implements ClusterCommunicationService {
   private static final Exception CONNECT_EXCEPTION = new ConnectException();
 
   static {
     CONNECT_EXCEPTION.setStackTrace(new StackTraceElement[0]);
   }
 
-  protected final ClusterMembershipService membershipService;
-  protected final MessagingService messagingService;
-  protected final UnicastService unicastService;
+  @Dependency
+  protected ClusterMembershipService membershipService;
+  @Dependency
+  protected MessagingService messagingService;
+  @Dependency
+  protected UnicastService unicastService;
   private final Map<String, BiConsumer<Address, byte[]>> unicastConsumers = Maps.newConcurrentMap();
-  private final AtomicBoolean started = new AtomicBoolean();
-
-  public DefaultClusterCommunicationService(
-      ClusterMembershipService membershipService,
-      MessagingService messagingService,
-      UnicastService unicastService) {
-    this.membershipService = checkNotNull(membershipService, "clusterService cannot be null");
-    this.messagingService = checkNotNull(messagingService, "messagingService cannot be null");
-    this.unicastService = checkNotNull(unicastService, "unicastService cannot be null");
-  }
 
   @Override
   public <M> void broadcast(
@@ -78,10 +66,10 @@ public class DefaultClusterCommunicationService implements ManagedClusterCommuni
       Function<M, byte[]> encoder,
       boolean reliable) {
     multicast(subject, message, encoder, membershipService.getMembers()
-        .stream()
-        .filter(node -> !Objects.equal(node, membershipService.getLocalMember()))
-        .map(Member::id)
-        .collect(Collectors.toSet()),
+            .stream()
+            .filter(node -> !Objects.equal(node, membershipService.getLocalMember()))
+            .map(Member::id)
+            .collect(Collectors.toSet()),
         reliable);
   }
 
@@ -92,9 +80,9 @@ public class DefaultClusterCommunicationService implements ManagedClusterCommuni
       Function<M, byte[]> encoder,
       boolean reliable) {
     multicast(subject, message, encoder, membershipService.getMembers()
-        .stream()
-        .map(Member::id)
-        .collect(Collectors.toSet()),
+            .stream()
+            .map(Member::id)
+            .collect(Collectors.toSet()),
         reliable);
   }
 
@@ -170,10 +158,10 @@ public class DefaultClusterCommunicationService implements ManagedClusterCommuni
 
   @Override
   public <M, R> CompletableFuture<Void> subscribe(String subject,
-                                                  Function<byte[], M> decoder,
-                                                  Function<M, R> handler,
-                                                  Function<R, byte[]> encoder,
-                                                  Executor executor) {
+      Function<byte[], M> decoder,
+      Function<M, R> handler,
+      Function<R, byte[]> encoder,
+      Executor executor) {
     messagingService.registerHandler(subject,
         new InternalMessageResponder<M, R>(decoder, encoder, m -> {
           CompletableFuture<R> responseFuture = new CompletableFuture<>();
@@ -191,18 +179,18 @@ public class DefaultClusterCommunicationService implements ManagedClusterCommuni
 
   @Override
   public <M, R> CompletableFuture<Void> subscribe(String subject,
-                                                  Function<byte[], M> decoder,
-                                                  Function<M, CompletableFuture<R>> handler,
-                                                  Function<R, byte[]> encoder) {
+      Function<byte[], M> decoder,
+      Function<M, CompletableFuture<R>> handler,
+      Function<R, byte[]> encoder) {
     messagingService.registerHandler(subject, new InternalMessageResponder<>(decoder, encoder, handler));
     return CompletableFuture.completedFuture(null);
   }
 
   @Override
   public <M> CompletableFuture<Void> subscribe(String subject,
-                                               Function<byte[], M> decoder,
-                                               Consumer<M> handler,
-                                               Executor executor) {
+      Function<byte[], M> decoder,
+      Consumer<M> handler,
+      Executor executor) {
     messagingService.registerHandler(subject, new InternalMessageConsumer<>(decoder, handler), executor);
     BiConsumer<Address, byte[]> unicastConsumer = new InternalMessageConsumer<>(decoder, handler);
     unicastConsumers.put(subject, unicastConsumer);
@@ -219,35 +207,14 @@ public class DefaultClusterCommunicationService implements ManagedClusterCommuni
     return CompletableFuture.completedFuture(null);
   }
 
-  @Override
-  public CompletableFuture<ClusterCommunicationService> start() {
-    if (started.compareAndSet(false, true)) {
-      log.info("Started");
-    }
-    return CompletableFuture.completedFuture(this);
-  }
-
-  @Override
-  public boolean isRunning() {
-    return started.get();
-  }
-
-  @Override
-  public CompletableFuture<Void> stop() {
-    if (started.compareAndSet(true, false)) {
-      log.info("Stopped");
-    }
-    return CompletableFuture.completedFuture(null);
-  }
-
   private static class InternalMessageResponder<M, R> implements BiFunction<Address, byte[], CompletableFuture<byte[]>> {
     private final Function<byte[], M> decoder;
     private final Function<R, byte[]> encoder;
     private final Function<M, CompletableFuture<R>> handler;
 
     InternalMessageResponder(Function<byte[], M> decoder,
-                             Function<R, byte[]> encoder,
-                             Function<M, CompletableFuture<R>> handler) {
+        Function<R, byte[]> encoder,
+        Function<M, CompletableFuture<R>> handler) {
       this.decoder = decoder;
       this.encoder = encoder;
       this.handler = handler;

@@ -36,7 +36,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
@@ -46,17 +45,19 @@ import com.google.common.base.Throwables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.util.concurrent.MoreExecutors;
-import io.atomix.cluster.messaging.ManagedMessagingService;
+import io.atomix.cluster.ClusterConfig;
 import io.atomix.cluster.messaging.MessagingConfig;
 import io.atomix.cluster.messaging.MessagingException;
 import io.atomix.cluster.messaging.MessagingService;
-import io.atomix.utils.stream.StreamFunction;
-import io.atomix.utils.stream.StreamHandler;
-import io.atomix.utils.TriConsumer;
 import io.atomix.utils.AtomixRuntimeException;
+import io.atomix.utils.TriConsumer;
+import io.atomix.utils.component.Component;
+import io.atomix.utils.component.Managed;
 import io.atomix.utils.concurrent.Futures;
 import io.atomix.utils.concurrent.OrderedFuture;
 import io.atomix.utils.net.Address;
+import io.atomix.utils.stream.StreamFunction;
+import io.atomix.utils.stream.StreamHandler;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.buffer.ByteBuf;
@@ -90,19 +91,19 @@ import static io.atomix.utils.concurrent.Threads.namedThreads;
 /**
  * Netty based MessagingService.
  */
-public class NettyMessagingService implements ManagedMessagingService {
+@Component(ClusterConfig.class)
+public class NettyMessagingService implements MessagingService, Managed<ClusterConfig> {
   private final Logger log = LoggerFactory.getLogger(getClass());
 
-  private final Address returnAddress;
-  private final int preamble;
-  private final MessagingConfig config;
-  private final ProtocolVersion protocolVersion;
-  private final AtomicBoolean started = new AtomicBoolean(false);
+  private Address returnAddress;
+  private int preamble;
+  private MessagingConfig config;
+  private final ProtocolVersion protocolVersion = ProtocolVersion.latest();
   private final HandlerRegistry<String, BiConsumer<ProtocolMessage, ServerConnection>> handlers = new HandlerRegistry<>();
   private volatile LocalClientConnection localConnection;
   private final Map<Channel, RemoteClientConnection> connections = Maps.newConcurrentMap();
   private final AtomicLong messageIdGenerator = new AtomicLong(0);
-  private final ChannelPool channelPool;
+  private ChannelPool channelPool;
 
   private EventLoopGroup serverGroup;
   private EventLoopGroup clientGroup;
@@ -116,29 +117,17 @@ public class NettyMessagingService implements ManagedMessagingService {
   protected TrustManagerFactory trustManager;
   protected KeyManagerFactory keyManager;
 
-  public NettyMessagingService(String cluster, Address address, MessagingConfig config) {
-    this(cluster, address, config, ProtocolVersion.latest());
-  }
-
-  NettyMessagingService(String cluster, Address address, MessagingConfig config, ProtocolVersion protocolVersion) {
-    this.preamble = cluster.hashCode();
-    this.returnAddress = address;
-    this.config = config;
-    this.protocolVersion = protocolVersion;
-    this.channelPool = new ChannelPool(this::openChannel, config.getConnectionPoolSize());
-  }
-
   @Override
   public Address address() {
     return returnAddress;
   }
 
   @Override
-  public CompletableFuture<MessagingService> start() {
-    if (started.get()) {
-      log.warn("Already running at local address: {}", returnAddress);
-      return CompletableFuture.completedFuture(this);
-    }
+  public CompletableFuture<Void> start(ClusterConfig config) {
+    this.preamble = config.getClusterId().hashCode();
+    this.returnAddress = config.getNodeConfig().getAddress();
+    this.config = config.getMessagingConfig();
+    this.channelPool = new ChannelPool(this::openChannel, config.getMessagingConfig().getConnectionPoolSize());
 
     enableNettyTls = loadKeyStores();
     initEventLoopGroup();
@@ -146,14 +135,8 @@ public class NettyMessagingService implements ManagedMessagingService {
       timeoutExecutor = Executors.newScheduledThreadPool(
           4, namedThreads("netty-messaging-timeout-%d", log));
       localConnection = new LocalClientConnection(timeoutExecutor, handlers);
-      started.set(true);
       log.info("Started");
-    }).thenApply(v -> this);
-  }
-
-  @Override
-  public boolean isRunning() {
-    return started.get();
+    });
   }
 
   private boolean loadKeyStores() {
@@ -851,38 +834,35 @@ public class NettyMessagingService implements ManagedMessagingService {
 
   @Override
   public CompletableFuture<Void> stop() {
-    if (started.compareAndSet(true, false)) {
-      return CompletableFuture.supplyAsync(() -> {
-        boolean interrupted = false;
+    return CompletableFuture.supplyAsync(() -> {
+      boolean interrupted = false;
+      try {
         try {
-          try {
-            serverChannel.close().sync();
-          } catch (InterruptedException e) {
-            interrupted = true;
-          }
-          Future<?> serverShutdownFuture = serverGroup.shutdownGracefully();
-          Future<?> clientShutdownFuture = clientGroup.shutdownGracefully();
-          try {
-            serverShutdownFuture.sync();
-          } catch (InterruptedException e) {
-            interrupted = true;
-          }
-          try {
-            clientShutdownFuture.sync();
-          } catch (InterruptedException e) {
-            interrupted = true;
-          }
-          timeoutExecutor.shutdown();
-        } finally {
-          log.info("Stopped");
-          if (interrupted) {
-            Thread.currentThread().interrupt();
-          }
+          serverChannel.close().sync();
+        } catch (InterruptedException e) {
+          interrupted = true;
         }
-        return null;
-      });
-    }
-    return CompletableFuture.completedFuture(null);
+        Future<?> serverShutdownFuture = serverGroup.shutdownGracefully();
+        Future<?> clientShutdownFuture = clientGroup.shutdownGracefully();
+        try {
+          serverShutdownFuture.sync();
+        } catch (InterruptedException e) {
+          interrupted = true;
+        }
+        try {
+          clientShutdownFuture.sync();
+        } catch (InterruptedException e) {
+          interrupted = true;
+        }
+        timeoutExecutor.shutdown();
+      } finally {
+        log.info("Stopped");
+        if (interrupted) {
+          Thread.currentThread().interrupt();
+        }
+      }
+      return null;
+    });
   }
 
   /**

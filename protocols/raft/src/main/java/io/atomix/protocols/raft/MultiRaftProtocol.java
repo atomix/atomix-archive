@@ -17,6 +17,7 @@ package io.atomix.protocols.raft;
 
 import io.atomix.primitive.protocol.PrimitiveProtocol;
 import io.atomix.primitive.protocol.ProxyProtocol;
+import io.atomix.utils.component.Component;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -57,6 +58,7 @@ public class MultiRaftProtocol implements ProxyProtocol {
   /**
    * Multi-Raft protocol type.
    */
+  @Component
   public static final class Type implements PrimitiveProtocol.Type<MultiRaftProtocolConfig> {
     private static final String NAME = "multi-raft";
 

@@ -33,11 +33,11 @@ import io.atomix.raft.protocol.QueryResponse;
 import io.atomix.raft.protocol.RaftClientProtocol;
 import io.atomix.raft.protocol.RaftError;
 import io.atomix.raft.protocol.ResponseStatus;
-import io.atomix.utils.stream.StreamHandler;
 import io.atomix.utils.concurrent.ThreadContext;
 import io.atomix.utils.concurrent.ThreadContextFactory;
 import io.atomix.utils.logging.ContextualLoggerFactory;
 import io.atomix.utils.logging.LoggerContext;
+import io.atomix.utils.stream.StreamHandler;
 import org.slf4j.Logger;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
@@ -270,6 +270,10 @@ public class DefaultRaftClient implements RaftClient {
         return new RaftException.QueryFailure(message);
       case APPLICATION_ERROR:
         return new RaftException.ApplicationException(message);
+      case UNKNOWN_SERVICE:
+        return new RaftException.UnknownService(message);
+      case UNKNOWN_SESSION:
+        return new RaftException.UnknownSession(message);
       case ILLEGAL_MEMBER_STATE:
         return new RaftException.IllegalMemberState(message);
       case PROTOCOL_ERROR:

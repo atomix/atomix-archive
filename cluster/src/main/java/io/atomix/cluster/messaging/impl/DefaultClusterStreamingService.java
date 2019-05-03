@@ -3,7 +3,6 @@ package io.atomix.cluster.messaging.impl;
 import java.net.ConnectException;
 import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -12,12 +11,13 @@ import io.atomix.cluster.ClusterMembershipService;
 import io.atomix.cluster.Member;
 import io.atomix.cluster.MemberId;
 import io.atomix.cluster.messaging.ClusterStreamingService;
-import io.atomix.cluster.messaging.ManagedClusterStreamingService;
 import io.atomix.cluster.messaging.MessagingService;
+import io.atomix.utils.component.Component;
+import io.atomix.utils.component.Dependency;
+import io.atomix.utils.concurrent.Futures;
 import io.atomix.utils.stream.EncodingStreamHandler;
 import io.atomix.utils.stream.StreamFunction;
 import io.atomix.utils.stream.StreamHandler;
-import io.atomix.utils.concurrent.Futures;
 import io.atomix.utils.stream.TranscodingStreamFunction;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -25,7 +25,8 @@ import org.slf4j.LoggerFactory;
 /**
  * Default streaming service.
  */
-public class DefaultClusterStreamingService implements ManagedClusterStreamingService {
+@Component
+public class DefaultClusterStreamingService implements ClusterStreamingService {
 
   private final Logger log = LoggerFactory.getLogger(getClass());
   private static final Exception CONNECT_EXCEPTION = new ConnectException();
@@ -34,14 +35,10 @@ public class DefaultClusterStreamingService implements ManagedClusterStreamingSe
     CONNECT_EXCEPTION.setStackTrace(new StackTraceElement[0]);
   }
 
-  protected final ClusterMembershipService membershipService;
-  protected final MessagingService messagingService;
-  private final AtomicBoolean started = new AtomicBoolean();
-
-  public DefaultClusterStreamingService(ClusterMembershipService membershipService, MessagingService messagingService) {
-    this.membershipService = membershipService;
-    this.messagingService = messagingService;
-  }
+  @Dependency
+  protected ClusterMembershipService membershipService;
+  @Dependency
+  protected MessagingService messagingService;
 
   @Override
   public <M> CompletableFuture<StreamHandler<M>> unicast(
@@ -141,26 +138,5 @@ public class DefaultClusterStreamingService implements ManagedClusterStreamingSe
   @Override
   public void unsubscribe(String type) {
     messagingService.unregisterHandler(type);
-  }
-
-  @Override
-  public CompletableFuture<ClusterStreamingService> start() {
-    if (started.compareAndSet(false, true)) {
-      log.info("Started");
-    }
-    return CompletableFuture.completedFuture(this);
-  }
-
-  @Override
-  public boolean isRunning() {
-    return started.get();
-  }
-
-  @Override
-  public CompletableFuture<Void> stop() {
-    if (started.compareAndSet(true, false)) {
-      log.info("Stopped");
-    }
-    return CompletableFuture.completedFuture(null);
   }
 }

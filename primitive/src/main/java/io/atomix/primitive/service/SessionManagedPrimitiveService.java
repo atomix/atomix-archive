@@ -18,6 +18,7 @@ import com.google.common.collect.Streams;
 import com.google.protobuf.ByteString;
 import io.atomix.primitive.PrimitiveException;
 import io.atomix.primitive.operation.CommandId;
+import io.atomix.primitive.operation.OperationType;
 import io.atomix.primitive.operation.QueryId;
 import io.atomix.primitive.operation.StreamType;
 import io.atomix.primitive.service.impl.DefaultServiceExecutor;
@@ -60,15 +61,17 @@ public abstract class SessionManagedPrimitiveService extends AbstractPrimitiveSe
   private final Map<SessionId, PrimitiveSession> sessions = new ConcurrentHashMap<>();
   private PrimitiveSession currentSession;
   private ServiceCodec codec;
+  private AbstractPrimitiveService.Context context;
   private DefaultServiceExecutor executor;
   private DefaultServiceScheduler scheduler;
 
   @Override
   public void init(StateMachine.Context context) {
     this.codec = new ServiceCodec();
-    this.executor = new DefaultServiceExecutor(context, codec);
-    this.scheduler = new DefaultServiceScheduler(executor);
-    super.init(executor, scheduler, scheduler);
+    this.context = new AbstractPrimitiveService.Context(context);
+    this.executor = new DefaultServiceExecutor(codec, this.context.getLogger());
+    this.scheduler = new DefaultServiceScheduler(this.context);
+    super.init(this.context, scheduler, scheduler);
     configure(executor);
   }
 
@@ -111,7 +114,7 @@ public abstract class SessionManagedPrimitiveService extends AbstractPrimitiveSe
           sessionSnapshot.getTimeout(),
           sessionSnapshot.getTimestamp(),
           codec,
-          executor);
+          context);
       session.setCommandSequence(sessionSnapshot.getCommandSequence());
       session.setLastApplied(sessionSnapshot.getLastApplied());
 
@@ -249,6 +252,9 @@ public abstract class SessionManagedPrimitiveService extends AbstractPrimitiveSe
 
   @Override
   public CompletableFuture<byte[]> apply(Command<byte[]> command) {
+    // Set the operation context to ensure scheduling is allowed.
+    context.setOperationType(OperationType.COMMAND);
+
     // Run tasks scheduled to execute prior to this command.
     scheduler.runScheduledTasks(command.timestamp());
 
@@ -296,7 +302,7 @@ public abstract class SessionManagedPrimitiveService extends AbstractPrimitiveSe
           openSession.value().getTimeout(),
           getCurrentTimestamp(),
           codec,
-          executor);
+          context);
       session.open();
       onOpen(session);
       return session;

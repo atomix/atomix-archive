@@ -23,37 +23,35 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
 import java.util.concurrent.RejectedExecutionException;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 
 import com.google.common.collect.Sets;
-import io.atomix.cluster.messaging.ManagedMessagingService;
 import io.atomix.cluster.messaging.MessagingException.NoRemoteHandler;
 import io.atomix.cluster.messaging.MessagingService;
-import io.atomix.utils.stream.StreamFunction;
-import io.atomix.utils.stream.StreamHandler;
 import io.atomix.utils.TriConsumer;
 import io.atomix.utils.concurrent.ComposableFuture;
 import io.atomix.utils.concurrent.Futures;
 import io.atomix.utils.net.Address;
+import io.atomix.utils.stream.StreamFunction;
+import io.atomix.utils.stream.StreamHandler;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
 /**
  * Test messaging service.
  */
-public class TestMessagingService implements ManagedMessagingService {
+public class TestMessagingService implements MessagingService {
   private final Address address;
   private final Map<Address, TestMessagingService> services;
   private final Map<String, BiFunction<Address, ?, ?>> handlers = new ConcurrentHashMap<>();
-  private final AtomicBoolean started = new AtomicBoolean();
   private final Set<Address> partitions = Sets.newConcurrentHashSet();
 
   public TestMessagingService(Address address, Map<Address, TestMessagingService> services) {
     this.address = address;
     this.services = services;
+    services.put(address, this);
   }
 
   /**
@@ -226,24 +224,5 @@ public class TestMessagingService implements ManagedMessagingService {
   @Override
   public void unregisterHandler(String type) {
     handlers.remove(checkNotNull(type));
-  }
-
-  @Override
-  public CompletableFuture<MessagingService> start() {
-    services.put(address, this);
-    started.set(true);
-    return CompletableFuture.completedFuture(this);
-  }
-
-  @Override
-  public boolean isRunning() {
-    return started.get();
-  }
-
-  @Override
-  public CompletableFuture<Void> stop() {
-    services.remove(address);
-    started.set(false);
-    return CompletableFuture.completedFuture(null);
   }
 }

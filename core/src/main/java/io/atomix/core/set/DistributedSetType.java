@@ -18,12 +18,14 @@ package io.atomix.core.set;
 import io.atomix.core.set.impl.DefaultDistributedSetBuilder;
 import io.atomix.primitive.PrimitiveManagementService;
 import io.atomix.primitive.PrimitiveType;
+import io.atomix.utils.component.Component;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
 
 /**
  * Distributed set primitive type.
  */
+@Component
 public class DistributedSetType<E> implements PrimitiveType<DistributedSetBuilder<E>, DistributedSetConfig, DistributedSet<E>> {
   private static final String NAME = "set";
   private static final DistributedSetType INSTANCE = new DistributedSetType();

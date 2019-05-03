@@ -15,18 +15,6 @@
  */
 package io.atomix.core.test.messaging;
 
-import com.google.common.collect.Sets;
-import io.atomix.cluster.messaging.ManagedMessagingService;
-import io.atomix.cluster.messaging.MessagingException.NoRemoteHandler;
-import io.atomix.cluster.messaging.MessagingService;
-import io.atomix.utils.TriConsumer;
-import io.atomix.utils.concurrent.ComposableFuture;
-import io.atomix.utils.concurrent.Futures;
-import io.atomix.utils.net.Address;
-import io.atomix.utils.stream.StreamFunction;
-import io.atomix.utils.stream.StreamHandler;
-import org.apache.commons.lang3.tuple.Pair;
-
 import java.net.ConnectException;
 import java.time.Duration;
 import java.util.Map;
@@ -35,26 +23,47 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
 import java.util.concurrent.RejectedExecutionException;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 import java.util.function.Function;
+
+import com.google.common.collect.Sets;
+import io.atomix.cluster.MemberService;
+import io.atomix.cluster.messaging.MessagingException.NoRemoteHandler;
+import io.atomix.cluster.messaging.MessagingService;
+import io.atomix.utils.TriConsumer;
+import io.atomix.utils.component.Component;
+import io.atomix.utils.component.Dependency;
+import io.atomix.utils.component.Managed;
+import io.atomix.utils.concurrent.ComposableFuture;
+import io.atomix.utils.concurrent.Futures;
+import io.atomix.utils.net.Address;
+import io.atomix.utils.stream.StreamFunction;
+import io.atomix.utils.stream.StreamHandler;
+import org.apache.commons.lang3.tuple.Pair;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
 /**
  * Test messaging service.
  */
-public class TestMessagingService implements ManagedMessagingService {
-  private final Address address;
-  private final Map<Address, TestMessagingService> services;
+@Component(scope = Component.Scope.TEST)
+public class TestMessagingService implements MessagingService, Managed {
+  @Dependency
+  private MemberService memberService;
+
+  @Dependency
+  private TestMessagingSubstrate substrate;
+
+  private Address address;
   private final Map<String, BiFunction> handlers = new ConcurrentHashMap<>();
-  private final AtomicBoolean started = new AtomicBoolean();
   private final Set<Address> partitions = Sets.newConcurrentHashSet();
 
-  public TestMessagingService(Address address, Map<Address, TestMessagingService> services) {
-    this.address = address;
-    this.services = services;
+  @Override
+  public CompletableFuture<Void> start() {
+    this.address = memberService.getLocalMember().address();
+    substrate.register(address, this);
+    return CompletableFuture.completedFuture(null);
   }
 
   /**
@@ -62,7 +71,7 @@ public class TestMessagingService implements ManagedMessagingService {
    */
   private TestMessagingService getService(Address address) {
     checkNotNull(address);
-    return services.get(address);
+    return substrate.get(address);
   }
 
   /**
@@ -249,24 +258,5 @@ public class TestMessagingService implements ManagedMessagingService {
   @Override
   public void unregisterHandler(String type) {
     handlers.remove(checkNotNull(type));
-  }
-
-  @Override
-  public CompletableFuture<MessagingService> start() {
-    services.put(address, this);
-    started.set(true);
-    return CompletableFuture.completedFuture(this);
-  }
-
-  @Override
-  public boolean isRunning() {
-    return started.get();
-  }
-
-  @Override
-  public CompletableFuture<Void> stop() {
-    services.remove(address);
-    started.set(false);
-    return CompletableFuture.completedFuture(null);
   }
 }

@@ -5,6 +5,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.concurrent.Executor;
 
+import io.atomix.primitive.operation.OperationType;
 import io.atomix.utils.concurrent.Scheduler;
 import org.slf4j.Logger;
 
@@ -104,4 +105,40 @@ public abstract class AbstractPrimitiveService implements PrimitiveService {
    */
   protected abstract void restore(InputStream input) throws IOException;
 
+
+  /**
+   * Session managed service context.
+   */
+  class Context implements PrimitiveService.Context {
+    private final StateMachine.Context parent;
+    private OperationType operationType;
+
+    Context(StateMachine.Context parent) {
+      this.parent = parent;
+    }
+
+    void setOperationType(OperationType operationType) {
+      this.operationType = operationType;
+    }
+
+    @Override
+    public long getIndex() {
+      return parent.getIndex();
+    }
+
+    @Override
+    public long getTimestamp() {
+      return parent.getTimestamp();
+    }
+
+    @Override
+    public OperationType getOperationType() {
+      return operationType;
+    }
+
+    @Override
+    public Logger getLogger() {
+      return parent.getLogger();
+    }
+  }
 }

@@ -15,22 +15,20 @@
  */
 package io.atomix.core.test;
 
-import io.atomix.cluster.MemberId;
-import io.atomix.core.Atomix;
-import io.atomix.core.test.messaging.TestBroadcastServiceFactory;
-import io.atomix.core.test.messaging.TestMessagingServiceFactory;
-import io.atomix.core.test.messaging.TestUnicastServiceFactory;
-import io.atomix.utils.net.Address;
-
 import java.util.concurrent.atomic.AtomicInteger;
+
+import io.atomix.cluster.MemberId;
+import io.atomix.cluster.discovery.BootstrapDiscoveryProvider;
+import io.atomix.core.Atomix;
+import io.atomix.core.AtomixBuilder;
+import io.atomix.core.test.partition.TestPartitionGroup;
+import io.atomix.utils.component.Component;
+import io.atomix.utils.net.Address;
 
 /**
  * Test Atomix factory.
  */
 public class TestAtomixFactory {
-  private final TestMessagingServiceFactory messagingServiceFactory = new TestMessagingServiceFactory();
-  private final TestUnicastServiceFactory unicastServiceFactory = new TestUnicastServiceFactory();
-  private final TestBroadcastServiceFactory broadcastServiceFactory = new TestBroadcastServiceFactory();
   private final AtomicInteger memberId = new AtomicInteger();
 
   /**
@@ -40,11 +38,16 @@ public class TestAtomixFactory {
    */
   public Atomix newInstance() {
     int id = memberId.incrementAndGet();
-    return new TestAtomix(
-        MemberId.from(String.valueOf(id)),
-        Address.from("localhost", 5000 + id),
-        messagingServiceFactory,
-        unicastServiceFactory,
-        broadcastServiceFactory);
+    return new AtomixBuilder(Component.Scope.TEST)
+        .withMemberId(MemberId.from(String.valueOf(id)))
+        .withMembershipProvider(BootstrapDiscoveryProvider.builder().build())
+        .withAddress(Address.from("localhost", 5000 + id))
+        .withManagementGroup(TestPartitionGroup.builder("system")
+            .withNumPartitions(1)
+            .build())
+        .addPartitionGroup(TestPartitionGroup.builder("test")
+            .withNumPartitions(3)
+            .build())
+        .build();
   }
 }

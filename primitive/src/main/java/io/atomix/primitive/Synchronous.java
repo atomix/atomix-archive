@@ -41,11 +41,6 @@ public abstract class Synchronous<T extends AsyncPrimitive> implements SyncPrimi
   }
 
   @Override
-  public PrimitiveType type() {
-    return primitive.type();
-  }
-
-  @Override
   public void delete() {
     try {
       primitive.delete().get(DEFAULT_OPERATION_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS);

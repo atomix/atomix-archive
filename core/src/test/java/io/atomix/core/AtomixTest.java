@@ -350,15 +350,15 @@ public class AtomixTest extends AbstractAtomixTest {
 
     Atomix atomix = startAtomix(4, Arrays.asList(1, 2, 3)).get(30, TimeUnit.SECONDS);
 
-    assertEquals("a", atomix.counterBuilder("a").get().name());
-    assertEquals(AtomicCounterType.instance(), atomix.counterBuilder("a").get().type());
-    assertSame(atomix.counterBuilder("a").get(), atomix.counterBuilder("a").get());
+    assertEquals("a", atomix.atomicCounterBuilder("a").get().name());
+    assertEquals(AtomicCounterType.instance(), atomix.atomicCounterBuilder("a").get().type());
+    assertSame(atomix.atomicCounterBuilder("a").get(), atomix.atomicCounterBuilder("a").get());
     assertEquals(1, atomix.getPrimitives(AtomicCounterType.instance()).size());
 
     assertEquals("b", atomix.atomicMapBuilder("b").get().name());
     assertEquals(AtomicMapType.instance(), atomix.atomicMapBuilder("b").get().type());
     assertSame(atomix.atomicMapBuilder("b").get(), atomix.atomicMapBuilder("b").get());
-    assertEquals(2, atomix.getPrimitives(AtomicMapType.instance()).size());
+    assertEquals(1, atomix.getPrimitives(AtomicMapType.instance()).size());
 
     assertEquals("e", atomix.atomicIdGeneratorBuilder("e").get().name());
     assertEquals(AtomicIdGeneratorType.instance(), atomix.atomicIdGeneratorBuilder("e").get().type());
@@ -400,7 +400,7 @@ public class AtomixTest extends AbstractAtomixTest {
     assertSame(atomix.valueBuilder("bb").get(), atomix.valueBuilder("bb").get());
     assertEquals(1, atomix.getPrimitives(DistributedValueType.instance()).size());
 
-    assertEquals(29, atomix.getPrimitives().size());
+    assertEquals(10, atomix.getPrimitives().size());
   }
 
   @Test

@@ -15,20 +15,6 @@
  */
 package io.atomix.cluster.discovery;
 
-import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Maps;
-import com.google.common.util.concurrent.AtomicLongMap;
-import io.atomix.cluster.AtomixClusterBuilder;
-import io.atomix.cluster.BootstrapService;
-import io.atomix.cluster.Node;
-import io.atomix.cluster.NodeId;
-import io.atomix.cluster.impl.AddressSerializer;
-import io.atomix.utils.event.AbstractListenerManager;
-import io.atomix.utils.net.Address;
-import io.atomix.utils.serializer.Serializer;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
@@ -38,6 +24,24 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
+
+import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Maps;
+import com.google.common.util.concurrent.AtomicLongMap;
+import io.atomix.cluster.AtomixClusterBuilder;
+import io.atomix.cluster.MemberService;
+import io.atomix.cluster.Node;
+import io.atomix.cluster.NodeId;
+import io.atomix.cluster.impl.AddressSerializer;
+import io.atomix.cluster.messaging.BroadcastService;
+import io.atomix.utils.component.Component;
+import io.atomix.utils.component.Dependency;
+import io.atomix.utils.component.Managed;
+import io.atomix.utils.event.AbstractListenerManager;
+import io.atomix.utils.net.Address;
+import io.atomix.utils.serializer.Serializer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 import static io.atomix.utils.concurrent.Threads.namedThreads;
@@ -50,9 +54,10 @@ import static io.atomix.utils.concurrent.Threads.namedThreads;
  * determined by each node broadcasting to a multicast group, and phi accrual failure detectors are used to detect nodes
  * joining and leaving the cluster.
  */
+@Component(MulticastDiscoveryConfig.class)
 public class MulticastDiscoveryProvider
     extends AbstractListenerManager<NodeDiscoveryEvent, NodeDiscoveryEventListener>
-    implements NodeDiscoveryProvider {
+    implements NodeDiscoveryProvider, Managed<MulticastDiscoveryConfig> {
 
   public static final Type TYPE = new Type();
 
@@ -96,9 +101,13 @@ public class MulticastDiscoveryProvider
 
   private static final String DISCOVERY_SUBJECT = "atomix-discovery";
 
-  private final MulticastDiscoveryConfig config;
-  private volatile BootstrapService bootstrap;
+  @Dependency
+  private MemberService memberService;
 
+  @Dependency
+  private BroadcastService broadcastService;
+
+  private MulticastDiscoveryConfig config;
   private final ScheduledExecutorService broadcastScheduler = Executors.newSingleThreadScheduledExecutor(
       namedThreads("atomix-cluster-broadcast", LOGGER));
   private volatile ScheduledFuture<?> broadcastFuture;
@@ -138,7 +147,7 @@ public class MulticastDiscoveryProvider
   }
 
   private void broadcastNode(Node localNode) {
-    bootstrap.getBroadcastService().broadcast(DISCOVERY_SUBJECT, SERIALIZER.encode(localNode));
+    broadcastService.broadcast(DISCOVERY_SUBJECT, SERIALIZER.encode(localNode));
     expireNodes();
   }
 
@@ -154,27 +163,27 @@ public class MulticastDiscoveryProvider
   }
 
   @Override
-  public CompletableFuture<Void> join(BootstrapService bootstrap, Node localNode) {
-    if (nodes.putIfAbsent(localNode.id(), localNode) == null) {
-      this.bootstrap = bootstrap;
-      post(new NodeDiscoveryEvent(NodeDiscoveryEvent.Type.JOIN, localNode));
-      bootstrap.getBroadcastService().addListener(DISCOVERY_SUBJECT, broadcastListener);
+  public CompletableFuture<Void> start(MulticastDiscoveryConfig config) {
+    this.config = config;
+    if (nodes.putIfAbsent(memberService.getLocalMember().id(), memberService.getLocalMember()) == null) {
+      post(new NodeDiscoveryEvent(NodeDiscoveryEvent.Type.JOIN, memberService.getLocalMember()));
+      broadcastService.addListener(DISCOVERY_SUBJECT, broadcastListener);
       broadcastFuture = broadcastScheduler.scheduleAtFixedRate(
-          () -> broadcastNode(localNode),
+          () -> broadcastNode(memberService.getLocalMember()),
           config.getBroadcastInterval().toMillis(),
           config.getBroadcastInterval().toMillis(),
           TimeUnit.MILLISECONDS);
-      broadcastNode(localNode);
+      broadcastNode(memberService.getLocalMember());
       LOGGER.info("Joined");
     }
     return CompletableFuture.completedFuture(null);
   }
 
   @Override
-  public CompletableFuture<Void> leave(Node localNode) {
-    if (nodes.remove(localNode.id()) != null) {
-      post(new NodeDiscoveryEvent(NodeDiscoveryEvent.Type.LEAVE, localNode));
-      bootstrap.getBroadcastService().removeListener(DISCOVERY_SUBJECT, broadcastListener);
+  public CompletableFuture<Void> stop() {
+    if (nodes.remove(memberService.getLocalMember().id()) != null) {
+      post(new NodeDiscoveryEvent(NodeDiscoveryEvent.Type.LEAVE, memberService.getLocalMember()));
+      broadcastService.removeListener(DISCOVERY_SUBJECT, broadcastListener);
       ScheduledFuture<?> broadcastFuture = this.broadcastFuture;
       if (broadcastFuture != null) {
         broadcastFuture.cancel(false);

@@ -20,7 +20,7 @@ import java.util.Map;
 
 import io.atomix.cluster.ClusterConfig;
 import io.atomix.primitive.config.PrimitiveConfig;
-import io.atomix.primitive.partition.PartitionGroupConfig;
+import io.atomix.primitive.partition.PartitionGroupsConfig;
 import io.atomix.utils.config.Config;
 
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -28,13 +28,11 @@ import static com.google.common.base.Preconditions.checkNotNull;
 /**
  * Atomix configuration.
  */
-public class AtomixConfig implements Config {
+public class AtomixConfig extends PartitionGroupsConfig implements Config {
   private static final String MANAGEMENT_GROUP_NAME = "system";
 
   private ClusterConfig cluster = new ClusterConfig();
   private boolean enableShutdownHook;
-  private PartitionGroupConfig managementGroup;
-  private Map<String, PartitionGroupConfig<?>> partitionGroups = new HashMap<>();
   private Map<String, PrimitiveConfig> primitiveDefaults = new HashMap<>();
   private Map<String, PrimitiveConfig> primitives = new HashMap<>();
   private boolean typeRegistrationRequired = false;
@@ -77,59 +75,6 @@ public class AtomixConfig implements Config {
    */
   public AtomixConfig setEnableShutdownHook(boolean enableShutdownHook) {
     this.enableShutdownHook = enableShutdownHook;
-    return this;
-  }
-
-  /**
-   * Returns the system management partition group.
-   *
-   * @return the system management partition group
-   */
-  public PartitionGroupConfig<?> getManagementGroup() {
-    return managementGroup;
-  }
-
-  /**
-   * Sets the system management partition group.
-   *
-   * @param managementGroup the system management partition group
-   * @return the Atomix configuration
-   */
-  public AtomixConfig setManagementGroup(PartitionGroupConfig<?> managementGroup) {
-    managementGroup.setName(MANAGEMENT_GROUP_NAME);
-    this.managementGroup = managementGroup;
-    return this;
-  }
-
-  /**
-   * Returns the partition group configurations.
-   *
-   * @return the partition group configurations
-   */
-  public Map<String, PartitionGroupConfig<?>> getPartitionGroups() {
-    return partitionGroups;
-  }
-
-  /**
-   * Sets the partition group configurations.
-   *
-   * @param partitionGroups the partition group configurations
-   * @return the Atomix configuration
-   */
-  public AtomixConfig setPartitionGroups(Map<String, PartitionGroupConfig<?>> partitionGroups) {
-    partitionGroups.forEach((name, group) -> group.setName(name));
-    this.partitionGroups = partitionGroups;
-    return this;
-  }
-
-  /**
-   * Adds a partition group configuration.
-   *
-   * @param partitionGroup the partition group configuration to add
-   * @return the Atomix configuration
-   */
-  public AtomixConfig addPartitionGroup(PartitionGroupConfig partitionGroup) {
-    partitionGroups.put(partitionGroup.getName(), partitionGroup);
     return this;
   }
 

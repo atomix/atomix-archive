@@ -18,12 +18,14 @@ package io.atomix.core.map;
 import io.atomix.core.map.impl.DefaultAtomicMapBuilder;
 import io.atomix.primitive.PrimitiveManagementService;
 import io.atomix.primitive.PrimitiveType;
+import io.atomix.utils.component.Component;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
 
 /**
  * Consistent map primitive type.
  */
+@Component
 public class AtomicMapType<K, V> implements PrimitiveType<AtomicMapBuilder<K, V>, AtomicMapConfig, AtomicMap<K, V>> {
   private static final String NAME = "atomic-map";
 

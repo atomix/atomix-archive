@@ -4,15 +4,19 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 
+import io.atomix.primitive.PrimitiveException;
 import io.atomix.primitive.operation.OperationType;
 import io.atomix.primitive.service.Command;
 import io.atomix.primitive.service.Query;
 import io.atomix.primitive.service.StateMachine;
 import io.atomix.raft.RaftCommand;
+import io.atomix.raft.RaftException;
 import io.atomix.raft.RaftOperation;
 import io.atomix.raft.RaftQuery;
 import io.atomix.raft.RaftStateMachine;
+import io.atomix.utils.concurrent.Futures;
 import io.atomix.utils.stream.StreamHandler;
 import org.slf4j.Logger;
 
@@ -46,24 +50,51 @@ public class RaftPartitionStateMachine implements RaftStateMachine {
     return stateMachine.canDelete(index);
   }
 
+  private Throwable convertException(Throwable error) {
+    if (error instanceof CompletionException) {
+      error = error.getCause();
+    }
+    if (error instanceof PrimitiveException.ServiceException) {
+      return new RaftException.ApplicationException(error.getMessage());
+    } else if (error instanceof PrimitiveException.CommandFailure) {
+      return new RaftException.CommandFailure(error.getMessage());
+    } else if (error instanceof PrimitiveException.QueryFailure) {
+      return new RaftException.QueryFailure(error.getMessage());
+    } else if (error instanceof PrimitiveException.UnknownSession) {
+      return new RaftException.UnknownSession(error.getMessage());
+    } else if (error instanceof PrimitiveException.UnknownService) {
+      return new RaftException.UnknownService(error.getMessage());
+    } else {
+      return error;
+    }
+  }
+
   @Override
   public CompletableFuture<byte[]> apply(RaftCommand command) {
-    return stateMachine.apply(new Command<>(command.index(), command.timestamp(), command.value()));
+    return Futures.transformExceptions(
+        stateMachine.apply(new Command<>(command.index(), command.timestamp(), command.value())),
+        this::convertException);
   }
 
   @Override
   public CompletableFuture<Void> apply(RaftCommand command, StreamHandler<byte[]> handler) {
-    return stateMachine.apply(new Command<>(command.index(), command.timestamp(), command.value()), handler);
+    return Futures.transformExceptions(
+        stateMachine.apply(new Command<>(command.index(), command.timestamp(), command.value()), handler),
+        this::convertException);
   }
 
   @Override
   public CompletableFuture<byte[]> apply(RaftQuery query) {
-    return stateMachine.apply(new Query<>(query.index(), query.timestamp(), query.value()));
+    return Futures.transformExceptions(
+        stateMachine.apply(new Query<>(query.index(), query.timestamp(), query.value())),
+        this::convertException);
   }
 
   @Override
   public CompletableFuture<Void> apply(RaftQuery query, StreamHandler<byte[]> handler) {
-    return stateMachine.apply(new Query<>(query.index(), query.timestamp(), query.value()), handler);
+    return Futures.transformExceptions(
+        stateMachine.apply(new Query<>(query.index(), query.timestamp(), query.value()), handler),
+        this::convertException);
   }
 
   private static class Context implements StateMachine.Context {

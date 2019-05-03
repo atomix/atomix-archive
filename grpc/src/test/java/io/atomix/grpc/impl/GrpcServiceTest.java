@@ -117,13 +117,16 @@ public abstract class GrpcServiceTest<T extends AbstractStub<T>> {
       Atomix atomix = buildAtomix(i);
       instanceFutures.add(atomix.start().thenApply(v -> atomix));
       instances.add(atomix);
+    }
+    CompletableFuture.allOf(instanceFutures.toArray(new CompletableFuture[0])).get(30, TimeUnit.SECONDS);
+
+    for (Atomix atomix : instances) {
       servers.add(InProcessServerBuilder.forName(atomix.getMembershipService().getLocalMember().id().id())
           .directExecutor()
           .addService(getService(atomix))
           .build()
           .start());
     }
-    CompletableFuture.allOf(instanceFutures.toArray(new CompletableFuture[0])).get(30, TimeUnit.SECONDS);
   }
 
   @After

@@ -15,6 +15,15 @@
  */
 package io.atomix.cluster.protocol;
 
+import java.time.Duration;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Map;
+import java.util.Properties;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.TimeUnit;
+
 import com.google.common.collect.HashMultiset;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Multiset;
@@ -25,9 +34,8 @@ import io.atomix.cluster.MemberId;
 import io.atomix.cluster.Node;
 import io.atomix.cluster.TestBootstrapService;
 import io.atomix.cluster.discovery.BootstrapDiscoveryProvider;
-import io.atomix.cluster.discovery.NodeDiscoveryProvider;
-import io.atomix.cluster.discovery.NodeDiscoveryService;
-import io.atomix.cluster.impl.DefaultNodeDiscoveryService;
+import io.atomix.cluster.impl.MemberManager;
+import io.atomix.cluster.impl.NodeDiscoveryManager;
 import io.atomix.cluster.messaging.impl.TestBroadcastServiceFactory;
 import io.atomix.cluster.messaging.impl.TestMessagingServiceFactory;
 import io.atomix.cluster.messaging.impl.TestUnicastServiceFactory;
@@ -36,15 +44,6 @@ import io.atomix.utils.net.Address;
 import net.jodah.concurrentunit.ConcurrentTestCase;
 import org.junit.Before;
 import org.junit.Test;
-
-import java.time.Duration;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Map;
-import java.util.Properties;
-import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.TimeUnit;
 
 import static io.atomix.cluster.protocol.GroupMembershipEvent.Type.MEMBER_ADDED;
 import static io.atomix.cluster.protocol.GroupMembershipEvent.Type.MEMBER_REMOVED;
@@ -193,19 +192,20 @@ public class SwimProtocolTest extends ConcurrentTestCase {
   }
 
   private SwimMembershipProtocol startProtocol(Member member) {
-    SwimMembershipProtocol protocol = new SwimMembershipProtocol(new SwimMembershipProtocolConfig()
-        .setFailureTimeout(Duration.ofSeconds(2)));
+    SwimMembershipProtocol protocol = new SwimMembershipProtocol();
     TestGroupMembershipEventListener listener = new TestGroupMembershipEventListener();
     listeners.put(member.id(), listener);
     protocol.addListener(listener);
     BootstrapService bootstrap = new TestBootstrapService(
-        messagingServiceFactory.newMessagingService(member.address()).start().join(),
-        unicastServiceFactory.newUnicastService(member.address()).start().join(),
-        broadcastServiceFactory.newBroadcastService().start().join());
-    NodeDiscoveryProvider provider = new BootstrapDiscoveryProvider(nodes);
-    provider.join(bootstrap, member).join();
-    NodeDiscoveryService discovery = new DefaultNodeDiscoveryService(bootstrap, member, provider).start().join();
-    protocol.join(bootstrap, discovery, member).join();
+        messagingServiceFactory.newMessagingService(member.address()),
+        unicastServiceFactory.newUnicastService(member.address()),
+        broadcastServiceFactory.newBroadcastService());
+    BootstrapDiscoveryProvider provider = new BootstrapDiscoveryProvider(nodes);
+    provider.start().join();
+    NodeDiscoveryManager discovery = new NodeDiscoveryManager(new MemberManager(member), bootstrap, provider);
+    discovery.start().join();
+    protocol.start(new SwimMembershipProtocolConfig()
+        .setFailureTimeout(Duration.ofSeconds(2))).join();
     protocols.put(member.id(), protocol);
     return protocol;
   }
@@ -213,7 +213,7 @@ public class SwimProtocolTest extends ConcurrentTestCase {
   private void stopProtocol(Member member) {
     SwimMembershipProtocol protocol = protocols.remove(member.id());
     if (protocol != null) {
-      protocol.leave(member).join();
+      protocol.stop().join();
     }
   }
 

@@ -39,6 +39,7 @@ import io.atomix.primitive.protocol.ProxyProtocol;
 import io.atomix.protocols.log.DistributedLogProtocol;
 import io.atomix.protocols.log.impl.DistributedLogClient;
 import io.atomix.storage.StorageLevel;
+import io.atomix.utils.component.Component;
 import io.atomix.utils.concurrent.BlockingAwareThreadPoolContextFactory;
 import io.atomix.utils.concurrent.ThreadContextFactory;
 import io.atomix.utils.logging.ContextualLoggerFactory;
@@ -71,6 +72,7 @@ public class LogPartitionGroup implements ManagedPartitionGroup {
   /**
    * Log partition group type.
    */
+  @Component
   public static class Type implements PartitionGroup.Type<LogPartitionGroupConfig> {
     private static final String NAME = "log";
 

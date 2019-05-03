@@ -19,10 +19,8 @@ import com.google.common.collect.Lists;
 import io.atomix.primitive.ManagedPrimitiveBuilder;
 import io.atomix.primitive.PrimitiveManagementService;
 import io.atomix.primitive.PrimitiveType;
-import io.atomix.utils.serializer.Namespace;
-import io.atomix.utils.serializer.NamespaceConfig;
+import io.atomix.utils.serializer.Namespaces;
 import io.atomix.utils.serializer.Serializer;
-import io.atomix.utils.serializer.SerializerBuilder;
 
 /**
  * Distributed collection builder.
@@ -123,29 +121,7 @@ public abstract class DistributedCollectionBuilder<
    */
   protected Serializer serializer() {
     if (serializer == null) {
-      NamespaceConfig namespaceConfig = this.config.getNamespaceConfig();
-      if (namespaceConfig == null) {
-        namespaceConfig = new NamespaceConfig();
-      }
-
-      SerializerBuilder serializerBuilder = managementService.getSerializationService().newBuilder(name);
-      serializerBuilder.withNamespace(new Namespace(namespaceConfig));
-
-      if (config.isRegistrationRequired()) {
-        serializerBuilder.withRegistrationRequired();
-      }
-      if (config.isCompatibleSerialization()) {
-        serializerBuilder.withCompatibleSerialization();
-      }
-
-      if (config.getElementType() != null) {
-        serializerBuilder.addType(config.getElementType());
-      }
-      if (!config.getExtraTypes().isEmpty()) {
-        serializerBuilder.withTypes(config.getExtraTypes().toArray(new Class<?>[config.getExtraTypes().size()]));
-      }
-
-      serializer = serializerBuilder.build();
+      serializer = Serializer.using(Namespaces.BASIC);
     }
     return serializer;
   }

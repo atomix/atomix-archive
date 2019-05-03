@@ -33,6 +33,7 @@ import io.atomix.primitive.service.PrimitiveService;
 import io.atomix.primitive.service.ServiceType;
 import io.atomix.primitive.session.Session;
 import io.atomix.primitive.session.SessionId;
+import io.atomix.utils.component.Component;
 import io.atomix.utils.concurrent.Scheduled;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
@@ -46,6 +47,7 @@ public class LockService extends AbstractLockService {
   /**
    * Lock service type.
    */
+  @Component
   public static class Type implements ServiceType {
     private static final String NAME = "lock";
 

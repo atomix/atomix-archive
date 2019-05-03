@@ -67,7 +67,7 @@ public class DefaultServiceScheduler implements Scheduler, Executor {
    * @param message the message to print if the current operation does not match the given type
    */
   private void checkOperation(OperationType type, String message) {
-    checkState(context.getOperationId().type() == type, message);
+    checkState(context.getOperationType() == type, message);
   }
 
   /**

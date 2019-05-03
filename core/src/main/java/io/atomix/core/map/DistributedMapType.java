@@ -18,12 +18,14 @@ package io.atomix.core.map;
 import io.atomix.core.map.impl.DefaultDistributedMapBuilder;
 import io.atomix.primitive.PrimitiveManagementService;
 import io.atomix.primitive.PrimitiveType;
+import io.atomix.utils.component.Component;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
 
 /**
  * Distributed map primitive type.
  */
+@Component
 public class DistributedMapType<K, V> implements PrimitiveType<DistributedMapBuilder<K, V>, DistributedMapConfig, DistributedMap<K, V>> {
   private static final String NAME = "map";
 

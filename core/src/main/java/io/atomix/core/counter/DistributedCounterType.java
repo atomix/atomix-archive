@@ -18,12 +18,14 @@ package io.atomix.core.counter;
 import io.atomix.core.counter.impl.DefaultDistributedCounterBuilder;
 import io.atomix.primitive.PrimitiveManagementService;
 import io.atomix.primitive.PrimitiveType;
+import io.atomix.utils.component.Component;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
 
 /**
  * Distributed counter primitive type.
  */
+@Component
 public class DistributedCounterType implements PrimitiveType<DistributedCounterBuilder, DistributedCounterConfig, DistributedCounter> {
   private static final String NAME = "counter";
   private static final DistributedCounterType INSTANCE = new DistributedCounterType();

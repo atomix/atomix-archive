@@ -15,27 +15,26 @@
  */
 package io.atomix.cluster.messaging.impl;
 
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Consumer;
+
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import io.atomix.cluster.messaging.BroadcastService;
-import io.atomix.cluster.messaging.ManagedBroadcastService;
-
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.function.Consumer;
 
 /**
  * Test broadcast service.
  */
-public class TestBroadcastService implements ManagedBroadcastService {
+public class TestBroadcastService implements BroadcastService {
   private final Set<TestBroadcastService> services;
   private final Map<String, Set<Consumer<byte[]>>> listeners = Maps.newConcurrentMap();
   private final AtomicBoolean started = new AtomicBoolean();
 
   public TestBroadcastService(Set<TestBroadcastService> services) {
     this.services = services;
+    services.add(this);
   }
 
   @Override
@@ -64,24 +63,5 @@ public class TestBroadcastService implements ManagedBroadcastService {
         this.listeners.remove(subject);
       }
     }
-  }
-
-  @Override
-  public CompletableFuture<BroadcastService> start() {
-    services.add(this);
-    started.set(true);
-    return CompletableFuture.completedFuture(this);
-  }
-
-  @Override
-  public boolean isRunning() {
-    return started.get();
-  }
-
-  @Override
-  public CompletableFuture<Void> stop() {
-    services.remove(this);
-    started.set(false);
-    return CompletableFuture.completedFuture(null);
   }
 }

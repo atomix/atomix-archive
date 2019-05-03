@@ -20,20 +20,14 @@ import io.atomix.grpc.protocol.MultiRaftProtocol;
 import io.atomix.primitive.PrimitiveCache;
 import io.atomix.primitive.PrimitiveManagementService;
 import io.atomix.primitive.PrimitiveRegistry;
-import io.atomix.primitive.PrimitiveType;
 import io.atomix.primitive.PrimitiveTypeRegistry;
-import io.atomix.primitive.impl.DefaultPrimitiveTypeRegistry;
 import io.atomix.primitive.partition.PartitionGroup;
 import io.atomix.primitive.partition.PartitionGroupTypeRegistry;
 import io.atomix.primitive.partition.PartitionId;
 import io.atomix.primitive.partition.PartitionService;
-import io.atomix.primitive.partition.impl.DefaultPartitionGroupTypeRegistry;
-import io.atomix.primitive.protocol.PrimitiveProtocol;
 import io.atomix.primitive.protocol.PrimitiveProtocolTypeRegistry;
 import io.atomix.primitive.protocol.ProxyProtocol;
-import io.atomix.primitive.protocol.impl.DefaultPrimitiveProtocolTypeRegistry;
 import io.atomix.primitive.proxy.PrimitiveProxy;
-import io.atomix.primitive.serialization.SerializationService;
 import io.atomix.primitive.service.ServiceType;
 import io.atomix.primitive.session.SessionId;
 import io.atomix.primitive.session.SessionIdService;
@@ -226,15 +220,9 @@ public class PrimitiveFactory<P extends PrimitiveProxy, I extends Message> {
 
   private static class PartialPrimitiveManagementService implements PrimitiveManagementService {
     private final Atomix atomix;
-    private final PrimitiveTypeRegistry primitiveTypes;
-    private final PrimitiveProtocolTypeRegistry protocolTypes;
-    private final PartitionGroupTypeRegistry partitionGroupTypes;
 
     PartialPrimitiveManagementService(Atomix atomix) {
       this.atomix = atomix;
-      this.primitiveTypes = new DefaultPrimitiveTypeRegistry(atomix.getRegistry().getTypes(PrimitiveType.class));
-      this.protocolTypes = new DefaultPrimitiveProtocolTypeRegistry(atomix.getRegistry().getTypes(PrimitiveProtocol.Type.class));
-      this.partitionGroupTypes = new DefaultPartitionGroupTypeRegistry(atomix.getRegistry().getTypes(PartitionGroup.Type.class));
     }
 
     @Override
@@ -250,11 +238,6 @@ public class PrimitiveFactory<P extends PrimitiveProxy, I extends Message> {
     @Override
     public ClusterEventService getEventService() {
       return atomix.getEventService();
-    }
-
-    @Override
-    public SerializationService getSerializationService() {
-      return atomix.getSerializationService();
     }
 
     @Override
@@ -274,17 +257,17 @@ public class PrimitiveFactory<P extends PrimitiveProxy, I extends Message> {
 
     @Override
     public PrimitiveTypeRegistry getPrimitiveTypeRegistry() {
-      return primitiveTypes;
+      return atomix.getPrimitiveTypes();
     }
 
     @Override
     public PrimitiveProtocolTypeRegistry getProtocolTypeRegistry() {
-      return protocolTypes;
+      return atomix.getProtocolTypes();
     }
 
     @Override
     public PartitionGroupTypeRegistry getPartitionGroupTypeRegistry() {
-      return partitionGroupTypes;
+      return atomix.getPartitionGroupTypes();
     }
 
     @Override

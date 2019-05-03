@@ -34,12 +34,12 @@ import java.util.function.BiFunction;
 
 import com.google.common.util.concurrent.MoreExecutors;
 import com.google.common.util.concurrent.Uninterruptibles;
-import io.atomix.cluster.messaging.ManagedMessagingService;
-import io.atomix.cluster.messaging.MessagingConfig;
-import io.atomix.utils.stream.StreamFunction;
-import io.atomix.utils.stream.StreamHandler;
+import io.atomix.cluster.ClusterConfig;
+import io.atomix.cluster.MemberConfig;
 import io.atomix.utils.concurrent.Futures;
 import io.atomix.utils.net.Address;
+import io.atomix.utils.stream.StreamFunction;
+import io.atomix.utils.stream.StreamHandler;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Ignore;
@@ -61,12 +61,12 @@ public class NettyMessagingServiceTest {
 
   private static final Logger LOGGER = getLogger(NettyMessagingServiceTest.class);
 
-  ManagedMessagingService netty1;
-  ManagedMessagingService netty2;
-  ManagedMessagingService nettyv11;
-  ManagedMessagingService nettyv12;
-  ManagedMessagingService nettyv21;
-  ManagedMessagingService nettyv22;
+  NettyMessagingService netty1;
+  NettyMessagingService netty2;
+  NettyMessagingService nettyv11;
+  NettyMessagingService nettyv12;
+  NettyMessagingService nettyv21;
+  NettyMessagingService nettyv22;
 
   private static final String IP_STRING = "127.0.0.1";
 
@@ -79,16 +79,28 @@ public class NettyMessagingServiceTest {
   @Before
   public void setUp() throws Exception {
     address1 = Address.from(findAvailablePort(5001));
-    netty1 = (ManagedMessagingService) new NettyMessagingService("test", address1, new MessagingConfig()).start().join();
+    netty1 = new NettyMessagingService();
+    netty1.start(new ClusterConfig()
+        .setClusterId("test")
+        .setNodeConfig(new MemberConfig().setAddress(address1))).join();
 
     address2 = Address.from(findAvailablePort(5002));
-    netty2 = (ManagedMessagingService) new NettyMessagingService("test", address2, new MessagingConfig()).start().join();
+    netty2 = new NettyMessagingService();
+    netty2.start(new ClusterConfig()
+        .setClusterId("test")
+        .setNodeConfig(new MemberConfig().setAddress(address2))).join();
 
     addressv21 = Address.from(findAvailablePort(5005));
-    nettyv21 = (ManagedMessagingService) new NettyMessagingService("test", addressv21, new MessagingConfig(), ProtocolVersion.V2).start().join();
+    nettyv21 = new NettyMessagingService();
+    nettyv21.start(new ClusterConfig()
+        .setClusterId("test")
+        .setNodeConfig(new MemberConfig().setAddress(addressv21))).join();
 
     addressv22 = Address.from(findAvailablePort(5006));
-    nettyv22 = (ManagedMessagingService) new NettyMessagingService("test", addressv22, new MessagingConfig(), ProtocolVersion.V2).start().join();
+    nettyv22 = new NettyMessagingService();
+    nettyv22.start(new ClusterConfig()
+        .setClusterId("test")
+        .setNodeConfig(new MemberConfig().setAddress(addressv22))).join();
 
     invalidAddress = Address.from(IP_STRING, 5007);
   }

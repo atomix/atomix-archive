@@ -10,12 +10,9 @@ import java.util.function.Supplier;
 
 import io.atomix.primitive.PrimitiveException;
 import io.atomix.primitive.operation.OperationId;
-import io.atomix.primitive.operation.OperationType;
 import io.atomix.primitive.operation.StreamType;
 import io.atomix.primitive.service.OperationExecutor;
-import io.atomix.primitive.service.PrimitiveService;
 import io.atomix.primitive.service.ServiceOperationRegistry;
-import io.atomix.primitive.service.StateMachine;
 import io.atomix.primitive.util.ByteArrayDecoder;
 import io.atomix.primitive.util.ByteArrayEncoder;
 import io.atomix.utils.stream.EncodingStreamHandler;
@@ -24,45 +21,16 @@ import org.slf4j.Logger;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
-public class DefaultServiceExecutor implements ServiceOperationRegistry, PrimitiveService.Context {
-  private final StateMachine.Context context;
+public class DefaultServiceExecutor implements ServiceOperationRegistry {
+  private final Logger logger;
   private final ServiceCodec codec;
   private final Map<OperationId, StreamType> streamTypes = new HashMap<>();
   private final Map<OperationId, OperationExecutor> operations = new HashMap<>();
   private OperationId operationId;
 
-  public DefaultServiceExecutor(StateMachine.Context context, ServiceCodec codec) {
-    this.context = context;
+  public DefaultServiceExecutor(ServiceCodec codec, Logger logger) {
     this.codec = codec;
-  }
-
-  @Override
-  public OperationId getOperationId() {
-    return operationId;
-  }
-
-  void setOperationId(OperationId operationId) {
-    this.operationId = operationId;
-  }
-
-  @Override
-  public long getIndex() {
-    return context.getIndex();
-  }
-
-  @Override
-  public long getTimestamp() {
-    return context.getTimestamp();
-  }
-
-  @Override
-  public OperationType getOperationType() {
-    return operationId.type();
-  }
-
-  @Override
-  public Logger getLogger() {
-    return context.getLogger();
+    this.logger = logger;
   }
 
   /**
@@ -157,7 +125,7 @@ public class DefaultServiceExecutor implements ServiceOperationRegistry, Primiti
         operationId,
         callback,
         codec.register(operationId, decoder, encoder)));
-    context.getLogger().trace("Registered streaming operation callback {}", operationId);
+    logger.trace("Registered streaming operation callback {}", operationId);
   }
 
   @Override
@@ -176,7 +144,7 @@ public class DefaultServiceExecutor implements ServiceOperationRegistry, Primiti
         operationId,
         (request, handler) -> callback.accept(handler),
         codec.register(operationId, encoder)));
-    context.getLogger().trace("Registered streaming operation callback {}", operationId);
+    logger.trace("Registered streaming operation callback {}", operationId);
   }
 
   @Override
@@ -196,7 +164,7 @@ public class DefaultServiceExecutor implements ServiceOperationRegistry, Primiti
         operationId,
         callback,
         codec.register(operationId, decoder, encoder)));
-    context.getLogger().trace("Registered streaming operation callback {}", operationId);
+    logger.trace("Registered streaming operation callback {}", operationId);
   }
 
   private class UnaryOperationExecutor<T, U> implements OperationExecutor<T, U> {
@@ -225,25 +193,23 @@ public class DefaultServiceExecutor implements ServiceOperationRegistry, Primiti
 
     @Override
     public U execute(T request) {
-      context.getLogger().trace("Executing {}", request);
-      setOperationId(operationId);
+      logger.trace("Executing {}", request);
       try {
         return function.apply(request);
       } catch (Exception e) {
-        context.getLogger().warn("State machine operation failed: {}", e.getMessage());
+        logger.warn("State machine operation failed: {}", e.getMessage());
         throw new PrimitiveException.ServiceException(e);
       }
     }
 
     @Override
     public void execute(T request, StreamHandler<U> handler) {
-      context.getLogger().trace("Executing {}", operationId);
-      setOperationId(operationId);
+      logger.trace("Executing {}", operationId);
       try {
         function.apply(request);
         handler.complete();
       } catch (Exception e) {
-        context.getLogger().warn("State machine operation failed: {}", e.getMessage());
+        logger.warn("State machine operation failed: {}", e.getMessage());
         handler.error(e);
       }
     }
@@ -280,8 +246,7 @@ public class DefaultServiceExecutor implements ServiceOperationRegistry, Primiti
 
     @Override
     public void execute(T request, StreamHandler<U> handler) {
-      context.getLogger().trace("Executing {}", operationId);
-      setOperationId(operationId);
+      logger.trace("Executing {}", operationId);
       try {
         function.apply(request).whenComplete((response, error) -> {
           if (error == null) {
@@ -292,7 +257,7 @@ public class DefaultServiceExecutor implements ServiceOperationRegistry, Primiti
           }
         });
       } catch (Exception e) {
-        context.getLogger().warn("State machine operation failed: {}", e.getMessage());
+        logger.warn("State machine operation failed: {}", e.getMessage());
         throw new PrimitiveException.ServiceException(e);
       }
     }
@@ -345,12 +310,11 @@ public class DefaultServiceExecutor implements ServiceOperationRegistry, Primiti
 
     @Override
     public void execute(T request, StreamHandler<U> handler) {
-      context.getLogger().trace("Executing {}", operationId);
-      setOperationId(operationId);
+      logger.trace("Executing {}", operationId);
       try {
         function.accept(request, handler);
       } catch (Exception e) {
-        context.getLogger().warn("State machine operation failed: {}", e.getMessage());
+        logger.warn("State machine operation failed: {}", e.getMessage());
         throw new PrimitiveException.ServiceException(e);
       }
     }

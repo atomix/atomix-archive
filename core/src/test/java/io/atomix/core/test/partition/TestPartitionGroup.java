@@ -35,14 +35,10 @@ import io.atomix.primitive.partition.PartitionManagementService;
 import io.atomix.primitive.protocol.PrimitiveProtocol;
 import io.atomix.primitive.protocol.ProxyProtocol;
 import io.atomix.protocols.raft.MultiRaftProtocol;
-import io.atomix.raft.RaftClient;
-import io.atomix.raft.impl.DefaultRaftClient;
+import io.atomix.utils.component.Component;
 import io.atomix.utils.concurrent.Futures;
-import io.atomix.utils.logging.ContextualLoggerFactory;
-import io.atomix.utils.logging.LoggerContext;
 import io.atomix.utils.serializer.Namespace;
 import io.atomix.utils.serializer.Namespaces;
-import org.slf4j.Logger;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
 
@@ -65,6 +61,7 @@ public class TestPartitionGroup implements ManagedPartitionGroup {
   /**
    * Raft partition group type.
    */
+  @Component(scope = Component.Scope.TEST)
   public static class Type implements PartitionGroup.Type<TestPartitionGroupConfig> {
     private static final String NAME = "raft";
 
@@ -95,9 +92,6 @@ public class TestPartitionGroup implements ManagedPartitionGroup {
   private final List<PartitionId> sortedPartitionIds = Lists.newCopyOnWriteArrayList();
 
   public TestPartitionGroup(TestPartitionGroupConfig config) {
-    Logger log = ContextualLoggerFactory.getLogger(DefaultRaftClient.class, LoggerContext.builder(RaftClient.class)
-        .addValue(config.getName())
-        .build());
     this.name = config.getName();
     this.config = config;
 
@@ -195,6 +189,11 @@ public class TestPartitionGroup implements ManagedPartitionGroup {
   public static class Builder extends PartitionGroup.Builder<TestPartitionGroupConfig> {
     protected Builder(TestPartitionGroupConfig config) {
       super(config);
+    }
+
+    public Builder withNumPartitions(int numPartitions) {
+      config.setPartitions(numPartitions);
+      return this;
     }
 
     @Override

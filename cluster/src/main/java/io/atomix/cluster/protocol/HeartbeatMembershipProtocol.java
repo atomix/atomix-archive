@@ -15,28 +15,6 @@
  */
 package io.atomix.cluster.protocol;
 
-import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
-import io.atomix.cluster.BootstrapService;
-import io.atomix.cluster.Member;
-import io.atomix.cluster.MemberId;
-import io.atomix.cluster.Node;
-import io.atomix.cluster.discovery.NodeDiscoveryEvent;
-import io.atomix.cluster.discovery.NodeDiscoveryEventListener;
-import io.atomix.cluster.discovery.NodeDiscoveryService;
-import io.atomix.cluster.impl.AddressSerializer;
-import io.atomix.cluster.impl.PhiAccrualFailureDetector;
-import io.atomix.utils.Version;
-import io.atomix.utils.concurrent.Futures;
-import io.atomix.utils.event.AbstractListenerManager;
-import io.atomix.utils.net.Address;
-import io.atomix.utils.serializer.Namespace;
-import io.atomix.utils.serializer.Namespaces;
-import io.atomix.utils.serializer.Serializer;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.util.Collection;
 import java.util.Map;
 import java.util.Objects;
@@ -52,14 +30,41 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
+import io.atomix.cluster.BootstrapService;
+import io.atomix.cluster.Member;
+import io.atomix.cluster.MemberId;
+import io.atomix.cluster.MemberService;
+import io.atomix.cluster.Node;
+import io.atomix.cluster.discovery.NodeDiscoveryEvent;
+import io.atomix.cluster.discovery.NodeDiscoveryEventListener;
+import io.atomix.cluster.discovery.NodeDiscoveryService;
+import io.atomix.cluster.impl.AddressSerializer;
+import io.atomix.cluster.impl.PhiAccrualFailureDetector;
+import io.atomix.utils.Version;
+import io.atomix.utils.component.Component;
+import io.atomix.utils.component.Dependency;
+import io.atomix.utils.component.Managed;
+import io.atomix.utils.concurrent.Futures;
+import io.atomix.utils.event.AbstractListenerManager;
+import io.atomix.utils.net.Address;
+import io.atomix.utils.serializer.Namespace;
+import io.atomix.utils.serializer.Namespaces;
+import io.atomix.utils.serializer.Serializer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import static io.atomix.utils.concurrent.Threads.namedThreads;
 
 /**
  * Gossip based group membership protocol.
  */
+@Component(HeartbeatMembershipProtocolConfig.class)
 public class HeartbeatMembershipProtocol
     extends AbstractListenerManager<GroupMembershipEvent, GroupMembershipEventListener>
-    implements GroupMembershipProtocol {
+    implements GroupMembershipProtocol, Managed<HeartbeatMembershipProtocolConfig> {
 
   public static final Type TYPE = new Type();
 
@@ -87,16 +92,11 @@ public class HeartbeatMembershipProtocol
     public HeartbeatMembershipProtocolConfig newConfig() {
       return new HeartbeatMembershipProtocolConfig();
     }
-
-    @Override
-    public GroupMembershipProtocol newProtocol(HeartbeatMembershipProtocolConfig config) {
-      return new HeartbeatMembershipProtocol(config);
-    }
   }
 
   private static final Logger LOGGER = LoggerFactory.getLogger(HeartbeatMembershipProtocol.class);
 
-  private final HeartbeatMembershipProtocolConfig config;
+  private HeartbeatMembershipProtocolConfig config;
 
   private static final String HEARTBEAT_MESSAGE = "atomix-cluster-membership";
 
@@ -109,8 +109,25 @@ public class HeartbeatMembershipProtocol
           .register(new AddressSerializer(), Address.class)
           .build("ClusterMembershipService"));
 
-  private volatile NodeDiscoveryService discoveryService;
-  private volatile BootstrapService bootstrapService;
+  @Dependency
+  private MemberService memberService;
+  @Dependency
+  private NodeDiscoveryService discoveryService;
+  @Dependency
+  private BootstrapService bootstrapService;
+
+  HeartbeatMembershipProtocol() {
+  }
+
+  public HeartbeatMembershipProtocol(MemberService memberService, NodeDiscoveryService discoveryService, BootstrapService bootstrapService) {
+    this.memberService = memberService;
+    this.discoveryService = discoveryService;
+    this.bootstrapService = bootstrapService;
+  }
+
+  HeartbeatMembershipProtocol(HeartbeatMembershipProtocolConfig config) {
+    this.config = config;
+  }
 
   private final AtomicBoolean started = new AtomicBoolean();
   private volatile GossipMember localMember;
@@ -124,10 +141,6 @@ public class HeartbeatMembershipProtocol
   private final ExecutorService eventExecutor = Executors.newSingleThreadExecutor(
       namedThreads("atomix-cluster-events", LOGGER));
   private ScheduledFuture<?> heartbeatFuture;
-
-  public HeartbeatMembershipProtocol(HeartbeatMembershipProtocolConfig config) {
-    this.config = config;
-  }
 
   @Override
   public GroupMembershipProtocolConfig config() {
@@ -269,7 +282,7 @@ public class HeartbeatMembershipProtocol
    * Updates the state of the given member.
    *
    * @param remoteMember the member received from a remote node
-   * @param direct whether this is a direct update
+   * @param direct       whether this is a direct update
    */
   private void updateMember(GossipMember remoteMember, boolean direct) {
     GossipMember localMember = members.get(remoteMember.id());
@@ -307,37 +320,39 @@ public class HeartbeatMembershipProtocol
   }
 
   @Override
-  public CompletableFuture<Void> join(BootstrapService bootstrap, NodeDiscoveryService discovery, Member member) {
-    if (started.compareAndSet(false, true)) {
-      this.bootstrapService = bootstrap;
-      this.discoveryService = discovery;
-      this.localMember = new GossipMember(
-          member.id(),
-          member.address(),
-          member.zone(),
-          member.rack(),
-          member.host(),
-          member.properties(),
-          member.version(),
-          System.currentTimeMillis());
-      discoveryService.addListener(discoveryEventListener);
+  public CompletableFuture<Void> start() {
+    return start(config);
+  }
 
-      LOGGER.info("{} - Member activated: {}", localMember.id(), localMember);
-      localMember.setActive(true);
-      localMember.setReachable(true);
-      members.put(localMember.id(), localMember);
-      post(new GroupMembershipEvent(GroupMembershipEvent.Type.MEMBER_ADDED, localMember));
+  @Override
+  public CompletableFuture<Void> start(HeartbeatMembershipProtocolConfig config) {
+    this.config = config;
+    this.localMember = new GossipMember(
+        memberService.getLocalMember().id(),
+        memberService.getLocalMember().address(),
+        memberService.getLocalMember().zone(),
+        memberService.getLocalMember().rack(),
+        memberService.getLocalMember().host(),
+        memberService.getLocalMember().properties(),
+        memberService.getLocalMember().version(),
+        System.currentTimeMillis());
+    discoveryService.addListener(discoveryEventListener);
 
-      bootstrapService.getMessagingService().registerHandler(HEARTBEAT_MESSAGE, this::handleHeartbeat, heartbeatScheduler);
-      heartbeatFuture = heartbeatScheduler.scheduleAtFixedRate(
-          this::sendHeartbeats, 0, config.getHeartbeatInterval().toMillis(), TimeUnit.MILLISECONDS);
-      LOGGER.info("Started");
-    }
+    LOGGER.info("{} - Member activated: {}", localMember.id(), localMember);
+    localMember.setActive(true);
+    localMember.setReachable(true);
+    members.put(localMember.id(), localMember);
+    post(new GroupMembershipEvent(GroupMembershipEvent.Type.MEMBER_ADDED, localMember));
+
+    bootstrapService.getMessagingService().registerHandler(HEARTBEAT_MESSAGE, this::handleHeartbeat, heartbeatScheduler);
+    heartbeatFuture = heartbeatScheduler.scheduleAtFixedRate(
+        this::sendHeartbeats, 0, config.getHeartbeatInterval().toMillis(), TimeUnit.MILLISECONDS);
+    LOGGER.info("Started");
     return CompletableFuture.completedFuture(null);
   }
 
   @Override
-  public CompletableFuture<Void> leave(Member member) {
+  public CompletableFuture<Void> stop() {
     if (started.compareAndSet(true, false)) {
       discoveryService.removeListener(discoveryEventListener);
       heartbeatFuture.cancel(true);
