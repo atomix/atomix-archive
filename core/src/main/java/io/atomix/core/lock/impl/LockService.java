@@ -168,9 +168,12 @@ public class LockService extends AbstractLockService {
         }
         lock = queue.poll();
       }
+      return UnlockResponse.newBuilder()
+          .setSucceeded(true)
+          .build();
     }
     return UnlockResponse.newBuilder()
-        .setSucceeded(true)
+        .setSucceeded(false)
         .build();
   }
 

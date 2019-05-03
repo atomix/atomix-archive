@@ -683,10 +683,10 @@ public final class LeaderRole extends ActiveRole {
                 raft.getServiceManager().<OperationResult>apply(entry.index(), new StreamHandler<byte[]>() {
                   @Override
                   public void next(byte[] value) {
-                    handler.next(CommandResponse.newBuilder()
+                    handler.next(logResponse(CommandResponse.newBuilder()
                         .setStatus(ResponseStatus.OK)
                         .setOutput(ByteString.copyFrom(value))
-                        .build());
+                        .build()));
                   }
 
                   @Override
@@ -697,40 +697,40 @@ public final class LeaderRole extends ActiveRole {
                   @Override
                   public void error(Throwable error) {
                     if (error instanceof RaftException) {
-                      handler.next(CommandResponse.newBuilder()
+                      handler.next(logResponse(CommandResponse.newBuilder()
                           .setStatus(ResponseStatus.ERROR)
                           .setError(((RaftException) error).getType())
-                          .build());
+                          .build()));
                       handler.complete();
                     } else if (error instanceof CompletionException && error.getCause() instanceof RaftException) {
-                      handler.next(CommandResponse.newBuilder()
+                      handler.next(logResponse(CommandResponse.newBuilder()
                           .setStatus(ResponseStatus.ERROR)
                           .setError(((RaftException) error.getCause()).getType())
-                          .build());
+                          .build()));
                       handler.complete();
                     } else {
                       log.warn("An unexpected error occurred: {}", error);
-                      handler.next(CommandResponse.newBuilder()
+                      handler.next(logResponse(CommandResponse.newBuilder()
                           .setStatus(ResponseStatus.ERROR)
                           .setError(RaftError.PROTOCOL_ERROR)
-                          .build());
+                          .build()));
                       handler.complete();
                     }
                   }
                 }).whenComplete((result, error) -> future.complete(null));
               } else {
-                handler.next(CommandResponse.newBuilder()
+                handler.next(logResponse(CommandResponse.newBuilder()
                     .setStatus(ResponseStatus.ERROR)
                     .setError(RaftError.COMMAND_FAILURE)
-                    .build());
+                    .build()));
                 handler.complete();
                 future.complete(null);
               }
             } else {
-              handler.next(CommandResponse.newBuilder()
+              handler.next(logResponse(CommandResponse.newBuilder()
                   .setStatus(ResponseStatus.ERROR)
                   .setError(RaftError.COMMAND_FAILURE)
-                  .build());
+                  .build()));
               handler.complete();
               future.complete(null);
             }

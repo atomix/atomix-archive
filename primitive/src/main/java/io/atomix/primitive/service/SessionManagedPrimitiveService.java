@@ -7,14 +7,13 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.Collection;
 import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
-import com.google.common.collect.Streams;
 import com.google.protobuf.ByteString;
 import io.atomix.primitive.PrimitiveException;
 import io.atomix.primitive.operation.CommandId;
@@ -514,6 +513,20 @@ public abstract class SessionManagedPrimitiveService extends AbstractPrimitiveSe
     // Create the operation and apply it.
     long sequenceNumber = command.value().getContext().getSequenceNumber();
 
+    // Create stream contexts prior to executing the command to ensure we're
+    // sending the stream state prior to this command.
+    // Prepend the stream to the list of streams so it's easily identifiable by the client.
+    List<SessionStreamContext> streams = new LinkedList<>();
+    streams.add(SessionStreamContext.newBuilder()
+        .setStreamId(sequenceNumber)
+        .setIndex(getCurrentIndex())
+        .build());
+    session.getStreams().forEach(stream -> streams.add(SessionStreamContext.newBuilder()
+        .setStreamId(stream.id().streamId())
+        .setIndex(stream.getLastIndex())
+        .setSequence(stream.getCurrentSequence())
+        .build()));
+
     // Create the stream.
     CommandId<?, ?> commandId = new CommandId<>(command.value().getName());
     OperationExecutor operation = executor.getExecutor(commandId);
@@ -527,22 +540,6 @@ public abstract class SessionManagedPrimitiveService extends AbstractPrimitiveSe
         response -> SessionResponse.newBuilder()
             .setStream(response)
             .build()));
-
-    // Create stream contexts prior to executing the command to ensure we're
-    // sending the stream state prior to this command.
-    List<SessionStreamContext> streams = Streams.concat(
-        Stream.of(SessionStreamContext.newBuilder()
-            .setStreamId(stream.id().streamId())
-            .setIndex(getCurrentIndex())
-            .build()),
-        session.getStreams()
-            .stream()
-            .map(s -> SessionStreamContext.newBuilder()
-                .setStreamId(s.id().streamId())
-                .setIndex(s.getLastIndex())
-                .setSequence(s.getCurrentSequence())
-                .build()))
-        .collect(Collectors.toList());
 
     // Initialize the stream handler with the session response.
     SessionCommandResponse response = SessionCommandResponse.newBuilder()

@@ -14,9 +14,10 @@ import io.atomix.primitive.service.Command;
 import io.atomix.primitive.service.PrimitiveService;
 import io.atomix.primitive.service.Query;
 import io.atomix.primitive.service.StateMachine;
-import io.atomix.utils.stream.StreamHandler;
+import io.atomix.utils.concurrent.Futures;
 import io.atomix.utils.logging.ContextualLoggerFactory;
 import io.atomix.utils.logging.LoggerContext;
+import io.atomix.utils.stream.StreamHandler;
 import org.slf4j.Logger;
 
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -85,22 +86,38 @@ public class ServiceStateMachine implements StateMachine {
 
   @Override
   public CompletableFuture<byte[]> apply(Command<byte[]> command) {
-    return stateMachine.apply(new Command<>(++index, command.timestamp(), command.value()));
+    try {
+      return stateMachine.apply(new Command<>(++index, command.timestamp(), command.value()));
+    } catch (Exception e) {
+      return Futures.exceptionalFuture(e);
+    }
   }
 
   @Override
   public CompletableFuture<Void> apply(Command<byte[]> command, StreamHandler<byte[]> handler) {
-    return stateMachine.apply(new Command<>(++index, command.timestamp(), command.value()), handler);
+    try {
+      return stateMachine.apply(new Command<>(++index, command.timestamp(), command.value()), handler);
+    } catch (Exception e) {
+      return Futures.exceptionalFuture(e);
+    }
   }
 
   @Override
   public CompletableFuture<byte[]> apply(Query<byte[]> query) {
-    return stateMachine.apply(new Query<>(index, query.timestamp(), query.value()));
+    try {
+      return stateMachine.apply(new Query<>(index, query.timestamp(), query.value()));
+    } catch (Exception e) {
+      return Futures.exceptionalFuture(e);
+    }
   }
 
   @Override
   public CompletableFuture<Void> apply(Query<byte[]> query, StreamHandler<byte[]> handler) {
-    return stateMachine.apply(new Query<>(index, query.timestamp(), query.value()), handler);
+    try {
+      return stateMachine.apply(new Query<>(index, query.timestamp(), query.value()), handler);
+    } catch (Exception e) {
+      return Futures.exceptionalFuture(e);
+    }
   }
 
   /**

@@ -703,6 +703,25 @@ public class PassiveRole extends InactiveRole {
   }
 
   @Override
+  public CompletableFuture<Void> onCommand(CommandRequest request, StreamHandler<CommandResponse> handler) {
+    raft.checkThread();
+    logRequest(request);
+
+    DefaultRaftMember leader = raft.getLeader();
+    if (leader == null) {
+      handler.next(logResponse(CommandResponse.newBuilder()
+          .setStatus(ResponseStatus.ERROR)
+          .setError(RaftError.NO_LEADER)
+          .build()));
+      handler.complete();
+      return CompletableFuture.completedFuture(null);
+    } else {
+      log.trace("Forwarding {}", request);
+      return raft.getProtocol().commandStream(leader.memberId(), request, handler);
+    }
+  }
+
+  @Override
   public CompletableFuture<JoinResponse> onJoin(JoinRequest request) {
     raft.checkThread();
     logRequest(request);
