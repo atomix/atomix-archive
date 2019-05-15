@@ -54,10 +54,24 @@ public interface PartitionManagementService {
   ServiceTypeRegistry getServiceTypes();
 
   /**
+   * Returns the partition metadata service.
+   *
+   * @return the partition metadata service
+   */
+  PartitionMetadataService getMetadataService();
+
+  /**
    * Returns the primary election service.
    *
    * @return the primary election service
    */
   PrimaryElectionService getElectionService();
+
+  /**
+   * Returns the partition group membership service.
+   *
+   * @return the partition group membership service
+   */
+  PartitionGroupMembershipService getGroupMembershipService();
 
 }

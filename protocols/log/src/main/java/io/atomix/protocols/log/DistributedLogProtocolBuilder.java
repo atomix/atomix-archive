@@ -15,14 +15,9 @@
  */
 package io.atomix.protocols.log;
 
-import io.atomix.primitive.Consistency;
-import io.atomix.primitive.Recovery;
-import io.atomix.primitive.Replication;
+import io.atomix.log.protocol.Replication;
 import io.atomix.primitive.partition.Partitioner;
 import io.atomix.primitive.protocol.PrimitiveProtocolBuilder;
-
-import java.time.Duration;
-import java.util.concurrent.TimeUnit;
 
 /**
  * Log protocol builder.
@@ -33,6 +28,39 @@ public class DistributedLogProtocolBuilder extends PrimitiveProtocolBuilder<Dist
   }
 
   /**
+   * Sets the number of partitions.
+   *
+   * @param numPartitions the number of partitions
+   * @return the log protocol builder
+   */
+  public DistributedLogProtocolBuilder withNumPartitions(int numPartitions) {
+    config.setPartitions(numPartitions);
+    return this;
+  }
+
+  /**
+   * Sets the replication factor.
+   *
+   * @param replicationFactor the replication factor
+   * @return the log protocol builder
+   */
+  public DistributedLogProtocolBuilder withReplicationFactor(int replicationFactor) {
+    config.setReplicationFactor(replicationFactor);
+    return this;
+  }
+
+  /**
+   * Sets the replication strategy.
+   *
+   * @param replicationStrategy the replication strategy
+   * @return the log protocol builder
+   */
+  public DistributedLogProtocolBuilder withReplicationStrategy(Replication replicationStrategy) {
+    config.setReplicationStrategy(replicationStrategy);
+    return this;
+  }
+
+  /**
    * Sets the protocol partitioner.
    *
    * @param partitioner the protocol partitioner
@@ -40,85 +68,6 @@ public class DistributedLogProtocolBuilder extends PrimitiveProtocolBuilder<Dist
    */
   public DistributedLogProtocolBuilder withPartitioner(Partitioner<String> partitioner) {
     config.setPartitioner(partitioner);
-    return this;
-  }
-
-  /**
-   * Sets the protocol consistency model.
-   *
-   * @param consistency the protocol consistency model
-   * @return the protocol builder
-   */
-  public DistributedLogProtocolBuilder withConsistency(Consistency consistency) {
-    config.setConsistency(consistency);
-    return this;
-  }
-
-  /**
-   * Sets the protocol replication strategy.
-   *
-   * @param replication the protocol replication strategy
-   * @return the protocol builder
-   */
-  public DistributedLogProtocolBuilder withReplication(Replication replication) {
-    config.setReplication(replication);
-    return this;
-  }
-
-  /**
-   * Sets the protocol recovery strategy.
-   *
-   * @param recovery the protocol recovery strategy
-   * @return the protocol builder
-   */
-  public DistributedLogProtocolBuilder withRecovery(Recovery recovery) {
-    config.setRecovery(recovery);
-    return this;
-  }
-
-  /**
-   * Sets the maximum number of retries before an operation can be failed.
-   *
-   * @param maxRetries the maximum number of retries before an operation can be failed
-   * @return the proxy builder
-   */
-  public DistributedLogProtocolBuilder withMaxRetries(int maxRetries) {
-    config.setMaxRetries(maxRetries);
-    return this;
-  }
-
-  /**
-   * Sets the operation retry delay.
-   *
-   * @param retryDelayMillis the delay between operation retries in milliseconds
-   * @return the proxy builder
-   */
-  public DistributedLogProtocolBuilder withRetryDelayMillis(long retryDelayMillis) {
-    config.setRetryDelayMillis(retryDelayMillis);
-    return this;
-  }
-
-  /**
-   * Sets the operation retry delay.
-   *
-   * @param retryDelay the delay between operation retries
-   * @param timeUnit   the delay time unit
-   * @return the proxy builder
-   * @throws NullPointerException if the time unit is null
-   */
-  public DistributedLogProtocolBuilder withRetryDelay(long retryDelay, TimeUnit timeUnit) {
-    return withRetryDelay(Duration.ofMillis(timeUnit.toMillis(retryDelay)));
-  }
-
-  /**
-   * Sets the operation retry delay.
-   *
-   * @param retryDelay the delay between operation retries
-   * @return the proxy builder
-   * @throws NullPointerException if the delay is null
-   */
-  public DistributedLogProtocolBuilder withRetryDelay(Duration retryDelay) {
-    config.setRetryDelay(retryDelay);
     return this;
   }
 

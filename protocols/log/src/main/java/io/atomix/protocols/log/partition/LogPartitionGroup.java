@@ -19,14 +19,19 @@ import java.io.File;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
-import io.atomix.primitive.Recovery;
+import io.atomix.cluster.MemberId;
+import io.atomix.log.protocol.LogPartitionGroupMetadata;
+import io.atomix.log.protocol.LogTopicMetadata;
 import io.atomix.primitive.partition.ManagedPartitionGroup;
 import io.atomix.primitive.partition.MemberGroupStrategy;
 import io.atomix.primitive.partition.Partition;
@@ -34,6 +39,7 @@ import io.atomix.primitive.partition.PartitionGroup;
 import io.atomix.primitive.partition.PartitionGroupConfig;
 import io.atomix.primitive.partition.PartitionId;
 import io.atomix.primitive.partition.PartitionManagementService;
+import io.atomix.primitive.partition.PartitionMetadataEvent;
 import io.atomix.primitive.protocol.PrimitiveProtocol;
 import io.atomix.primitive.protocol.ProxyProtocol;
 import io.atomix.protocols.log.DistributedLogProtocol;
@@ -41,6 +47,8 @@ import io.atomix.protocols.log.impl.DistributedLogClient;
 import io.atomix.storage.StorageLevel;
 import io.atomix.utils.component.Component;
 import io.atomix.utils.concurrent.BlockingAwareThreadPoolContextFactory;
+import io.atomix.utils.concurrent.Futures;
+import io.atomix.utils.concurrent.ThreadContext;
 import io.atomix.utils.concurrent.ThreadContextFactory;
 import io.atomix.utils.logging.ContextualLoggerFactory;
 import io.atomix.utils.logging.LoggerContext;
@@ -104,27 +112,19 @@ public class LogPartitionGroup implements ManagedPartitionGroup {
     }
   }
 
-  private static Collection<LogPartition> buildPartitions(
-      LogPartitionGroupConfig config,
-      ThreadContextFactory threadContextFactory) {
-    List<LogPartition> partitions = new ArrayList<>(config.getPartitions());
-    for (int i = 0; i < config.getPartitions(); i++) {
-      partitions.add(new LogPartition(PartitionId.newBuilder()
-          .setGroup(config.getName())
-          .setPartition(i + 1)
-          .build(), config, threadContextFactory));
-    }
-    return partitions;
-  }
-
   private static final Logger LOGGER = LoggerFactory.getLogger(LogPartitionGroup.class);
 
   private final String name;
   private final LogPartitionGroupConfig config;
+  private final Map<String, Map<PartitionId, LogPartition>> topics = Maps.newConcurrentMap();
   private final Map<PartitionId, LogPartition> partitions = Maps.newConcurrentMap();
   private final List<LogPartition> sortedPartitions = Lists.newCopyOnWriteArrayList();
   private final List<PartitionId> sortedPartitionIds = Lists.newCopyOnWriteArrayList();
   private final ThreadContextFactory threadContextFactory;
+  private final ThreadContext threadContext;
+  private final Consumer<PartitionMetadataEvent<LogPartitionGroupMetadata>> metadataListener;
+  private volatile PartitionManagementService managementService;
+  private final Map<String, CompletableFuture<LogTopicMetadata>> topicFutures = new ConcurrentHashMap<>();
 
   public LogPartitionGroup(LogPartitionGroupConfig config) {
     Logger log = ContextualLoggerFactory.getLogger(DistributedLogClient.class, LoggerContext.builder(DistributedLogClient.class)
@@ -135,11 +135,8 @@ public class LogPartitionGroup implements ManagedPartitionGroup {
     int threadPoolSize = Math.max(Math.min(Runtime.getRuntime().availableProcessors() * 2, 16), 4);
     this.threadContextFactory = new BlockingAwareThreadPoolContextFactory(
         "raft-partition-group-" + name + "-%d", threadPoolSize, log);
-    buildPartitions(config, threadContextFactory).forEach(p -> {
-      this.partitions.put(p.id(), p);
-      this.sortedPartitions.add(p);
-      this.sortedPartitionIds.add(p.id());
-    });
+    this.threadContext = threadContextFactory.createContext();
+    this.metadataListener = e -> threadContext.execute(() -> onMetadataEvent(e));
   }
 
   @Override
@@ -164,9 +161,7 @@ public class LogPartitionGroup implements ManagedPartitionGroup {
 
   @Override
   public ProxyProtocol newProtocol() {
-    return DistributedLogProtocol.builder(name)
-        .withRecovery(Recovery.RECOVER)
-        .build();
+    return DistributedLogProtocol.builder(name).build();
   }
 
   @Override
@@ -180,17 +175,117 @@ public class LogPartitionGroup implements ManagedPartitionGroup {
     return (Collection) sortedPartitions;
   }
 
+  /**
+   * Returns a collection of partitions for the given topic.
+   *
+   * @param topic the topic for which to return partitions
+   * @return the partitions for the given topic
+   */
+  public Collection<Partition> getPartitions(String topic) {
+    Map<PartitionId, LogPartition> partitions =  topics.get(topic);
+    return partitions != null ? (Collection) partitions.values() : null;
+  }
+
   @Override
   public List<PartitionId> getPartitionIds() {
     return sortedPartitionIds;
   }
 
+  /**
+   * Handles a log partition group metadata event.
+   *
+   * @param event the event to handle
+   */
+  private void onMetadataEvent(PartitionMetadataEvent<LogPartitionGroupMetadata> event) {
+    MemberId localMemberId = managementService.getMembershipService().getLocalMember().id();
+    for (LogTopicMetadata topic : event.metadata().getTopicsMap().values()) {
+      if (!this.topics.containsKey(topic.getTopic())) {
+        Map<PartitionId, LogPartition> partitions = new HashMap<>();
+        for (int partitionId : topic.getPartitionIdsList()) {
+          LogPartition partition = new LogPartition(PartitionId.newBuilder()
+              .setGroup(config.getName())
+              .setPartition(partitionId)
+              .build(), config, topic, threadContextFactory);
+          partitions.put(partition.id(), partition);
+        }
+        this.topics.put(topic.getTopic(), partitions);
+        this.partitions.putAll(partitions);
+      }
+
+      if (managementService.getGroupMembershipService().getMembership(name).members().contains(localMemberId)) {
+        if (!topic.getReadyList().contains(localMemberId.id())) {
+          Futures.allOf(partitions.values().stream().map(p -> p.join(managementService)))
+              .thenRun(() -> {
+                managementService.getMetadataService().update(
+                    name,
+                    LogPartitionGroupMetadata::parseFrom,
+                    metadata -> {
+                      if (metadata == null) {
+                        metadata = LogPartitionGroupMetadata.newBuilder().build();
+                      }
+
+                      LogTopicMetadata topicMetadata = metadata.getTopicsMap().get(topic.getTopic());
+                      if (topicMetadata != null && !topicMetadata.getReadyList().contains(localMemberId.id())) {
+                        return LogPartitionGroupMetadata.newBuilder(metadata)
+                            .putTopics(topicMetadata.getTopic(), LogTopicMetadata.newBuilder(topic)
+                                .addReady(localMemberId.id())
+                                .build())
+                            .build();
+                      }
+                      return metadata;
+                    },
+                    LogPartitionGroupMetadata::toByteArray);
+              });
+        } else if (topic.getReadyList().size() == managementService.getGroupMembershipService().getMembership(name).members().size()) {
+          CompletableFuture<LogTopicMetadata> future = topicFutures.remove(topic.getTopic());
+          if (future != null) {
+            future.complete(topic);
+          }
+        }
+      } else {
+        partitions.values().forEach(p -> p.connect(managementService));
+      }
+    }
+  }
+
+  /**
+   * Starts the partition group.
+   *
+   * @param managementService the partition management service
+   * @return a future to be completed once the partition group has been started
+   */
+  private CompletableFuture<Void> start(PartitionManagementService managementService) {
+    this.managementService = managementService;
+    return managementService.getMetadataService().addListener(name, LogPartitionGroupMetadata::parseFrom, metadataListener)
+    .thenCompose(v -> managementService.getMetadataService().get(
+        name,
+        LogPartitionGroupMetadata::parseFrom)
+        .thenAccept(metadata -> {
+          if (metadata != null) {
+            for (LogTopicMetadata topic : metadata.getTopicsMap().values()) {
+              Map<PartitionId, LogPartition> partitions = new HashMap<>();
+              for (int partitionId : topic.getPartitionIdsList()) {
+                LogPartition partition = new LogPartition(PartitionId.newBuilder()
+                    .setGroup(config.getName())
+                    .setPartition(++partitionId)
+                    .build(), config, topic, threadContextFactory);
+                partitions.put(partition.id(), partition);
+              }
+              this.topics.put(topic.getTopic(), partitions);
+              this.partitions.putAll(partitions);
+            }
+          }
+        }));
+  }
+
   @Override
   public CompletableFuture<ManagedPartitionGroup> join(PartitionManagementService managementService) {
-    List<CompletableFuture<Partition>> futures = partitions.values().stream()
-        .map(p -> p.join(managementService))
-        .collect(Collectors.toList());
-    return CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).thenApply(v -> {
+    return start(managementService).thenCompose(v -> {
+      CompletableFuture[] futures = partitions.values().stream()
+          .map(p -> p.join(managementService))
+          .toArray(CompletableFuture[]::new);
+      return CompletableFuture.allOf(futures);
+    }).thenApply(v -> {
       LOGGER.info("Started");
       return this;
     });
@@ -198,13 +293,70 @@ public class LogPartitionGroup implements ManagedPartitionGroup {
 
   @Override
   public CompletableFuture<ManagedPartitionGroup> connect(PartitionManagementService managementService) {
-    List<CompletableFuture<Partition>> futures = partitions.values().stream()
-        .map(p -> p.connect(managementService))
-        .collect(Collectors.toList());
-    return CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).thenApply(v -> {
+    return start(managementService).thenCompose(v -> {
+      CompletableFuture[] futures = partitions.values().stream()
+          .map(p -> p.connect(managementService))
+          .toArray(CompletableFuture[]::new);
+      return CompletableFuture.allOf(futures);
+    }).thenApply(v -> {
       LOGGER.info("Started");
       return this;
     });
+  }
+
+  /**
+   * Creates a new topic in the partition group.
+   *
+   * @param topic the topic to create
+   * @return a future to be completed once the topic has been created
+   */
+  public CompletableFuture<LogTopicMetadata> createTopic(LogTopicMetadata topic) {
+    CompletableFuture<LogTopicMetadata> future = new CompletableFuture<>();
+    topicFutures.put(topic.getTopic(), future);
+    managementService.getMetadataService().update(
+        name,
+        LogPartitionGroupMetadata::parseFrom,
+        logMetadata -> {
+          if (logMetadata == null) {
+            logMetadata = LogPartitionGroupMetadata.newBuilder().build();
+          }
+
+          LogTopicMetadata topicMetadata = logMetadata.getTopicsMap().get(topic.getTopic());
+          if (topicMetadata == null) {
+            int maxPartitionId = 0;
+            for (LogTopicMetadata logTopicMetadata : logMetadata.getTopicsMap().values()) {
+              for (int partitionId : logTopicMetadata.getPartitionIdsList()) {
+                maxPartitionId = Math.max(maxPartitionId, partitionId);
+              }
+            }
+
+            List<Integer> partitionIds = new ArrayList<>();
+            for (int i = 0; i < topic.getPartitions(); i++) {
+              partitionIds.add(++maxPartitionId);
+            }
+            topicMetadata = LogTopicMetadata.newBuilder(topic)
+                .addAllPartitionIds(partitionIds)
+                .build();
+            return LogPartitionGroupMetadata.newBuilder(logMetadata)
+                .putTopics(topic.getTopic(), topicMetadata)
+                .build();
+          }
+          return logMetadata;
+        },
+        LogPartitionGroupMetadata::toByteArray)
+        .whenComplete((metadata, error) -> {
+          if (error == null) {
+            LogTopicMetadata topicMetadata = metadata.getTopicsMap().get(topic.getTopic());
+            if (topicMetadata.getReadyList().size() == managementService.getGroupMembershipService().getMembership(name).members().size()) {
+              topicFutures.remove(topic.getTopic());
+              future.complete(topicMetadata);
+            }
+          } else {
+            topicFutures.remove(topic.getTopic());
+            future.completeExceptionally(error);
+          }
+        });
+    return future;
   }
 
   @Override
@@ -233,18 +385,6 @@ public class LogPartitionGroup implements ManagedPartitionGroup {
   public static class Builder extends PartitionGroup.Builder<LogPartitionGroupConfig> {
     protected Builder(LogPartitionGroupConfig config) {
       super(config);
-    }
-
-    /**
-     * Sets the number of partitions.
-     *
-     * @param numPartitions the number of partitions
-     * @return the partition group builder
-     * @throws IllegalArgumentException if the number of partitions is not positive
-     */
-    public Builder withNumPartitions(int numPartitions) {
-      config.setPartitions(numPartitions);
-      return this;
     }
 
     /**

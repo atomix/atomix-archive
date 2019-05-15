@@ -18,6 +18,7 @@ package io.atomix.protocols.log.partition.impl;
 import java.util.concurrent.CompletableFuture;
 
 import io.atomix.log.DistributedLogClient;
+import io.atomix.log.protocol.LogTopicMetadata;
 import io.atomix.primitive.log.LogConsumer;
 import io.atomix.primitive.log.LogProducer;
 import io.atomix.primitive.log.LogSession;
@@ -39,6 +40,7 @@ public class LogPartitionSession implements LogSession, Managed<LogPartitionSess
   private final LogPartition partition;
   private final PartitionManagementService managementService;
   private final LogPartitionGroupConfig config;
+  private final LogTopicMetadata metadata;
   private final ThreadContextFactory threadFactory;
   private volatile DistributedLogClient client;
 
@@ -46,9 +48,11 @@ public class LogPartitionSession implements LogSession, Managed<LogPartitionSess
       LogPartition partition,
       PartitionManagementService managementService,
       LogPartitionGroupConfig config,
+      LogTopicMetadata metadata,
       ThreadContextFactory threadFactory) {
     this.partition = partition;
     this.config = config;
+    this.metadata = metadata;
     this.managementService = managementService;
     this.threadFactory = threadFactory;
   }
@@ -90,7 +94,7 @@ public class LogPartitionSession implements LogSession, Managed<LogPartitionSess
                 .setMemberId(managementService.getMembershipService().getLocalMember().id().id())
                 .setMemberGroupId(memberGroup.id().id())
                 .build(),
-            config.getReplicationFactor()))
+            metadata.getReplicationFactor()))
         .withThreadContextFactory(threadFactory)
         .build();
   }

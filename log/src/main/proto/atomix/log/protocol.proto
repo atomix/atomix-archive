@@ -69,3 +69,16 @@ enum ResponseStatus {
     OK = 0;
     ERROR = 1;
 }
+
+message LogPartitionGroupMetadata {
+    map<string, LogTopicMetadata> topics = 1;
+}
+
+message LogTopicMetadata {
+    string topic = 1;
+    int32 partitions = 2;
+    repeated int32 partition_ids = 3;
+    int32 replication_factor = 4;
+    Replication replication_strategy = 5;
+    repeated string ready = 6;
+}

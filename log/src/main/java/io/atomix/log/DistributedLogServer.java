@@ -20,6 +20,7 @@ import java.time.Duration;
 
 import io.atomix.log.impl.DefaultDistributedLogServer;
 import io.atomix.log.protocol.LogServerProtocol;
+import io.atomix.log.protocol.Replication;
 import io.atomix.storage.StorageLevel;
 import io.atomix.utils.Managed;
 import io.atomix.utils.concurrent.ThreadContextFactory;
@@ -77,7 +78,7 @@ public interface DistributedLogServer extends Managed<DistributedLogServer> {
     private static final String DEFAULT_SERVER_NAME = "atomix";
     private static final String DEFAULT_DIRECTORY = System.getProperty("user.dir");
     private static final int DEFAULT_REPLICATION_FACTOR = 2;
-    private static final ReplicationStrategy DEFAULT_REPLICATION_STRATEGY = ReplicationStrategy.SYNCHRONOUS;
+    private static final Replication DEFAULT_REPLICATION_STRATEGY = Replication.SYNCHRONOUS;
     private static final int DEFAULT_MAX_SEGMENT_SIZE = 1024 * 1024 * 32;
     private static final int DEFAULT_MAX_ENTRY_SIZE = 1024 * 1024;
     private static final boolean DEFAULT_FLUSH_ON_COMMIT = false;
@@ -92,7 +93,7 @@ public interface DistributedLogServer extends Managed<DistributedLogServer> {
     protected int threadPoolSize = Math.max(Math.min(Runtime.getRuntime().availableProcessors() * 2, 16), 4);
     protected ThreadContextFactory threadContextFactory;
     protected int replicationFactor = DEFAULT_REPLICATION_FACTOR;
-    protected ReplicationStrategy replicationStrategy = DEFAULT_REPLICATION_STRATEGY;
+    protected Replication replicationStrategy = DEFAULT_REPLICATION_STRATEGY;
     protected StorageLevel storageLevel = StorageLevel.DISK;
     protected File directory = new File(DEFAULT_DIRECTORY);
     protected int maxSegmentSize = DEFAULT_MAX_SEGMENT_SIZE;
@@ -193,7 +194,7 @@ public interface DistributedLogServer extends Managed<DistributedLogServer> {
      * @return the server builder
      * @throws NullPointerException if the replication strategy is null
      */
-    public Builder withReplicationStrategy(ReplicationStrategy replicationStrategy) {
+    public Builder withReplicationStrategy(Replication replicationStrategy) {
       this.replicationStrategy = checkNotNull(replicationStrategy, "replicationStrategy cannot be null");
       return this;
     }

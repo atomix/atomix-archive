@@ -23,14 +23,19 @@ import io.atomix.primitive.partition.PartitionGroupConfig;
  */
 public class TestPartitionGroupConfig extends PartitionGroupConfig<TestPartitionGroupConfig> {
   private static final int DEFAULT_PARTITIONS = 3;
+  private int partitions = DEFAULT_PARTITIONS;
 
   @Override
   public PartitionGroup.Type getType() {
     return TestPartitionGroup.TYPE;
   }
 
-  @Override
-  protected int getDefaultPartitions() {
-    return DEFAULT_PARTITIONS;
+  public int getPartitions() {
+    return partitions;
+  }
+
+  public TestPartitionGroupConfig setPartitions(int partitions) {
+    this.partitions = partitions;
+    return this;
   }
 }

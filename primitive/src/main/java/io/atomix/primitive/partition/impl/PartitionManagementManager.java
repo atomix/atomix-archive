@@ -18,7 +18,9 @@ package io.atomix.primitive.partition.impl;
 import io.atomix.cluster.ClusterMembershipService;
 import io.atomix.cluster.messaging.ClusterCommunicationService;
 import io.atomix.cluster.messaging.ClusterStreamingService;
+import io.atomix.primitive.partition.PartitionGroupMembershipService;
 import io.atomix.primitive.partition.PartitionManagementService;
+import io.atomix.primitive.partition.PartitionMetadataService;
 import io.atomix.primitive.partition.PrimaryElectionService;
 import io.atomix.primitive.service.ServiceTypeRegistry;
 import io.atomix.utils.component.Component;
@@ -38,7 +40,11 @@ public class PartitionManagementManager implements PartitionManagementService {
   @Dependency
   private ServiceTypeRegistry serviceTypes;
   @Dependency
+  private PartitionMetadataService metadataService;
+  @Dependency
   private PrimaryElectionService electionService;
+  @Dependency
+  private PartitionGroupMembershipService groupMembershipService;
 
   @Override
   public ClusterMembershipService getMembershipService() {
@@ -61,7 +67,17 @@ public class PartitionManagementManager implements PartitionManagementService {
   }
 
   @Override
+  public PartitionMetadataService getMetadataService() {
+    return metadataService;
+  }
+
+  @Override
   public PrimaryElectionService getElectionService() {
     return electionService;
+  }
+
+  @Override
+  public PartitionGroupMembershipService getGroupMembershipService() {
+    return groupMembershipService;
   }
 }

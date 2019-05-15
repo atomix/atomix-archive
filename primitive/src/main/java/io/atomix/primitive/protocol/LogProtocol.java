@@ -15,6 +15,8 @@
  */
 package io.atomix.primitive.protocol;
 
+import java.util.concurrent.CompletableFuture;
+
 import io.atomix.primitive.log.LogClient;
 import io.atomix.primitive.partition.PartitionService;
 
@@ -29,6 +31,15 @@ public interface LogProtocol extends ProxyProtocol {
    * @return the protocol partition group name
    */
   String group();
+
+  /**
+   * Creates a new topic via the protocol.
+   *
+   * @param topic            the topic to create
+   * @param partitionService the partition service
+   * @return the log client
+   */
+  CompletableFuture<LogClient> create(String topic, PartitionService partitionService);
 
   /**
    * Returns a new log client.

@@ -16,6 +16,7 @@
 package io.atomix.grpc.impl;
 
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 
@@ -47,42 +48,46 @@ public class LogServiceImpl extends LogServiceGrpc.LogServiceImplBase {
    * @param id the log ID
    * @return the log client
    */
-  private LogClient getClient(LogId id) {
-    return DistributedLogProtocol.builder(id.getLog().getGroup()).build()
-        .newClient(atomix.getPartitionService());
+  private CompletableFuture<LogClient> getClient(LogId id) {
+    return DistributedLogProtocol.builder(id.getLog().getGroup())
+        .withNumPartitions(id.getLog().getPartitions())
+        .build()
+        .create(id.getName(), atomix.getPartitionService());
   }
 
   @Override
   public StreamObserver<ProduceRequest> produce(StreamObserver<ProduceResponse> responseObserver) {
-    Map<LogId, LogClient> clients = new ConcurrentHashMap<>();
+    Map<LogId, CompletableFuture<LogClient>> clients = new ConcurrentHashMap<>();
     return new StreamObserver<ProduceRequest>() {
       @Override
       public void onNext(ProduceRequest request) {
-        LogClient client = clients.get(request.getId());
-        if (client == null) {
-          client = clients.computeIfAbsent(request.getId(), LogServiceImpl.this::getClient);
-        }
-
-        if (request.getPartition() != 0) {
-          client.getPartition(request.getPartition())
-              .producer()
-              .append(request.getValue().toByteArray())
-              .whenComplete((response, error) -> {
-                if (error != null) {
-                  responseObserver.onError(error);
+        clients.computeIfAbsent(request.getId(), LogServiceImpl.this::getClient)
+            .whenComplete((client, clientError) -> {
+              if (clientError == null) {
+                if (request.getPartition() != 0) {
+                  client.getPartition(request.getPartition())
+                      .producer()
+                      .append(request.getValue().toByteArray())
+                      .whenComplete((response, error) -> {
+                        if (error != null) {
+                          responseObserver.onError(error);
+                        }
+                      });
+                } else {
+                  byte[] bytes = request.getValue().toByteArray();
+                  client.getPartition(BaseEncoding.base16().encode(bytes))
+                      .producer()
+                      .append(bytes)
+                      .whenComplete((response, error) -> {
+                        if (error != null) {
+                          responseObserver.onError(error);
+                        }
+                      });
                 }
-              });
-        } else {
-          byte[] bytes = request.getValue().toByteArray();
-          client.getPartition(BaseEncoding.base16().encode(bytes))
-              .producer()
-              .append(bytes)
-              .whenComplete((response, error) -> {
-                if (error != null) {
-                  responseObserver.onError(error);
-                }
-              });
-        }
+              } else {
+                responseObserver.onError(clientError);
+              }
+            });
       }
 
       @Override
@@ -107,15 +112,20 @@ public class LogServiceImpl extends LogServiceGrpc.LogServiceImplBase {
           .build());
     };
 
-    if (request.getPartition() != 0) {
-      getClient(request.getId())
-          .getPartition(request.getPartition())
-          .consumer()
-          .consume(consumer);
-    } else {
-      getClient(request.getId())
-          .getPartitions()
-          .forEach(partition -> partition.consumer().consume(consumer));
-    }
+    getClient(request.getId())
+        .whenComplete((client, error) -> {
+          if (error == null) {
+            if (request.getPartition() != 0) {
+              client.getPartition(request.getPartition())
+                  .consumer()
+                  .consume(consumer);
+            } else {
+              client.getPartitions()
+                  .forEach(partition -> partition.consumer().consume(consumer));
+            }
+          } else {
+            responseObserver.onError(error);
+          }
+        });
   }
 }

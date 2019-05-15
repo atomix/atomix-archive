@@ -129,7 +129,6 @@ public class AtomixTest extends AbstractAtomixTest {
             .withDataDirectory(new File(new File(DATA_DIR, "log"), "1"))
             .build())
             .withPartitionGroups(LogPartitionGroup.builder("log")
-                .withNumPartitions(3)
                 .build())
             .build());
 
@@ -140,7 +139,6 @@ public class AtomixTest extends AbstractAtomixTest {
             .withDataDirectory(new File(new File(DATA_DIR, "log"), "2"))
             .build())
             .withPartitionGroups(LogPartitionGroup.builder("log")
-                .withNumPartitions(3)
                 .build())
             .build());
 
@@ -192,7 +190,6 @@ public class AtomixTest extends AbstractAtomixTest {
             .withDataDirectory(new File(new File(DATA_DIR, "log"), "1"))
             .build())
             .withPartitionGroups(LogPartitionGroup.builder("log")
-                .withNumPartitions(3)
                 .build())
             .build());
 
@@ -203,7 +200,6 @@ public class AtomixTest extends AbstractAtomixTest {
             .withDataDirectory(new File(new File(DATA_DIR, "log"), "2"))
             .build())
             .withPartitionGroups(LogPartitionGroup.builder("log")
-                .withNumPartitions(3)
                 .build())
             .build());
 

@@ -54,7 +54,10 @@ public class LogServiceImplTest extends GrpcServiceTest<LogServiceGrpc.LogServic
     LogServiceGrpc.LogServiceStub log2 = getStub(2);
 
     LogId logId = LogId.newBuilder()
-        .setLog(DistributedLogProtocol.newBuilder().build())
+        .setName("test")
+        .setLog(DistributedLogProtocol.newBuilder()
+            .setPartitions(3)
+            .build())
         .build();
 
     CountDownLatch latch = new CountDownLatch(1);
@@ -109,7 +112,10 @@ public class LogServiceImplTest extends GrpcServiceTest<LogServiceGrpc.LogServic
     LogServiceGrpc.LogServiceStub log2 = getStub(2);
 
     LogId logId = LogId.newBuilder()
-        .setLog(DistributedLogProtocol.newBuilder().build())
+        .setName("test")
+        .setLog(DistributedLogProtocol.newBuilder()
+            .setPartitions(3)
+            .build())
         .build();
 
     CountDownLatch latch = new CountDownLatch(1);

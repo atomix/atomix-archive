@@ -27,6 +27,7 @@ import java.util.Set;
 public class RaftPartitionGroupConfig extends PartitionGroupConfig<RaftPartitionGroupConfig> {
   private static final int DEFAULT_PARTITIONS = 7;
 
+  private int partitions = DEFAULT_PARTITIONS;
   private Set<String> members = new HashSet<>();
   private int partitionSize;
   private RaftStorageConfig storageConfig = new RaftStorageConfig();
@@ -37,9 +38,24 @@ public class RaftPartitionGroupConfig extends PartitionGroupConfig<RaftPartition
     return RaftPartitionGroup.TYPE;
   }
 
-  @Override
-  protected int getDefaultPartitions() {
-    return DEFAULT_PARTITIONS;
+  /**
+   * Returns the number of partitions in the group.
+   *
+   * @return the number of partitions in the group.
+   */
+  public int getPartitions() {
+    return partitions;
+  }
+
+  /**
+   * Sets the number of partitions in the group.
+   *
+   * @param partitions the number of partitions in the group
+   * @return the partition group configuration
+   */
+  public RaftPartitionGroupConfig setPartitions(int partitions) {
+    this.partitions = partitions;
+    return this;
   }
 
   /**

@@ -10,6 +10,7 @@ import io.atomix.primitive.partition.PartitionGroup;
 import io.atomix.primitive.partition.PartitionGroupMembership;
 import io.atomix.primitive.partition.PartitionGroupMembershipService;
 import io.atomix.primitive.partition.PartitionManagementService;
+import io.atomix.primitive.partition.PartitionMetadataService;
 import io.atomix.primitive.partition.PrimaryElectionService;
 import io.atomix.primitive.partition.SystemPartitionService;
 import io.atomix.primitive.service.ServiceTypeRegistry;
@@ -59,6 +60,11 @@ public class SystemPartitionManager implements SystemPartitionService, Partition
   }
 
   @Override
+  public PartitionMetadataService getMetadataService() {
+    return null;
+  }
+
+  @Override
   public ServiceTypeRegistry getServiceTypes() {
     return serviceTypeRegistry;
   }
@@ -71,6 +77,11 @@ public class SystemPartitionManager implements SystemPartitionService, Partition
   @Override
   public PartitionGroup getSystemPartitionGroup() {
     return partitionGroup;
+  }
+
+  @Override
+  public PartitionGroupMembershipService getGroupMembershipService() {
+    return groupMembershipService;
   }
 
   @Override

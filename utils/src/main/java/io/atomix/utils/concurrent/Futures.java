@@ -15,6 +15,7 @@
  */
 package io.atomix.utils.concurrent;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
@@ -24,6 +25,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.function.BinaryOperator;
 import java.util.function.Function;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -229,6 +231,29 @@ public final class Futures {
   public static <T> CompletableFuture<T> allOf(
       List<CompletableFuture<T>> futures, BinaryOperator<T> reducer, T emptyValue) {
     return allOf(futures).thenApply(resultList -> resultList.stream().reduce(reducer).orElse(emptyValue));
+  }
+
+  public static CompletableFuture<Void> retry(Supplier<CompletableFuture<Boolean>> supplier, ThreadContext context) {
+    CompletableFuture<Void> future = new CompletableFuture<>();
+    retry(supplier, context, future);
+    return future;
+  }
+
+  private static void retry(
+      Supplier<CompletableFuture<Boolean>> supplier,
+      ThreadContext context,
+      CompletableFuture<Void> future) {
+    supplier.get().whenComplete((succeeded, error) -> {
+      if (error == null) {
+        if (succeeded) {
+          future.complete(null);
+        } else {
+          context.schedule(Duration.ofMillis(10), () -> retry(supplier, context, future));
+        }
+      } else {
+        future.completeExceptionally(error);
+      }
+    });
   }
 
   @FunctionalInterface

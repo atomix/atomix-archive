@@ -183,7 +183,6 @@ public abstract class GrpcServiceTest<T extends AbstractStub<T>> {
             .withDataDirectory(new File("target/test-logs/" + memberId + "/data"))
             .build())
         .addPartitionGroup(LogPartitionGroup.builder("log")
-            .withNumPartitions(3)
             .withDataDirectory(new File("target/test-logs/" + memberId + "/log"))
             .withMaxSize(1024 * 1024)
             .build())

@@ -16,9 +16,11 @@
 package io.atomix.protocols.log;
 
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
 import com.google.common.collect.Maps;
+import io.atomix.log.protocol.LogTopicMetadata;
 import io.atomix.primitive.log.LogClient;
 import io.atomix.primitive.log.LogSession;
 import io.atomix.primitive.partition.PartitionId;
@@ -27,6 +29,7 @@ import io.atomix.primitive.protocol.LogProtocol;
 import io.atomix.primitive.protocol.PrimitiveProtocol;
 import io.atomix.protocols.log.impl.DistributedLogClient;
 import io.atomix.protocols.log.partition.LogPartition;
+import io.atomix.protocols.log.partition.LogPartitionGroup;
 import io.atomix.utils.component.Component;
 
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -102,6 +105,23 @@ public class DistributedLogProtocol implements LogProtocol {
   @Override
   public String group() {
     return config.getGroup();
+  }
+
+  @Override
+  public CompletableFuture<LogClient> create(String topic, PartitionService partitionService) {
+    LogPartitionGroup partitionGroup = (LogPartitionGroup) partitionService.getPartitionGroup(this);
+    return partitionGroup.createTopic(LogTopicMetadata.newBuilder()
+        .setTopic(topic)
+        .setPartitions(config.getPartitions())
+        .setReplicationFactor(config.getReplicationFactor())
+        .setReplicationStrategy(config.getReplicationStrategy())
+        .build())
+        .thenApply(metadata -> {
+          Map<PartitionId, LogSession> partitions = partitionGroup.getPartitions(metadata.getTopic()).stream()
+              .map(partition -> Maps.immutableEntry(partition.id(), ((LogPartition) partition).getSession()))
+              .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+          return new DistributedLogClient(partitions, config.getPartitioner());
+        });
   }
 
   @Override

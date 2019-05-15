@@ -20,6 +20,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
 import io.atomix.cluster.MemberId;
+import io.atomix.log.protocol.LogTopicMetadata;
 import io.atomix.primitive.log.LogSession;
 import io.atomix.primitive.partition.GroupMember;
 import io.atomix.primitive.partition.Partition;
@@ -42,25 +43,37 @@ import static com.google.common.base.MoreObjects.toStringHelper;
 public class LogPartition implements Partition {
   private final PartitionId partitionId;
   private final LogPartitionGroupConfig config;
+  private final LogTopicMetadata metadata;
   private final ThreadContextFactory threadContextFactory;
   private PartitionManagementService managementService;
   private PrimaryElection election;
-  private LogPartitionServer server;
+  private volatile LogPartitionServer server;
   private volatile LogPartitionClient client;
-  private LogPartitionSession session;
+  private volatile LogPartitionSession session;
 
   public LogPartition(
       PartitionId partitionId,
       LogPartitionGroupConfig config,
+      LogTopicMetadata metadata,
       ThreadContextFactory threadContextFactory) {
     this.partitionId = partitionId;
     this.config = config;
+    this.metadata = metadata;
     this.threadContextFactory = threadContextFactory;
   }
 
   @Override
   public PartitionId id() {
     return partitionId;
+  }
+
+  /**
+   * Returns the partition topic.
+   *
+   * @return the partition topic
+   */
+  public String topic() {
+    return metadata.getTopic();
   }
 
   @Override
@@ -133,27 +146,42 @@ public class LogPartition implements Partition {
    * Joins the log partition.
    */
   CompletableFuture<Partition> join(PartitionManagementService managementService) {
-    this.managementService = managementService;
-    election = managementService.getElectionService().getElectionFor(partitionId);
-    server = new LogPartitionServer(
-        this,
-        managementService,
-        config,
-        threadContextFactory);
-    return server.start()
-        .thenCompose(v -> {
-          session = new LogPartitionSession(this, managementService, config, threadContextFactory);
-          return session.start();
-        }).thenApply(v -> this);
+    if (server == null) {
+      synchronized (this) {
+        if (server == null) {
+          this.managementService = managementService;
+          election = managementService.getElectionService().getElectionFor(partitionId);
+          server = new LogPartitionServer(
+              this,
+              managementService,
+              config,
+              metadata,
+              threadContextFactory);
+          return server.start()
+              .thenCompose(v -> {
+                session = new LogPartitionSession(this, managementService, config, metadata, threadContextFactory);
+                return session.start();
+              }).thenApply(v -> this);
+        }
+      }
+    }
+    return CompletableFuture.completedFuture(null);
   }
 
   /**
    * Connects to the log partition.
    */
   CompletableFuture<Partition> connect(PartitionManagementService managementService) {
-    election = managementService.getElectionService().getElectionFor(partitionId);
-    session = new LogPartitionSession(this, managementService, config, threadContextFactory);
-    return session.start().thenApply(v -> this);
+    if (session == null) {
+      synchronized (this) {
+        if (session == null) {
+          election = managementService.getElectionService().getElectionFor(partitionId);
+          session = new LogPartitionSession(this, managementService, config, metadata, threadContextFactory);
+          return session.start().thenApply(v -> this);
+        }
+      }
+    }
+    return CompletableFuture.completedFuture(this);
   }
 
   /**

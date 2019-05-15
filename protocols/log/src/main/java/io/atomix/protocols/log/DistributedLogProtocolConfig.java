@@ -15,26 +15,31 @@
  */
 package io.atomix.protocols.log;
 
+import java.time.Duration;
+
 import io.atomix.primitive.Consistency;
 import io.atomix.primitive.Recovery;
-import io.atomix.primitive.Replication;
+import io.atomix.log.protocol.Replication;
 import io.atomix.primitive.partition.Partitioner;
 import io.atomix.primitive.protocol.PrimitiveProtocol;
 import io.atomix.primitive.protocol.PrimitiveProtocolConfig;
 
-import java.time.Duration;
+import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.base.Preconditions.checkNotNull;
 
 /**
  * Log protocol configuration.
  */
 public class DistributedLogProtocolConfig extends PrimitiveProtocolConfig<DistributedLogProtocolConfig> {
+  private static final int DEFAULT_PARTITIONS = 1;
+  private static final int DEFAULT_REPLICATION_FACTOR = 1;
+  private static final Replication DEFAULT_REPLICATION_STRATEGY = Replication.ASYNCHRONOUS;
+
   private String group;
+  private int partitions = DEFAULT_PARTITIONS;
+  private int replicationFactor = DEFAULT_REPLICATION_FACTOR;
+  private Replication replicationStrategy = DEFAULT_REPLICATION_STRATEGY;
   private Partitioner<String> partitioner = Partitioner.MURMUR3;
-  private Consistency consistency = Consistency.SEQUENTIAL;
-  private Replication replication = Replication.ASYNCHRONOUS;
-  private Recovery recovery = Recovery.RECOVER;
-  private int maxRetries = 0;
-  private Duration retryDelay = Duration.ofMillis(100);
 
   @Override
   public PrimitiveProtocol.Type getType() {
@@ -82,112 +87,66 @@ public class DistributedLogProtocolConfig extends PrimitiveProtocolConfig<Distri
   }
 
   /**
-   * Returns the consistency level.
+   * Returns the number of partitions for the topic.
    *
-   * @return the consistency level
+   * @return the number of partitions for the topic
    */
-  public Consistency getConsistency() {
-    return consistency;
+  public int getPartitions() {
+    return partitions;
   }
 
   /**
-   * Sets the consistency level.
+   * Sets the number of partitions for the topic.
    *
-   * @param consistency the consistency level
-   * @return the protocol configuration
+   * @param partitions the number of partitions for the topic
+   * @return the log protocol configuration
    */
-  public DistributedLogProtocolConfig setConsistency(Consistency consistency) {
-    this.consistency = consistency;
+  public DistributedLogProtocolConfig setPartitions(int partitions) {
+    checkArgument(partitions > 0, "partitions must be positive");
+    this.partitions = partitions;
     return this;
   }
 
   /**
-   * Returns the replication level.
+   * Returns the replication factor.
    *
-   * @return the replication level
+   * @return the replication factor
    */
-  public Replication getReplication() {
-    return replication;
+  public int getReplicationFactor() {
+    return replicationFactor;
   }
 
   /**
-   * Sets the replication level.
+   * Sets the replication factor.
    *
-   * @param replication the replication level
-   * @return the protocol configuration
+   * @param replicationFactor the replication factor
+   * @return the log protocol configuration
+   * @throws IllegalArgumentException if the replication factor is negative
    */
-  public DistributedLogProtocolConfig setReplication(Replication replication) {
-    this.replication = replication;
+  public DistributedLogProtocolConfig setReplicationFactor(int replicationFactor) {
+    checkArgument(replicationFactor >= 0);
+    this.replicationFactor = replicationFactor;
     return this;
   }
 
   /**
-   * Returns the recovery strategy.
+   * Returns the replication strategy.
    *
-   * @return the recovery strategy
+   * @return the replication strategy
    */
-  public Recovery getRecovery() {
-    return recovery;
+  public Replication getReplicationStrategy() {
+    return replicationStrategy;
   }
 
   /**
-   * Sets the recovery strategy.
+   * Sets the replication strategy.
    *
-   * @param recovery the recovery strategy
-   * @return the protocol configuration
+   * @param replicationStrategy the replication strategy
+   * @return the log protocol configuration
    */
-  public DistributedLogProtocolConfig setRecovery(Recovery recovery) {
-    this.recovery = recovery;
-    return this;
-  }
-
-  /**
-   * Returns the maximum allowed number of retries.
-   *
-   * @return the maximum allowed number of retries
-   */
-  public int getMaxRetries() {
-    return maxRetries;
-  }
-
-  /**
-   * Sets the maximum allowed number of retries.
-   *
-   * @param maxRetries the maximum allowed number of retries
-   * @return the protocol configuration
-   */
-  public DistributedLogProtocolConfig setMaxRetries(int maxRetries) {
-    this.maxRetries = maxRetries;
-    return this;
-  }
-
-  /**
-   * Returns the retry delay.
-   *
-   * @return the retry delay
-   */
-  public Duration getRetryDelay() {
-    return retryDelay;
-  }
-
-  /**
-   * Sets the retry delay.
-   *
-   * @param retryDelayMillis the retry delay in milliseconds
-   * @return the protocol configuration
-   */
-  public DistributedLogProtocolConfig setRetryDelayMillis(long retryDelayMillis) {
-    return setRetryDelay(Duration.ofMillis(retryDelayMillis));
-  }
-
-  /**
-   * Sets the retry delay.
-   *
-   * @param retryDelay the retry delay
-   * @return the protocol configuration
-   */
-  public DistributedLogProtocolConfig setRetryDelay(Duration retryDelay) {
-    this.retryDelay = retryDelay;
+  public DistributedLogProtocolConfig setReplicationStrategy(Replication replicationStrategy) {
+    checkNotNull(replicationStrategy);
+    this.replicationStrategy = replicationStrategy;
     return this;
   }
 }

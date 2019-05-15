@@ -19,6 +19,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import io.atomix.log.DistributedLogServer;
+import io.atomix.log.protocol.LogTopicMetadata;
 import io.atomix.primitive.partition.GroupMember;
 import io.atomix.primitive.partition.MemberGroup;
 import io.atomix.primitive.partition.PartitionManagementService;
@@ -37,6 +38,7 @@ public class LogPartitionServer implements Managed<LogPartitionServer> {
   private final LogPartition partition;
   private final PartitionManagementService managementService;
   private final LogPartitionGroupConfig config;
+  private final LogTopicMetadata metadata;
   private final ThreadContextFactory threadFactory;
   private DistributedLogServer server;
   private final AtomicBoolean started = new AtomicBoolean();
@@ -45,10 +47,12 @@ public class LogPartitionServer implements Managed<LogPartitionServer> {
       LogPartition partition,
       PartitionManagementService managementService,
       LogPartitionGroupConfig config,
+      LogTopicMetadata metadata,
       ThreadContextFactory threadFactory) {
     this.partition = partition;
     this.managementService = managementService;
     this.config = config;
+    this.metadata = metadata;
     this.threadFactory = threadFactory;
   }
 
@@ -87,7 +91,9 @@ public class LogPartitionServer implements Managed<LogPartitionServer> {
                 .setMemberId(managementService.getMembershipService().getLocalMember().id().id())
                 .setMemberGroupId(memberGroup.id().id())
                 .build(),
-            config.getReplicationFactor()))
+            metadata.getReplicationFactor()))
+        .withReplicationFactor(metadata.getReplicationFactor())
+        .withReplicationStrategy(metadata.getReplicationStrategy())
         .withStorageLevel(config.getStorageConfig().getLevel())
         .withDirectory(config.getStorageConfig().getDirectory(partition.name()))
         .withMaxSegmentSize((int) config.getStorageConfig().getSegmentSize().bytes())

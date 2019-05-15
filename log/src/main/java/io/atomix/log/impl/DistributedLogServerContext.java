@@ -26,7 +26,6 @@ import java.util.function.Supplier;
 
 import com.google.protobuf.Message;
 import io.atomix.log.DistributedLogServer;
-import io.atomix.log.ReplicationStrategy;
 import io.atomix.log.Term;
 import io.atomix.log.TermProvider;
 import io.atomix.log.protocol.AppendRequest;
@@ -37,6 +36,7 @@ import io.atomix.log.protocol.ConsumeRequest;
 import io.atomix.log.protocol.ConsumeResponse;
 import io.atomix.log.protocol.LogEntry;
 import io.atomix.log.protocol.LogServerProtocol;
+import io.atomix.log.protocol.Replication;
 import io.atomix.log.protocol.ResetRequest;
 import io.atomix.log.roles.FollowerRole;
 import io.atomix.log.roles.LeaderRole;
@@ -65,14 +65,13 @@ public class DistributedLogServerContext implements Managed<Void> {
   private final TermProvider termProvider;
   private final LogServerProtocol protocol;
   private final int replicationFactor;
-  private final ReplicationStrategy replicationStrategy;
+  private final Replication replicationStrategy;
   private final ThreadContextFactory threadContextFactory;
   private final ThreadContext threadContext;
   private final boolean closeOnStop;
   private String leader;
   private List<String> followers;
   private LogServerRole role = new NoneRole(this);
-  ;
   private long currentTerm;
   private long commitIndex;
   private final SegmentedJournal<LogEntry> journal;
@@ -89,7 +88,7 @@ public class DistributedLogServerContext implements Managed<Void> {
       TermProvider termProvider,
       LogServerProtocol protocol,
       int replicationFactor,
-      ReplicationStrategy replicationStrategy,
+      Replication replicationStrategy,
       SegmentedJournal<LogEntry> journal,
       long maxLogSize,
       Duration maxLogAge,
@@ -173,7 +172,7 @@ public class DistributedLogServerContext implements Managed<Void> {
    *
    * @return the replication strategy
    */
-  public ReplicationStrategy replicationStrategy() {
+  public Replication replicationStrategy() {
     return replicationStrategy;
   }
 
