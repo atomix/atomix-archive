@@ -52,7 +52,7 @@ public class LogServiceImpl extends LogServiceGrpc.LogServiceImplBase {
     return DistributedLogProtocol.builder(id.getLog().getGroup())
         .withNumPartitions(id.getLog().getPartitions())
         .build()
-        .create(id.getName(), atomix.getPartitionService());
+        .createTopic(id.getName(), atomix.getPartitionService());
   }
 
   @Override

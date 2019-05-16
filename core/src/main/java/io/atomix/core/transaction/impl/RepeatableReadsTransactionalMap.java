@@ -26,7 +26,7 @@ import io.atomix.core.map.impl.MapUpdate;
 import io.atomix.core.map.impl.MapUpdate.Type;
 import io.atomix.core.transaction.TransactionId;
 import io.atomix.core.transaction.TransactionLog;
-import io.atomix.primitive.protocol.ProxyProtocol;
+import io.atomix.primitive.protocol.ServiceProtocol;
 import io.atomix.utils.time.Versioned;
 
 /**
@@ -36,7 +36,7 @@ public class RepeatableReadsTransactionalMap<K, V> extends TransactionalMapParti
   private final Map<K, CompletableFuture<Versioned<V>>> cache = Maps.newConcurrentMap();
   private final Map<K, MapUpdate<K, V>> updates = Maps.newConcurrentMap();
 
-  public RepeatableReadsTransactionalMap(TransactionId transactionId, ProxyProtocol protocol, AsyncAtomicMap<K, V> consistentMap) {
+  public RepeatableReadsTransactionalMap(TransactionId transactionId, ServiceProtocol protocol, AsyncAtomicMap<K, V> consistentMap) {
     super(transactionId, protocol, consistentMap);
   }
 

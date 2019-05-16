@@ -21,12 +21,17 @@ import java.util.stream.Collectors;
 
 import com.google.common.collect.Maps;
 import io.atomix.log.protocol.LogTopicMetadata;
+import io.atomix.primitive.PrimitiveClient;
+import io.atomix.primitive.impl.DefaultPrimitiveClient;
 import io.atomix.primitive.log.LogClient;
 import io.atomix.primitive.log.LogSession;
 import io.atomix.primitive.partition.PartitionId;
 import io.atomix.primitive.partition.PartitionService;
 import io.atomix.primitive.protocol.LogProtocol;
 import io.atomix.primitive.protocol.PrimitiveProtocol;
+import io.atomix.primitive.service.ServiceClient;
+import io.atomix.primitive.service.impl.DefaultServiceClient;
+import io.atomix.primitive.service.impl.ServiceId;
 import io.atomix.protocols.log.impl.DistributedLogClient;
 import io.atomix.protocols.log.partition.LogPartition;
 import io.atomix.protocols.log.partition.LogPartitionGroup;
@@ -108,7 +113,7 @@ public class DistributedLogProtocol implements LogProtocol {
   }
 
   @Override
-  public CompletableFuture<LogClient> create(String topic, PartitionService partitionService) {
+  public CompletableFuture<LogClient> createTopic(String topic, PartitionService partitionService) {
     LogPartitionGroup partitionGroup = (LogPartitionGroup) partitionService.getPartitionGroup(this);
     return partitionGroup.createTopic(LogTopicMetadata.newBuilder()
         .setTopic(topic)
@@ -125,12 +130,19 @@ public class DistributedLogProtocol implements LogProtocol {
   }
 
   @Override
-  public LogClient newClient(PartitionService partitionService) {
-    Map<PartitionId, LogSession> partitions = partitionService.getPartitionGroup(this)
-        .getPartitions()
-        .stream()
-        .map(partition -> Maps.immutableEntry(partition.id(), ((LogPartition) partition).getSession()))
-        .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
-    return new DistributedLogClient(partitions, config.getPartitioner());
+  public CompletableFuture<PrimitiveClient> createService(ServiceId serviceId, PartitionService partitionService) {
+    LogPartitionGroup partitionGroup = (LogPartitionGroup) partitionService.getPartitionGroup(this);
+    return partitionGroup.createTopic(LogTopicMetadata.newBuilder()
+        .setTopic(serviceId.getName())
+        .setPartitions(config.getPartitions())
+        .setReplicationFactor(config.getReplicationFactor())
+        .setReplicationStrategy(config.getReplicationStrategy())
+        .build())
+        .thenApply(metadata -> {
+          Map<PartitionId, ServiceClient> partitions = partitionGroup.getPartitions(metadata.getTopic()).stream()
+              .map(partition -> Maps.immutableEntry(partition.id(), new DefaultServiceClient(serviceId, partition.getClient())))
+              .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+          return new DefaultPrimitiveClient(partitions, config.getPartitioner());
+        });
   }
 }

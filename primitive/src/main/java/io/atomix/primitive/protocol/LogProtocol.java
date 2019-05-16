@@ -23,7 +23,7 @@ import io.atomix.primitive.partition.PartitionService;
 /**
  * Log replication based primitive protocol.
  */
-public interface LogProtocol extends ProxyProtocol {
+public interface LogProtocol extends ServiceProtocol {
 
   /**
    * Returns the protocol partition group name.
@@ -39,14 +39,6 @@ public interface LogProtocol extends ProxyProtocol {
    * @param partitionService the partition service
    * @return the log client
    */
-  CompletableFuture<LogClient> create(String topic, PartitionService partitionService);
-
-  /**
-   * Returns a new log client.
-   *
-   * @param partitionService the partition service
-   * @return a new log client
-   */
-  LogClient newClient(PartitionService partitionService);
+  CompletableFuture<LogClient> createTopic(String topic, PartitionService partitionService);
 
 }

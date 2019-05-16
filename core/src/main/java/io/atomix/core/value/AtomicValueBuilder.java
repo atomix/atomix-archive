@@ -18,7 +18,7 @@ package io.atomix.core.value;
 import io.atomix.primitive.PrimitiveManagementService;
 import io.atomix.primitive.protocol.PrimitiveProtocol;
 import io.atomix.primitive.protocol.ProxyCompatibleBuilder;
-import io.atomix.primitive.protocol.ProxyProtocol;
+import io.atomix.primitive.protocol.ServiceProtocol;
 
 /**
  * Builder for constructing new AtomicValue instances.
@@ -34,7 +34,7 @@ public abstract class AtomicValueBuilder<V>
   }
 
   @Override
-  public AtomicValueBuilder<V> withProtocol(ProxyProtocol protocol) {
+  public AtomicValueBuilder<V> withProtocol(ServiceProtocol protocol) {
     return withProtocol((PrimitiveProtocol) protocol);
   }
 }

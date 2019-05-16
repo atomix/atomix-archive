@@ -25,7 +25,7 @@ import io.atomix.core.transaction.TransactionId;
 import io.atomix.core.transaction.TransactionParticipant;
 import io.atomix.core.transaction.TransactionalSet;
 import io.atomix.primitive.PrimitiveType;
-import io.atomix.primitive.protocol.ProxyProtocol;
+import io.atomix.primitive.protocol.ServiceProtocol;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -35,10 +35,10 @@ import static com.google.common.base.Preconditions.checkNotNull;
  */
 public abstract class TransactionalSetParticipant<E> implements AsyncTransactionalSet<E>, TransactionParticipant<SetUpdate<E>> {
   protected final TransactionId transactionId;
-  protected final ProxyProtocol protocol;
+  protected final ServiceProtocol protocol;
   protected final AsyncDistributedSet<E> set;
 
-  protected TransactionalSetParticipant(TransactionId transactionId, ProxyProtocol protocol, AsyncDistributedSet<E> set) {
+  protected TransactionalSetParticipant(TransactionId transactionId, ServiceProtocol protocol, AsyncDistributedSet<E> set) {
     this.transactionId = checkNotNull(transactionId);
     this.protocol = checkNotNull(protocol);
     this.set = checkNotNull(set);
@@ -55,7 +55,7 @@ public abstract class TransactionalSetParticipant<E> implements AsyncTransaction
   }
 
   @Override
-  public ProxyProtocol protocol() {
+  public ServiceProtocol protocol() {
     return protocol;
   }
 

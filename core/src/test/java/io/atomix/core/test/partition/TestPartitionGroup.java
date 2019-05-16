@@ -33,7 +33,7 @@ import io.atomix.primitive.partition.PartitionGroupConfig;
 import io.atomix.primitive.partition.PartitionId;
 import io.atomix.primitive.partition.PartitionManagementService;
 import io.atomix.primitive.protocol.PrimitiveProtocol;
-import io.atomix.primitive.protocol.ProxyProtocol;
+import io.atomix.primitive.protocol.ServiceProtocol;
 import io.atomix.protocols.raft.MultiRaftProtocol;
 import io.atomix.utils.component.Component;
 import io.atomix.utils.concurrent.Futures;
@@ -135,7 +135,7 @@ public class TestPartitionGroup implements ManagedPartitionGroup {
   }
 
   @Override
-  public ProxyProtocol newProtocol() {
+  public ServiceProtocol newProtocol() {
     return MultiRaftProtocol.builder(name)
         .withRecoveryStrategy(Recovery.RECOVER)
         .withMaxRetries(5)

@@ -178,3 +178,12 @@ enum RaftError {
     CONFIGURATION_ERROR = 10;
     UNAVAILABLE = 11;
 }
+
+message RaftPartitionGroupMetadata {
+    map<string, RaftPrimitiveMetadata> primitives = 1;
+}
+
+message RaftPrimitiveMetadata {
+    string name = 1;
+    string type = 2;
+}

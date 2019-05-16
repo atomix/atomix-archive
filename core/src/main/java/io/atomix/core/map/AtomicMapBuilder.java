@@ -18,7 +18,7 @@ package io.atomix.core.map;
 import io.atomix.primitive.PrimitiveManagementService;
 import io.atomix.primitive.protocol.PrimitiveProtocol;
 import io.atomix.primitive.protocol.ProxyCompatibleBuilder;
-import io.atomix.primitive.protocol.ProxyProtocol;
+import io.atomix.primitive.protocol.ServiceProtocol;
 
 /**
  * Builder for {@link AtomicMap} instances.
@@ -35,7 +35,7 @@ public abstract class AtomicMapBuilder<K, V>
   }
 
   @Override
-  public AtomicMapBuilder<K, V> withProtocol(ProxyProtocol protocol) {
+  public AtomicMapBuilder<K, V> withProtocol(ServiceProtocol protocol) {
     return withProtocol((PrimitiveProtocol) protocol);
   }
 }

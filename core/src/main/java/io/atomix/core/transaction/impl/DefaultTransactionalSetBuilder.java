@@ -28,7 +28,7 @@ import io.atomix.core.transaction.TransactionalSet;
 import io.atomix.core.transaction.TransactionalSetBuilder;
 import io.atomix.core.transaction.TransactionalSetConfig;
 import io.atomix.primitive.PrimitiveManagementService;
-import io.atomix.primitive.protocol.ProxyProtocol;
+import io.atomix.primitive.protocol.ServiceProtocol;
 import io.atomix.utils.serializer.Serializer;
 
 /**
@@ -45,7 +45,7 @@ public class DefaultTransactionalSetBuilder<E> extends TransactionalSetBuilder<E
   }
 
   @Override
-  public TransactionalSetBuilder<E> withProtocol(ProxyProtocol protocol) {
+  public TransactionalSetBuilder<E> withProtocol(ServiceProtocol protocol) {
     setBuilder.withProtocol(protocol);
     return this;
   }
@@ -74,10 +74,10 @@ public class DefaultTransactionalSetBuilder<E> extends TransactionalSetBuilder<E
           TransactionalSetParticipant<E> transactionalSet;
           switch (transaction.isolation()) {
             case READ_COMMITTED:
-              transactionalSet = new ReadCommittedTransactionalSet<>(transaction.transactionId(), (ProxyProtocol) protocol(), set.async());
+              transactionalSet = new ReadCommittedTransactionalSet<>(transaction.transactionId(), (ServiceProtocol) protocol(), set.async());
               break;
             case REPEATABLE_READS:
-              transactionalSet = new RepeatableReadsTransactionalSet<>(transaction.transactionId(), (ProxyProtocol) protocol(), set.async());
+              transactionalSet = new RepeatableReadsTransactionalSet<>(transaction.transactionId(), (ServiceProtocol) protocol(), set.async());
               break;
             default:
               throw new AssertionError();

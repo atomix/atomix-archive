@@ -20,7 +20,7 @@ import io.atomix.primitive.PrimitiveBuilder;
 import io.atomix.primitive.PrimitiveManagementService;
 import io.atomix.primitive.protocol.PrimitiveProtocol;
 import io.atomix.primitive.protocol.ProxyCompatibleBuilder;
-import io.atomix.primitive.protocol.ProxyProtocol;
+import io.atomix.primitive.protocol.ServiceProtocol;
 
 /**
  * Transactional set builder.
@@ -34,7 +34,7 @@ public abstract class TransactionalSetBuilder<E>
   }
 
   @Override
-  public TransactionalSetBuilder<E> withProtocol(ProxyProtocol protocol) {
+  public TransactionalSetBuilder<E> withProtocol(ServiceProtocol protocol) {
     return withProtocol((PrimitiveProtocol) protocol);
   }
 }

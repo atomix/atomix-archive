@@ -25,7 +25,7 @@ import io.atomix.core.transaction.TransactionId;
 import io.atomix.core.transaction.TransactionParticipant;
 import io.atomix.core.transaction.TransactionalMap;
 import io.atomix.primitive.PrimitiveType;
-import io.atomix.primitive.protocol.ProxyProtocol;
+import io.atomix.primitive.protocol.ServiceProtocol;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -35,10 +35,10 @@ import static com.google.common.base.Preconditions.checkNotNull;
  */
 public abstract class TransactionalMapParticipant<K, V> implements AsyncTransactionalMap<K, V>, TransactionParticipant<MapUpdate<K, V>> {
   protected final TransactionId transactionId;
-  protected final ProxyProtocol protocol;
+  protected final ServiceProtocol protocol;
   protected final AsyncAtomicMap<K, V> consistentMap;
 
-  protected TransactionalMapParticipant(TransactionId transactionId, ProxyProtocol protocol, AsyncAtomicMap<K, V> consistentMap) {
+  protected TransactionalMapParticipant(TransactionId transactionId, ServiceProtocol protocol, AsyncAtomicMap<K, V> consistentMap) {
     this.transactionId = checkNotNull(transactionId);
     this.protocol = checkNotNull(protocol);
     this.consistentMap = checkNotNull(consistentMap);
@@ -55,7 +55,7 @@ public abstract class TransactionalMapParticipant<K, V> implements AsyncTransact
   }
 
   @Override
-  public ProxyProtocol protocol() {
+  public ServiceProtocol protocol() {
     return protocol;
   }
 

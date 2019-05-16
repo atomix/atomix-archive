@@ -19,7 +19,7 @@ import io.atomix.primitive.PrimitiveBuilder;
 import io.atomix.primitive.PrimitiveManagementService;
 import io.atomix.primitive.protocol.PrimitiveProtocol;
 import io.atomix.primitive.protocol.ProxyCompatibleBuilder;
-import io.atomix.primitive.protocol.ProxyProtocol;
+import io.atomix.primitive.protocol.ServiceProtocol;
 
 /**
  * Builder for AtomicCounter.
@@ -33,7 +33,7 @@ public abstract class AtomicCounterBuilder
   }
 
   @Override
-  public AtomicCounterBuilder withProtocol(ProxyProtocol protocol) {
+  public AtomicCounterBuilder withProtocol(ServiceProtocol protocol) {
     return withProtocol((PrimitiveProtocol) protocol);
   }
 }

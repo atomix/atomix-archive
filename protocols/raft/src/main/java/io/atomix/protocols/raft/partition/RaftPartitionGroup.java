@@ -45,10 +45,12 @@ import io.atomix.primitive.partition.PartitionId;
 import io.atomix.primitive.partition.PartitionManagementService;
 import io.atomix.primitive.partition.PartitionMetadata;
 import io.atomix.primitive.protocol.PrimitiveProtocol;
-import io.atomix.primitive.protocol.ProxyProtocol;
+import io.atomix.primitive.protocol.ServiceProtocol;
 import io.atomix.protocols.raft.MultiRaftProtocol;
 import io.atomix.raft.RaftClient;
 import io.atomix.raft.impl.DefaultRaftClient;
+import io.atomix.raft.protocol.RaftPartitionGroupMetadata;
+import io.atomix.raft.protocol.RaftPrimitiveMetadata;
 import io.atomix.storage.StorageLevel;
 import io.atomix.utils.component.Component;
 import io.atomix.utils.concurrent.BlockingAwareThreadPoolContextFactory;
@@ -144,6 +146,7 @@ public class RaftPartitionGroup implements ManagedPartitionGroup {
   private final Map<PartitionId, RaftPartition> partitions = Maps.newConcurrentMap();
   private final List<PartitionId> sortedPartitionIds = Lists.newCopyOnWriteArrayList();
   private Collection<PartitionMetadata> metadata;
+  private PartitionManagementService managementService;
   private ClusterCommunicationService communicationService;
   private final String snapshotSubject;
 
@@ -188,7 +191,7 @@ public class RaftPartitionGroup implements ManagedPartitionGroup {
   }
 
   @Override
-  public ProxyProtocol newProtocol() {
+  public ServiceProtocol newProtocol() {
     return MultiRaftProtocol.builder(name)
         .withRecoveryStrategy(Recovery.RECOVER)
         .withMaxRetries(5)
@@ -239,6 +242,7 @@ public class RaftPartitionGroup implements ManagedPartitionGroup {
   @Override
   public CompletableFuture<ManagedPartitionGroup> join(PartitionManagementService managementService) {
     this.metadata = buildPartitions();
+    this.managementService = managementService;
     this.communicationService = managementService.getMessagingService();
     communicationService.<Void, Void>subscribe(snapshotSubject, m -> handleSnapshot());
     List<CompletableFuture<Partition>> futures = metadata.stream()
@@ -256,6 +260,33 @@ public class RaftPartitionGroup implements ManagedPartitionGroup {
   @Override
   public CompletableFuture<ManagedPartitionGroup> connect(PartitionManagementService managementService) {
     return join(managementService);
+  }
+
+  /**
+   * Creates a new Raft primitive.
+   *
+   * @param metadata the primitive metadata
+   * @return a future to be completed once the primitive has been created
+   */
+  public CompletableFuture<RaftPrimitiveMetadata> createPrimitive(RaftPrimitiveMetadata metadata) {
+    return managementService.getMetadataService().update(
+        name,
+        RaftPartitionGroupMetadata::parseFrom,
+        groupMetadata -> {
+          if (groupMetadata == null) {
+            groupMetadata = RaftPartitionGroupMetadata.newBuilder().build();
+          }
+
+          RaftPrimitiveMetadata primitive = groupMetadata.getPrimitivesMap().get(metadata.getName());
+          if (primitive == null) {
+            groupMetadata = RaftPartitionGroupMetadata.newBuilder(groupMetadata)
+                .putPrimitives(metadata.getName(), metadata)
+                .build();
+          }
+          return groupMetadata;
+        },
+        RaftPartitionGroupMetadata::toByteArray)
+        .thenApply(groupMetadata -> groupMetadata.getPrimitivesMap().get(metadata.getName()));
   }
 
   private Collection<PartitionMetadata> buildPartitions() {

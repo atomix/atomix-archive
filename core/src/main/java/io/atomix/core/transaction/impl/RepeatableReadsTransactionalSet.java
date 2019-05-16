@@ -24,7 +24,7 @@ import io.atomix.core.set.AsyncDistributedSet;
 import io.atomix.core.set.impl.SetUpdate;
 import io.atomix.core.transaction.TransactionId;
 import io.atomix.core.transaction.TransactionLog;
-import io.atomix.primitive.protocol.ProxyProtocol;
+import io.atomix.primitive.protocol.ServiceProtocol;
 
 /**
  * Repeatable reads transactional set.
@@ -33,7 +33,7 @@ public class RepeatableReadsTransactionalSet<E> extends TransactionalSetParticip
   private final Map<E, CompletableFuture<Boolean>> cache = Maps.newConcurrentMap();
   private final Map<E, SetUpdate<E>> updates = Maps.newConcurrentMap();
 
-  public RepeatableReadsTransactionalSet(TransactionId transactionId, ProxyProtocol protocol, AsyncDistributedSet<E> set) {
+  public RepeatableReadsTransactionalSet(TransactionId transactionId, ServiceProtocol protocol, AsyncDistributedSet<E> set) {
     super(transactionId, protocol, set);
   }
 

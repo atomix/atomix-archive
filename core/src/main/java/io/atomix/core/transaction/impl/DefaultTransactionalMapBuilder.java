@@ -28,7 +28,7 @@ import io.atomix.core.transaction.TransactionalMap;
 import io.atomix.core.transaction.TransactionalMapBuilder;
 import io.atomix.core.transaction.TransactionalMapConfig;
 import io.atomix.primitive.PrimitiveManagementService;
-import io.atomix.primitive.protocol.ProxyProtocol;
+import io.atomix.primitive.protocol.ServiceProtocol;
 import io.atomix.utils.serializer.Serializer;
 
 /**
@@ -45,7 +45,7 @@ public class DefaultTransactionalMapBuilder<K, V> extends TransactionalMapBuilde
   }
 
   @Override
-  public TransactionalMapBuilder<K, V> withProtocol(ProxyProtocol protocol) {
+  public TransactionalMapBuilder<K, V> withProtocol(ServiceProtocol protocol) {
     mapBuilder.withProtocol(protocol);
     return this;
   }
@@ -74,10 +74,10 @@ public class DefaultTransactionalMapBuilder<K, V> extends TransactionalMapBuilde
           TransactionalMapParticipant<K, V> transactionalMap;
           switch (transaction.isolation()) {
             case READ_COMMITTED:
-              transactionalMap = new ReadCommittedTransactionalMap<>(transaction.transactionId(), (ProxyProtocol) protocol(), map.async());
+              transactionalMap = new ReadCommittedTransactionalMap<>(transaction.transactionId(), (ServiceProtocol) protocol(), map.async());
               break;
             case REPEATABLE_READS:
-              transactionalMap = new RepeatableReadsTransactionalMap<>(transaction.transactionId(), (ProxyProtocol) protocol(), map.async());
+              transactionalMap = new RepeatableReadsTransactionalMap<>(transaction.transactionId(), (ServiceProtocol) protocol(), map.async());
               break;
             default:
               throw new AssertionError();

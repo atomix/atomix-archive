@@ -19,7 +19,7 @@ import io.atomix.core.collection.DistributedCollectionBuilder;
 import io.atomix.primitive.PrimitiveManagementService;
 import io.atomix.primitive.protocol.PrimitiveProtocol;
 import io.atomix.primitive.protocol.ProxyCompatibleBuilder;
-import io.atomix.primitive.protocol.ProxyProtocol;
+import io.atomix.primitive.protocol.ServiceProtocol;
 
 /**
  * Builder for distributed set.
@@ -35,7 +35,7 @@ public abstract class DistributedSetBuilder<E>
   }
 
   @Override
-  public DistributedSetBuilder<E> withProtocol(ProxyProtocol protocol) {
+  public DistributedSetBuilder<E> withProtocol(ServiceProtocol protocol) {
     return withProtocol((PrimitiveProtocol) protocol);
   }
 }

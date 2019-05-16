@@ -19,7 +19,7 @@ import io.atomix.primitive.ManagedPrimitiveBuilder;
 import io.atomix.primitive.PrimitiveManagementService;
 import io.atomix.primitive.protocol.PrimitiveProtocol;
 import io.atomix.primitive.protocol.ProxyCompatibleBuilder;
-import io.atomix.primitive.protocol.ProxyProtocol;
+import io.atomix.primitive.protocol.ServiceProtocol;
 
 /**
  * Builder for DistributedLock.
@@ -33,7 +33,7 @@ public abstract class DistributedLockBuilder
   }
 
   @Override
-  public DistributedLockBuilder withProtocol(ProxyProtocol protocol) {
+  public DistributedLockBuilder withProtocol(ServiceProtocol protocol) {
     return withProtocol((PrimitiveProtocol) protocol);
   }
 }

@@ -41,7 +41,7 @@ import io.atomix.primitive.partition.PartitionId;
 import io.atomix.primitive.partition.PartitionManagementService;
 import io.atomix.primitive.partition.PartitionMetadataEvent;
 import io.atomix.primitive.protocol.PrimitiveProtocol;
-import io.atomix.primitive.protocol.ProxyProtocol;
+import io.atomix.primitive.protocol.ServiceProtocol;
 import io.atomix.protocols.log.DistributedLogProtocol;
 import io.atomix.protocols.log.impl.DistributedLogClient;
 import io.atomix.storage.StorageLevel;
@@ -160,7 +160,7 @@ public class LogPartitionGroup implements ManagedPartitionGroup {
   }
 
   @Override
-  public ProxyProtocol newProtocol() {
+  public ServiceProtocol newProtocol() {
     return DistributedLogProtocol.builder(name).build();
   }
 

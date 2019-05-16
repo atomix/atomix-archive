@@ -19,7 +19,7 @@ import io.atomix.primitive.PrimitiveBuilder;
 import io.atomix.primitive.PrimitiveManagementService;
 import io.atomix.primitive.protocol.PrimitiveProtocol;
 import io.atomix.primitive.protocol.ProxyCompatibleBuilder;
-import io.atomix.primitive.protocol.ProxyProtocol;
+import io.atomix.primitive.protocol.ServiceProtocol;
 
 /**
  * Builder for AtomicIdGenerator.
@@ -33,7 +33,7 @@ public abstract class AtomicIdGeneratorBuilder
   }
 
   @Override
-  public AtomicIdGeneratorBuilder withProtocol(ProxyProtocol protocol) {
+  public AtomicIdGeneratorBuilder withProtocol(ServiceProtocol protocol) {
     return withProtocol((PrimitiveProtocol) protocol);
   }
 }

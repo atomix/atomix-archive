@@ -36,7 +36,7 @@ public class DefaultDistributedLogBuilder<E> extends DistributedLogBuilder<E> {
     return managementService.getPrimitiveRegistry().createPrimitive(name, type)
         .thenCompose(v -> {
           LogProtocol protocol = (LogProtocol) protocol();
-          return protocol.create(name, managementService.getPartitionService())
+          return protocol.createTopic(name, managementService.getPartitionService())
               .thenApply(client -> new DefaultAsyncDistributedLog<E>(name, client, serializer()).sync());
         });
   }

@@ -30,7 +30,7 @@ import io.atomix.primitive.partition.PartitionGroup;
 import io.atomix.primitive.partition.PartitionId;
 import io.atomix.primitive.protocol.PrimitiveProtocol;
 import io.atomix.primitive.protocol.PrimitiveProtocolConfig;
-import io.atomix.primitive.protocol.ProxyProtocol;
+import io.atomix.primitive.protocol.ServiceProtocol;
 import io.atomix.primitive.proxy.PrimitiveProxy;
 import io.atomix.primitive.service.ServiceType;
 import io.atomix.utils.Builder;
@@ -174,7 +174,7 @@ public abstract class PrimitiveBuilder<B extends PrimitiveBuilder<B, C, P>, C ex
   protected <P extends PrimitiveProxy> Map<PartitionId, P> newMultitonProxies(
       ServiceType serviceType, Function<PrimitiveProxy.Context, P> factory) {
     List<PartitionId> partitions = managementService.getPartitionService()
-        .getPartitionGroup((ProxyProtocol) protocol())
+        .getPartitionGroup((ServiceProtocol) protocol())
         .getPartitions()
         .stream()
         .map(Partition::id)
@@ -206,7 +206,7 @@ public abstract class PrimitiveBuilder<B extends PrimitiveBuilder<B, C, P>, C ex
    */
   protected <P extends PrimitiveProxy> P newSingletonProxy(ServiceType serviceType, Function<PrimitiveProxy.Context, P> factory) {
     PartitionId partitionId = managementService.getPartitionService()
-        .getPartitionGroup((ProxyProtocol) protocol())
+        .getPartitionGroup((ServiceProtocol) protocol())
         .getPartition(name)
         .id();
     return newProxy(serviceType, partitionId, factory);

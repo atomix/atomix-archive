@@ -24,7 +24,7 @@ import io.atomix.core.set.AsyncDistributedSet;
 import io.atomix.core.set.impl.SetUpdate;
 import io.atomix.core.transaction.TransactionId;
 import io.atomix.core.transaction.TransactionLog;
-import io.atomix.primitive.protocol.ProxyProtocol;
+import io.atomix.primitive.protocol.ServiceProtocol;
 
 /**
  * Default transactional set.
@@ -32,7 +32,7 @@ import io.atomix.primitive.protocol.ProxyProtocol;
 public class ReadCommittedTransactionalSet<E> extends TransactionalSetParticipant<E> {
   private final Map<E, SetUpdate<E>> updates = Maps.newConcurrentMap();
 
-  public ReadCommittedTransactionalSet(TransactionId transactionId, ProxyProtocol protocol, AsyncDistributedSet<E> set) {
+  public ReadCommittedTransactionalSet(TransactionId transactionId, ServiceProtocol protocol, AsyncDistributedSet<E> set) {
     super(transactionId, protocol, set);
   }
 

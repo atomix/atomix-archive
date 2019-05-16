@@ -24,7 +24,7 @@ import java.util.stream.Collectors;
 import io.atomix.core.test.TestAtomixFactory;
 import io.atomix.core.test.protocol.TestProtocol;
 import io.atomix.core.test.protocol.TestStateMachine;
-import io.atomix.primitive.protocol.ProxyProtocol;
+import io.atomix.primitive.protocol.ServiceProtocol;
 import org.junit.After;
 import org.junit.Before;
 
@@ -41,7 +41,7 @@ public abstract class AbstractPrimitiveTest {
    *
    * @return the protocol with which to test
    */
-  protected ProxyProtocol protocol() {
+  protected ServiceProtocol protocol() {
     return protocol;
   }
 

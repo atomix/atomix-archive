@@ -26,6 +26,6 @@ public interface ProxyCompatibleBuilder<B extends ProxyCompatibleBuilder<B>> {
    * @param protocol the state machine replication protocol
    * @return the primitive builder
    */
-  B withProtocol(ProxyProtocol protocol);
+  B withProtocol(ServiceProtocol protocol);
 
 }

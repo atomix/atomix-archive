@@ -20,7 +20,7 @@ import io.atomix.primitive.PrimitiveBuilder;
 import io.atomix.primitive.PrimitiveManagementService;
 import io.atomix.primitive.protocol.PrimitiveProtocol;
 import io.atomix.primitive.protocol.ProxyCompatibleBuilder;
-import io.atomix.primitive.protocol.ProxyProtocol;
+import io.atomix.primitive.protocol.ServiceProtocol;
 
 /**
  * Transactional map builder.
@@ -34,7 +34,7 @@ public abstract class TransactionalMapBuilder<K, V>
   }
 
   @Override
-  public TransactionalMapBuilder<K, V> withProtocol(ProxyProtocol protocol) {
+  public TransactionalMapBuilder<K, V> withProtocol(ServiceProtocol protocol) {
     return withProtocol((PrimitiveProtocol) protocol);
   }
 }

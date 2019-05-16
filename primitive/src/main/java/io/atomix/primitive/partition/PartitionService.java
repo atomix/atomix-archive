@@ -15,7 +15,7 @@
  */
 package io.atomix.primitive.partition;
 
-import io.atomix.primitive.protocol.ProxyProtocol;
+import io.atomix.primitive.protocol.ServiceProtocol;
 import io.atomix.primitive.protocol.PrimitiveProtocol;
 
 import java.util.Collection;
@@ -61,7 +61,7 @@ public interface PartitionService {
    * @return the first partition group that matches the given primitive protocol
    */
   @SuppressWarnings("unchecked")
-  default PartitionGroup getPartitionGroup(ProxyProtocol protocol) {
+  default PartitionGroup getPartitionGroup(ServiceProtocol protocol) {
     if (protocol.group() != null && !protocol.group().equals("")) {
       PartitionGroup group = getPartitionGroup(protocol.group());
       if (group != null) {

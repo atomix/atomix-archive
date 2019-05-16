@@ -26,7 +26,7 @@ import io.atomix.primitive.partition.PartitionGroupTypeRegistry;
 import io.atomix.primitive.partition.PartitionId;
 import io.atomix.primitive.partition.PartitionService;
 import io.atomix.primitive.protocol.PrimitiveProtocolTypeRegistry;
-import io.atomix.primitive.protocol.ProxyProtocol;
+import io.atomix.primitive.protocol.ServiceProtocol;
 import io.atomix.primitive.proxy.PrimitiveProxy;
 import io.atomix.primitive.service.ServiceType;
 import io.atomix.primitive.session.SessionId;
@@ -95,7 +95,7 @@ public class PrimitiveFactory<P extends PrimitiveProxy, I extends Message> {
    * @param id the primitive ID
    * @return the primitive protocol
    */
-  private ProxyProtocol toProtocol(I id) {
+  private ServiceProtocol toProtocol(I id) {
     if (primitiveIdDescriptor.hasMultiRaftProtocol(id)) {
       String group = primitiveIdDescriptor.getMultiRaftProtocol(id).getGroup();
       return io.atomix.protocols.raft.MultiRaftProtocol.builder(group).build();
@@ -120,7 +120,7 @@ public class PrimitiveFactory<P extends PrimitiveProxy, I extends Message> {
    * @return the partition group name
    */
   public String getPartitionGroup(I id) {
-    ProxyProtocol protocol = toProtocol(id);
+    ServiceProtocol protocol = toProtocol(id);
     return protocol != null ? protocol.group() : null;
   }
 
@@ -198,7 +198,7 @@ public class PrimitiveFactory<P extends PrimitiveProxy, I extends Message> {
    */
   public P getPrimitive(I id) {
     String name = getPrimitiveName(id);
-    ProxyProtocol protocol = toProtocol(id);
+    ServiceProtocol protocol = toProtocol(id);
     return getPrimitive(name, atomix.getPartitionService().getPartitionGroup(protocol).getPartition(name).id());
   }
 
@@ -210,7 +210,7 @@ public class PrimitiveFactory<P extends PrimitiveProxy, I extends Message> {
    */
   public Map<PartitionId, P> getPrimitives(I id) {
     String name = getPrimitiveName(id);
-    ProxyProtocol protocol = toProtocol(id);
+    ServiceProtocol protocol = toProtocol(id);
     return atomix.getPartitionService().getPartitionGroup(protocol)
         .getPartitions()
         .stream()

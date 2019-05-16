@@ -20,7 +20,7 @@ import java.util.concurrent.CompletableFuture;
 import io.atomix.core.map.impl.MapUpdate;
 import io.atomix.core.transaction.TransactionLog;
 import io.atomix.core.transaction.TransactionParticipant;
-import io.atomix.primitive.protocol.ProxyProtocol;
+import io.atomix.primitive.protocol.ServiceProtocol;
 
 /**
  * Singleton transactional map.
@@ -34,7 +34,7 @@ public class SingletonTransactionalMap<K, V> extends DelegatingTransactionalMap<
   }
 
   @Override
-  public ProxyProtocol protocol() {
+  public ServiceProtocol protocol() {
     return map.protocol();
   }
 
