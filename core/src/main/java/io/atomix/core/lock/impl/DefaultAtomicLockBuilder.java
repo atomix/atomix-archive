@@ -23,6 +23,9 @@ import io.atomix.core.lock.AtomicLockBuilder;
 import io.atomix.core.lock.AtomicLockConfig;
 import io.atomix.primitive.ManagedAsyncPrimitive;
 import io.atomix.primitive.PrimitiveManagementService;
+import io.atomix.primitive.protocol.ServiceProtocol;
+import io.atomix.primitive.service.impl.ServiceId;
+import io.atomix.primitive.session.impl.DefaultSessionClient;
 
 /**
  * Default distributed lock builder implementation.
@@ -35,8 +38,13 @@ public class DefaultAtomicLockBuilder extends AtomicLockBuilder {
   @Override
   @SuppressWarnings("unchecked")
   public CompletableFuture<AtomicLock> buildAsync() {
-    return managementService.getPrimitiveRegistry().createPrimitive(name, type)
-        .thenApply(v -> newSingletonProxy(LockService.TYPE, LockProxy::new))
+    ServiceProtocol protocol = (ServiceProtocol) protocol();
+    ServiceId serviceId = ServiceId.newBuilder()
+        .setName(name)
+        .setType(LockService.TYPE.name())
+        .build();
+    return protocol.createService(name, managementService.getPartitionService())
+        .thenApply(client -> new LockProxy(new DefaultSessionClient(serviceId, client.getPartition(name))))
         .thenApply(proxy -> new DefaultAsyncAtomicLock(proxy, config.getSessionTimeout(), managementService))
         .thenCompose(ManagedAsyncPrimitive::connect)
         .thenApply(AsyncAtomicLock::sync);

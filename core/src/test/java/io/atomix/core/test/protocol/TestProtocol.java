@@ -23,13 +23,11 @@ import com.google.common.collect.Maps;
 import io.atomix.core.test.partition.TestPartitionGroup;
 import io.atomix.primitive.PrimitiveClient;
 import io.atomix.primitive.impl.DefaultPrimitiveClient;
+import io.atomix.primitive.partition.PartitionClient;
 import io.atomix.primitive.partition.PartitionId;
 import io.atomix.primitive.partition.PartitionService;
 import io.atomix.primitive.protocol.PrimitiveProtocol;
 import io.atomix.primitive.protocol.ServiceProtocol;
-import io.atomix.primitive.service.ServiceClient;
-import io.atomix.primitive.service.impl.DefaultServiceClient;
-import io.atomix.primitive.service.impl.ServiceId;
 import io.atomix.utils.component.Component;
 
 /**
@@ -88,10 +86,10 @@ public class TestProtocol implements ServiceProtocol {
   }
 
   @Override
-  public CompletableFuture<PrimitiveClient> createService(ServiceId serviceId, PartitionService partitionService) {
+  public CompletableFuture<PrimitiveClient> createService(String name, PartitionService partitionService) {
     TestPartitionGroup partitionGroup = (TestPartitionGroup) partitionService.getPartitionGroup(this);
-    Map<PartitionId, ServiceClient> partitions = partitionGroup.getPartitions().stream()
-        .map(partition -> Maps.immutableEntry(partition.id(), new DefaultServiceClient(serviceId, partition.getClient())))
+    Map<PartitionId, PartitionClient> partitions = partitionGroup.getPartitions().stream()
+        .map(partition -> Maps.immutableEntry(partition.id(), partition.getClient()))
         .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
     return CompletableFuture.completedFuture(new DefaultPrimitiveClient(partitions, config.getPartitioner()));
   }

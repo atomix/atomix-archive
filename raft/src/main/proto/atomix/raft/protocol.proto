@@ -185,5 +185,4 @@ message RaftPartitionGroupMetadata {
 
 message RaftPrimitiveMetadata {
     string name = 1;
-    string type = 2;
 }

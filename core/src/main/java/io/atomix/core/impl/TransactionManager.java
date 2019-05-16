@@ -54,7 +54,8 @@ import io.atomix.primitive.partition.PartitionId;
 import io.atomix.primitive.partition.Partitioner;
 import io.atomix.primitive.protocol.PrimitiveProtocol;
 import io.atomix.primitive.protocol.ProxyCompatibleBuilder;
-import io.atomix.primitive.proxy.PrimitiveProxy;
+import io.atomix.primitive.service.impl.ServiceId;
+import io.atomix.primitive.session.impl.DefaultSessionClient;
 import io.atomix.utils.component.Component;
 import io.atomix.utils.component.Dependency;
 import io.atomix.utils.component.Managed;
@@ -376,8 +377,11 @@ public class TransactionManager implements TransactionService, Managed {
         .getPartitions()
         .stream()
         .map(partition -> {
-          MapProxy proxy = new MapProxy(new PrimitiveProxy.Context(
-              "atomix-transactions", MapService.TYPE, partition, managementService.getThreadFactory()));
+          ServiceId serviceId = ServiceId.newBuilder()
+              .setName("atomix-transactions")
+              .setType(MapService.TYPE.name())
+              .build();
+          MapProxy proxy = new MapProxy(new DefaultSessionClient(serviceId, partition.getClient()));
           return Pair.of(partition.id(), new RawAsyncAtomicMap(proxy, Duration.ofSeconds(30), managementService));
         }).collect(Collectors.toMap(Pair::getKey, Pair::getValue));
     return Futures.allOf(partitions.values().stream().map(RawAsyncAtomicMap::connect))

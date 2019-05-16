@@ -4,9 +4,11 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicLong;
 
 import io.atomix.primitive.AsyncPrimitive;
+import io.atomix.primitive.PrimitiveManagementService;
 import io.atomix.primitive.proxy.PrimitiveProxy;
 import io.atomix.primitive.service.impl.RequestContext;
 import io.atomix.primitive.service.impl.StreamContext;
+import io.atomix.utils.concurrent.ThreadContext;
 import io.atomix.utils.stream.StreamHandler;
 import org.apache.commons.lang3.tuple.Pair;
 
@@ -15,15 +17,26 @@ import org.apache.commons.lang3.tuple.Pair;
  */
 public abstract class SimpleAsyncPrimitive<P extends PrimitiveProxy> implements AsyncPrimitive {
   private final P proxy;
+  private final ThreadContext context;
   private final AtomicLong index = new AtomicLong();
 
-  public SimpleAsyncPrimitive(P proxy) {
+  public SimpleAsyncPrimitive(P proxy, PrimitiveManagementService managementService) {
     this.proxy = proxy;
+    this.context = managementService.getThreadFactory().createContext();
   }
 
   @Override
   public String name() {
     return proxy.name();
+  }
+
+  /**
+   * Returns the primitive thread context.
+   *
+   * @return the primitive thread context
+   */
+  protected ThreadContext context() {
+    return context;
   }
 
   /**

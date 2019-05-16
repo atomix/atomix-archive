@@ -33,8 +33,9 @@ import io.atomix.primitive.partition.PartitionService;
 import io.atomix.primitive.partition.Partitioner;
 import io.atomix.primitive.partition.SystemPartitionService;
 import io.atomix.primitive.protocol.PrimitiveProtocolTypeRegistry;
-import io.atomix.primitive.proxy.PrimitiveProxy;
+import io.atomix.primitive.service.impl.ServiceId;
 import io.atomix.primitive.session.SessionIdService;
+import io.atomix.primitive.session.impl.DefaultSessionClient;
 import io.atomix.primitive.session.impl.PrimitiveSessionIdManager;
 import io.atomix.primitive.util.ByteArrayDecoder;
 import io.atomix.primitive.util.ByteArrayEncoder;
@@ -220,8 +221,11 @@ public class PartitionMetadataManager implements PartitionMetadataService, Manag
         .getPartitions()
         .stream()
         .map(partition -> {
-          MapProxy proxy = new MapProxy(new PrimitiveProxy.Context(
-              "atomix-partition-metadata", MapService.TYPE, partition, threadService.getFactory()));
+          ServiceId serviceId = ServiceId.newBuilder()
+              .setName("atomix-partition-metadata")
+              .setType(MapService.TYPE.name())
+              .build();
+          MapProxy proxy = new MapProxy(new DefaultSessionClient(serviceId, partition.getClient()));
           return Pair.of(partition.id(), new RawAsyncAtomicMap(proxy, Duration.ofSeconds(30), new PartialPrimitiveManagementService()));
         }).collect(Collectors.toMap(Pair::getKey, Pair::getValue));
     return Futures.allOf(partitions.values().stream().map(RawAsyncAtomicMap::connect))

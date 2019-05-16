@@ -4,6 +4,7 @@ import java.util.concurrent.CompletableFuture;
 
 import io.atomix.primitive.partition.PrimaryElectionEvent;
 import io.atomix.primitive.proxy.SessionEnabledPrimitiveProxy;
+import io.atomix.primitive.session.SessionClient;
 import io.atomix.primitive.session.impl.SessionCommandContext;
 import io.atomix.primitive.session.impl.SessionQueryContext;
 import io.atomix.primitive.session.impl.SessionResponseContext;
@@ -15,8 +16,8 @@ import org.apache.commons.lang3.tuple.Pair;
  * Primary election proxy.
  */
 public class PrimaryElectorProxy extends SessionEnabledPrimitiveProxy {
-  PrimaryElectorProxy(Context context) {
-    super(context);
+  PrimaryElectorProxy(SessionClient client) {
+    super(client);
   }
 
   public CompletableFuture<Pair<SessionResponseContext, EnterResponse>> enter(

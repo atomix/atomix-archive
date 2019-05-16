@@ -19,7 +19,6 @@ import java.util.concurrent.CompletableFuture;
 
 import io.atomix.primitive.PrimitiveClient;
 import io.atomix.primitive.partition.PartitionService;
-import io.atomix.primitive.service.impl.ServiceId;
 
 /**
  * State machine replication-based primitive protocol.
@@ -36,10 +35,10 @@ public interface ServiceProtocol extends PrimitiveProtocol {
   /**
    * Creates a new service via the protocol.
    *
-   * @param serviceId        the service to create
+   * @param name             the service name
    * @param partitionService the partition service
    * @return the service client
    */
-  CompletableFuture<PrimitiveClient> createService(ServiceId serviceId, PartitionService partitionService);
+  CompletableFuture<PrimitiveClient> createService(String name, PartitionService partitionService);
 
 }

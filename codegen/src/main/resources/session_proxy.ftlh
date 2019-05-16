@@ -19,6 +19,7 @@ import io.atomix.primitive.PrimitiveManagementService;
 import io.atomix.primitive.partition.PartitionId;
 import io.atomix.primitive.proxy.SessionEnabledPrimitiveProxy;
 import io.atomix.primitive.service.impl.ServiceId;
+import io.atomix.primitive.session.SessionClient;
 import io.atomix.primitive.session.impl.SessionResponseContext;
 <#if hasCommands>
 import io.atomix.primitive.session.impl.SessionCommandContext;
@@ -50,8 +51,8 @@ import ${operation.responseClass.packageName}.${operation.responseClass.classNam
  * Atomix generated proxy ${proxyClass.className}.
  */
 public class ${proxyClass.className} extends SessionEnabledPrimitiveProxy {
-    public ${proxyClass.className}(Context context) {
-        super(context);
+    public ${proxyClass.className}(SessionClient client) {
+        super(client);
     }
 
     <#list operations as operation>

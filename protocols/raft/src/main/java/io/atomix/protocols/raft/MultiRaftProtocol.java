@@ -22,13 +22,11 @@ import java.util.stream.Collectors;
 import com.google.common.collect.Maps;
 import io.atomix.primitive.PrimitiveClient;
 import io.atomix.primitive.impl.DefaultPrimitiveClient;
+import io.atomix.primitive.partition.PartitionClient;
 import io.atomix.primitive.partition.PartitionId;
 import io.atomix.primitive.partition.PartitionService;
 import io.atomix.primitive.protocol.PrimitiveProtocol;
 import io.atomix.primitive.protocol.ServiceProtocol;
-import io.atomix.primitive.service.ServiceClient;
-import io.atomix.primitive.service.impl.DefaultServiceClient;
-import io.atomix.primitive.service.impl.ServiceId;
 import io.atomix.protocols.raft.partition.RaftPartitionGroup;
 import io.atomix.raft.protocol.RaftPrimitiveMetadata;
 import io.atomix.utils.component.Component;
@@ -109,15 +107,14 @@ public class MultiRaftProtocol implements ServiceProtocol {
   }
 
   @Override
-  public CompletableFuture<PrimitiveClient> createService(ServiceId serviceId, PartitionService partitionService) {
+  public CompletableFuture<PrimitiveClient> createService(String name, PartitionService partitionService) {
     RaftPartitionGroup partitionGroup = (RaftPartitionGroup) partitionService.getPartitionGroup(this);
     return partitionGroup.createPrimitive(RaftPrimitiveMetadata.newBuilder()
-        .setName(serviceId.getName())
-        .setType(serviceId.getType())
+        .setName(name)
         .build())
         .thenApply(metadata -> {
-          Map<PartitionId, ServiceClient> partitions = partitionGroup.getPartitions().stream()
-              .map(partition -> Maps.immutableEntry(partition.id(), new DefaultServiceClient(serviceId, partition.getClient())))
+          Map<PartitionId, PartitionClient> partitions = partitionGroup.getPartitions().stream()
+              .map(partition -> Maps.immutableEntry(partition.id(), partition.getClient()))
               .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
           return new DefaultPrimitiveClient(partitions, config.getPartitioner());
         });

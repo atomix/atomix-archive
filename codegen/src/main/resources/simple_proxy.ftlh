@@ -16,6 +16,7 @@
 package ${proxyClass.packageName};
 
 import io.atomix.primitive.PrimitiveManagementService;
+import io.atomix.primitive.service.ServiceClient;
 import io.atomix.primitive.service.impl.ServiceId;
 import io.atomix.primitive.service.impl.RequestContext;
 import io.atomix.primitive.service.impl.ResponseContext;
@@ -45,8 +46,8 @@ import ${operation.responseClass.packageName}.${operation.responseClass.classNam
  * Atomix generated proxy ${proxyClass.className}.
  */
 public class ${proxyClass.className} extends SimplePrimitiveProxy {
-    public ${proxyClass.className}(Context context) {
-        super(context);
+    public ${proxyClass.className}(ServiceClient client) {
+        super(client);
     }
 
     <#list operations as operation>

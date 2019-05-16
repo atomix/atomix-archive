@@ -16,23 +16,15 @@
 package io.atomix.primitive;
 
 import java.util.Collection;
-import java.util.List;
-import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import com.google.common.base.Joiner;
 import io.atomix.primitive.config.PrimitiveConfig;
-import io.atomix.primitive.partition.Partition;
 import io.atomix.primitive.partition.PartitionGroup;
-import io.atomix.primitive.partition.PartitionId;
 import io.atomix.primitive.protocol.PrimitiveProtocol;
 import io.atomix.primitive.protocol.PrimitiveProtocolConfig;
-import io.atomix.primitive.protocol.ServiceProtocol;
-import io.atomix.primitive.proxy.PrimitiveProxy;
-import io.atomix.primitive.service.ServiceType;
 import io.atomix.utils.Builder;
 import io.atomix.utils.config.ConfigurationException;
 import io.atomix.utils.serializer.Namespace;
@@ -162,70 +154,6 @@ public abstract class PrimitiveBuilder<B extends PrimitiveBuilder<B, C, P>, C ex
       }
     }
     return serializer;
-  }
-
-  /**
-   * Creates a new map of proxies for all partitions for the configured protocol.
-   *
-   * @param factory the proxy factory
-   * @param <P>     the proxy type
-   * @return the proxy
-   */
-  protected <P extends PrimitiveProxy> Map<PartitionId, P> newMultitonProxies(
-      ServiceType serviceType, Function<PrimitiveProxy.Context, P> factory) {
-    List<PartitionId> partitions = managementService.getPartitionService()
-        .getPartitionGroup((ServiceProtocol) protocol())
-        .getPartitions()
-        .stream()
-        .map(Partition::id)
-        .collect(Collectors.toList());
-    return newProxies(serviceType, partitions, factory);
-  }
-
-  /**
-   * Creates a new map of proxies for the given partitions.
-   *
-   * @param partitions the partitions for which to create the proxies
-   * @param factory    the proxy factory
-   * @param <P>        the proxy type
-   * @return the proxy
-   */
-  protected <P extends PrimitiveProxy> Map<PartitionId, P> newProxies(
-      ServiceType serviceType, List<PartitionId> partitions, Function<PrimitiveProxy.Context, P> factory) {
-    return partitions.stream()
-        .map(partitionId -> newProxy(serviceType, partitionId, factory))
-        .collect(Collectors.toMap(PrimitiveProxy::partitionId, Function.identity()));
-  }
-
-  /**
-   * Creates a new singleton primitive proxy.
-   *
-   * @param factory the proxy factory
-   * @param <P>     the proxy type
-   * @return the proxy
-   */
-  protected <P extends PrimitiveProxy> P newSingletonProxy(ServiceType serviceType, Function<PrimitiveProxy.Context, P> factory) {
-    PartitionId partitionId = managementService.getPartitionService()
-        .getPartitionGroup((ServiceProtocol) protocol())
-        .getPartition(name)
-        .id();
-    return newProxy(serviceType, partitionId, factory);
-  }
-
-  /**
-   * Creates a new primitive proxy.
-   *
-   * @param partitionId the partition for which to return the proxy
-   * @param factory     the proxy factory
-   * @param <P>         the proxy type
-   * @return the proxy
-   */
-  protected <P extends PrimitiveProxy> P newProxy(ServiceType serviceType, PartitionId partitionId, Function<PrimitiveProxy.Context, P> factory) {
-    return factory.apply(new PrimitiveProxy.Context(
-        name,
-        serviceType,
-        managementService.getPartitionService().getPartitionGroup(partitionId.getGroup()).getPartition(partitionId),
-        managementService.getThreadFactory()));
   }
 
   /**

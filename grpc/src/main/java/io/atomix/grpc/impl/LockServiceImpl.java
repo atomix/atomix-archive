@@ -45,6 +45,7 @@ import io.atomix.grpc.lock.UnlockResponse;
 import io.atomix.grpc.protocol.DistributedLogProtocol;
 import io.atomix.grpc.protocol.MultiPrimaryProtocol;
 import io.atomix.grpc.protocol.MultiRaftProtocol;
+import io.atomix.primitive.session.impl.DefaultSessionClient;
 import io.atomix.primitive.session.impl.OpenSessionRequest;
 import io.atomix.primitive.session.impl.SessionCommandContext;
 import io.atomix.primitive.session.impl.SessionQueryContext;
@@ -63,7 +64,7 @@ public class LockServiceImpl extends LockServiceGrpc.LockServiceImplBase {
   private final RequestExecutor<LockProxy, LockId, SessionQueryHeader, IsLockedRequest, IsLockedResponse> isLocked;
 
   public LockServiceImpl(Atomix atomix) {
-    this.primitiveFactory = new PrimitiveFactory<>(atomix, LockService.TYPE, LockProxy::new, LOCK_ID_DESCRIPTOR);
+    this.primitiveFactory = new PrimitiveFactory<>(atomix, LockService.TYPE, (id, client) -> new LockProxy(new DefaultSessionClient(id, client)), LOCK_ID_DESCRIPTOR);
     this.create = new RequestExecutor<>(primitiveFactory, CREATE_DESCRIPTOR, CreateResponse::getDefaultInstance);
     this.keepAlive = new RequestExecutor<>(primitiveFactory, KEEP_ALIVE_DESCRIPTOR, KeepAliveResponse::getDefaultInstance);
     this.close = new RequestExecutor<>(primitiveFactory, CLOSE_DESCRIPTOR, CloseResponse::getDefaultInstance);

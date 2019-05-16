@@ -25,6 +25,9 @@ import io.atomix.core.idgenerator.AtomicIdGenerator;
 import io.atomix.core.idgenerator.AtomicIdGeneratorBuilder;
 import io.atomix.core.idgenerator.AtomicIdGeneratorConfig;
 import io.atomix.primitive.PrimitiveManagementService;
+import io.atomix.primitive.protocol.ServiceProtocol;
+import io.atomix.primitive.service.impl.DefaultServiceClient;
+import io.atomix.primitive.service.impl.ServiceId;
 
 /**
  * Default implementation of AtomicIdGeneratorBuilder.
@@ -36,9 +39,14 @@ public class DelegatingAtomicIdGeneratorBuilder extends AtomicIdGeneratorBuilder
 
   @Override
   public CompletableFuture<AtomicIdGenerator> buildAsync() {
-    return managementService.getPrimitiveRegistry().createPrimitive(name, type)
-        .thenApply(v -> newSingletonProxy(CounterService.TYPE, CounterProxy::new))
-        .thenApply(DefaultAsyncAtomicCounter::new)
+    ServiceProtocol protocol = (ServiceProtocol) protocol();
+    ServiceId serviceId = ServiceId.newBuilder()
+        .setName(name)
+        .setType(CounterService.TYPE.name())
+        .build();
+    return protocol.createService(name, managementService.getPartitionService())
+        .thenApply(client -> new CounterProxy(new DefaultServiceClient(serviceId, client.getPartition(name))))
+        .thenApply(proxy -> new DefaultAsyncAtomicCounter(proxy, managementService))
         .thenApply(DelegatingAtomicIdGenerator::new)
         .thenApply(AsyncAtomicIdGenerator::sync);
   }

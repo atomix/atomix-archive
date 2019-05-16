@@ -72,7 +72,7 @@ public class DefaultAsyncAtomicLock extends SessionEnabledAsyncPrimitive<LockPro
   @Override
   public CompletableFuture<Optional<Version>> tryLock(Duration timeout) {
     CompletableFuture<Optional<Version>> future = new CompletableFuture<>();
-    Scheduled timer = getProxy().context().schedule(timeout, () -> future.complete(Optional.empty()));
+    Scheduled timer = context().schedule(timeout, () -> future.complete(Optional.empty()));
     execute(LockProxy::lock, LockRequest.newBuilder()
         .setTimeout(timeout.toMillis())
         .build())

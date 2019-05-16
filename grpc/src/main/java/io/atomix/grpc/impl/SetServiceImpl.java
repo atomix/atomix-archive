@@ -55,6 +55,7 @@ import io.atomix.grpc.set.SetId;
 import io.atomix.grpc.set.SetServiceGrpc;
 import io.atomix.grpc.set.SizeRequest;
 import io.atomix.grpc.set.SizeResponse;
+import io.atomix.primitive.session.impl.DefaultSessionClient;
 import io.atomix.primitive.session.impl.OpenSessionRequest;
 import io.atomix.primitive.session.impl.SessionCommandContext;
 import io.atomix.primitive.session.impl.SessionQueryContext;
@@ -79,7 +80,7 @@ public class SetServiceImpl extends SetServiceGrpc.SetServiceImplBase {
   private final RequestExecutor<SetProxy, SetId, SessionQueryHeader, IterateRequest, IterateResponse> iterate;
 
   public SetServiceImpl(Atomix atomix) {
-    this.primitiveFactory = new PrimitiveFactory<>(atomix, SetService.TYPE, SetProxy::new, SET_ID_DESCRIPTOR);
+    this.primitiveFactory = new PrimitiveFactory<>(atomix, SetService.TYPE, (id, client) -> new SetProxy(new DefaultSessionClient(id, client)), SET_ID_DESCRIPTOR);
     this.create = new RequestExecutor<>(primitiveFactory, CREATE_DESCRIPTOR, CreateResponse::getDefaultInstance);
     this.keepAlive = new RequestExecutor<>(primitiveFactory, KEEP_ALIVE_DESCRIPTOR, KeepAliveResponse::getDefaultInstance);
     this.close = new RequestExecutor<>(primitiveFactory, CLOSE_DESCRIPTOR, CloseResponse::getDefaultInstance);

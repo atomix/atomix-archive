@@ -39,8 +39,9 @@ import io.atomix.primitive.partition.PrimaryElectionEvent;
 import io.atomix.primitive.partition.PrimaryElectionService;
 import io.atomix.primitive.partition.SystemPartitionService;
 import io.atomix.primitive.protocol.PrimitiveProtocolTypeRegistry;
-import io.atomix.primitive.proxy.PrimitiveProxy;
+import io.atomix.primitive.service.impl.ServiceId;
 import io.atomix.primitive.session.SessionIdService;
+import io.atomix.primitive.session.impl.DefaultSessionClient;
 import io.atomix.primitive.session.impl.PrimitiveSessionIdManager;
 import io.atomix.utils.component.Component;
 import io.atomix.utils.component.Dependency;
@@ -102,13 +103,13 @@ public class PrimitivePrimaryElectionManager implements PrimaryElectionService, 
   @SuppressWarnings("unchecked")
   public CompletableFuture<Void> start() {
     this.threadContextFactory = new BlockingAwareThreadPoolContextFactory("atomix-primary-election", 4, LOGGER);
+    ServiceId serviceId = ServiceId.newBuilder()
+        .setName(PRIMITIVE_NAME)
+        .setType(PrimaryElectorService.TYPE.name())
+        .build();
     Partition partition = systemService.getSystemPartitionGroup().getPartitions().iterator().next();
     this.elector = new PrimaryElectorSession(
-        new PrimaryElectorProxy(new PrimitiveProxy.Context(
-            PRIMITIVE_NAME,
-            PrimaryElectorService.TYPE,
-            partition,
-            threadContextFactory)),
+        new PrimaryElectorProxy(new DefaultSessionClient(serviceId, partition.getClient())),
         Duration.ofSeconds(10),
         new PartialPrimitiveManagementService());
     return elector.connect().thenApply(v -> null);

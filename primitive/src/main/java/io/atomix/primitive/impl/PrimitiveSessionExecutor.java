@@ -34,6 +34,7 @@ import io.atomix.primitive.session.impl.SessionCommandContext;
 import io.atomix.primitive.session.impl.SessionQueryContext;
 import io.atomix.primitive.session.impl.SessionResponseContext;
 import io.atomix.primitive.session.impl.SessionStreamContext;
+import io.atomix.utils.concurrent.ThreadContext;
 import io.atomix.utils.stream.StreamHandler;
 import org.apache.commons.lang3.tuple.Pair;
 
@@ -59,24 +60,27 @@ final class PrimitiveSessionExecutor<P extends SessionEnabledPrimitiveProxy> {
   private final PrimitiveSessionState state;
   private final ManagedPrimitiveContext context;
   private final PrimitiveSessionSequencer sequencer;
+  private final ThreadContext threadContext;
   private final Map<Long, OperationAttempt> attempts = new LinkedHashMap<>();
 
   PrimitiveSessionExecutor(
       P proxy,
       PrimitiveSessionState state,
       ManagedPrimitiveContext context,
-      PrimitiveSessionSequencer sequencer) {
+      PrimitiveSessionSequencer sequencer,
+      ThreadContext threadContext) {
     this.proxy = checkNotNull(proxy, "proxy cannot be null");
-    this.state = checkNotNull(state, "state");
+    this.state = checkNotNull(state, "state cannot be null");
     this.context = checkNotNull(context, "context cannot be null");
-    this.sequencer = checkNotNull(sequencer, "sequencer");
+    this.sequencer = checkNotNull(sequencer, "sequencer cannot be null");
+    this.threadContext = checkNotNull(threadContext, "threadContext cannot be null");
   }
 
   protected <T, U> CompletableFuture<U> execute(
       SessionCommandFunction<P, T, U> function,
       T request) {
     CompletableFuture<U> future = new CompletableFuture<>();
-    proxy.context().execute(() -> invokeCommand(function, request, future));
+    threadContext.execute(() -> invokeCommand(function, request, future));
     return future;
   }
 
@@ -85,7 +89,7 @@ final class PrimitiveSessionExecutor<P extends SessionEnabledPrimitiveProxy> {
       T request,
       StreamHandler<U> handler) {
     CompletableFuture<Long> future = new CompletableFuture<>();
-    proxy.context().execute(() -> invokeCommand(function, request, handler, future));
+    threadContext.execute(() -> invokeCommand(function, request, handler, future));
     return future;
   }
 
@@ -93,7 +97,7 @@ final class PrimitiveSessionExecutor<P extends SessionEnabledPrimitiveProxy> {
       SessionQueryFunction<P, T, U> function,
       T request) {
     CompletableFuture<U> future = new CompletableFuture<>();
-    proxy.context().execute(() -> invokeQuery(function, request, future));
+    threadContext.execute(() -> invokeQuery(function, request, future));
     return future;
   }
 
@@ -102,7 +106,7 @@ final class PrimitiveSessionExecutor<P extends SessionEnabledPrimitiveProxy> {
       T request,
       StreamHandler<U> handler) {
     CompletableFuture<Void> future = new CompletableFuture<>();
-    proxy.context().execute(() -> invokeQuery(function, request, handler, future));
+    threadContext.execute(() -> invokeQuery(function, request, handler, future));
     return future;
   }
 
@@ -197,7 +201,7 @@ final class PrimitiveSessionExecutor<P extends SessionEnabledPrimitiveProxy> {
    * Resubmits pending commands.
    */
   public void reset() {
-    proxy.context().execute(() -> {
+    threadContext.execute(() -> {
       for (OperationAttempt attempt : attempts.values()) {
         attempt.retry();
       }
@@ -303,7 +307,7 @@ final class PrimitiveSessionExecutor<P extends SessionEnabledPrimitiveProxy> {
      * Immediately retries the attempt.
      */
     public void retry() {
-      proxy.context().execute(() -> invoke(next()));
+      threadContext.execute(() -> invoke(next()));
     }
 
     /**
@@ -312,7 +316,7 @@ final class PrimitiveSessionExecutor<P extends SessionEnabledPrimitiveProxy> {
      * @param after The duration after which to retry the attempt.
      */
     public void retry(Duration after) {
-      proxy.context().schedule(after, () -> invoke(next()));
+      threadContext.schedule(after, () -> invoke(next()));
     }
   }
 

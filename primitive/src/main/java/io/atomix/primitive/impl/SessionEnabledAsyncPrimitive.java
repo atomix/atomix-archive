@@ -55,7 +55,7 @@ public abstract class SessionEnabledAsyncPrimitive<P extends SessionEnabledPrimi
       P proxy,
       Duration timeout,
       PrimitiveManagementService managementService) {
-    super(proxy);
+    super(proxy, managementService);
     this.timeout = timeout;
     this.managementService = managementService;
   }
@@ -114,7 +114,7 @@ public abstract class SessionEnabledAsyncPrimitive<P extends SessionEnabledPrimi
                   timeout);
               state = new PrimitiveSessionState(sessionId, timeout.toMillis());
               sequencer = new PrimitiveSessionSequencer(state, context);
-              executor = new PrimitiveSessionExecutor<>(getProxy(), state, context, sequencer);
+              executor = new PrimitiveSessionExecutor<>(getProxy(), state, context, sequencer, context());
               keepAlive(System.currentTimeMillis());
               return (T) this;
             }));
@@ -160,7 +160,7 @@ public abstract class SessionEnabledAsyncPrimitive<P extends SessionEnabledPrimi
     Duration delay = Duration.ofMillis(
         Math.max(Math.max((long) (timeout.toMillis() * TIMEOUT_FACTOR) - delta,
             timeout.toMillis() - MIN_TIMEOUT_DELTA - delta), 0));
-    keepAliveTimer = getProxy().context().schedule(delay, () -> {
+    keepAliveTimer = context().schedule(delay, () -> {
       if (open.get()) {
         keepAlive(lastKeepAliveTime);
       }

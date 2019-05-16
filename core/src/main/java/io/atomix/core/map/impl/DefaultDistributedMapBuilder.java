@@ -29,7 +29,9 @@ import io.atomix.core.map.DistributedMapConfig;
 import io.atomix.primitive.ManagedAsyncPrimitive;
 import io.atomix.primitive.PrimitiveManagementService;
 import io.atomix.primitive.partition.PartitionId;
-import io.atomix.primitive.partition.Partitioner;
+import io.atomix.primitive.protocol.ServiceProtocol;
+import io.atomix.primitive.service.impl.ServiceId;
+import io.atomix.primitive.session.impl.DefaultSessionClient;
 import io.atomix.utils.serializer.Serializer;
 
 /**
@@ -43,14 +45,20 @@ public class DefaultDistributedMapBuilder<K, V> extends DistributedMapBuilder<K,
   @Override
   @SuppressWarnings("unchecked")
   public CompletableFuture<DistributedMap<K, V>> buildAsync() {
-    return managementService.getPrimitiveRegistry().createPrimitive(name, type)
-        .thenApply(v -> newMultitonProxies(MapService.TYPE, MapProxy::new))
-        .thenApply(proxies -> proxies.entrySet().stream()
-            .map(entry -> Maps.<PartitionId, AsyncAtomicMap<String, byte[]>>immutableEntry(
-                entry.getKey(),
-                new RawAsyncAtomicMap(entry.getValue(), config.getSessionTimeout(), managementService)))
-            .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue)))
-        .thenApply(partitions -> new PartitionedAsyncAtomicMap(name, type, partitions, Partitioner.MURMUR3))
+    ServiceProtocol protocol = (ServiceProtocol) protocol();
+    ServiceId serviceId = ServiceId.newBuilder()
+        .setName(name)
+        .setType(MapService.TYPE.name())
+        .build();
+    return protocol.createService(name, managementService.getPartitionService())
+        .thenApply(client -> {
+          Map<PartitionId, AsyncAtomicMap<String, byte[]>> partitions = client.getPartitionIds().stream()
+              .map(id -> Maps.immutableEntry(id, new DefaultSessionClient(serviceId, client.getPartition(id))))
+              .map(e -> Maps.immutableEntry(e.getKey(), new MapProxy(e.getValue())))
+              .map(e -> Maps.immutableEntry(e.getKey(), new RawAsyncAtomicMap(e.getValue(), config.getSessionTimeout(), managementService)))
+              .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+          return new PartitionedAsyncAtomicMap(name, type, partitions, client.getPartitioner());
+        })
         .thenCompose(ManagedAsyncPrimitive::connect)
         .thenApply(rawMap -> {
           Serializer serializer = serializer();

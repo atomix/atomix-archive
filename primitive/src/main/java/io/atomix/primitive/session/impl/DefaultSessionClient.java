@@ -33,6 +33,16 @@ public class DefaultSessionClient implements SessionClient {
   }
 
   @Override
+  public String name() {
+    return serviceId.getName();
+  }
+
+  @Override
+  public String type() {
+    return serviceId.getType();
+  }
+
+  @Override
   public CompletableFuture<OpenSessionResponse> openSession(OpenSessionRequest request) {
     return command(SessionRequest.newBuilder()
         .setOpenSession(request)

@@ -18,6 +18,20 @@ import org.apache.commons.lang3.tuple.Pair;
 public interface ServiceClient {
 
   /**
+   * Returns the service name.
+   *
+   * @return the service name
+   */
+  String name();
+
+  /**
+   * Returns the service type.
+   *
+   * @return the service type
+   */
+  String type();
+
+  /**
    * Executes an operation on the primitive.
    *
    * @param operation the operation to execute

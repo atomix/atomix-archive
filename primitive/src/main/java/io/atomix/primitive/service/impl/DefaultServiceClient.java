@@ -3,22 +3,9 @@ package io.atomix.primitive.service.impl;
 import java.util.concurrent.CompletableFuture;
 
 import com.google.protobuf.Message;
-import io.atomix.primitive.service.ServiceClient;
 import io.atomix.primitive.operation.OperationId;
 import io.atomix.primitive.partition.PartitionClient;
-import io.atomix.primitive.service.impl.CommandRequest;
-import io.atomix.primitive.service.impl.CommandResponse;
-import io.atomix.primitive.service.impl.CreateRequest;
-import io.atomix.primitive.service.impl.DeleteRequest;
-import io.atomix.primitive.service.impl.QueryRequest;
-import io.atomix.primitive.service.impl.QueryResponse;
-import io.atomix.primitive.service.impl.RequestContext;
-import io.atomix.primitive.service.impl.ResponseContext;
-import io.atomix.primitive.service.impl.ServiceId;
-import io.atomix.primitive.service.impl.ServiceRequest;
-import io.atomix.primitive.service.impl.ServiceResponse;
-import io.atomix.primitive.service.impl.StreamContext;
-import io.atomix.primitive.service.impl.StreamResponse;
+import io.atomix.primitive.service.ServiceClient;
 import io.atomix.primitive.util.ByteArrayDecoder;
 import io.atomix.primitive.util.ByteBufferDecoder;
 import io.atomix.primitive.util.ByteStringEncoder;
@@ -36,6 +23,16 @@ public class DefaultServiceClient implements ServiceClient {
   public DefaultServiceClient(ServiceId serviceId, PartitionClient client) {
     this.serviceId = serviceId;
     this.client = client;
+  }
+
+  @Override
+  public String name() {
+    return serviceId.getName();
+  }
+
+  @Override
+  public String type() {
+    return serviceId.getType();
   }
 
   @Override

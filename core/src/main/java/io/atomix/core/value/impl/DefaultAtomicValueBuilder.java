@@ -23,6 +23,9 @@ import io.atomix.core.value.AtomicValueBuilder;
 import io.atomix.core.value.AtomicValueConfig;
 import io.atomix.primitive.ManagedAsyncPrimitive;
 import io.atomix.primitive.PrimitiveManagementService;
+import io.atomix.primitive.protocol.ServiceProtocol;
+import io.atomix.primitive.service.impl.ServiceId;
+import io.atomix.primitive.session.impl.DefaultSessionClient;
 import io.atomix.utils.serializer.Serializer;
 
 /**
@@ -38,8 +41,13 @@ public class DefaultAtomicValueBuilder<V> extends AtomicValueBuilder<V> {
   @Override
   @SuppressWarnings("unchecked")
   public CompletableFuture<AtomicValue<V>> buildAsync() {
-    return managementService.getPrimitiveRegistry().createPrimitive(name, type)
-        .thenApply(v -> newSingletonProxy(ValueService.TYPE, ValueProxy::new))
+    ServiceProtocol protocol = (ServiceProtocol) protocol();
+    ServiceId serviceId = ServiceId.newBuilder()
+        .setName(name)
+        .setType(ValueService.TYPE.name())
+        .build();
+    return protocol.createService(name, managementService.getPartitionService())
+        .thenApply(client -> new ValueProxy(new DefaultSessionClient(serviceId, client.getPartition(name))))
         .thenApply(proxy -> new RawAsyncAtomicValue(proxy, config.getSessionTimeout(), managementService))
         .thenCompose(ManagedAsyncPrimitive::connect)
         .thenApply(rawValue -> {

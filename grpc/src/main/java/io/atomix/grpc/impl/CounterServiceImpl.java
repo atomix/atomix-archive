@@ -36,6 +36,7 @@ import io.atomix.grpc.headers.ResponseHeaders;
 import io.atomix.grpc.protocol.DistributedLogProtocol;
 import io.atomix.grpc.protocol.MultiPrimaryProtocol;
 import io.atomix.grpc.protocol.MultiRaftProtocol;
+import io.atomix.primitive.service.impl.DefaultServiceClient;
 import io.atomix.primitive.service.impl.RequestContext;
 import io.grpc.stub.StreamObserver;
 
@@ -51,7 +52,7 @@ public class CounterServiceImpl extends CounterServiceGrpc.CounterServiceImplBas
   private final RequestExecutor<CounterProxy, CounterId, RequestHeader, DecrementRequest, DecrementResponse> decrement;
 
   public CounterServiceImpl(Atomix atomix) {
-    this.primitiveFactory = new PrimitiveFactory<>(atomix, CounterService.TYPE, CounterProxy::new, COUNTER_ID_DESCRIPTOR);
+    this.primitiveFactory = new PrimitiveFactory<>(atomix, CounterService.TYPE, (id, client) -> new CounterProxy(new DefaultServiceClient(id, client)), COUNTER_ID_DESCRIPTOR);
     this.set = new RequestExecutor<>(primitiveFactory, SET_DESCRIPTOR, SetResponse::getDefaultInstance);
     this.get = new RequestExecutor<>(primitiveFactory, GET_DESCRIPTOR, GetResponse::getDefaultInstance);
     this.checkAndSet = new RequestExecutor<>(primitiveFactory, CHECK_AND_SET_DESCRIPTOR, CheckAndSetResponse::getDefaultInstance);

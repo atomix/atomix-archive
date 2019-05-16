@@ -101,12 +101,18 @@ public class RequestExecutor<P extends PrimitiveProxy, I extends Message, H exte
       Function<P, CompletableFuture<R>> function) {
     I id = getId(request);
     if (isValidId(id, responseObserver)) {
-      function.apply(primitiveFactory.getPrimitive(id)).whenComplete((result, funcError) -> {
-        if (funcError == null) {
-          responseObserver.onNext(result);
-          responseObserver.onCompleted();
+      primitiveFactory.getPrimitive(id).whenComplete((primitive, primitiveError) -> {
+        if (primitiveError == null) {
+          function.apply(primitive.getRight()).whenComplete((result, funcError) -> {
+            if (funcError == null) {
+              responseObserver.onNext(result);
+              responseObserver.onCompleted();
+            } else {
+              responseObserver.onError(funcError);
+            }
+          });
         } else {
-          responseObserver.onError(funcError);
+          responseObserver.onError(primitiveError);
         }
       });
     }
@@ -129,13 +135,18 @@ public class RequestExecutor<P extends PrimitiveProxy, I extends Message, H exte
     if (isValidId(id, responseObserver)) {
       primitiveFactory.createSession().whenComplete((sessionId, sessionError) -> {
         if (sessionError == null) {
-          PartitionId partitionId = primitiveFactory.getPartitionId(id, key);
-          function.apply(partitionId, sessionId, primitiveFactory.getPrimitive(primitiveFactory.getPrimitiveName(id), partitionId)).whenComplete((result, funcError) -> {
-            if (funcError == null) {
-              responseObserver.onNext(result);
-              responseObserver.onCompleted();
+          primitiveFactory.getPrimitive(id, key).whenComplete((primitive, primitiveError) -> {
+            if (primitiveError == null) {
+              function.apply(primitive.getLeft(), sessionId, primitive.getRight()).whenComplete((result, funcError) -> {
+                if (funcError == null) {
+                  responseObserver.onNext(result);
+                  responseObserver.onCompleted();
+                } else {
+                  responseObserver.onError(funcError);
+                }
+              });
             } else {
-              responseObserver.onError(funcError);
+              responseObserver.onError(primitiveError);
             }
           });
         } else {
@@ -162,9 +173,9 @@ public class RequestExecutor<P extends PrimitiveProxy, I extends Message, H exte
     if (isValidId(id, responseObserver)) {
       primitiveFactory.createSession().whenComplete((sessionId, sessionError) -> {
         if (sessionError == null) {
-          final String name = primitiveFactory.getPrimitiveName(id);
-          Futures.allOf(primitiveFactory.getPartitionIds(id).stream()
-              .map(partitionId -> function.apply(partitionId, sessionId, primitiveFactory.getPrimitive(name, partitionId))))
+          primitiveFactory.getPrimitives(id)
+              .thenCompose(partitions -> Futures.allOf(partitions.entrySet().stream()
+                  .map(e -> function.apply(e.getKey(), sessionId, e.getValue()))))
               .thenApply(results -> responseFunction.apply(sessionId, results))
               .whenComplete((result, funcError) -> {
                 if (funcError == null) {
@@ -197,18 +208,18 @@ public class RequestExecutor<P extends PrimitiveProxy, I extends Message, H exte
     I id = getId(request);
     if (isValidId(id, responseObserver)) {
       final String group = primitiveFactory.getPartitionGroup(id);
-      final String name = primitiveFactory.getPrimitiveName(id);
       Map<PartitionId, H> headerMap = getHeaders(request).stream()
           .map(header -> Pair.of(PartitionId.newBuilder()
               .setGroup(group)
               .setPartition(getPartitionId(header))
               .build(), header))
           .collect(Collectors.toMap(Pair::getKey, Pair::getValue));
-      Futures.allOf(primitiveFactory.getPartitionIds(id).stream()
-          .map(partitionId -> {
-            H header = headerMap.computeIfAbsent(partitionId, i -> getDefaultHeader(i.getPartition()));
-            return function.apply(partitionId, header, primitiveFactory.getPrimitive(name, partitionId));
-          }))
+      primitiveFactory.getPrimitives(id)
+          .thenCompose(partitions -> Futures.allOf(partitions.entrySet().stream()
+              .map(e -> {
+                H header = headerMap.computeIfAbsent(e.getKey(), i -> getDefaultHeader(i.getPartition()));
+                return function.apply(e.getKey(), header, e.getValue());
+              })))
           .thenApply(aggregator)
           .whenComplete((result, funcError) -> {
             if (funcError == null) {
@@ -237,33 +248,33 @@ public class RequestExecutor<P extends PrimitiveProxy, I extends Message, H exte
     I id = getId(request);
     if (isValidId(id, responseObserver)) {
       final String group = primitiveFactory.getPartitionGroup(id);
-      final String name = primitiveFactory.getPrimitiveName(id);
       Map<PartitionId, H> headerMap = getHeaders(request).stream()
           .map(header -> Pair.of(PartitionId.newBuilder()
               .setGroup(group)
               .setPartition(getPartitionId(header))
               .build(), header))
           .collect(Collectors.toMap(Pair::getKey, Pair::getValue));
-      Futures.allOf(primitiveFactory.getPartitionIds(id).stream()
-          .map(partitionId -> {
-            H header = headerMap.computeIfAbsent(partitionId, i -> getDefaultHeader(i.getPartition()));
-            return function.apply(header, new StreamHandler<V>() {
-              @Override
-              public void next(V value) {
-                responseObserver.onNext(converter.apply(header, value));
-              }
+      primitiveFactory.getPrimitives(id)
+          .thenCompose(partitions -> Futures.allOf(partitions.entrySet().stream()
+              .map(e -> {
+                H header = headerMap.computeIfAbsent(e.getKey(), i -> getDefaultHeader(i.getPartition()));
+                return function.apply(header, new StreamHandler<V>() {
+                  @Override
+                  public void next(V value) {
+                    responseObserver.onNext(converter.apply(header, value));
+                  }
 
-              @Override
-              public void complete() {
-                responseObserver.onCompleted();
-              }
+                  @Override
+                  public void complete() {
+                    responseObserver.onCompleted();
+                  }
 
-              @Override
-              public void error(Throwable error) {
-                responseObserver.onError(error);
-              }
-            }, primitiveFactory.getPrimitive(name, partitionId));
-          }))
+                  @Override
+                  public void error(Throwable error) {
+                    responseObserver.onError(error);
+                  }
+                }, e.getValue());
+              })))
           .whenComplete((result, funcError) -> {
             if (funcError != null) {
               responseObserver.onError(funcError);
@@ -286,18 +297,18 @@ public class RequestExecutor<P extends PrimitiveProxy, I extends Message, H exte
     I id = getId(request);
     if (isValidId(id, responseObserver)) {
       final String group = primitiveFactory.getPartitionGroup(id);
-      final String name = primitiveFactory.getPrimitiveName(id);
       Map<PartitionId, H> headerMap = getHeaders(request).stream()
           .map(header -> Pair.of(PartitionId.newBuilder()
               .setGroup(group)
               .setPartition(getPartitionId(header))
               .build(), header))
           .collect(Collectors.toMap(Pair::getKey, Pair::getValue));
-      Futures.allOf(primitiveFactory.getPartitionIds(id).stream()
-          .map(partitionId -> {
-            H header = headerMap.computeIfAbsent(partitionId, i -> getDefaultHeader(i.getPartition()));
-            return function.apply(partitionId, header, primitiveFactory.getPrimitive(name, partitionId));
-          }))
+      primitiveFactory.getPrimitives(id)
+          .thenCompose(partitions -> Futures.allOf(partitions.entrySet().stream()
+              .map(e -> {
+                H header = headerMap.computeIfAbsent(e.getKey(), i -> getDefaultHeader(i.getPartition()));
+                return function.apply(e.getKey(), header, e.getValue());
+              })))
           .whenComplete((result, funcError) -> {
             if (funcError != null) {
               responseObserver.onError(funcError);
@@ -321,17 +332,22 @@ public class RequestExecutor<P extends PrimitiveProxy, I extends Message, H exte
       TriFunction<PartitionId, H, P, CompletableFuture<R>> function) {
     I id = getId(request);
     if (isValidId(id, responseObserver)) {
-      PartitionId partitionId = primitiveFactory.getPartitionId(id, key);
-      H header = getHeaders(request).stream()
-          .filter(h -> getPartitionId(h) == partitionId.getPartition())
-          .findFirst()
-          .orElseGet(() -> getDefaultHeader(partitionId.getPartition()));
-      function.apply(partitionId, header, primitiveFactory.getPrimitive(primitiveFactory.getPrimitiveName(id), partitionId)).whenComplete((result, funcError) -> {
-        if (funcError == null) {
-          responseObserver.onNext(result);
-          responseObserver.onCompleted();
+      primitiveFactory.getPrimitive(id, key).whenComplete((primitive, primitiveError) -> {
+        if (primitiveError == null) {
+          H header = getHeaders(request).stream()
+              .filter(h -> getPartitionId(h) == primitive.getLeft().getPartition())
+              .findFirst()
+              .orElseGet(() -> getDefaultHeader(primitive.getLeft().getPartition()));
+          function.apply(primitive.getLeft(), header, primitive.getRight()).whenComplete((result, funcError) -> {
+            if (funcError == null) {
+              responseObserver.onNext(result);
+              responseObserver.onCompleted();
+            } else {
+              responseObserver.onError(funcError);
+            }
+          });
         } else {
-          responseObserver.onError(funcError);
+          responseObserver.onError(primitiveError);
         }
       });
     }
@@ -353,31 +369,35 @@ public class RequestExecutor<P extends PrimitiveProxy, I extends Message, H exte
       TriFunction<PartitionId, H, V, R> converter) {
     I id = getId(request);
     if (isValidId(id, responseObserver)) {
-      PartitionId partitionId = primitiveFactory.getPartitionId(id, key);
-      H header = getHeaders(request).stream()
-          .filter(h -> getPartitionId(h) == partitionId.getPartition())
-          .findFirst()
-          .orElseGet(() -> getDefaultHeader(partitionId.getPartition()));
-      P primitive = primitiveFactory.getPrimitive(primitiveFactory.getPrimitiveName(id), partitionId);
-      StreamHandler<V> handler = new StreamHandler<V>() {
-        @Override
-        public void next(V value) {
-          responseObserver.onNext(converter.apply(partitionId, header, value));
-        }
+      primitiveFactory.getPrimitive(id, key).whenComplete((primitive, primitiveError) -> {
+        if (primitiveError == null) {
+          H header = getHeaders(request).stream()
+              .filter(h -> getPartitionId(h) == primitive.getLeft().getPartition())
+              .findFirst()
+              .orElseGet(() -> getDefaultHeader(primitive.getLeft().getPartition()));
+          StreamHandler<V> handler = new StreamHandler<V>() {
+            @Override
+            public void next(V value) {
+              responseObserver.onNext(converter.apply(primitive.getLeft(), header, value));
+            }
 
-        @Override
-        public void complete() {
-          responseObserver.onCompleted();
-        }
+            @Override
+            public void complete() {
+              responseObserver.onCompleted();
+            }
 
-        @Override
-        public void error(Throwable error) {
-          responseObserver.onError(error);
-        }
-      };
-      function.apply(partitionId, header, handler, primitive).whenComplete((result, funcError) -> {
-        if (funcError != null) {
-          responseObserver.onError(funcError);
+            @Override
+            public void error(Throwable error) {
+              responseObserver.onError(error);
+            }
+          };
+          function.apply(primitive.getLeft(), header, handler, primitive.getRight()).whenComplete((result, funcError) -> {
+            if (funcError != null) {
+              responseObserver.onError(funcError);
+            }
+          });
+        } else {
+          responseObserver.onError(primitiveError);
         }
       });
     }
@@ -401,22 +421,18 @@ public class RequestExecutor<P extends PrimitiveProxy, I extends Message, H exte
     I id = getId(request);
     if (isValidId(id, responseObserver)) {
       final String group = primitiveFactory.getPartitionGroup(id);
-      final String name = primitiveFactory.getPrimitiveName(id);
-      Map<PartitionId, Collection<String>> partitionMap = primitiveFactory.getPartitionIds(id, keys);
       Map<PartitionId, H> headerMap = getHeaders(request).stream()
           .map(header -> Pair.of(PartitionId.newBuilder()
               .setGroup(group)
               .setPartition(getPartitionId(header))
               .build(), header))
-          .filter(pair -> partitionMap.containsKey(pair.getKey()))
           .collect(Collectors.toMap(Pair::getKey, Pair::getValue));
-      Futures.allOf(partitionMap.entrySet().stream()
-          .map(e -> {
-            PartitionId partitionId = e.getKey();
-            Collection<String> partitionKeys = e.getValue();
-            H partitionHeader = headerMap.computeIfAbsent(partitionId, i -> getDefaultHeader(i.getPartition()));
-            return function.apply(partitionHeader, partitionKeys, primitiveFactory.getPrimitive(name, partitionId));
-          }))
+      primitiveFactory.getPrimitives(id, keys)
+          .thenCompose(partitions -> Futures.allOf(partitions.entrySet().stream()
+              .map(e -> {
+                H header = headerMap.computeIfAbsent(e.getKey(), i -> getDefaultHeader(i.getPartition()));
+                return function.apply(header, e.getValue().getLeft(), e.getValue().getRight());
+              })))
           .thenApply(aggregator)
           .whenComplete((result, funcError) -> {
             if (funcError == null) {

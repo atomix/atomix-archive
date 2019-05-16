@@ -17,8 +17,9 @@ package io.atomix.primitive;
 
 import java.util.Collection;
 
+import io.atomix.primitive.partition.PartitionClient;
 import io.atomix.primitive.partition.PartitionId;
-import io.atomix.primitive.service.ServiceClient;
+import io.atomix.primitive.partition.Partitioner;
 
 /**
  * Primitive client.
@@ -26,11 +27,18 @@ import io.atomix.primitive.service.ServiceClient;
 public interface PrimitiveClient {
 
   /**
+   * Returns the partitioner for the client.
+   *
+   * @return the partitioner
+   */
+  Partitioner<String> getPartitioner();
+
+  /**
    * Returns the collection of all partitions.
    *
    * @return the collection of all partitions
    */
-  Collection<ServiceClient> getPartitions();
+  Collection<PartitionClient> getPartitions();
 
   /**
    * Returns the collection of all partition IDs.
@@ -45,7 +53,7 @@ public interface PrimitiveClient {
    * @param partitionId the partition with the given identifier
    * @return the partition with the given identifier
    */
-  ServiceClient getPartition(int partitionId);
+  PartitionClient getPartition(int partitionId);
 
   /**
    * Returns the partition with the given identifier.
@@ -53,7 +61,7 @@ public interface PrimitiveClient {
    * @param partitionId the partition with the given identifier
    * @return the partition with the given identifier
    */
-  ServiceClient getPartition(PartitionId partitionId);
+  PartitionClient getPartition(PartitionId partitionId);
 
   /**
    * Returns the partition ID for the given key.
@@ -69,7 +77,7 @@ public interface PrimitiveClient {
    * @param key the key for which to return the partition
    * @return the partition for the given key
    */
-  default ServiceClient getPartition(String key) {
+  default PartitionClient getPartition(String key) {
     return getPartition(getPartitionId(key));
   }
 

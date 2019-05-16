@@ -28,7 +28,9 @@ import io.atomix.core.set.DistributedSetConfig;
 import io.atomix.primitive.ManagedAsyncPrimitive;
 import io.atomix.primitive.PrimitiveManagementService;
 import io.atomix.primitive.partition.PartitionId;
-import io.atomix.primitive.partition.Partitioner;
+import io.atomix.primitive.protocol.ServiceProtocol;
+import io.atomix.primitive.service.impl.ServiceId;
+import io.atomix.primitive.session.impl.DefaultSessionClient;
 import io.atomix.utils.serializer.Serializer;
 
 /**
@@ -44,14 +46,20 @@ public class DefaultDistributedSetBuilder<E> extends DistributedSetBuilder<E> {
   @Override
   @SuppressWarnings("unchecked")
   public CompletableFuture<DistributedSet<E>> buildAsync() {
-    return managementService.getPrimitiveRegistry().createPrimitive(name, type)
-        .thenApply(v -> newMultitonProxies(SetService.TYPE, SetProxy::new))
-        .thenApply(proxies -> proxies.entrySet().stream()
-            .map(entry -> Maps.<PartitionId, AsyncDistributedSet<String>>immutableEntry(
-                entry.getKey(),
-                new RawAsyncDistributedSet(entry.getValue(), config.getSessionTimeout(), managementService)))
-            .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue)))
-        .thenApply(partitions -> new PartitionedAsyncDistributedSet(name, type, partitions, Partitioner.MURMUR3))
+    ServiceProtocol protocol = (ServiceProtocol) protocol();
+    ServiceId serviceId = ServiceId.newBuilder()
+        .setName(name)
+        .setType(SetService.TYPE.name())
+        .build();
+    return protocol.createService(name, managementService.getPartitionService())
+        .thenApply(client -> {
+          Map<PartitionId, AsyncDistributedSet<String>> partitions = client.getPartitionIds().stream()
+              .map(id -> Maps.immutableEntry(id, new DefaultSessionClient(serviceId, client.getPartition(id))))
+              .map(e -> Maps.immutableEntry(e.getKey(), new SetProxy(e.getValue())))
+              .map(e -> Maps.immutableEntry(e.getKey(), new RawAsyncDistributedSet(e.getValue(), config.getSessionTimeout(), managementService)))
+              .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+          return new PartitionedAsyncDistributedSet(name, type, partitions, client.getPartitioner());
+        })
         .thenCompose(ManagedAsyncPrimitive::connect)
         .thenApply(rawSet -> {
           Serializer serializer = serializer();

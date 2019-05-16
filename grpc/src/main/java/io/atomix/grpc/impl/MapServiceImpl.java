@@ -59,6 +59,7 @@ import io.atomix.grpc.map.SizeResponse;
 import io.atomix.grpc.protocol.DistributedLogProtocol;
 import io.atomix.grpc.protocol.MultiPrimaryProtocol;
 import io.atomix.grpc.protocol.MultiRaftProtocol;
+import io.atomix.primitive.session.impl.DefaultSessionClient;
 import io.atomix.primitive.session.impl.OpenSessionRequest;
 import io.atomix.primitive.session.impl.SessionCommandContext;
 import io.atomix.primitive.session.impl.SessionQueryContext;
@@ -84,7 +85,7 @@ public class MapServiceImpl extends MapServiceGrpc.MapServiceImplBase {
   private final RequestExecutor<MapProxy, MapId, SessionCommandHeader, EventRequest, EventResponse> events;
 
   public MapServiceImpl(Atomix atomix) {
-    this.primitiveFactory = new PrimitiveFactory<>(atomix, MapService.TYPE, MapProxy::new, MAP_ID_DESCRIPTOR);
+    this.primitiveFactory = new PrimitiveFactory<>(atomix, MapService.TYPE, (id, client) -> new MapProxy(new DefaultSessionClient(id, client)), MAP_ID_DESCRIPTOR);
     this.create = new RequestExecutor<>(primitiveFactory, CREATE_DESCRIPTOR, CreateResponse::getDefaultInstance);
     this.keepAlive = new RequestExecutor<>(primitiveFactory, KEEP_ALIVE_DESCRIPTOR, KeepAliveResponse::getDefaultInstance);
     this.close = new RequestExecutor<>(primitiveFactory, CLOSE_DESCRIPTOR, CloseResponse::getDefaultInstance);

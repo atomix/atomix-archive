@@ -7,9 +7,9 @@ import java.util.concurrent.CopyOnWriteArrayList;
 
 import com.google.common.collect.Maps;
 import io.atomix.primitive.PrimitiveClient;
+import io.atomix.primitive.partition.PartitionClient;
 import io.atomix.primitive.partition.PartitionId;
 import io.atomix.primitive.partition.Partitioner;
-import io.atomix.primitive.service.ServiceClient;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -18,13 +18,13 @@ import static com.google.common.base.Preconditions.checkNotNull;
  */
 public class DefaultPrimitiveClient implements PrimitiveClient {
   private final List<PartitionId> partitionIds = new CopyOnWriteArrayList<>();
-  private final Map<Integer, ServiceClient> intPartitions = Maps.newConcurrentMap();
-  private final Map<PartitionId, ServiceClient> partitions = Maps.newConcurrentMap();
-  private final List<ServiceClient> sortedPartitions = new CopyOnWriteArrayList<>();
+  private final Map<Integer, PartitionClient> intPartitions = Maps.newConcurrentMap();
+  private final Map<PartitionId, PartitionClient> partitions = Maps.newConcurrentMap();
+  private final List<PartitionClient> sortedPartitions = new CopyOnWriteArrayList<>();
   private final Partitioner<String> partitioner;
 
   public DefaultPrimitiveClient(
-      Map<PartitionId, ServiceClient> partitions,
+      Map<PartitionId, PartitionClient> partitions,
       Partitioner<String> partitioner) {
     this.partitioner = checkNotNull(partitioner, "partitioner cannot be null");
     partitions.forEach((partitionId, partition) -> {
@@ -36,7 +36,12 @@ public class DefaultPrimitiveClient implements PrimitiveClient {
   }
 
   @Override
-  public Collection<ServiceClient> getPartitions() {
+  public Partitioner<String> getPartitioner() {
+    return partitioner;
+  }
+
+  @Override
+  public Collection<PartitionClient> getPartitions() {
     return sortedPartitions;
   }
 
@@ -46,12 +51,12 @@ public class DefaultPrimitiveClient implements PrimitiveClient {
   }
 
   @Override
-  public ServiceClient getPartition(int partitionId) {
+  public PartitionClient getPartition(int partitionId) {
     return intPartitions.get(partitionId);
   }
 
   @Override
-  public ServiceClient getPartition(PartitionId partitionId) {
+  public PartitionClient getPartition(PartitionId partitionId) {
     return partitions.get(partitionId);
   }
 

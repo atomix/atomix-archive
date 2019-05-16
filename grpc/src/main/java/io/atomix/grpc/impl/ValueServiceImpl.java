@@ -48,6 +48,7 @@ import io.atomix.grpc.value.SetRequest;
 import io.atomix.grpc.value.SetResponse;
 import io.atomix.grpc.value.ValueId;
 import io.atomix.grpc.value.ValueServiceGrpc;
+import io.atomix.primitive.session.impl.DefaultSessionClient;
 import io.atomix.primitive.session.impl.OpenSessionRequest;
 import io.atomix.primitive.session.impl.SessionCommandContext;
 import io.atomix.primitive.session.impl.SessionQueryContext;
@@ -69,7 +70,7 @@ public class ValueServiceImpl extends ValueServiceGrpc.ValueServiceImplBase {
   private final RequestExecutor<ValueProxy, ValueId, SessionCommandHeader, EventRequest, EventResponse> events;
 
   public ValueServiceImpl(Atomix atomix) {
-    this.primitiveFactory = new PrimitiveFactory<>(atomix, ValueService.TYPE, ValueProxy::new, VALUE_ID_DESCRIPTOR);
+    this.primitiveFactory = new PrimitiveFactory<>(atomix, ValueService.TYPE, (id, client) -> new ValueProxy(new DefaultSessionClient(id, client)), VALUE_ID_DESCRIPTOR);
     this.create = new RequestExecutor<>(primitiveFactory, CREATE_DESCRIPTOR, CreateResponse::getDefaultInstance);
     this.keepAlive = new RequestExecutor<>(primitiveFactory, KEEP_ALIVE_DESCRIPTOR, KeepAliveResponse::getDefaultInstance);
     this.close = new RequestExecutor<>(primitiveFactory, CLOSE_DESCRIPTOR, CloseResponse::getDefaultInstance);

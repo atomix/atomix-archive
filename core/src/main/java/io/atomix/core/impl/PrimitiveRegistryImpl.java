@@ -48,8 +48,9 @@ import io.atomix.primitive.partition.PartitionId;
 import io.atomix.primitive.partition.PartitionService;
 import io.atomix.primitive.partition.Partitioner;
 import io.atomix.primitive.protocol.PrimitiveProtocolTypeRegistry;
-import io.atomix.primitive.proxy.PrimitiveProxy;
+import io.atomix.primitive.service.impl.ServiceId;
 import io.atomix.primitive.session.SessionIdService;
+import io.atomix.primitive.session.impl.DefaultSessionClient;
 import io.atomix.primitive.session.impl.PrimitiveSessionIdManager;
 import io.atomix.utils.component.Component;
 import io.atomix.utils.component.Dependency;
@@ -141,8 +142,11 @@ public class PrimitiveRegistryImpl implements PrimitiveRegistry, Managed {
   public CompletableFuture<Void> start() {
     Map<PartitionId, RawAsyncAtomicMap> partitions = partitionService.getSystemPartitionGroup().getPartitions().stream()
         .map(partition -> {
-          MapProxy proxy = new MapProxy(new PrimitiveProxy.Context(
-              "primitives", MapService.TYPE, partition, threadService.getFactory()));
+          ServiceId serviceId = ServiceId.newBuilder()
+              .setName("atomix-primitives")
+              .setType(MapService.TYPE.name())
+              .build();
+          MapProxy proxy = new MapProxy(new DefaultSessionClient(serviceId, partition.getClient()));
           return Pair.of(partition.id(), new RawAsyncAtomicMap(proxy, Duration.ofSeconds(30), new PartialPrimitiveManagementService()));
         }).collect(Collectors.toMap(Pair::getKey, Pair::getValue));
     return new PartitionedAsyncAtomicMap(

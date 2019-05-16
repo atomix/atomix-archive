@@ -20,7 +20,6 @@ import java.util.concurrent.CompletableFuture;
 import io.atomix.primitive.session.SessionClient;
 import io.atomix.primitive.session.impl.CloseSessionRequest;
 import io.atomix.primitive.session.impl.CloseSessionResponse;
-import io.atomix.primitive.session.impl.DefaultSessionClient;
 import io.atomix.primitive.session.impl.KeepAliveRequest;
 import io.atomix.primitive.session.impl.KeepAliveResponse;
 import io.atomix.primitive.session.impl.OpenSessionRequest;
@@ -30,13 +29,18 @@ import io.atomix.primitive.session.impl.OpenSessionResponse;
  * Interface for session aware primitive proxies.
  */
 public abstract class SessionEnabledPrimitiveProxy extends AbstractPrimitiveProxy<SessionClient> {
-  public SessionEnabledPrimitiveProxy(Context context) {
-    super(context);
+  public SessionEnabledPrimitiveProxy(SessionClient client) {
+    super(client);
   }
 
   @Override
-  protected SessionClient createClient() {
-    return new DefaultSessionClient(serviceId(), getPartitionClient());
+  public String name() {
+    return getClient().name();
+  }
+
+  @Override
+  public String type() {
+    return getClient().type();
   }
 
   /**
