@@ -396,11 +396,18 @@ public class PrimaryElectorService extends SessionManagedPrimitiveService {
     }
 
     PrimaryTerm term() {
-      return PrimaryTerm.newBuilder()
-          .setTerm(term)
-          .setPrimary(primary())
-          .addAllCandidates(candidates())
-          .build();
+      GroupMember primary = primary();
+      if (primary != null) {
+        return PrimaryTerm.newBuilder()
+            .setTerm(term)
+            .setPrimary(primary())
+            .addAllCandidates(candidates())
+            .build();
+      } else {
+        return PrimaryTerm.newBuilder()
+            .setTerm(term)
+            .build();
+      }
     }
 
     GroupMember primary() {

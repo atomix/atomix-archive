@@ -207,10 +207,10 @@ public class ComponentManager<C extends Config, M> {
         try {
           Object instance = component.instance();
           LOGGER.info("Starting component {}", instance);
+          component.setStarted(true);
           if (instance instanceof Managed) {
             return ((Managed) instance).start(component.config());
           }
-          component.setStarted(true);
           return CompletableFuture.completedFuture(null);
         } catch (Exception e) {
           return Futures.exceptionalFuture(e);
