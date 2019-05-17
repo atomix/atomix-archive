@@ -7,6 +7,8 @@ import io.atomix.core.counter.AtomicCounterType;
 import io.atomix.core.counter.DistributedCounter;
 import io.atomix.core.counter.DistributedCounterBuilder;
 import io.atomix.core.counter.DistributedCounterType;
+import io.atomix.core.election.LeaderElectionBuilder;
+import io.atomix.core.election.LeaderElectionType;
 import io.atomix.core.idgenerator.AtomicIdGenerator;
 import io.atomix.core.idgenerator.AtomicIdGeneratorBuilder;
 import io.atomix.core.idgenerator.AtomicIdGeneratorType;
@@ -386,6 +388,28 @@ public interface AtomixService extends PrimitiveFactory, ClusterService {
    */
   default AtomicLockBuilder atomicLockBuilder(String name) {
     return primitiveBuilder(name, AtomicLockType.instance());
+  }
+
+  /**
+   * Creates a new named {@link io.atomix.core.election.LeaderElection} builder.
+   * <p>
+   * The election name must be provided when constructing the builder. The name is used to reference a distinct instance of
+   * the primitive within the cluster. Multiple instances of the primitive with the same name will share the same state.
+   * However, the instance of the primitive constructed by the returned builder will be distinct and will not share
+   * local memory (e.g. cache) with any other instance on this node.
+   * <p>
+   * To get an asynchronous instance of the election, use the {@link SyncPrimitive#async()} method:
+   * <pre>
+   *   {@code
+   *   AsyncLeaderElection<String> election = atomix.<String>leaderElectionBuilder("my-election").build().async();
+   *   }
+   * </pre>
+   *
+   * @param name the primitive name
+   * @return distributed leader election builder
+   */
+  default <T> LeaderElectionBuilder<T> leaderElectionBuilder(String name) {
+    return primitiveBuilder(name, LeaderElectionType.instance());
   }
 
   /**
