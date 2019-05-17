@@ -1,23 +1,19 @@
 package io.atomix.grpc.impl;
 
 import java.util.Collection;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 import com.google.protobuf.Message;
 import io.atomix.grpc.headers.RequestHeader;
-import io.atomix.grpc.headers.RequestHeaders;
 import io.atomix.grpc.headers.SessionCommandHeader;
-import io.atomix.grpc.headers.SessionCommandHeaders;
 import io.atomix.grpc.headers.SessionHeader;
-import io.atomix.grpc.headers.SessionHeaders;
 import io.atomix.grpc.headers.SessionQueryHeader;
-import io.atomix.grpc.headers.SessionQueryHeaders;
 import io.atomix.primitive.partition.PartitionId;
 import io.atomix.primitive.proxy.PrimitiveProxy;
 import io.atomix.primitive.session.impl.SessionResponseContext;
@@ -130,6 +126,38 @@ public class RequestExecutor<P extends PrimitiveProxy, I extends Message, H exte
       T request,
       String key,
       StreamObserver<R> responseObserver,
+      BiFunction<PartitionId, P, CompletableFuture<R>> function) {
+    I id = getId(request);
+    if (isValidId(id, responseObserver)) {
+      primitiveFactory.getPrimitive(id, key).whenComplete((primitive, primitiveError) -> {
+        if (primitiveError == null) {
+          function.apply(primitive.getLeft(), primitive.getRight()).whenComplete((result, funcError) -> {
+            if (funcError == null) {
+              responseObserver.onNext(result);
+              responseObserver.onCompleted();
+            } else {
+              responseObserver.onError(funcError);
+            }
+          });
+        } else {
+          responseObserver.onError(primitiveError);
+        }
+      });
+    }
+  }
+
+  /**
+   * Creates a new session ID and applies it to the given function.
+   *
+   * @param request          the request
+   * @param key              the request key
+   * @param responseObserver the response observer
+   * @param function         the function to which to apply the session ID
+   */
+  public void createBy(
+      T request,
+      String key,
+      StreamObserver<R> responseObserver,
       TriFunction<PartitionId, Long, P, CompletableFuture<R>> function) {
     I id = getId(request);
     if (isValidId(id, responseObserver)) {
@@ -168,7 +196,7 @@ public class RequestExecutor<P extends PrimitiveProxy, I extends Message, H exte
       T request,
       StreamObserver<R> responseObserver,
       TriFunction<PartitionId, Long, P, CompletableFuture<V>> function,
-      BiFunction<Long, Stream<V>, R> responseFunction) {
+      BiFunction<Long, List<V>, R> responseFunction) {
     I id = getId(request);
     if (isValidId(id, responseObserver)) {
       primitiveFactory.createSession().whenComplete((sessionId, sessionError) -> {
@@ -176,6 +204,7 @@ public class RequestExecutor<P extends PrimitiveProxy, I extends Message, H exte
           primitiveFactory.getPrimitives(id)
               .thenCompose(partitions -> Futures.allOf(partitions.entrySet().stream()
                   .map(e -> function.apply(e.getKey(), sessionId, e.getValue()))))
+              .thenApply(results -> results.collect(Collectors.toList()))
               .thenApply(results -> responseFunction.apply(sessionId, results))
               .whenComplete((result, funcError) -> {
                 if (funcError == null) {
@@ -204,7 +233,7 @@ public class RequestExecutor<P extends PrimitiveProxy, I extends Message, H exte
       T request,
       StreamObserver<R> responseObserver,
       TriFunction<PartitionId, H, P, CompletableFuture<V>> function,
-      Function<Stream<V>, R> aggregator) {
+      Function<List<V>, R> aggregator) {
     I id = getId(request);
     if (isValidId(id, responseObserver)) {
       final String group = primitiveFactory.getPartitionGroup(id);
@@ -220,6 +249,7 @@ public class RequestExecutor<P extends PrimitiveProxy, I extends Message, H exte
                 H header = headerMap.computeIfAbsent(e.getKey(), i -> getDefaultHeader(i.getPartition()));
                 return function.apply(e.getKey(), header, e.getValue());
               })))
+          .thenApply(responses -> responses.collect(Collectors.toList()))
           .thenApply(aggregator)
           .whenComplete((result, funcError) -> {
             if (funcError == null) {
@@ -321,23 +351,19 @@ public class RequestExecutor<P extends PrimitiveProxy, I extends Message, H exte
    * Executes the given function on the partition owning the given key.
    *
    * @param request          the request
-   * @param key              the key with which to partition the request
+   * @param header           the header with which to partition the request
    * @param responseObserver the response observer
    * @param function         the function to execute
    */
   public void executeBy(
       T request,
-      String key,
+      H header,
       StreamObserver<R> responseObserver,
       TriFunction<PartitionId, H, P, CompletableFuture<R>> function) {
     I id = getId(request);
     if (isValidId(id, responseObserver)) {
-      primitiveFactory.getPrimitive(id, key).whenComplete((primitive, primitiveError) -> {
+      primitiveFactory.getPrimitive(id, getPartitionId(header)).whenComplete((primitive, primitiveError) -> {
         if (primitiveError == null) {
-          H header = getHeaders(request).stream()
-              .filter(h -> getPartitionId(h) == primitive.getLeft().getPartition())
-              .findFirst()
-              .orElseGet(() -> getDefaultHeader(primitive.getLeft().getPartition()));
           function.apply(primitive.getLeft(), header, primitive.getRight()).whenComplete((result, funcError) -> {
             if (funcError == null) {
               responseObserver.onNext(result);
@@ -357,24 +383,20 @@ public class RequestExecutor<P extends PrimitiveProxy, I extends Message, H exte
    * Executes the given function on the partition owning the given key.
    *
    * @param request          the request
-   * @param key              the key with which to partition the request
+   * @param header           the header with which to partition the request
    * @param responseObserver the response observer
    * @param function         the function to execute
    */
   public <V> void executeBy(
       T request,
-      String key,
+      H header,
       StreamObserver<R> responseObserver,
       QuadFunction<PartitionId, H, StreamHandler<V>, P, CompletableFuture<SessionResponseContext>> function,
       TriFunction<PartitionId, H, V, R> converter) {
     I id = getId(request);
     if (isValidId(id, responseObserver)) {
-      primitiveFactory.getPrimitive(id, key).whenComplete((primitive, primitiveError) -> {
+      primitiveFactory.getPrimitive(id, getPartitionId(header)).whenComplete((primitive, primitiveError) -> {
         if (primitiveError == null) {
-          H header = getHeaders(request).stream()
-              .filter(h -> getPartitionId(h) == primitive.getLeft().getPartition())
-              .findFirst()
-              .orElseGet(() -> getDefaultHeader(primitive.getLeft().getPartition()));
           StreamHandler<V> handler = new StreamHandler<V>() {
             @Override
             public void next(V value) {
@@ -416,8 +438,8 @@ public class RequestExecutor<P extends PrimitiveProxy, I extends Message, H exte
       T request,
       Collection<String> keys,
       StreamObserver<R> responseObserver,
-      TriFunction<H, Collection<String>, P, CompletableFuture<V>> function,
-      Function<Stream<V>, R> aggregator) {
+      QuadFunction<PartitionId, H, Collection<String>, P, CompletableFuture<V>> function,
+      Function<List<V>, R> aggregator) {
     I id = getId(request);
     if (isValidId(id, responseObserver)) {
       final String group = primitiveFactory.getPartitionGroup(id);
@@ -431,8 +453,9 @@ public class RequestExecutor<P extends PrimitiveProxy, I extends Message, H exte
           .thenCompose(partitions -> Futures.allOf(partitions.entrySet().stream()
               .map(e -> {
                 H header = headerMap.computeIfAbsent(e.getKey(), i -> getDefaultHeader(i.getPartition()));
-                return function.apply(header, e.getValue().getLeft(), e.getValue().getRight());
+                return function.apply(e.getKey(), header, e.getValue().getLeft(), e.getValue().getRight());
               })))
+          .thenApply(responses -> responses.collect(Collectors.toList()))
           .thenApply(aggregator)
           .whenComplete((result, funcError) -> {
             if (funcError == null) {
@@ -520,9 +543,9 @@ public class RequestExecutor<P extends PrimitiveProxy, I extends Message, H exte
 
   static class BasicDescriptor<T extends Message, I extends Message> implements RequestExecutor.RequestDescriptor<T, I, RequestHeader> {
     private final Function<T, I> idGetter;
-    private final Function<T, RequestHeaders> headerGetter;
+    private final Function<T, Collection<RequestHeader>> headerGetter;
 
-    BasicDescriptor(Function<T, I> idGetter, Function<T, RequestHeaders> headerGetter) {
+    BasicDescriptor(Function<T, I> idGetter, Function<T, Collection<RequestHeader>> headerGetter) {
       this.idGetter = idGetter;
       this.headerGetter = headerGetter;
     }
@@ -534,7 +557,7 @@ public class RequestExecutor<P extends PrimitiveProxy, I extends Message, H exte
 
     @Override
     public Collection<RequestHeader> getHeaders(T request) {
-      return headerGetter.apply(request).getHeadersList();
+      return headerGetter.apply(request);
     }
 
     @Override
@@ -552,9 +575,9 @@ public class RequestExecutor<P extends PrimitiveProxy, I extends Message, H exte
 
   static class SessionDescriptor<T extends Message, I extends Message> implements RequestExecutor.RequestDescriptor<T, I, SessionHeader> {
     private final Function<T, I> idGetter;
-    private final Function<T, SessionHeaders> headerGetter;
+    private final Function<T, Collection<SessionHeader>> headerGetter;
 
-    SessionDescriptor(Function<T, I> idGetter, Function<T, SessionHeaders> headerGetter) {
+    SessionDescriptor(Function<T, I> idGetter, Function<T, Collection<SessionHeader>> headerGetter) {
       this.idGetter = idGetter;
       this.headerGetter = headerGetter;
     }
@@ -566,7 +589,7 @@ public class RequestExecutor<P extends PrimitiveProxy, I extends Message, H exte
 
     @Override
     public Collection<SessionHeader> getHeaders(T request) {
-      return headerGetter.apply(request).getHeadersList();
+      return headerGetter.apply(request);
     }
 
     @Override
@@ -584,9 +607,9 @@ public class RequestExecutor<P extends PrimitiveProxy, I extends Message, H exte
 
   static class SessionCommandDescriptor<T extends Message, I extends Message> implements RequestExecutor.RequestDescriptor<T, I, SessionCommandHeader> {
     private final Function<T, I> idGetter;
-    private final Function<T, SessionCommandHeaders> headerGetter;
+    private final Function<T, Collection<SessionCommandHeader>> headerGetter;
 
-    SessionCommandDescriptor(Function<T, I> idGetter, Function<T, SessionCommandHeaders> headerGetter) {
+    SessionCommandDescriptor(Function<T, I> idGetter, Function<T, Collection<SessionCommandHeader>> headerGetter) {
       this.idGetter = idGetter;
       this.headerGetter = headerGetter;
     }
@@ -598,7 +621,7 @@ public class RequestExecutor<P extends PrimitiveProxy, I extends Message, H exte
 
     @Override
     public Collection<SessionCommandHeader> getHeaders(T request) {
-      return headerGetter.apply(request).getHeadersList();
+      return headerGetter.apply(request);
     }
 
     @Override
@@ -616,9 +639,9 @@ public class RequestExecutor<P extends PrimitiveProxy, I extends Message, H exte
 
   static class SessionQueryDescriptor<T extends Message, I extends Message> implements RequestExecutor.RequestDescriptor<T, I, SessionQueryHeader> {
     private final Function<T, I> idGetter;
-    private final Function<T, SessionQueryHeaders> headerGetter;
+    private final Function<T, Collection<SessionQueryHeader>> headerGetter;
 
-    SessionQueryDescriptor(Function<T, I> idGetter, Function<T, SessionQueryHeaders> headerGetter) {
+    SessionQueryDescriptor(Function<T, I> idGetter, Function<T, Collection<SessionQueryHeader>> headerGetter) {
       this.idGetter = idGetter;
       this.headerGetter = headerGetter;
     }
@@ -630,7 +653,7 @@ public class RequestExecutor<P extends PrimitiveProxy, I extends Message, H exte
 
     @Override
     public Collection<SessionQueryHeader> getHeaders(T request) {
-      return headerGetter.apply(request).getHeadersList();
+      return headerGetter.apply(request);
     }
 
     @Override

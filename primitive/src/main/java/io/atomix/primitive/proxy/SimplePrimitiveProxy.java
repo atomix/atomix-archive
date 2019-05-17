@@ -37,6 +37,15 @@ public abstract class SimplePrimitiveProxy extends AbstractPrimitiveProxy<Servic
     return getClient().type();
   }
 
+  /**
+   * Creates a service.
+   *
+   * @return a future to be completed once the service has been created
+   */
+  public CompletableFuture<Void> create() {
+    return getClient().create();
+  }
+
   @Override
   public CompletableFuture<Void> delete() {
     return getClient().delete();

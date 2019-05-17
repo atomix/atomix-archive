@@ -18,10 +18,13 @@ package io.atomix.grpc.impl;
 import io.atomix.core.Atomix;
 import io.atomix.grpc.counter.CounterId;
 import io.atomix.grpc.counter.CounterServiceGrpc;
+import io.atomix.grpc.counter.CreateRequest;
+import io.atomix.grpc.counter.CreateResponse;
 import io.atomix.grpc.counter.DecrementRequest;
 import io.atomix.grpc.counter.GetRequest;
 import io.atomix.grpc.counter.IncrementRequest;
 import io.atomix.grpc.counter.SetRequest;
+import io.atomix.grpc.headers.RequestHeader;
 import io.atomix.grpc.protocol.MultiRaftProtocol;
 import io.grpc.BindableService;
 import io.grpc.Channel;
@@ -54,6 +57,13 @@ public class CounterServiceImplTest extends GrpcServiceTest<CounterServiceGrpc.C
         .setRaft(MultiRaftProtocol.newBuilder().build())
         .build();
 
+    CreateResponse create1 = counter1.create(CreateRequest.newBuilder()
+        .setId(counterId)
+        .build());
+    CreateResponse create2 = counter2.create(CreateRequest.newBuilder()
+        .setId(counterId)
+        .build());
+
     try {
       counter1.get(GetRequest.newBuilder().build());
       fail();
@@ -70,25 +80,55 @@ public class CounterServiceImplTest extends GrpcServiceTest<CounterServiceGrpc.C
     } catch (Exception e) {
     }
 
-    assertEquals(0, counter1.get(GetRequest.newBuilder().setId(counterId).build()).getValue());
+    assertEquals(0, counter1.get(GetRequest.newBuilder()
+        .setId(counterId)
+        .setHeader(RequestHeader.newBuilder()
+            .setPartitionId(create1.getHeader().getPartitionId())
+            .build())
+        .build())
+        .getValue());
     counter1.set(SetRequest.newBuilder()
         .setId(counterId)
+        .setHeader(RequestHeader.newBuilder()
+            .setPartitionId(create1.getHeader().getPartitionId())
+            .build())
         .setValue(1)
         .build());
-    assertEquals(1, counter2.get(GetRequest.newBuilder().setId(counterId).build()).getValue());
+    assertEquals(1, counter2.get(GetRequest.newBuilder()
+        .setId(counterId)
+        .setHeader(RequestHeader.newBuilder()
+            .setPartitionId(create2.getHeader().getPartitionId())
+            .build())
+        .build())
+        .getValue());
     assertEquals(2, counter2.increment(IncrementRequest.newBuilder()
         .setId(counterId)
+        .setHeader(RequestHeader.newBuilder()
+            .setPartitionId(create2.getHeader().getPartitionId())
+            .build())
         .build())
         .getNextValue());
     assertEquals(4, counter2.increment(IncrementRequest.newBuilder()
         .setId(counterId)
+        .setHeader(RequestHeader.newBuilder()
+            .setPartitionId(create2.getHeader().getPartitionId())
+            .build())
         .setDelta(2)
         .build())
         .getNextValue());
     Thread.sleep(100);
-    assertEquals(4, counter1.get(GetRequest.newBuilder().setId(counterId).build()).getValue());
+    assertEquals(4, counter1.get(GetRequest.newBuilder()
+        .setId(counterId)
+        .setHeader(RequestHeader.newBuilder()
+            .setPartitionId(create1.getHeader().getPartitionId())
+            .build())
+        .build())
+        .getValue());
     assertEquals(2, counter2.decrement(DecrementRequest.newBuilder()
         .setId(counterId)
+        .setHeader(RequestHeader.newBuilder()
+            .setPartitionId(create2.getHeader().getPartitionId())
+            .build())
         .setDelta(2)
         .build())
         .getNextValue());

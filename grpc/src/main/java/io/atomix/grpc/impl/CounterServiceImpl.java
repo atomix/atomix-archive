@@ -15,6 +15,8 @@
  */
 package io.atomix.grpc.impl;
 
+import java.util.Collections;
+
 import io.atomix.core.Atomix;
 import io.atomix.core.counter.impl.CounterProxy;
 import io.atomix.core.counter.impl.CounterService;
@@ -22,8 +24,12 @@ import io.atomix.grpc.counter.CheckAndSetRequest;
 import io.atomix.grpc.counter.CheckAndSetResponse;
 import io.atomix.grpc.counter.CounterId;
 import io.atomix.grpc.counter.CounterServiceGrpc;
+import io.atomix.grpc.counter.CreateRequest;
+import io.atomix.grpc.counter.CreateResponse;
 import io.atomix.grpc.counter.DecrementRequest;
 import io.atomix.grpc.counter.DecrementResponse;
+import io.atomix.grpc.counter.DeleteRequest;
+import io.atomix.grpc.counter.DeleteResponse;
 import io.atomix.grpc.counter.GetRequest;
 import io.atomix.grpc.counter.GetResponse;
 import io.atomix.grpc.counter.IncrementRequest;
@@ -32,7 +38,6 @@ import io.atomix.grpc.counter.SetRequest;
 import io.atomix.grpc.counter.SetResponse;
 import io.atomix.grpc.headers.RequestHeader;
 import io.atomix.grpc.headers.ResponseHeader;
-import io.atomix.grpc.headers.ResponseHeaders;
 import io.atomix.grpc.protocol.DistributedLogProtocol;
 import io.atomix.grpc.protocol.MultiPrimaryProtocol;
 import io.atomix.grpc.protocol.MultiRaftProtocol;
@@ -45,6 +50,8 @@ import io.grpc.stub.StreamObserver;
  */
 public class CounterServiceImpl extends CounterServiceGrpc.CounterServiceImplBase {
   private final PrimitiveFactory<CounterProxy, CounterId> primitiveFactory;
+  private final RequestExecutor<CounterProxy, CounterId, RequestHeader, CreateRequest, CreateResponse> create;
+  private final RequestExecutor<CounterProxy, CounterId, RequestHeader, DeleteRequest, DeleteResponse> delete;
   private final RequestExecutor<CounterProxy, CounterId, RequestHeader, SetRequest, SetResponse> set;
   private final RequestExecutor<CounterProxy, CounterId, RequestHeader, GetRequest, GetResponse> get;
   private final RequestExecutor<CounterProxy, CounterId, RequestHeader, CheckAndSetRequest, CheckAndSetResponse> checkAndSet;
@@ -53,6 +60,8 @@ public class CounterServiceImpl extends CounterServiceGrpc.CounterServiceImplBas
 
   public CounterServiceImpl(Atomix atomix) {
     this.primitiveFactory = new PrimitiveFactory<>(atomix, CounterService.TYPE, (id, client) -> new CounterProxy(new DefaultServiceClient(id, client)), COUNTER_ID_DESCRIPTOR);
+    this.create = new RequestExecutor<>(primitiveFactory, CREATE_DESCRIPTOR, CreateResponse::getDefaultInstance);
+    this.delete = new RequestExecutor<>(primitiveFactory, DELETE_DESCRIPTOR, DeleteResponse::getDefaultInstance);
     this.set = new RequestExecutor<>(primitiveFactory, SET_DESCRIPTOR, SetResponse::getDefaultInstance);
     this.get = new RequestExecutor<>(primitiveFactory, GET_DESCRIPTOR, GetResponse::getDefaultInstance);
     this.checkAndSet = new RequestExecutor<>(primitiveFactory, CHECK_AND_SET_DESCRIPTOR, CheckAndSetResponse::getDefaultInstance);
@@ -61,8 +70,26 @@ public class CounterServiceImpl extends CounterServiceGrpc.CounterServiceImplBas
   }
 
   @Override
+  public void create(CreateRequest request, StreamObserver<CreateResponse> responseObserver) {
+    create.createBy(request, request.getId().getName(), responseObserver,
+        (partitionId, counter) -> counter.create()
+            .thenApply(v -> CreateResponse.newBuilder()
+                .setHeader(ResponseHeader.newBuilder()
+                    .setPartitionId(partitionId.getPartition())
+                    .build())
+                .build()));
+  }
+
+  @Override
+  public void delete(DeleteRequest request, StreamObserver<DeleteResponse> responseObserver) {
+    delete.executeBy(request, request.getHeader(), responseObserver,
+        (partitionId, header, counter) -> counter.delete()
+            .thenApply(v -> DeleteResponse.newBuilder().build()));
+  }
+
+  @Override
   public void set(SetRequest request, StreamObserver<SetResponse> responseObserver) {
-    set.executeBy(request, request.getId().getName(), responseObserver,
+    set.executeBy(request, request.getHeader(), responseObserver,
         (partitionId, header, counter) -> counter.set(
             RequestContext.newBuilder()
                 .setIndex(header.getIndex())
@@ -71,29 +98,25 @@ public class CounterServiceImpl extends CounterServiceGrpc.CounterServiceImplBas
                 .setValue(request.getValue())
                 .build())
             .thenApply(response -> SetResponse.newBuilder()
-                .setHeaders(ResponseHeaders.newBuilder()
-                    .addHeaders(ResponseHeader.newBuilder()
-                        .setPartitionId(partitionId.getPartition())
-                        .setIndex(response.getLeft().getIndex())
-                        .build())
+                .setHeader(ResponseHeader.newBuilder()
+                    .setPartitionId(partitionId.getPartition())
+                    .setIndex(response.getLeft().getIndex())
                     .build())
                 .build()));
   }
 
   @Override
   public void get(GetRequest request, StreamObserver<GetResponse> responseObserver) {
-    get.executeBy(request, request.getId().getName(), responseObserver,
+    get.executeBy(request, request.getHeader(), responseObserver,
         (partitionId, header, counter) -> counter.get(
             RequestContext.newBuilder()
                 .setIndex(header.getIndex())
                 .build(),
             io.atomix.core.counter.impl.GetRequest.newBuilder().build())
             .thenApply(response -> GetResponse.newBuilder()
-                .setHeaders(ResponseHeaders.newBuilder()
-                    .addHeaders(ResponseHeader.newBuilder()
-                        .setPartitionId(partitionId.getPartition())
-                        .setIndex(response.getLeft().getIndex())
-                        .build())
+                .setHeader(ResponseHeader.newBuilder()
+                    .setPartitionId(partitionId.getPartition())
+                    .setIndex(response.getLeft().getIndex())
                     .build())
                 .setValue(response.getRight().getValue())
                 .build()));
@@ -101,7 +124,7 @@ public class CounterServiceImpl extends CounterServiceGrpc.CounterServiceImplBas
 
   @Override
   public void checkAndSet(CheckAndSetRequest request, StreamObserver<CheckAndSetResponse> responseObserver) {
-    checkAndSet.executeBy(request, request.getId().getName(), responseObserver,
+    checkAndSet.executeBy(request, request.getHeader(), responseObserver,
         (partitionId, header, counter) -> counter.checkAndSet(
             RequestContext.newBuilder()
                 .setIndex(header.getIndex())
@@ -111,11 +134,9 @@ public class CounterServiceImpl extends CounterServiceGrpc.CounterServiceImplBas
                 .setUpdate(request.getUpdate())
                 .build())
             .thenApply(response -> CheckAndSetResponse.newBuilder()
-                .setHeaders(ResponseHeaders.newBuilder()
-                    .addHeaders(ResponseHeader.newBuilder()
-                        .setPartitionId(partitionId.getPartition())
-                        .setIndex(response.getLeft().getIndex())
-                        .build())
+                .setHeader(ResponseHeader.newBuilder()
+                    .setPartitionId(partitionId.getPartition())
+                    .setIndex(response.getLeft().getIndex())
                     .build())
                 .setSucceeded(response.getRight().getSucceeded())
                 .build()));
@@ -123,7 +144,7 @@ public class CounterServiceImpl extends CounterServiceGrpc.CounterServiceImplBas
 
   @Override
   public void increment(IncrementRequest request, StreamObserver<IncrementResponse> responseObserver) {
-    increment.executeBy(request, request.getId().getName(), responseObserver,
+    increment.executeBy(request, request.getHeader(), responseObserver,
         (partitionId, header, counter) -> counter.increment(
             RequestContext.newBuilder()
                 .setIndex(header.getIndex())
@@ -132,11 +153,9 @@ public class CounterServiceImpl extends CounterServiceGrpc.CounterServiceImplBas
                 .setDelta(request.getDelta())
                 .build())
             .thenApply(response -> IncrementResponse.newBuilder()
-                .setHeaders(ResponseHeaders.newBuilder()
-                    .addHeaders(ResponseHeader.newBuilder()
-                        .setPartitionId(partitionId.getPartition())
-                        .setIndex(response.getLeft().getIndex())
-                        .build())
+                .setHeader(ResponseHeader.newBuilder()
+                    .setPartitionId(partitionId.getPartition())
+                    .setIndex(response.getLeft().getIndex())
                     .build())
                 .setPreviousValue(response.getRight().getPreviousValue())
                 .setNextValue(response.getRight().getNextValue())
@@ -145,7 +164,7 @@ public class CounterServiceImpl extends CounterServiceGrpc.CounterServiceImplBas
 
   @Override
   public void decrement(DecrementRequest request, StreamObserver<DecrementResponse> responseObserver) {
-    decrement.executeBy(request, request.getId().getName(), responseObserver,
+    decrement.executeBy(request, request.getHeader(), responseObserver,
         (partitionId, header, counter) -> counter.decrement(
             RequestContext.newBuilder()
                 .setIndex(header.getIndex())
@@ -154,11 +173,9 @@ public class CounterServiceImpl extends CounterServiceGrpc.CounterServiceImplBas
                 .setDelta(request.getDelta())
                 .build())
             .thenApply(response -> DecrementResponse.newBuilder()
-                .setHeaders(ResponseHeaders.newBuilder()
-                    .addHeaders(ResponseHeader.newBuilder()
-                        .setPartitionId(partitionId.getPartition())
-                        .setIndex(response.getLeft().getIndex())
-                        .build())
+                .setHeader(ResponseHeader.newBuilder()
+                    .setPartitionId(partitionId.getPartition())
+                    .setIndex(response.getLeft().getIndex())
                     .build())
                 .setPreviousValue(response.getRight().getPreviousValue())
                 .setNextValue(response.getRight().getNextValue())
@@ -202,18 +219,24 @@ public class CounterServiceImpl extends CounterServiceGrpc.CounterServiceImplBas
     }
   };
 
+  private static final RequestExecutor.RequestDescriptor<CreateRequest, CounterId, RequestHeader> CREATE_DESCRIPTOR =
+      new RequestExecutor.BasicDescriptor<>(CreateRequest::getId, request -> Collections.emptyList());
+
+  private static final RequestExecutor.RequestDescriptor<DeleteRequest, CounterId, RequestHeader> DELETE_DESCRIPTOR =
+      new RequestExecutor.BasicDescriptor<>(DeleteRequest::getId, request -> Collections.singletonList(request.getHeader()));
+
   private static final RequestExecutor.RequestDescriptor<GetRequest, CounterId, RequestHeader> GET_DESCRIPTOR =
-      new RequestExecutor.BasicDescriptor<>(GetRequest::getId, GetRequest::getHeaders);
+      new RequestExecutor.BasicDescriptor<>(GetRequest::getId, request -> Collections.singletonList(request.getHeader()));
 
   private static final RequestExecutor.RequestDescriptor<SetRequest, CounterId, RequestHeader> SET_DESCRIPTOR =
-      new RequestExecutor.BasicDescriptor<>(SetRequest::getId, SetRequest::getHeaders);
+      new RequestExecutor.BasicDescriptor<>(SetRequest::getId, request -> Collections.singletonList(request.getHeader()));
 
   private static final RequestExecutor.RequestDescriptor<CheckAndSetRequest, CounterId, RequestHeader> CHECK_AND_SET_DESCRIPTOR =
-      new RequestExecutor.BasicDescriptor<>(CheckAndSetRequest::getId, CheckAndSetRequest::getHeaders);
+      new RequestExecutor.BasicDescriptor<>(CheckAndSetRequest::getId, request -> Collections.singletonList(request.getHeader()));
 
   private static final RequestExecutor.RequestDescriptor<IncrementRequest, CounterId, RequestHeader> INCREMENT_DESCRIPTOR =
-      new RequestExecutor.BasicDescriptor<>(IncrementRequest::getId, IncrementRequest::getHeaders);
+      new RequestExecutor.BasicDescriptor<>(IncrementRequest::getId, request -> Collections.singletonList(request.getHeader()));
 
   private static final RequestExecutor.RequestDescriptor<DecrementRequest, CounterId, RequestHeader> DECREMENT_DESCRIPTOR =
-      new RequestExecutor.BasicDescriptor<>(DecrementRequest::getId, DecrementRequest::getHeaders);
+      new RequestExecutor.BasicDescriptor<>(DecrementRequest::getId, request -> Collections.singletonList(request.getHeader()));
 }

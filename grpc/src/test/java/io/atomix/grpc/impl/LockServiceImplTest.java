@@ -18,9 +18,8 @@ package io.atomix.grpc.impl;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.protobuf.Duration;
 import io.atomix.core.Atomix;
-import io.atomix.grpc.headers.SessionCommandHeaders;
+import io.atomix.grpc.headers.SessionCommandHeader;
 import io.atomix.grpc.headers.SessionQueryHeader;
-import io.atomix.grpc.headers.SessionQueryHeaders;
 import io.atomix.grpc.lock.CreateRequest;
 import io.atomix.grpc.lock.IsLockedRequest;
 import io.atomix.grpc.lock.IsLockedResponse;
@@ -69,7 +68,7 @@ public class LockServiceImplTest extends GrpcServiceTest<LockServiceGrpc.LockSer
             .build())
         .build())
         .get()
-        .getHeaders()
+        .getHeader()
         .getSessionId();
 
     long sessionId2 = lock2.create(CreateRequest.newBuilder()
@@ -79,12 +78,12 @@ public class LockServiceImplTest extends GrpcServiceTest<LockServiceGrpc.LockSer
             .build())
         .build())
         .get()
-        .getHeaders()
+        .getHeader()
         .getSessionId();
 
     IsLockedResponse isLockedResponse = lock1.isLocked(IsLockedRequest.newBuilder()
         .setId(lockId)
-        .setHeaders(SessionQueryHeaders.newBuilder()
+        .setHeader(SessionQueryHeader.newBuilder()
             .setSessionId(sessionId1)
             .build())
         .build())
@@ -96,7 +95,7 @@ public class LockServiceImplTest extends GrpcServiceTest<LockServiceGrpc.LockSer
         .setTimeout(Duration.newBuilder()
             .setSeconds(-1)
             .build())
-        .setHeaders(SessionCommandHeaders.newBuilder()
+        .setHeader(SessionCommandHeader.newBuilder()
             .setSessionId(sessionId1)
             .build())
         .build())
@@ -105,11 +104,9 @@ public class LockServiceImplTest extends GrpcServiceTest<LockServiceGrpc.LockSer
 
     isLockedResponse = lock1.isLocked(IsLockedRequest.newBuilder()
         .setId(lockId)
-        .setHeaders(SessionQueryHeaders.newBuilder()
+        .setHeader(SessionQueryHeader.newBuilder()
             .setSessionId(sessionId1)
-            .addHeaders(SessionQueryHeader.newBuilder()
-                .setLastIndex(lockResponse.getHeaders().getHeaders(0).getIndex())
-                .build())
+            .setLastIndex(lockResponse.getHeader().getIndex())
             .build())
         .build())
         .get();
@@ -117,7 +114,7 @@ public class LockServiceImplTest extends GrpcServiceTest<LockServiceGrpc.LockSer
 
     isLockedResponse = lock2.isLocked(IsLockedRequest.newBuilder()
         .setId(lockId)
-        .setHeaders(SessionQueryHeaders.newBuilder()
+        .setHeader(SessionQueryHeader.newBuilder()
             .setSessionId(sessionId2)
             .build())
         .build())
@@ -127,7 +124,7 @@ public class LockServiceImplTest extends GrpcServiceTest<LockServiceGrpc.LockSer
     isLockedResponse = lock1.isLocked(IsLockedRequest.newBuilder()
         .setId(lockId)
         .setVersion(lockResponse.getVersion())
-        .setHeaders(SessionQueryHeaders.newBuilder()
+        .setHeader(SessionQueryHeader.newBuilder()
             .setSessionId(sessionId1)
             .build())
         .build())
@@ -137,7 +134,7 @@ public class LockServiceImplTest extends GrpcServiceTest<LockServiceGrpc.LockSer
     isLockedResponse = lock2.isLocked(IsLockedRequest.newBuilder()
         .setId(lockId)
         .setVersion(lockResponse.getVersion())
-        .setHeaders(SessionQueryHeaders.newBuilder()
+        .setHeader(SessionQueryHeader.newBuilder()
             .setSessionId(sessionId2)
             .build())
         .build())
@@ -149,7 +146,7 @@ public class LockServiceImplTest extends GrpcServiceTest<LockServiceGrpc.LockSer
         .setTimeout(Duration.newBuilder()
             .setSeconds(-1)
             .build())
-        .setHeaders(SessionCommandHeaders.newBuilder()
+        .setHeader(SessionCommandHeader.newBuilder()
             .setSessionId(sessionId2)
             .build())
         .build());
@@ -157,7 +154,7 @@ public class LockServiceImplTest extends GrpcServiceTest<LockServiceGrpc.LockSer
     UnlockResponse unlockResponse = lock1.unlock(UnlockRequest.newBuilder()
         .setId(lockId)
         .setVersion(lockResponse.getVersion())
-        .setHeaders(SessionCommandHeaders.newBuilder()
+        .setHeader(SessionCommandHeader.newBuilder()
             .setSessionId(sessionId1)
             .build())
         .build())
@@ -169,7 +166,7 @@ public class LockServiceImplTest extends GrpcServiceTest<LockServiceGrpc.LockSer
 
     unlockResponse = lock2.unlock(UnlockRequest.newBuilder()
         .setId(lockId)
-        .setHeaders(SessionCommandHeaders.newBuilder()
+        .setHeader(SessionCommandHeader.newBuilder()
             .setSessionId(sessionId2)
             .build())
         .build())
@@ -178,7 +175,7 @@ public class LockServiceImplTest extends GrpcServiceTest<LockServiceGrpc.LockSer
 
     unlockResponse = lock1.unlock(UnlockRequest.newBuilder()
         .setId(lockId)
-        .setHeaders(SessionCommandHeaders.newBuilder()
+        .setHeader(SessionCommandHeader.newBuilder()
             .setSessionId(sessionId1)
             .build())
         .build())

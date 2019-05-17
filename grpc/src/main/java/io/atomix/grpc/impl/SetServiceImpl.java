@@ -16,7 +16,7 @@
 package io.atomix.grpc.impl;
 
 import java.time.Duration;
-import java.util.function.Predicate;
+import java.util.Collections;
 import java.util.stream.Collectors;
 
 import io.atomix.core.Atomix;
@@ -25,10 +25,8 @@ import io.atomix.core.set.impl.SetProxy;
 import io.atomix.core.set.impl.SetService;
 import io.atomix.grpc.headers.SessionCommandHeader;
 import io.atomix.grpc.headers.SessionHeader;
-import io.atomix.grpc.headers.SessionHeaders;
 import io.atomix.grpc.headers.SessionQueryHeader;
 import io.atomix.grpc.headers.SessionResponseHeader;
-import io.atomix.grpc.headers.SessionResponseHeaders;
 import io.atomix.grpc.headers.SessionStreamHeader;
 import io.atomix.grpc.protocol.DistributedLogProtocol;
 import io.atomix.grpc.protocol.MultiPrimaryProtocol;
@@ -55,6 +53,7 @@ import io.atomix.grpc.set.SetId;
 import io.atomix.grpc.set.SetServiceGrpc;
 import io.atomix.grpc.set.SizeRequest;
 import io.atomix.grpc.set.SizeResponse;
+import io.atomix.primitive.session.impl.CloseSessionRequest;
 import io.atomix.primitive.session.impl.DefaultSessionClient;
 import io.atomix.primitive.session.impl.OpenSessionRequest;
 import io.atomix.primitive.session.impl.SessionCommandContext;
@@ -95,62 +94,65 @@ public class SetServiceImpl extends SetServiceGrpc.SetServiceImplBase {
 
   @Override
   public void create(CreateRequest request, StreamObserver<CreateResponse> responseObserver) {
-    create.createBy(request, request.getId().getName(), responseObserver,
+    create.createAll(request, responseObserver,
         (partitionId, sessionId, set) -> set.openSession(OpenSessionRequest.newBuilder()
             .setSessionId(sessionId)
             .setTimeout(Duration.ofSeconds(request.getTimeout().getSeconds())
                 .plusNanos(request.getTimeout().getNanos())
                 .toMillis())
             .build())
-            .thenApply(response -> CreateResponse.newBuilder()
-                .setHeaders(SessionHeaders.newBuilder()
-                    .setSessionId(sessionId)
-                    .build())
-                .build()));
+            .thenApply(response -> SessionHeader.newBuilder()
+                .setSessionId(sessionId)
+                .setPartitionId(partitionId.getPartition())
+                .build()),
+        (sessionId, responses) -> CreateResponse.newBuilder()
+            .addAllHeaders(responses)
+            .build());
   }
 
   @Override
   public void keepAlive(KeepAliveRequest request, StreamObserver<KeepAliveResponse> responseObserver) {
-    keepAlive.executeBy(request, request.getId().getName(), responseObserver,
+    keepAlive.executeAll(request, responseObserver,
         (partitionId, header, set) -> set.keepAlive(io.atomix.primitive.session.impl.KeepAliveRequest.newBuilder()
-            .setSessionId(request.getHeaders().getSessionId())
+            .setSessionId(header.getSessionId())
             .setCommandSequence(header.getLastSequenceNumber())
             .build())
-            .thenApply(response -> KeepAliveResponse.newBuilder()
-                .setHeaders(SessionHeaders.newBuilder()
-                    .setSessionId(request.getHeaders().getSessionId())
-                    .addHeaders(SessionHeader.newBuilder()
-                        .setPartitionId(partitionId.getPartition())
-                        .build())
-                    .build())
-                .build()));
+            .thenApply(response -> SessionHeader.newBuilder()
+                .setSessionId(header.getSessionId())
+                .setPartitionId(partitionId.getPartition())
+                .build()),
+        responses -> KeepAliveResponse.newBuilder()
+            .addAllHeaders(responses)
+            .build());
   }
 
   @Override
   public void close(CloseRequest request, StreamObserver<CloseResponse> responseObserver) {
-    close.executeBy(request, request.getId().getName(), responseObserver,
-        (partitionId, header, set) -> set.closeSession(io.atomix.primitive.session.impl.CloseSessionRequest.newBuilder()
-            .setSessionId(request.getHeaders().getSessionId())
-            .build()).thenApply(response -> CloseResponse.newBuilder().build()));
+    close.executeAll(request, responseObserver,
+        (partitionId, header, set) -> set.closeSession(CloseSessionRequest.newBuilder()
+            .setSessionId(header.getSessionId())
+            .build()),
+        responses -> CloseResponse.newBuilder().build());
   }
 
   @Override
   public void add(AddRequest request, StreamObserver<AddResponse> responseObserver) {
-    add.executeAll(request, responseObserver,
-        (partitionId, header, set) -> set.add(SessionCommandContext.newBuilder()
-                .setSessionId(request.getHeaders().getSessionId())
+    add.executeBy(request, request.getValuesList(), responseObserver,
+        (partitionId, header, values, set) -> set.add(SessionCommandContext.newBuilder()
+                .setSessionId(header.getSessionId())
                 .setSequenceNumber(header.getSequenceNumber())
                 .build(),
             io.atomix.core.set.impl.AddRequest.newBuilder()
-                .addAllValues(request.getValuesList())
-                .build()),
-        responses -> AddResponse.newBuilder()
-            .setHeaders(SessionResponseHeaders.newBuilder()
-                .setSessionId(request.getHeaders().getSessionId())
-                .addAllHeaders(responses.map(Pair::getLeft).map(context -> SessionResponseHeader.newBuilder()
-                    .setIndex(context.getIndex())
-                    .setSequenceNumber(context.getSequence())
-                    .addAllStreams(context.getStreamsList().stream()
+                .addAllValues(values)
+                .build())
+            .thenApply(response -> AddResponse.newBuilder()
+                .setAdded(response.getRight().getAdded())
+                .addHeaders(SessionResponseHeader.newBuilder()
+                    .setSessionId(header.getSessionId())
+                    .setPartitionId(partitionId.getPartition())
+                    .setIndex(response.getLeft().getIndex())
+                    .setSequenceNumber(response.getLeft().getSequence())
+                    .addAllStreams(response.getLeft().getStreamsList().stream()
                         .map(stream -> SessionStreamHeader.newBuilder()
                             .setStreamId(stream.getStreamId())
                             .setIndex(stream.getIndex())
@@ -158,10 +160,10 @@ public class SetServiceImpl extends SetServiceGrpc.SetServiceImplBase {
                             .build())
                         .collect(Collectors.toList()))
                     .build())
-                    .collect(Collectors.toList()))
-                .build())
-            .setAdded(responses.map(Pair::getRight)
-                .map(io.atomix.core.set.impl.AddResponse::getAdded)
+                .build()),
+        responses -> AddResponse.newBuilder()
+            .addAllHeaders(responses.stream().map(response -> response.getHeaders(0)).collect(Collectors.toList()))
+            .setAdded(responses.stream().map(response -> response.getAdded())
                 .reduce(Boolean::logicalOr)
                 .orElse(false))
             .build());
@@ -169,21 +171,22 @@ public class SetServiceImpl extends SetServiceGrpc.SetServiceImplBase {
 
   @Override
   public void remove(RemoveRequest request, StreamObserver<RemoveResponse> responseObserver) {
-    remove.executeAll(request, responseObserver,
-        (partitionId, header, set) -> set.remove(SessionCommandContext.newBuilder()
-                .setSessionId(request.getHeaders().getSessionId())
+    remove.executeBy(request, request.getValuesList(), responseObserver,
+        (partitionId, header, values, set) -> set.remove(SessionCommandContext.newBuilder()
+                .setSessionId(header.getSessionId())
                 .setSequenceNumber(header.getSequenceNumber())
                 .build(),
             io.atomix.core.set.impl.RemoveRequest.newBuilder()
-                .addAllValues(request.getValuesList())
-                .build()),
-        responses -> RemoveResponse.newBuilder()
-            .setHeaders(SessionResponseHeaders.newBuilder()
-                .setSessionId(request.getHeaders().getSessionId())
-                .addAllHeaders(responses.map(Pair::getLeft).map(context -> SessionResponseHeader.newBuilder()
-                    .setIndex(context.getIndex())
-                    .setSequenceNumber(context.getSequence())
-                    .addAllStreams(context.getStreamsList().stream()
+                .addAllValues(values)
+                .build())
+            .thenApply(response -> RemoveResponse.newBuilder()
+                .setRemoved(response.getRight().getRemoved())
+                .addHeaders(SessionResponseHeader.newBuilder()
+                    .setSessionId(header.getSessionId())
+                    .setPartitionId(partitionId.getPartition())
+                    .setIndex(response.getLeft().getIndex())
+                    .setSequenceNumber(response.getLeft().getSequence())
+                    .addAllStreams(response.getLeft().getStreamsList().stream()
                         .map(stream -> SessionStreamHeader.newBuilder()
                             .setStreamId(stream.getStreamId())
                             .setIndex(stream.getIndex())
@@ -191,10 +194,10 @@ public class SetServiceImpl extends SetServiceGrpc.SetServiceImplBase {
                             .build())
                         .collect(Collectors.toList()))
                     .build())
-                    .collect(Collectors.toList()))
-                .build())
-            .setRemoved(responses.map(Pair::getRight)
-                .map(io.atomix.core.set.impl.RemoveResponse::getRemoved)
+                .build()),
+        responses -> RemoveResponse.newBuilder()
+            .addAllHeaders(responses.stream().map(response -> response.getHeaders(0)).collect(Collectors.toList()))
+            .setRemoved(responses.stream().map(response -> response.getRemoved())
                 .reduce(Boolean::logicalOr)
                 .orElse(false))
             .build());
@@ -202,22 +205,23 @@ public class SetServiceImpl extends SetServiceGrpc.SetServiceImplBase {
 
   @Override
   public void contains(ContainsRequest request, StreamObserver<ContainsResponse> responseObserver) {
-    contains.executeAll(request, responseObserver,
-        (partitionId, header, set) -> set.contains(SessionQueryContext.newBuilder()
-                .setSessionId(request.getHeaders().getSessionId())
+    contains.executeBy(request, request.getValuesList(), responseObserver,
+        (partitionId, header, values, set) -> set.contains(SessionQueryContext.newBuilder()
+                .setSessionId(header.getSessionId())
                 .setLastIndex(header.getLastIndex())
                 .setLastSequenceNumber(header.getLastSequenceNumber())
                 .build(),
             io.atomix.core.set.impl.ContainsRequest.newBuilder()
-                .addAllValues(request.getValuesList())
-                .build()),
-        responses -> ContainsResponse.newBuilder()
-            .setHeaders(SessionResponseHeaders.newBuilder()
-                .setSessionId(request.getHeaders().getSessionId())
-                .addAllHeaders(responses.map(Pair::getLeft).map(context -> SessionResponseHeader.newBuilder()
-                    .setIndex(context.getIndex())
-                    .setSequenceNumber(context.getSequence())
-                    .addAllStreams(context.getStreamsList().stream()
+                .addAllValues(values)
+                .build())
+            .thenApply(response -> ContainsResponse.newBuilder()
+                .setContains(response.getRight().getContains())
+                .addHeaders(SessionResponseHeader.newBuilder()
+                    .setSessionId(header.getSessionId())
+                    .setPartitionId(partitionId.getPartition())
+                    .setIndex(response.getLeft().getIndex())
+                    .setSequenceNumber(response.getLeft().getSequence())
+                    .addAllStreams(response.getLeft().getStreamsList().stream()
                         .map(stream -> SessionStreamHeader.newBuilder()
                             .setStreamId(stream.getStreamId())
                             .setIndex(stream.getIndex())
@@ -225,12 +229,11 @@ public class SetServiceImpl extends SetServiceGrpc.SetServiceImplBase {
                             .build())
                         .collect(Collectors.toList()))
                     .build())
-                    .collect(Collectors.toList()))
-                .build())
-            .setContains(responses.map(Pair::getRight)
-                .map(io.atomix.core.set.impl.ContainsResponse::getContains)
-                .filter(Predicate.isEqual(true))
-                .findFirst()
+                .build()),
+        responses -> ContainsResponse.newBuilder()
+            .addAllHeaders(responses.stream().map(response -> response.getHeaders(0)).collect(Collectors.toList()))
+            .setContains(responses.stream().map(response -> response.getContains())
+                .reduce(Boolean::logicalAnd)
                 .orElse(false))
             .build());
   }
@@ -239,18 +242,19 @@ public class SetServiceImpl extends SetServiceGrpc.SetServiceImplBase {
   public void size(SizeRequest request, StreamObserver<SizeResponse> responseObserver) {
     size.executeAll(request, responseObserver,
         (partitionId, header, set) -> set.size(SessionQueryContext.newBuilder()
-                .setSessionId(request.getHeaders().getSessionId())
+                .setSessionId(header.getSessionId())
                 .setLastIndex(header.getLastIndex())
                 .setLastSequenceNumber(header.getLastSequenceNumber())
                 .build(),
-            io.atomix.core.set.impl.SizeRequest.newBuilder().build()),
-        responses -> SizeResponse.newBuilder()
-            .setHeaders(SessionResponseHeaders.newBuilder()
-                .setSessionId(request.getHeaders().getSessionId())
-                .addAllHeaders(responses.map(Pair::getLeft).map(context -> SessionResponseHeader.newBuilder()
-                    .setIndex(context.getIndex())
-                    .setSequenceNumber(context.getSequence())
-                    .addAllStreams(context.getStreamsList().stream()
+            io.atomix.core.set.impl.SizeRequest.newBuilder().build())
+            .thenApply(response -> SizeResponse.newBuilder()
+                .setSize(response.getRight().getSize())
+                .addHeaders(SessionResponseHeader.newBuilder()
+                    .setSessionId(header.getSessionId())
+                    .setPartitionId(partitionId.getPartition())
+                    .setIndex(response.getLeft().getIndex())
+                    .setSequenceNumber(response.getLeft().getSequence())
+                    .addAllStreams(response.getLeft().getStreamsList().stream()
                         .map(stream -> SessionStreamHeader.newBuilder()
                             .setStreamId(stream.getStreamId())
                             .setIndex(stream.getIndex())
@@ -258,9 +262,10 @@ public class SetServiceImpl extends SetServiceGrpc.SetServiceImplBase {
                             .build())
                         .collect(Collectors.toList()))
                     .build())
-                    .collect(Collectors.toList()))
-                .build())
-            .setSize(responses.map(r -> r.getRight().getSize()).reduce(Math::addExact).orElse(0))
+                .build()),
+        responses -> SizeResponse.newBuilder()
+            .addAllHeaders(responses.stream().map(response -> response.getHeaders(0)).collect(Collectors.toList()))
+            .setSize(responses.stream().mapToInt(r -> r.getSize()).sum())
             .build());
   }
 
@@ -268,17 +273,17 @@ public class SetServiceImpl extends SetServiceGrpc.SetServiceImplBase {
   public void clear(ClearRequest request, StreamObserver<ClearResponse> responseObserver) {
     clear.executeAll(request, responseObserver,
         (partitionId, header, set) -> set.clear(SessionCommandContext.newBuilder()
-                .setSessionId(request.getHeaders().getSessionId())
+                .setSessionId(header.getSessionId())
                 .setSequenceNumber(header.getSequenceNumber())
                 .build(),
-            io.atomix.core.set.impl.ClearRequest.newBuilder().build()),
-        responses -> ClearResponse.newBuilder()
-            .setHeaders(SessionResponseHeaders.newBuilder()
-                .setSessionId(request.getHeaders().getSessionId())
-                .addAllHeaders(responses.map(Pair::getLeft).map(context -> SessionResponseHeader.newBuilder()
-                    .setIndex(context.getIndex())
-                    .setSequenceNumber(context.getSequence())
-                    .addAllStreams(context.getStreamsList().stream()
+            io.atomix.core.set.impl.ClearRequest.newBuilder().build())
+            .thenApply(response -> ClearResponse.newBuilder()
+                .addHeaders(SessionResponseHeader.newBuilder()
+                    .setSessionId(header.getSessionId())
+                    .setPartitionId(partitionId.getPartition())
+                    .setIndex(response.getLeft().getIndex())
+                    .setSequenceNumber(response.getLeft().getSequence())
+                    .addAllStreams(response.getLeft().getStreamsList().stream()
                         .map(stream -> SessionStreamHeader.newBuilder()
                             .setStreamId(stream.getStreamId())
                             .setIndex(stream.getIndex())
@@ -286,8 +291,9 @@ public class SetServiceImpl extends SetServiceGrpc.SetServiceImplBase {
                             .build())
                         .collect(Collectors.toList()))
                     .build())
-                    .collect(Collectors.toList()))
-                .build())
+                .build()),
+        responses -> ClearResponse.newBuilder()
+            .addAllHeaders(responses.stream().map(response -> response.getHeaders(0)).collect(Collectors.toList()))
             .build());
   }
 
@@ -295,22 +301,20 @@ public class SetServiceImpl extends SetServiceGrpc.SetServiceImplBase {
   public void listen(EventRequest request, StreamObserver<EventResponse> responseObserver) {
     listen.<Pair<SessionStreamContext, ListenResponse>>executeAll(request, responseObserver,
         (header, handler, set) -> set.listen(SessionCommandContext.newBuilder()
-                .setSessionId(request.getHeaders().getSessionId())
+                .setSessionId(header.getSessionId())
                 .setSequenceNumber(header.getSequenceNumber())
                 .build(),
             io.atomix.core.set.impl.ListenRequest.newBuilder().build(), handler),
         (header, response) -> EventResponse.newBuilder()
-            .setHeaders(SessionResponseHeaders.newBuilder()
-                .setSessionId(request.getHeaders().getSessionId())
-                .addHeaders(SessionResponseHeader.newBuilder()
-                    .setPartitionId(header.getPartitionId())
+            .setHeader(SessionResponseHeader.newBuilder()
+                .setSessionId(header.getSessionId())
+                .setPartitionId(header.getPartitionId())
+                .setIndex(response.getLeft().getIndex())
+                .setSequenceNumber(response.getLeft().getSequence())
+                .addStreams(SessionStreamHeader.newBuilder()
+                    .setStreamId(response.getLeft().getStreamId())
                     .setIndex(response.getLeft().getIndex())
-                    .setSequenceNumber(response.getLeft().getSequence())
-                    .addStreams(SessionStreamHeader.newBuilder()
-                        .setStreamId(response.getLeft().getStreamId())
-                        .setIndex(response.getLeft().getIndex())
-                        .setLastItemNumber(response.getLeft().getSequence())
-                        .build())
+                    .setLastItemNumber(response.getLeft().getSequence())
                     .build())
                 .build())
             .setType(EventResponse.Type.valueOf(response.getRight().getType().name()))
@@ -322,23 +326,21 @@ public class SetServiceImpl extends SetServiceGrpc.SetServiceImplBase {
   public void iterate(IterateRequest request, StreamObserver<IterateResponse> responseObserver) {
     iterate.<Pair<SessionStreamContext, io.atomix.core.set.impl.IterateResponse>>executeAll(request, responseObserver,
         (header, handler, set) -> set.iterate(SessionQueryContext.newBuilder()
-                .setSessionId(request.getHeaders().getSessionId())
+                .setSessionId(header.getSessionId())
                 .setLastIndex(header.getLastIndex())
                 .setLastSequenceNumber(header.getLastSequenceNumber())
                 .build(),
             io.atomix.core.set.impl.IterateRequest.newBuilder().build(), handler),
         (header, response) -> IterateResponse.newBuilder()
-            .setHeaders(SessionResponseHeaders.newBuilder()
-                .setSessionId(request.getHeaders().getSessionId())
-                .addHeaders(SessionResponseHeader.newBuilder()
-                    .setPartitionId(header.getPartitionId())
+            .setHeader(SessionResponseHeader.newBuilder()
+                .setSessionId(header.getSessionId())
+                .setPartitionId(header.getPartitionId())
+                .setIndex(response.getLeft().getIndex())
+                .setSequenceNumber(response.getLeft().getSequence())
+                .addStreams(SessionStreamHeader.newBuilder()
+                    .setStreamId(response.getLeft().getStreamId())
                     .setIndex(response.getLeft().getIndex())
-                    .setSequenceNumber(response.getLeft().getSequence())
-                    .addStreams(SessionStreamHeader.newBuilder()
-                        .setStreamId(response.getLeft().getStreamId())
-                        .setIndex(response.getLeft().getIndex())
-                        .setLastItemNumber(response.getLeft().getSequence())
-                        .build())
+                    .setLastItemNumber(response.getLeft().getSequence())
                     .build())
                 .build())
             .setValue(response.getRight().getValue())
@@ -383,32 +385,32 @@ public class SetServiceImpl extends SetServiceGrpc.SetServiceImplBase {
   };
 
   private static final RequestExecutor.RequestDescriptor<CreateRequest, SetId, SessionHeader> CREATE_DESCRIPTOR =
-      new RequestExecutor.SessionDescriptor<>(CreateRequest::getId, r -> SessionHeaders.getDefaultInstance());
+      new RequestExecutor.SessionDescriptor<>(CreateRequest::getId, r -> Collections.emptyList());
 
   private static final RequestExecutor.RequestDescriptor<KeepAliveRequest, SetId, SessionHeader> KEEP_ALIVE_DESCRIPTOR =
-      new RequestExecutor.SessionDescriptor<>(KeepAliveRequest::getId, KeepAliveRequest::getHeaders);
+      new RequestExecutor.SessionDescriptor<>(KeepAliveRequest::getId, KeepAliveRequest::getHeadersList);
 
   private static final RequestExecutor.RequestDescriptor<CloseRequest, SetId, SessionHeader> CLOSE_DESCRIPTOR =
-      new RequestExecutor.SessionDescriptor<>(CloseRequest::getId, CloseRequest::getHeaders);
+      new RequestExecutor.SessionDescriptor<>(CloseRequest::getId, CloseRequest::getHeadersList);
 
   private static final RequestExecutor.RequestDescriptor<AddRequest, SetId, SessionCommandHeader> ADD_DESCRIPTOR =
-      new RequestExecutor.SessionCommandDescriptor<>(AddRequest::getId, AddRequest::getHeaders);
+      new RequestExecutor.SessionCommandDescriptor<>(AddRequest::getId, AddRequest::getHeadersList);
 
   private static final RequestExecutor.RequestDescriptor<RemoveRequest, SetId, SessionCommandHeader> REMOVE_DESCRIPTOR =
-      new RequestExecutor.SessionCommandDescriptor<>(RemoveRequest::getId, RemoveRequest::getHeaders);
+      new RequestExecutor.SessionCommandDescriptor<>(RemoveRequest::getId, RemoveRequest::getHeadersList);
 
   private static final RequestExecutor.RequestDescriptor<ContainsRequest, SetId, SessionQueryHeader> CONTAINS_DESCRIPTOR =
-      new RequestExecutor.SessionQueryDescriptor<>(ContainsRequest::getId, ContainsRequest::getHeaders);
+      new RequestExecutor.SessionQueryDescriptor<>(ContainsRequest::getId, ContainsRequest::getHeadersList);
 
   private static final RequestExecutor.RequestDescriptor<SizeRequest, SetId, SessionQueryHeader> SIZE_DESCRIPTOR =
-      new RequestExecutor.SessionQueryDescriptor<>(SizeRequest::getId, SizeRequest::getHeaders);
+      new RequestExecutor.SessionQueryDescriptor<>(SizeRequest::getId, SizeRequest::getHeadersList);
 
   private static final RequestExecutor.RequestDescriptor<ClearRequest, SetId, SessionCommandHeader> CLEAR_DESCRIPTOR =
-      new RequestExecutor.SessionCommandDescriptor<>(ClearRequest::getId, ClearRequest::getHeaders);
+      new RequestExecutor.SessionCommandDescriptor<>(ClearRequest::getId, ClearRequest::getHeadersList);
 
   private static final RequestExecutor.RequestDescriptor<EventRequest, SetId, SessionCommandHeader> EVENT_DESCRIPTOR =
-      new RequestExecutor.SessionCommandDescriptor<>(EventRequest::getId, EventRequest::getHeaders);
+      new RequestExecutor.SessionCommandDescriptor<>(EventRequest::getId, EventRequest::getHeadersList);
 
   private static final RequestExecutor.RequestDescriptor<IterateRequest, SetId, SessionQueryHeader> ITERATE_DESCRIPTOR =
-      new RequestExecutor.SessionQueryDescriptor<>(IterateRequest::getId, IterateRequest::getHeaders);
+      new RequestExecutor.SessionQueryDescriptor<>(IterateRequest::getId, IterateRequest::getHeadersList);
 }

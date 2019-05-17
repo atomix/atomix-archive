@@ -16,20 +16,17 @@
 package io.atomix.grpc.impl;
 
 import java.time.Duration;
-import java.util.function.Predicate;
+import java.util.Collections;
 import java.util.stream.Collectors;
 
 import io.atomix.core.Atomix;
-import io.atomix.core.map.impl.ContainsKeyResponse;
 import io.atomix.core.map.impl.ListenResponse;
 import io.atomix.core.map.impl.MapProxy;
 import io.atomix.core.map.impl.MapService;
 import io.atomix.grpc.headers.SessionCommandHeader;
 import io.atomix.grpc.headers.SessionHeader;
-import io.atomix.grpc.headers.SessionHeaders;
 import io.atomix.grpc.headers.SessionQueryHeader;
 import io.atomix.grpc.headers.SessionResponseHeader;
-import io.atomix.grpc.headers.SessionResponseHeaders;
 import io.atomix.grpc.headers.SessionStreamHeader;
 import io.atomix.grpc.map.ClearRequest;
 import io.atomix.grpc.map.ClearResponse;
@@ -59,6 +56,7 @@ import io.atomix.grpc.map.SizeResponse;
 import io.atomix.grpc.protocol.DistributedLogProtocol;
 import io.atomix.grpc.protocol.MultiPrimaryProtocol;
 import io.atomix.grpc.protocol.MultiRaftProtocol;
+import io.atomix.primitive.session.impl.CloseSessionRequest;
 import io.atomix.primitive.session.impl.DefaultSessionClient;
 import io.atomix.primitive.session.impl.OpenSessionRequest;
 import io.atomix.primitive.session.impl.SessionCommandContext;
@@ -101,45 +99,43 @@ public class MapServiceImpl extends MapServiceGrpc.MapServiceImplBase {
 
   @Override
   public void create(CreateRequest request, StreamObserver<CreateResponse> responseObserver) {
-    create.createAll(request, responseObserver, (partitionId, sessionId, map) -> map.openSession(OpenSessionRequest.newBuilder()
-        .setSessionId(sessionId)
-        .setTimeout(Duration.ofSeconds(request.getTimeout().getSeconds())
-            .plusNanos(request.getTimeout().getNanos())
-            .toMillis())
-        .build())
-        .thenApply(response -> SessionHeader.newBuilder()
-            .setPartitionId(partitionId.getPartition())
-            .build()), (sessionId, headers) -> CreateResponse.newBuilder()
-        .setHeaders(SessionHeaders.newBuilder()
+    create.createAll(request, responseObserver,
+        (partitionId, sessionId, map) -> map.openSession(OpenSessionRequest.newBuilder()
             .setSessionId(sessionId)
-            .addAllHeaders(headers.collect(Collectors.toList()))
+            .setTimeout(Duration.ofSeconds(request.getTimeout().getSeconds())
+                .plusNanos(request.getTimeout().getNanos())
+                .toMillis())
             .build())
-        .build());
+            .thenApply(response -> SessionHeader.newBuilder()
+                .setSessionId(sessionId)
+                .setPartitionId(partitionId.getPartition())
+                .build()),
+        (sessionId, responses) -> CreateResponse.newBuilder()
+            .addAllHeaders(responses)
+            .build());
   }
 
   @Override
   public void keepAlive(KeepAliveRequest request, StreamObserver<KeepAliveResponse> responseObserver) {
     keepAlive.executeAll(request, responseObserver,
         (partitionId, header, map) -> map.keepAlive(io.atomix.primitive.session.impl.KeepAliveRequest.newBuilder()
-            .setSessionId(request.getHeaders().getSessionId())
+            .setSessionId(header.getSessionId())
             .setCommandSequence(header.getLastSequenceNumber())
             .build())
             .thenApply(response -> SessionHeader.newBuilder()
-                .setPartitionId(header.getPartitionId())
+                .setSessionId(header.getSessionId())
+                .setPartitionId(partitionId.getPartition())
                 .build()),
         responses -> KeepAliveResponse.newBuilder()
-            .setHeaders(SessionHeaders.newBuilder()
-                .setSessionId(request.getHeaders().getSessionId())
-                .addAllHeaders(responses.collect(Collectors.toList()))
-                .build())
+            .addAllHeaders(responses)
             .build());
   }
 
   @Override
   public void close(CloseRequest request, StreamObserver<CloseResponse> responseObserver) {
     close.executeAll(request, responseObserver,
-        (partitionId, header, map) -> map.closeSession(io.atomix.primitive.session.impl.CloseSessionRequest.newBuilder()
-            .setSessionId(request.getHeaders().getSessionId())
+        (partitionId, header, map) -> map.closeSession(CloseSessionRequest.newBuilder()
+            .setSessionId(header.getSessionId())
             .build()),
         responses -> CloseResponse.newBuilder().build());
   }
@@ -148,18 +144,19 @@ public class MapServiceImpl extends MapServiceGrpc.MapServiceImplBase {
   public void size(SizeRequest request, StreamObserver<SizeResponse> responseObserver) {
     size.executeAll(request, responseObserver,
         (partitionId, header, map) -> map.size(SessionQueryContext.newBuilder()
-                .setSessionId(request.getHeaders().getSessionId())
+                .setSessionId(header.getSessionId())
                 .setLastIndex(header.getLastIndex())
                 .setLastSequenceNumber(header.getLastSequenceNumber())
                 .build(),
-            io.atomix.core.map.impl.SizeRequest.newBuilder().build()),
-        responses -> SizeResponse.newBuilder()
-            .setHeaders(SessionResponseHeaders.newBuilder()
-                .setSessionId(request.getHeaders().getSessionId())
-                .addAllHeaders(responses.map(Pair::getLeft).map(context -> SessionResponseHeader.newBuilder()
-                    .setIndex(context.getIndex())
-                    .setSequenceNumber(context.getSequence())
-                    .addAllStreams(context.getStreamsList().stream()
+            io.atomix.core.map.impl.SizeRequest.newBuilder().build())
+            .thenApply(response -> SizeResponse.newBuilder()
+                .setSize(response.getRight().getSize())
+                .addHeaders(SessionResponseHeader.newBuilder()
+                    .setSessionId(header.getSessionId())
+                    .setPartitionId(partitionId.getPartition())
+                    .setIndex(response.getLeft().getIndex())
+                    .setSequenceNumber(response.getLeft().getSequence())
+                    .addAllStreams(response.getLeft().getStreamsList().stream()
                         .map(stream -> SessionStreamHeader.newBuilder()
                             .setStreamId(stream.getStreamId())
                             .setIndex(stream.getIndex())
@@ -167,17 +164,18 @@ public class MapServiceImpl extends MapServiceGrpc.MapServiceImplBase {
                             .build())
                         .collect(Collectors.toList()))
                     .build())
-                    .collect(Collectors.toList()))
-                .build())
-            .setSize(responses.map(r -> r.getRight().getSize()).reduce(Math::addExact).orElse(0))
+                .build()),
+        responses -> SizeResponse.newBuilder()
+            .addAllHeaders(responses.stream().map(response -> response.getHeaders(0)).collect(Collectors.toList()))
+            .setSize(responses.stream().mapToInt(r -> r.getSize()).sum())
             .build());
   }
 
   @Override
   public void put(PutRequest request, StreamObserver<PutResponse> responseObserver) {
-    put.executeBy(request, request.getKey(), responseObserver,
+    put.executeBy(request, request.getHeader(), responseObserver,
         (partitionId, header, map) -> map.put(SessionCommandContext.newBuilder()
-                .setSessionId(request.getHeaders().getSessionId())
+                .setSessionId(header.getSessionId())
                 .setSequenceNumber(header.getSequenceNumber())
                 .build(),
             io.atomix.core.map.impl.PutRequest.newBuilder()
@@ -187,20 +185,18 @@ public class MapServiceImpl extends MapServiceGrpc.MapServiceImplBase {
                 .setVersion(request.getVersion())
                 .build())
             .thenApply(response -> PutResponse.newBuilder()
-                .setHeaders(SessionResponseHeaders.newBuilder()
-                    .setSessionId(request.getHeaders().getSessionId())
-                    .addHeaders(SessionResponseHeader.newBuilder()
-                        .setPartitionId(header.getPartitionId())
-                        .setIndex(response.getLeft().getIndex())
-                        .setSequenceNumber(response.getLeft().getSequence())
-                        .addAllStreams(response.getLeft().getStreamsList().stream()
-                            .map(stream -> SessionStreamHeader.newBuilder()
-                                .setStreamId(stream.getStreamId())
-                                .setIndex(stream.getIndex())
-                                .setLastItemNumber(stream.getSequence())
-                                .build())
-                            .collect(Collectors.toList()))
-                        .build())
+                .setHeader(SessionResponseHeader.newBuilder()
+                    .setSessionId(header.getSessionId())
+                    .setPartitionId(header.getPartitionId())
+                    .setIndex(response.getLeft().getIndex())
+                    .setSequenceNumber(response.getLeft().getSequence())
+                    .addAllStreams(response.getLeft().getStreamsList().stream()
+                        .map(stream -> SessionStreamHeader.newBuilder()
+                            .setStreamId(stream.getStreamId())
+                            .setIndex(stream.getIndex())
+                            .setLastItemNumber(stream.getSequence())
+                            .build())
+                        .collect(Collectors.toList()))
                     .build())
                 .setStatus(ResponseStatus.valueOf(response.getRight().getStatus().name()))
                 .setPreviousValue(response.getRight().getPreviousValue())
@@ -210,22 +206,22 @@ public class MapServiceImpl extends MapServiceGrpc.MapServiceImplBase {
 
   @Override
   public void exists(ExistsRequest request, StreamObserver<ExistsResponse> responseObserver) {
-    exists.executeBy(request, request.getKeysList(), responseObserver,
-        (header, keys, map) -> map.containsKey(SessionQueryContext.newBuilder()
-                .setSessionId(request.getHeaders().getSessionId())
+    exists.executeBy(request, request.getHeader(), responseObserver,
+        (partitionId, header, map) -> map.containsKey(SessionQueryContext.newBuilder()
+                .setSessionId(header.getSessionId())
                 .setLastIndex(header.getLastIndex())
                 .setLastSequenceNumber(header.getLastSequenceNumber())
                 .build(),
             io.atomix.core.map.impl.ContainsKeyRequest.newBuilder()
-                .addAllKeys(keys)
-                .build()),
-        responses -> ExistsResponse.newBuilder()
-            .setHeaders(SessionResponseHeaders.newBuilder()
-                .setSessionId(request.getHeaders().getSessionId())
-                .addAllHeaders(responses.map(Pair::getLeft).map(context -> SessionResponseHeader.newBuilder()
-                    .setIndex(context.getIndex())
-                    .setSequenceNumber(context.getSequence())
-                    .addAllStreams(context.getStreamsList().stream()
+                .addKeys(request.getKey())
+                .build())
+            .thenApply(response -> ExistsResponse.newBuilder()
+                .setHeader(SessionResponseHeader.newBuilder()
+                    .setSessionId(header.getSessionId())
+                    .setPartitionId(header.getPartitionId())
+                    .setIndex(response.getLeft().getIndex())
+                    .setSequenceNumber(response.getLeft().getSequence())
+                    .addAllStreams(response.getLeft().getStreamsList().stream()
                         .map(stream -> SessionStreamHeader.newBuilder()
                             .setStreamId(stream.getStreamId())
                             .setIndex(stream.getIndex())
@@ -233,21 +229,15 @@ public class MapServiceImpl extends MapServiceGrpc.MapServiceImplBase {
                             .build())
                         .collect(Collectors.toList()))
                     .build())
-                    .collect(Collectors.toList()))
-                .build())
-            .setContainsKey(responses.map(Pair::getRight)
-                .map(ContainsKeyResponse::getContainsKey)
-                .filter(Predicate.isEqual(true))
-                .findFirst()
-                .orElse(false))
-            .build());
+                .setContainsKey(response.getRight().getContainsKey())
+                .build()));
   }
 
   @Override
   public void get(GetRequest request, StreamObserver<GetResponse> responseObserver) {
-    get.executeBy(request, request.getKey(), responseObserver,
+    get.executeBy(request, request.getHeader(), responseObserver,
         (partitionId, header, map) -> map.get(SessionQueryContext.newBuilder()
-                .setSessionId(request.getHeaders().getSessionId())
+                .setSessionId(header.getSessionId())
                 .setLastIndex(header.getLastIndex())
                 .setLastSequenceNumber(header.getLastSequenceNumber())
                 .build(),
@@ -255,20 +245,18 @@ public class MapServiceImpl extends MapServiceGrpc.MapServiceImplBase {
                 .setKey(request.getKey())
                 .build())
             .thenApply(response -> GetResponse.newBuilder()
-                .setHeaders(SessionResponseHeaders.newBuilder()
-                    .setSessionId(request.getHeaders().getSessionId())
-                    .addHeaders(SessionResponseHeader.newBuilder()
-                        .setPartitionId(header.getPartitionId())
-                        .setIndex(response.getLeft().getIndex())
-                        .setSequenceNumber(response.getLeft().getSequence())
-                        .addAllStreams(response.getLeft().getStreamsList().stream()
-                            .map(stream -> SessionStreamHeader.newBuilder()
-                                .setStreamId(stream.getStreamId())
-                                .setIndex(stream.getIndex())
-                                .setLastItemNumber(stream.getSequence())
-                                .build())
-                            .collect(Collectors.toList()))
-                        .build())
+                .setHeader(SessionResponseHeader.newBuilder()
+                    .setSessionId(header.getSessionId())
+                    .setPartitionId(header.getPartitionId())
+                    .setIndex(response.getLeft().getIndex())
+                    .setSequenceNumber(response.getLeft().getSequence())
+                    .addAllStreams(response.getLeft().getStreamsList().stream()
+                        .map(stream -> SessionStreamHeader.newBuilder()
+                            .setStreamId(stream.getStreamId())
+                            .setIndex(stream.getIndex())
+                            .setLastItemNumber(stream.getSequence())
+                            .build())
+                        .collect(Collectors.toList()))
                     .build())
                 .setValue(response.getRight().getValue())
                 .setVersion(response.getRight().getVersion())
@@ -277,29 +265,27 @@ public class MapServiceImpl extends MapServiceGrpc.MapServiceImplBase {
 
   @Override
   public void replace(ReplaceRequest request, StreamObserver<ReplaceResponse> responseObserver) {
-    replace.executeBy(request, request.getKey(), responseObserver,
+    replace.executeBy(request, request.getHeader(), responseObserver,
         (partitionId, header, map) -> map.replace(SessionCommandContext.newBuilder()
-                .setSessionId(request.getHeaders().getSessionId())
+                .setSessionId(header.getSessionId())
                 .setSequenceNumber(header.getSequenceNumber())
                 .build(),
             io.atomix.core.map.impl.ReplaceRequest.newBuilder()
                 .setKey(request.getKey())
                 .build())
             .thenApply(response -> ReplaceResponse.newBuilder()
-                .setHeaders(SessionResponseHeaders.newBuilder()
-                    .setSessionId(request.getHeaders().getSessionId())
-                    .addHeaders(SessionResponseHeader.newBuilder()
-                        .setPartitionId(header.getPartitionId())
-                        .setIndex(response.getLeft().getIndex())
-                        .setSequenceNumber(response.getLeft().getSequence())
-                        .addAllStreams(response.getLeft().getStreamsList().stream()
-                            .map(stream -> SessionStreamHeader.newBuilder()
-                                .setStreamId(stream.getStreamId())
-                                .setIndex(stream.getIndex())
-                                .setLastItemNumber(stream.getSequence())
-                                .build())
-                            .collect(Collectors.toList()))
-                        .build())
+                .setHeader(SessionResponseHeader.newBuilder()
+                    .setSessionId(header.getSessionId())
+                    .setPartitionId(header.getPartitionId())
+                    .setIndex(response.getLeft().getIndex())
+                    .setSequenceNumber(response.getLeft().getSequence())
+                    .addAllStreams(response.getLeft().getStreamsList().stream()
+                        .map(stream -> SessionStreamHeader.newBuilder()
+                            .setStreamId(stream.getStreamId())
+                            .setIndex(stream.getIndex())
+                            .setLastItemNumber(stream.getSequence())
+                            .build())
+                        .collect(Collectors.toList()))
                     .build())
                 .setStatus(ResponseStatus.valueOf(response.getRight().getStatus().name()))
                 .setPreviousValue(response.getRight().getPreviousValue())
@@ -309,29 +295,27 @@ public class MapServiceImpl extends MapServiceGrpc.MapServiceImplBase {
 
   @Override
   public void remove(RemoveRequest request, StreamObserver<RemoveResponse> responseObserver) {
-    remove.executeBy(request, request.getKey(), responseObserver,
+    remove.executeBy(request, request.getHeader(), responseObserver,
         (partitionId, header, map) -> map.remove(SessionCommandContext.newBuilder()
-                .setSessionId(request.getHeaders().getSessionId())
+                .setSessionId(header.getSessionId())
                 .setSequenceNumber(header.getSequenceNumber())
                 .build(),
             io.atomix.core.map.impl.RemoveRequest.newBuilder()
                 .setKey(request.getKey())
                 .build())
             .thenApply(response -> RemoveResponse.newBuilder()
-                .setHeaders(SessionResponseHeaders.newBuilder()
-                    .setSessionId(request.getHeaders().getSessionId())
-                    .addHeaders(SessionResponseHeader.newBuilder()
-                        .setPartitionId(header.getPartitionId())
-                        .setIndex(response.getLeft().getIndex())
-                        .setSequenceNumber(response.getLeft().getSequence())
-                        .addAllStreams(response.getLeft().getStreamsList().stream()
-                            .map(stream -> SessionStreamHeader.newBuilder()
-                                .setStreamId(stream.getStreamId())
-                                .setIndex(stream.getIndex())
-                                .setLastItemNumber(stream.getSequence())
-                                .build())
-                            .collect(Collectors.toList()))
-                        .build())
+                .setHeader(SessionResponseHeader.newBuilder()
+                    .setSessionId(header.getSessionId())
+                    .setPartitionId(header.getPartitionId())
+                    .setIndex(response.getLeft().getIndex())
+                    .setSequenceNumber(response.getLeft().getSequence())
+                    .addAllStreams(response.getLeft().getStreamsList().stream()
+                        .map(stream -> SessionStreamHeader.newBuilder()
+                            .setStreamId(stream.getStreamId())
+                            .setIndex(stream.getIndex())
+                            .setLastItemNumber(stream.getSequence())
+                            .build())
+                        .collect(Collectors.toList()))
                     .build())
                 .setStatus(ResponseStatus.valueOf(response.getRight().getStatus().name()))
                 .setPreviousValue(response.getRight().getPreviousValue())
@@ -343,17 +327,17 @@ public class MapServiceImpl extends MapServiceGrpc.MapServiceImplBase {
   public void clear(ClearRequest request, StreamObserver<ClearResponse> responseObserver) {
     clear.executeAll(request, responseObserver,
         (partitionId, header, map) -> map.clear(SessionCommandContext.newBuilder()
-                .setSessionId(request.getHeaders().getSessionId())
+                .setSessionId(header.getSessionId())
                 .setSequenceNumber(header.getSequenceNumber())
                 .build(),
-            io.atomix.core.map.impl.ClearRequest.newBuilder().build()),
-        responses -> ClearResponse.newBuilder()
-            .setHeaders(SessionResponseHeaders.newBuilder()
-                .setSessionId(request.getHeaders().getSessionId())
-                .addAllHeaders(responses.map(Pair::getLeft).map(context -> SessionResponseHeader.newBuilder()
-                    .setIndex(context.getIndex())
-                    .setSequenceNumber(context.getSequence())
-                    .addAllStreams(context.getStreamsList().stream()
+            io.atomix.core.map.impl.ClearRequest.newBuilder().build())
+            .thenApply(response -> ClearResponse.newBuilder()
+                .addHeaders(SessionResponseHeader.newBuilder()
+                    .setSessionId(header.getSessionId())
+                    .setPartitionId(partitionId.getPartition())
+                    .setIndex(response.getLeft().getIndex())
+                    .setSequenceNumber(response.getLeft().getSequence())
+                    .addAllStreams(response.getLeft().getStreamsList().stream()
                         .map(stream -> SessionStreamHeader.newBuilder()
                             .setStreamId(stream.getStreamId())
                             .setIndex(stream.getIndex())
@@ -361,8 +345,9 @@ public class MapServiceImpl extends MapServiceGrpc.MapServiceImplBase {
                             .build())
                         .collect(Collectors.toList()))
                     .build())
-                    .collect(Collectors.toList()))
-                .build())
+                .build()),
+        responses -> ClearResponse.newBuilder()
+            .addAllHeaders(responses.stream().map(response -> response.getHeaders(0)).collect(Collectors.toList()))
             .build());
   }
 
@@ -370,22 +355,20 @@ public class MapServiceImpl extends MapServiceGrpc.MapServiceImplBase {
   public void events(EventRequest request, StreamObserver<EventResponse> responseObserver) {
     events.<Pair<SessionStreamContext, ListenResponse>>executeAll(request, responseObserver,
         (header, handler, map) -> map.listen(SessionCommandContext.newBuilder()
-                .setSessionId(request.getHeaders().getSessionId())
+                .setSessionId(header.getSessionId())
                 .setSequenceNumber(header.getSequenceNumber())
                 .build(),
             io.atomix.core.map.impl.ListenRequest.newBuilder().build(), handler),
         (header, response) -> EventResponse.newBuilder()
-            .setHeaders(SessionResponseHeaders.newBuilder()
-                .setSessionId(request.getHeaders().getSessionId())
-                .addHeaders(SessionResponseHeader.newBuilder()
-                    .setPartitionId(header.getPartitionId())
+            .setHeader(SessionResponseHeader.newBuilder()
+                .setSessionId(header.getSessionId())
+                .setPartitionId(header.getPartitionId())
+                .setIndex(response.getLeft().getIndex())
+                .setSequenceNumber(response.getLeft().getSequence())
+                .addStreams(SessionStreamHeader.newBuilder()
+                    .setStreamId(response.getLeft().getStreamId())
                     .setIndex(response.getLeft().getIndex())
-                    .setSequenceNumber(response.getLeft().getSequence())
-                    .addStreams(SessionStreamHeader.newBuilder()
-                        .setStreamId(response.getLeft().getStreamId())
-                        .setIndex(response.getLeft().getIndex())
-                        .setLastItemNumber(response.getLeft().getSequence())
-                        .build())
+                    .setLastItemNumber(response.getLeft().getSequence())
                     .build())
                 .build())
             .setType(EventResponse.Type.valueOf(response.getRight().getType().name()))
@@ -435,35 +418,35 @@ public class MapServiceImpl extends MapServiceGrpc.MapServiceImplBase {
   };
 
   private static final RequestExecutor.RequestDescriptor<CreateRequest, MapId, SessionHeader> CREATE_DESCRIPTOR =
-      new RequestExecutor.SessionDescriptor<>(CreateRequest::getId, r -> SessionHeaders.getDefaultInstance());
+      new RequestExecutor.SessionDescriptor<>(CreateRequest::getId, r -> Collections.emptyList());
 
   private static final RequestExecutor.RequestDescriptor<KeepAliveRequest, MapId, SessionHeader> KEEP_ALIVE_DESCRIPTOR =
-      new RequestExecutor.SessionDescriptor<>(KeepAliveRequest::getId, KeepAliveRequest::getHeaders);
+      new RequestExecutor.SessionDescriptor<>(KeepAliveRequest::getId, KeepAliveRequest::getHeadersList);
 
   private static final RequestExecutor.RequestDescriptor<CloseRequest, MapId, SessionHeader> CLOSE_DESCRIPTOR =
-      new RequestExecutor.SessionDescriptor<>(CloseRequest::getId, CloseRequest::getHeaders);
+      new RequestExecutor.SessionDescriptor<>(CloseRequest::getId, CloseRequest::getHeadersList);
 
   private static final RequestExecutor.RequestDescriptor<SizeRequest, MapId, SessionQueryHeader> SIZE_DESCRIPTOR =
-      new RequestExecutor.SessionQueryDescriptor<>(SizeRequest::getId, SizeRequest::getHeaders);
+      new RequestExecutor.SessionQueryDescriptor<>(SizeRequest::getId, SizeRequest::getHeadersList);
 
   private static final RequestExecutor.RequestDescriptor<PutRequest, MapId, SessionCommandHeader> PUT_DESCRIPTOR =
-      new RequestExecutor.SessionCommandDescriptor<>(PutRequest::getId, PutRequest::getHeaders);
+      new RequestExecutor.SessionCommandDescriptor<>(PutRequest::getId, request -> Collections.singletonList(request.getHeader()));
 
   private static final RequestExecutor.RequestDescriptor<ExistsRequest, MapId, SessionQueryHeader> EXISTS_DESCRIPTOR =
-      new RequestExecutor.SessionQueryDescriptor<>(ExistsRequest::getId, ExistsRequest::getHeaders);
+      new RequestExecutor.SessionQueryDescriptor<>(ExistsRequest::getId, request -> Collections.singletonList(request.getHeader()));
 
   private static final RequestExecutor.RequestDescriptor<GetRequest, MapId, SessionQueryHeader> GET_DESCRIPTOR =
-      new RequestExecutor.SessionQueryDescriptor<>(GetRequest::getId, GetRequest::getHeaders);
+      new RequestExecutor.SessionQueryDescriptor<>(GetRequest::getId, request -> Collections.singletonList(request.getHeader()));
 
   private static final RequestExecutor.RequestDescriptor<ReplaceRequest, MapId, SessionCommandHeader> REPLACE_DESCRIPTOR =
-      new RequestExecutor.SessionCommandDescriptor<>(ReplaceRequest::getId, ReplaceRequest::getHeaders);
+      new RequestExecutor.SessionCommandDescriptor<>(ReplaceRequest::getId, request -> Collections.singletonList(request.getHeader()));
 
   private static final RequestExecutor.RequestDescriptor<RemoveRequest, MapId, SessionCommandHeader> REMOVE_DESCRIPTOR =
-      new RequestExecutor.SessionCommandDescriptor<>(RemoveRequest::getId, RemoveRequest::getHeaders);
+      new RequestExecutor.SessionCommandDescriptor<>(RemoveRequest::getId, request -> Collections.singletonList(request.getHeader()));
 
   private static final RequestExecutor.RequestDescriptor<ClearRequest, MapId, SessionCommandHeader> CLEAR_DESCRIPTOR =
-      new RequestExecutor.SessionCommandDescriptor<>(ClearRequest::getId, ClearRequest::getHeaders);
+      new RequestExecutor.SessionCommandDescriptor<>(ClearRequest::getId, ClearRequest::getHeadersList);
 
   private static final RequestExecutor.RequestDescriptor<EventRequest, MapId, SessionCommandHeader> EVENTS_DESCRIPTOR =
-      new RequestExecutor.SessionCommandDescriptor<>(EventRequest::getId, EventRequest::getHeaders);
+      new RequestExecutor.SessionCommandDescriptor<>(EventRequest::getId, EventRequest::getHeadersList);
 }

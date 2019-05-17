@@ -100,6 +100,11 @@ public class PrimitiveFactory<P extends PrimitiveProxy, I extends Message> {
   private ServiceProtocol toProtocol(I id) {
     if (primitiveIdDescriptor.hasMultiRaftProtocol(id)) {
       String group = primitiveIdDescriptor.getMultiRaftProtocol(id).getGroup();
+      if (Strings.isNullOrEmpty(group)) {
+        group = managementService.getPartitionService()
+            .getPartitionGroup(io.atomix.protocols.raft.MultiRaftProtocol.TYPE)
+            .name();
+      }
       return io.atomix.protocols.raft.MultiRaftProtocol.builder(group).build();
     }
 
@@ -110,6 +115,11 @@ public class PrimitiveFactory<P extends PrimitiveProxy, I extends Message> {
 
     if (primitiveIdDescriptor.hasDistributedLogProtocol(id)) {
       String group = primitiveIdDescriptor.getDistributedLogProtocol(id).getGroup();
+      if (Strings.isNullOrEmpty(group)) {
+        group = managementService.getPartitionService()
+            .getPartitionGroup(io.atomix.protocols.log.DistributedLogProtocol.TYPE)
+            .name();
+      }
       return io.atomix.protocols.log.DistributedLogProtocol.builder(group)
           .withNumPartitions(primitiveIdDescriptor.getDistributedLogProtocol(id).getPartitions())
           .withReplicationFactor(primitiveIdDescriptor.getDistributedLogProtocol(id).getReplicationFactor())
@@ -165,6 +175,20 @@ public class PrimitiveFactory<P extends PrimitiveProxy, I extends Message> {
           PartitionId partitionId = client.getPartitionId(partitionKey);
           return Pair.of(partitionId, primitiveFactory.apply(getServiceId(id), client.getPartition(partitionId)));
         });
+  }
+
+  /**
+   * Returns a proxy for the given partition.
+   *
+   * @param id          the primitive ID
+   * @param partitionId the partition ID
+   * @return the primitive
+   */
+  public CompletableFuture<Pair<PartitionId, P>> getPrimitive(I id, int partitionId) {
+    return getPrimitive(id, PartitionId.newBuilder()
+        .setPartition(partitionId)
+        .setGroup(getPartitionGroup(id))
+        .build());
   }
 
   /**
