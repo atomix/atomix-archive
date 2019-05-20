@@ -25,6 +25,8 @@ import java.nio.file.Files;
 
 import io.atomix.utils.AtomixIOException;
 import io.atomix.utils.memory.BufferCleaner;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -32,6 +34,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
  * {@link ByteBuffer} based mapped bytes.
  */
 public class MappedBytes extends ByteBufferBytes {
+  private static final Logger LOGGER = LoggerFactory.getLogger(MappedBytes.class);
 
   /**
    * Allocates a mapped buffer in {@link FileChannel.MapMode#READ_WRITE} mode.
@@ -91,7 +94,10 @@ public class MappedBytes extends ByteBufferBytes {
   public Bytes reset(ByteBuffer buffer) {
     try {
       BufferCleaner.freeBuffer(this.buffer);
-    } catch (IOException e) {
+    } catch (Exception e) {
+      if (LOGGER.isDebugEnabled()) {
+        LOGGER.debug("Failed to unmap direct buffer", e);
+      }
     }
     this.buffer = checkNotNull(buffer, "buffer cannot be null");
     return this;
@@ -121,6 +127,12 @@ public class MappedBytes extends ByteBufferBytes {
   public void close() {
     try {
       BufferCleaner.freeBuffer(buffer);
+    } catch (Exception e) {
+      if (LOGGER.isDebugEnabled()) {
+        LOGGER.debug("Failed to unmap direct buffer", e);
+      }
+    }
+    try {
       channel.close();
       randomAccessFile.close();
     } catch (IOException e) {
