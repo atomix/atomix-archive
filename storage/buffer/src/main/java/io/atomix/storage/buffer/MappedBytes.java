@@ -93,7 +93,9 @@ public class MappedBytes extends ByteBufferBytes {
   @Override
   public Bytes reset(ByteBuffer buffer) {
     try {
-      BufferCleaner.freeBuffer(this.buffer);
+      if (buffer != this.buffer) {
+        BufferCleaner.freeBuffer(this.buffer);
+      }
     } catch (Exception e) {
       if (LOGGER.isDebugEnabled()) {
         LOGGER.debug("Failed to unmap direct buffer", e);
