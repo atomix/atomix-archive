@@ -197,7 +197,7 @@ public class LogPartitionGroup implements ManagedPartitionGroup {
    * @param event the event to handle
    */
   private void onMetadataEvent(PartitionMetadataEvent<LogPartitionGroupMetadata> event) {
-    MemberId localMemberId = managementService.getMembershipService().getLocalMember().id();
+    MemberId localMemberId = managementService.getMembershipService().getLocalMemberId();
     for (LogTopicMetadata topic : event.metadata().getTopicsMap().values()) {
       if (!this.topics.containsKey(topic.getTopic())) {
         Map<PartitionId, LogPartition> partitions = new HashMap<>();

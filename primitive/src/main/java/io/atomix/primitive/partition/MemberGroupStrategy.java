@@ -15,9 +15,6 @@
  */
 package io.atomix.primitive.partition;
 
-import io.atomix.cluster.Member;
-import io.atomix.primitive.partition.impl.NodeMemberGroup;
-
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -25,6 +22,11 @@ import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+
+import com.google.common.base.Strings;
+import io.atomix.cluster.Member;
+import io.atomix.cluster.MemberId;
+import io.atomix.primitive.partition.impl.NodeMemberGroup;
 
 /**
  * Member group strategy.
@@ -41,7 +43,9 @@ public enum MemberGroupStrategy implements MemberGroupProvider {
   ZONE_AWARE {
     @Override
     public Collection<MemberGroup> getMemberGroups(Collection<Member> members) {
-      return groupNodes(members, node -> node.zone() != null ? node.zone() : node.id().id());
+      return groupNodes(members, node -> !Strings.isNullOrEmpty(node.getZoneId())
+          ? node.getZoneId()
+          : MemberId.from(node.getId(), node.getNamespace()).toString());
     }
   },
 
@@ -53,7 +57,9 @@ public enum MemberGroupStrategy implements MemberGroupProvider {
   RACK_AWARE {
     @Override
     public Collection<MemberGroup> getMemberGroups(Collection<Member> members) {
-      return groupNodes(members, node -> node.rack() != null ? node.rack() : node.id().id());
+      return groupNodes(members, node -> !Strings.isNullOrEmpty(node.getRackId())
+          ? node.getRackId()
+          : MemberId.from(node.getId(), node.getNamespace()).toString());
     }
   },
 
@@ -65,7 +71,9 @@ public enum MemberGroupStrategy implements MemberGroupProvider {
   HOST_AWARE {
     @Override
     public Collection<MemberGroup> getMemberGroups(Collection<Member> members) {
-      return groupNodes(members, node -> node.host() != null ? node.host() : node.id().id());
+      return groupNodes(members, node -> !Strings.isNullOrEmpty(node.getHostId())
+          ? node.getHostId()
+          : MemberId.from(node.getId(), node.getNamespace()).toString());
     }
   },
 
@@ -78,14 +86,14 @@ public enum MemberGroupStrategy implements MemberGroupProvider {
   NODE_AWARE {
     @Override
     public Collection<MemberGroup> getMemberGroups(Collection<Member> members) {
-      return groupNodes(members, node -> node.id().id());
+      return groupNodes(members, node -> MemberId.from(node.getId(), node.getNamespace()).toString());
     }
   };
 
   /**
    * Groups nodes by the given key function.
    *
-   * @param members       the nodes to group
+   * @param members     the nodes to group
    * @param keyFunction the key function to apply to nodes to extract a key
    * @return a collection of node member groups
    */

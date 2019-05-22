@@ -15,22 +15,13 @@
  */
 package io.atomix.cluster.messaging;
 
-import java.io.File;
-
 /**
  * TLS configuration.
  */
 public class TlsConfig {
-  private static final String CONFIG_DIR = "/conf";
-  private static final String KEYSTORE_FILE_NAME = "atomix.jks";
-  private static final File DEFAULT_KEYSTORE_FILE = new File(CONFIG_DIR, KEYSTORE_FILE_NAME);
-  private static final String DEFAULT_KEYSTORE_PASSWORD = "changeit";
-
   private boolean enabled = Boolean.parseBoolean(System.getProperty("io.atomix.enableNettyTLS", Boolean.toString(false)));
-  private String keyStore = System.getProperty("javax.net.ssl.keyStore", DEFAULT_KEYSTORE_FILE.toString());
-  private String trustStore = System.getProperty("javax.net.ssl.trustStore", DEFAULT_KEYSTORE_FILE.toString());
-  private String keyStorePassword = System.getProperty("javax.net.ssl.keyStorePassword", DEFAULT_KEYSTORE_PASSWORD);
-  private String trustStorePassword = System.getProperty("javax.net.ssl.trustStorePassword", DEFAULT_KEYSTORE_PASSWORD);
+  private String certPath = System.getProperty("io.atomix.messaging.tls.certPath");
+  private String keyPath = System.getProperty("io.atomix.messaging.tls.keyPath");
 
   /**
    * Returns whether TLS is enabled.
@@ -53,82 +44,42 @@ public class TlsConfig {
   }
 
   /**
-   * Returns the key store path.
+   * Returns the certificate chain path.
    *
-   * @return the key store path
+   * @return the certificate chain path
    */
-  public String getKeyStore() {
-    return keyStore;
+  public String getCertPath() {
+    return certPath;
   }
 
   /**
-   * Sets the key store path.
+   * Sets the certificate chain path.
    *
-   * @param keyStore the key store path
+   * @param certPath the certificate chain path
    * @return the TLS configuration
    */
-  public TlsConfig setKeyStore(String keyStore) {
-    this.keyStore = keyStore;
+  public TlsConfig setCertPath(String certPath) {
+    this.certPath = certPath;
     return this;
   }
 
   /**
-   * Returns the trust store path.
+   * Returns the private key path.
    *
-   * @return the trust store path
+   * @return the private key path
    */
-  public String getTrustStore() {
-    return trustStore;
+  public String getKeyPath() {
+    return keyPath;
   }
 
   /**
-   * Sets the trust store path.
+   * Sets the private key path.
    *
-   * @param trustStore the trust store path
+   * @param keyPath the private key path
    * @return the TLS configuration
    */
-  public TlsConfig setTrustStore(String trustStore) {
-    this.trustStore = trustStore;
-    return this;
-  }
-
-  /**
-   * Returns the key store password.
-   *
-   * @return the key store password
-   */
-  public String getKeyStorePassword() {
-    return keyStorePassword;
-  }
-
-  /**
-   * Sets the key store password.
-   *
-   * @param keyStorePassword the key store password
-   * @return the TLS configuration
-   */
-  public TlsConfig setKeyStorePassword(String keyStorePassword) {
-    this.keyStorePassword = keyStorePassword;
-    return this;
-  }
-
-  /**
-   * Returns the trust store password.
-   *
-   * @return the trust store password
-   */
-  public String getTrustStorePassword() {
-    return trustStorePassword;
-  }
-
-  /**
-   * Sets the trust store password.
-   *
-   * @param trustStorePassword the trust store password
-   * @return the TLS configuration
-   */
-  public TlsConfig setTrustStorePassword(String trustStorePassword) {
-    this.trustStorePassword = trustStorePassword;
+  public TlsConfig setKeyPath(String keyPath) {
+    this.keyPath = keyPath;
     return this;
   }
 }

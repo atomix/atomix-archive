@@ -31,10 +31,9 @@ import java.util.function.Consumer;
 
 import com.google.common.collect.Maps;
 import com.google.common.hash.Hashing;
-import io.atomix.cluster.ClusterMembershipEvent;
-import io.atomix.cluster.ClusterMembershipEventListener;
 import io.atomix.cluster.ClusterMembershipService;
 import io.atomix.cluster.Member;
+import io.atomix.cluster.MemberEvent;
 import io.atomix.cluster.MemberId;
 import io.atomix.cluster.messaging.ClusterCommunicationService;
 import io.atomix.primitive.partition.GroupMember;
@@ -68,7 +67,7 @@ public class HashBasedPrimaryElection implements PrimaryElection {
   private final ClusterMembershipService clusterMembershipService;
   private final PartitionGroupMembershipService groupMembershipService;
   private final ClusterCommunicationService communicationService;
-  private final ClusterMembershipEventListener clusterMembershipEventListener = this::handleClusterMembershipEvent;
+  private final Consumer<MemberEvent> clusterMembershipEventListener = this::handleClusterMembershipEvent;
   private final Set<Consumer<PrimaryElectionEvent>> listeners = new CopyOnWriteArraySet<>();
   private final Map<MemberId, Integer> counters = Maps.newConcurrentMap();
   private final String subject;
@@ -130,8 +129,8 @@ public class HashBasedPrimaryElection implements PrimaryElection {
   /**
    * Handles a cluster membership event.
    */
-  private void handleClusterMembershipEvent(ClusterMembershipEvent event) {
-    if (event.type() == ClusterMembershipEvent.Type.MEMBER_ADDED || event.type() == ClusterMembershipEvent.Type.MEMBER_REMOVED) {
+  private void handleClusterMembershipEvent(MemberEvent event) {
+    if (event.getType() == MemberEvent.Type.ADDED || event.getType() == MemberEvent.Type.REMOVED) {
       recomputeTerm(groupMembershipService.getMembership(partitionId.getGroup()));
     }
   }
@@ -151,7 +150,7 @@ public class HashBasedPrimaryElection implements PrimaryElection {
    * @return the current term
    */
   private long incrementTerm() {
-    counters.compute(clusterMembershipService.getLocalMember().id(), (id, value) -> value != null ? value + 1 : 1);
+    counters.compute(MemberId.from(clusterMembershipService.getLocalMember()), (id, value) -> value != null ? value + 1 : 1);
     broadcastCounters();
     return currentTerm();
   }
@@ -190,7 +189,7 @@ public class HashBasedPrimaryElection implements PrimaryElection {
     List<GroupMember> candidates = new ArrayList<>();
     for (MemberId memberId : membership.members()) {
       Member member = clusterMembershipService.getMember(memberId);
-      if (member != null && member.isReachable()) {
+      if (member != null && member.getState() != Member.State.DEAD) {
         candidates.add(GroupMember.newBuilder()
             .setMemberId(memberId.id())
             .setMemberGroupId(memberId.id())
@@ -228,7 +227,7 @@ public class HashBasedPrimaryElection implements PrimaryElection {
         .build();
     if (!Objects.equals(currentTerm, newTerm)) {
       this.currentTerm = newTerm;
-      LOGGER.debug("{} - Recomputed term for partition {}: {}", clusterMembershipService.getLocalMember().id(), partitionId, newTerm);
+      LOGGER.debug("{} - Recomputed term for partition {}: {}", MemberId.from(clusterMembershipService.getLocalMember()), partitionId, newTerm);
       listeners.forEach(l -> l.accept(PrimaryElectionEvent.newBuilder()
           .setPartitionId(partitionId)
           .setTerm(newTerm)

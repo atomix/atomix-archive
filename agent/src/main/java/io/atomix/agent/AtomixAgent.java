@@ -27,7 +27,6 @@ import com.google.common.collect.Lists;
 import io.atomix.cluster.MemberId;
 import io.atomix.cluster.NodeConfig;
 import io.atomix.cluster.discovery.BootstrapDiscoveryConfig;
-import io.atomix.cluster.discovery.MulticastDiscoveryConfig;
 import io.atomix.core.Atomix;
 import io.atomix.core.AtomixConfig;
 import io.atomix.grpc.GrpcService;
@@ -66,7 +65,7 @@ public class AtomixAgent {
 
     final Atomix atomix = buildAtomix(namespace);
     atomix.start().join();
-    logger.info("Atomix listening at {}", atomix.getMembershipService().getLocalMember().address());
+    logger.info("Atomix listening at {}", atomix.getMembershipService().getLocalMember().getPort());
 
     final ManagedGrpcService grpc = buildGrpcService(atomix, namespace);
     grpc.start().join();
@@ -239,18 +238,6 @@ public class AtomixAgent {
         .metavar("NAME@HOST:PORT")
         .required(false)
         .help("The set of static members to join. When provided, bootstrap node discovery will be used.");
-    parser.addArgument("--multicast")
-        .action(new StoreTrueArgumentAction())
-        .setDefault(false)
-        .help("Enables multicast discovery. Note that the network must support multicast for this feature to work.");
-    parser.addArgument("--multicast-group")
-        .type(String.class)
-        .metavar("IP")
-        .help("Sets the multicast group. Defaults to 230.0.0.1");
-    parser.addArgument("--multicast-port")
-        .type(Integer.class)
-        .metavar("PORT")
-        .help("Sets the multicast port. Defaults to 54321");
     parser.addArgument("--grpc-host")
         .type(String.class)
         .metavar("HOST")
@@ -298,9 +285,6 @@ public class AtomixAgent {
     final String rack = namespace.getString("rack");
     final String zone = namespace.getString("zone");
     final List<NodeConfig> bootstrap = namespace.getList("bootstrap");
-    final boolean multicastEnabled = namespace.getBoolean("multicast");
-    final String multicastGroup = namespace.get("multicast_group");
-    final Integer multicastPort = namespace.get("multicast_port");
 
     System.setProperty("atomix.data", namespace.getString("data_dir"));
 
@@ -333,19 +317,6 @@ public class AtomixAgent {
 
     if (bootstrap != null && !bootstrap.isEmpty()) {
       config.getClusterConfig().setDiscoveryConfig(new BootstrapDiscoveryConfig().setNodes(bootstrap));
-    }
-
-    if (multicastEnabled) {
-      config.getClusterConfig().getMulticastConfig().setEnabled(true);
-      if (multicastGroup != null) {
-        config.getClusterConfig().getMulticastConfig().setGroup(multicastGroup);
-      }
-      if (multicastPort != null) {
-        config.getClusterConfig().getMulticastConfig().setPort(multicastPort);
-      }
-      if (bootstrap == null || bootstrap.isEmpty()) {
-        config.getClusterConfig().setDiscoveryConfig(new MulticastDiscoveryConfig());
-      }
     }
     return config;
   }

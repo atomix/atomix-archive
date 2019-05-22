@@ -1,0 +1,96 @@
+syntax = "proto3";
+
+package atomix.cluster;
+
+option java_package = "io.atomix.cluster";
+option java_multiple_files = true;
+
+message ClusterMessage {
+    oneof message {
+        JoinRequest join_request = 1;
+        JoinResponse join_response = 2;
+        GossipMessage gossip = 3;
+        ProbeRequest probe_request = 4;
+        ProbeResponse probe_response = 5;
+        VerifyRequest verify_request = 6;
+        VerifyResponse verify_response = 7;
+        LeaveRequest leave_request = 8;
+        LeaveResponse leave_response = 9;
+    }
+}
+
+message JoinRequest {
+    Member member = 1;
+}
+
+message JoinResponse {
+    repeated Member members = 1;
+}
+
+message GossipMessage {
+    repeated Member updates = 1;
+}
+
+message ProbeRequest {
+    Member source = 1;
+    Member target = 2;
+}
+
+message ProbeResponse {
+    Member member = 1;
+}
+
+message VerifyRequest {
+    Member target = 1;
+}
+
+message VerifyResponse {
+    Member target = 1;
+    bool succeeded = 2;
+}
+
+message LeaveRequest {
+    Member member = 1;
+}
+
+message LeaveResponse {
+}
+
+// Cluster member
+message Member {
+    string id = 1;
+    string namespace = 2;
+    string host = 3;
+    int32 port = 4;
+    string zoneId = 5;
+    string rackId = 6;
+    string hostId = 7;
+    map<string, string> properties = 8;
+    string version = 9;
+    int64 timestamp = 10;
+    State state = 11;
+    int64 incarnation_number = 12;
+
+    enum State {
+        ALIVE = 0;
+        SUSPECT = 1;
+        DEAD = 2;
+    }
+}
+
+// Cluster membership event
+message MemberEvent {
+    Type type = 1;
+    Member member = 2;
+
+    enum Type {
+        ADDED = 0;
+        REMOVED = 1;
+    }
+}
+
+// Cluster membership service
+service MembershipService {
+    // Joins the cluster
+    rpc Join(stream ClusterMessage) returns (stream ClusterMessage) {}
+}

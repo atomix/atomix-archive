@@ -15,17 +15,16 @@
  */
 package io.atomix.cluster;
 
-import io.atomix.utils.event.ListenerService;
-import io.atomix.utils.net.Address;
-
 import java.util.Set;
-import java.util.stream.Collectors;
+
+import io.atomix.utils.event.Listenable;
+import io.atomix.utils.net.Address;
 
 /**
  * Service for obtaining information about the individual members within
  * the cluster.
  */
-public interface ClusterMembershipService extends ListenerService<ClusterMembershipEvent, ClusterMembershipEventListener> {
+public interface ClusterMembershipService extends Listenable<MemberEvent> {
 
   /**
    * Returns the local member.
@@ -35,22 +34,20 @@ public interface ClusterMembershipService extends ListenerService<ClusterMembers
   Member getLocalMember();
 
   /**
+   * Returns the local member ID.
+   *
+   * @return the local member ID
+   */
+  default MemberId getLocalMemberId() {
+    return MemberId.from(getLocalMember());
+  }
+
+  /**
    * Returns the set of current cluster members.
    *
    * @return set of cluster members
    */
   Set<Member> getMembers();
-
-  /**
-   * Returns the set of active reachable members.
-   *
-   * @return the set of active reachable members
-   */
-  default Set<Member> getReachableMembers() {
-    return getMembers().stream()
-        .filter(member -> member.isReachable())
-        .collect(Collectors.toSet());
-  }
 
   /**
    * Returns the specified member node.
@@ -81,7 +78,7 @@ public interface ClusterMembershipService extends ListenerService<ClusterMembers
    */
   default Member getMember(Address address) {
     return getMembers().stream()
-        .filter(member -> member.address().equals(address))
+        .filter(member -> member.getHost().equals(address.host()) && member.getPort() == address.port())
         .findFirst()
         .orElse(null);
   }

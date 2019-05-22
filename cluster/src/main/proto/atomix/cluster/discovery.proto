@@ -1,0 +1,25 @@
+syntax = "proto3";
+
+package atomix.cluster;
+
+option java_package = "io.atomix.cluster.discovery";
+option java_multiple_files = true;
+
+// Cluster node
+message Node {
+    string id = 1;
+    string namespace = 2;
+    string host = 3;
+    int32 port = 4;
+}
+
+// Node discovery event
+message DiscoveryEvent {
+    Type type = 1;
+    Node node = 2;
+
+    enum Type {
+        JOIN = 0;
+        LEAVE = 1;
+    }
+}

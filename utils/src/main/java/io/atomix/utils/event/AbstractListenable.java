@@ -13,11 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.atomix.primitive.event;
+package io.atomix.utils.event;
 
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.function.Consumer;
+
+import io.atomix.utils.event.Listenable;
 
 /**
  * Basis for components which need to export listener mechanism.

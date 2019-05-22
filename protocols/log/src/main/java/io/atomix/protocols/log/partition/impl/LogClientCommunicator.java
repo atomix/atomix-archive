@@ -49,7 +49,7 @@ public class LogClientCommunicator implements LogClientProtocol {
   }
 
   private <T> void unicast(String subject, T request, Function<T, byte[]> encoder, MemberId memberId) {
-    clusterCommunicator.unicast(subject, request, encoder, memberId, false);
+    clusterCommunicator.unicast(subject, request, encoder, memberId);
   }
 
   private <T, U> CompletableFuture<U> send(String subject, T request, Function<T, byte[]> encoder, Function<byte[], U> decoder, MemberId memberId) {

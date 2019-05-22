@@ -32,11 +32,10 @@ import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
-import io.atomix.cluster.Node;
 import io.atomix.cluster.NodeId;
 import io.atomix.utils.component.Component;
 import io.atomix.utils.component.Managed;
-import io.atomix.utils.event.AbstractListenerManager;
+import io.atomix.utils.event.AbstractListenable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -47,8 +46,7 @@ import static io.atomix.utils.concurrent.Threads.namedThreads;
  * Cluster membership provider that uses DNS SRV lookups.
  */
 @Component(DnsDiscoveryConfig.class)
-public class DnsDiscoveryProvider
-    extends AbstractListenerManager<NodeDiscoveryEvent, NodeDiscoveryEventListener>
+public class DnsDiscoveryProvider extends AbstractListenable<DiscoveryEvent>
     implements NodeDiscoveryProvider, Managed<DnsDiscoveryConfig> {
 
   public static final Type TYPE = new Type();
@@ -138,16 +136,20 @@ public class DnsDiscoveryProvider
         String port = items[2].trim();
         String id = Splitter.on('.').splitToList(host).get(0);
 
-        Node node = Node.builder()
-            .withId(id)
-            .withHost(host)
-            .withPort(Integer.parseInt(port))
+        Node node = Node.newBuilder()
+            .setId(id)
+            .setNamespace(service)
+            .setHost(host)
+            .setPort(Integer.parseInt(port))
             .build();
 
-        if (nodes.putIfAbsent(node.id(), node) == null) {
-          newNodeIds.add(node.id());
+        if (nodes.putIfAbsent(NodeId.from(node.getId(), node.getNamespace()), node) == null) {
+          newNodeIds.add(NodeId.from(node.getId(), node.getNamespace()));
           LOGGER.info("Node joined: {}", node);
-          post(new NodeDiscoveryEvent(NodeDiscoveryEvent.Type.JOIN, node));
+          post(DiscoveryEvent.newBuilder()
+              .setType(DiscoveryEvent.Type.JOIN)
+              .setNode(node)
+              .build());
         }
       }
 
@@ -156,7 +158,10 @@ public class DnsDiscoveryProvider
           Node node = nodes.remove(nodeId);
           if (node != null) {
             LOGGER.info("Node left: {}", node);
-            post(new NodeDiscoveryEvent(NodeDiscoveryEvent.Type.LEAVE, node));
+            post(DiscoveryEvent.newBuilder()
+                .setType(DiscoveryEvent.Type.LEAVE)
+                .setNode(node)
+                .build());
           }
         }
       }

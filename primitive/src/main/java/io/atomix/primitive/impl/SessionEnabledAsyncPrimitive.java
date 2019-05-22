@@ -107,7 +107,7 @@ public abstract class SessionEnabledAsyncPrimitive<P extends SessionEnabledPrimi
             .build())
             .thenApply(response -> {
               ManagedPrimitiveContext context = new ManagedPrimitiveContext(
-                  managementService.getMembershipService().getLocalMember().id(),
+                  managementService.getMembershipService().getLocalMemberId(),
                   sessionId,
                   name(),
                   type(),

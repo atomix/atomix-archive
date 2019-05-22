@@ -20,12 +20,10 @@ import java.util.Collection;
 import io.atomix.cluster.ClusterMembershipService;
 import io.atomix.cluster.ClusterService;
 import io.atomix.cluster.VersionService;
-import io.atomix.cluster.messaging.BroadcastService;
 import io.atomix.cluster.messaging.ClusterCommunicationService;
 import io.atomix.cluster.messaging.ClusterEventService;
 import io.atomix.cluster.messaging.ClusterStreamingService;
 import io.atomix.cluster.messaging.MessagingService;
-import io.atomix.cluster.messaging.UnicastService;
 import io.atomix.core.AtomixConfig;
 import io.atomix.core.AtomixService;
 import io.atomix.core.transaction.TransactionBuilder;
@@ -122,16 +120,6 @@ public class AtomixManager implements AtomixService, Managed<AtomixConfig> {
   @Override
   public ThreadContextFactory getThreadFactory() {
     return threadService.getFactory();
-  }
-
-  @Override
-  public UnicastService getUnicastService() {
-    return clusterService.getUnicastService();
-  }
-
-  @Override
-  public BroadcastService getBroadcastService() {
-    return clusterService.getBroadcastService();
   }
 
   @Override

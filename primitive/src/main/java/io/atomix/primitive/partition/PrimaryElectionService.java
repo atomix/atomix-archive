@@ -15,7 +15,7 @@
  */
 package io.atomix.primitive.partition;
 
-import io.atomix.primitive.event.Listenable;
+import io.atomix.utils.event.Listenable;
 
 /**
  * Partition primary election service.

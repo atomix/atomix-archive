@@ -21,6 +21,7 @@ import java.util.concurrent.CompletableFuture;
 
 import com.google.common.collect.Maps;
 import io.atomix.cluster.ClusterMembershipService;
+import io.atomix.cluster.MemberId;
 import io.atomix.cluster.messaging.ClusterCommunicationService;
 import io.atomix.cluster.messaging.ClusterStreamingService;
 import io.atomix.primitive.partition.ManagedPartitionGroup;
@@ -108,7 +109,7 @@ public class PartitionManager implements PartitionService, Managed {
           group = ((PartitionGroup.Type) event.membership().config().getType())
               .newPartitionGroup(event.membership().config());
           groups.put(event.membership().group(), group);
-          if (event.membership().members().contains(clusterMembershipService.getLocalMember().id())) {
+          if (event.membership().members().contains(MemberId.from(clusterMembershipService.getLocalMember()))) {
             group.join(partitionManagementService);
           } else {
             group.connect(partitionManagementService);
@@ -133,7 +134,7 @@ public class PartitionManager implements PartitionService, Managed {
               groups.put(group.name(), group);
             }
           }
-          if (membership.members().contains(clusterMembershipService.getLocalMember().id())) {
+          if (membership.members().contains(MemberId.from(clusterMembershipService.getLocalMember()))) {
             return group.join(partitionManagementService);
           } else {
             return group.connect(partitionManagementService);

@@ -30,7 +30,6 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -109,8 +108,8 @@ public class ClusterEventManager implements ClusterEventService, Managed {
     byte[] payload = SERIALIZER.encode(new InternalMessage(InternalMessage.Type.ALL, encoder.apply(message)));
     getSubscriberNodes(topic).forEach(memberId -> {
       Member member = membershipService.getMember(memberId);
-      if (member != null && member.isReachable()) {
-        messagingService.sendAsync(member.address(), topic, payload);
+      if (member != null && member.getState() != Member.State.DEAD) {
+        messagingService.sendAsync(Address.from(member.getHost(), member.getPort()), topic, payload);
       }
     });
   }
@@ -120,9 +119,9 @@ public class ClusterEventManager implements ClusterEventService, Managed {
     MemberId memberId = getNextMemberId(topic);
     if (memberId != null) {
       Member member = membershipService.getMember(memberId);
-      if (member != null && member.isReachable()) {
+      if (member != null && member.getState() != Member.State.DEAD) {
         byte[] payload = SERIALIZER.encode(new InternalMessage(InternalMessage.Type.DIRECT, encoder.apply(message)));
-        return messagingService.sendAsync(member.address(), topic, payload);
+        return messagingService.sendAsync(Address.from(member.getHost(), member.getPort()), topic, payload);
       }
     }
     return CompletableFuture.completedFuture(null);
@@ -133,9 +132,9 @@ public class ClusterEventManager implements ClusterEventService, Managed {
     MemberId memberId = getNextMemberId(topic);
     if (memberId != null) {
       Member member = membershipService.getMember(memberId);
-      if (member != null && member.isReachable()) {
+      if (member != null && member.getState() != Member.State.DEAD) {
         byte[] payload = SERIALIZER.encode(new InternalMessage(InternalMessage.Type.DIRECT, encoder.apply(message)));
-        return messagingService.sendAndReceive(member.address(), topic, payload, timeout).thenApply(decoder);
+        return messagingService.sendAndReceive(Address.from(member.getHost(), member.getPort()), topic, payload, timeout).thenApply(decoder);
       }
     }
     return Futures.exceptionalFuture(new MessagingException.NoRemoteHandler());
@@ -233,8 +232,9 @@ public class ClusterEventManager implements ClusterEventService, Managed {
   private void gossip() {
     List<Member> members = membershipService.getMembers()
         .stream()
-        .filter(node -> !membershipService.getLocalMember().id().equals(node.id()))
-        .filter(node -> node.isReachable())
+        .filter(node -> !membershipService.getLocalMember().getId().equals(node.getId())
+            || !membershipService.getLocalMember().getNamespace().equals(node.getNamespace()))
+        .filter(node -> node.getState() != Member.State.DEAD)
         .collect(Collectors.toList());
 
     if (!members.isEmpty()) {
@@ -250,7 +250,8 @@ public class ClusterEventManager implements ClusterEventService, Managed {
   private CompletableFuture<Void> updateNodes() {
     List<CompletableFuture<Void>> futures = membershipService.getMembers()
         .stream()
-        .filter(node -> !membershipService.getLocalMember().id().equals(node.id()))
+        .filter(node -> !membershipService.getLocalMember().getId().equals(node.getId())
+            || !membershipService.getLocalMember().getNamespace().equals(node.getNamespace()))
         .map(this::updateNode)
         .collect(Collectors.toList());
     return CompletableFuture.allOf(futures.toArray(new CompletableFuture[futures.size()]));
@@ -263,7 +264,7 @@ public class ClusterEventManager implements ClusterEventService, Managed {
    */
   private CompletableFuture<Void> updateNode(Member member) {
     long updateTime = System.currentTimeMillis();
-    long lastUpdateTime = updateTimes.getOrDefault(member.id(), 0L);
+    long lastUpdateTime = updateTimes.getOrDefault(MemberId.from(member.getId(), member.getNamespace()), 0L);
 
     Collection<InternalSubscriptionInfo> subscriptions = topics.values()
         .stream()
@@ -271,10 +272,10 @@ public class ClusterEventManager implements ClusterEventService, Managed {
         .collect(Collectors.toList());
 
     CompletableFuture<Void> future = new CompletableFuture<>();
-    messagingService.sendAndReceive(member.address(), GOSSIP_MESSAGE_SUBJECT, SERIALIZER.encode(subscriptions))
+    messagingService.sendAndReceive(Address.from(member.getHost(), member.getPort()), GOSSIP_MESSAGE_SUBJECT, SERIALIZER.encode(subscriptions))
         .whenComplete((result, error) -> {
           if (error == null) {
-            updateTimes.put(member.id(), updateTime);
+            updateTimes.put(MemberId.from(member.getId(), member.getNamespace()), updateTime);
           }
           future.complete(null);
         });
@@ -287,7 +288,7 @@ public class ClusterEventManager implements ClusterEventService, Managed {
   private void purgeTombstones() {
     long minTombstoneTime = membershipService.getMembers()
         .stream()
-        .map(node -> updateTimes.getOrDefault(node.id(), 0L))
+        .map(member -> updateTimes.getOrDefault(MemberId.from(member.getId(), member.getNamespace()), 0L))
         .reduce(Math::min)
         .orElse(0L);
     for (InternalTopic topic : topics.values()) {
@@ -309,7 +310,7 @@ public class ClusterEventManager implements ClusterEventService, Managed {
         TOMBSTONE_EXPIRATION_MILLIS,
         TOMBSTONE_EXPIRATION_MILLIS,
         TimeUnit.MILLISECONDS);
-    messagingService.registerHandler(GOSSIP_MESSAGE_SUBJECT, (address, payload) -> {
+    messagingService.registerHandler(GOSSIP_MESSAGE_SUBJECT, payload -> {
       update(SERIALIZER.decode(payload));
       return new byte[0];
     }, gossipExecutor);
@@ -541,7 +542,7 @@ public class ClusterEventManager implements ClusterEventService, Managed {
   /**
    * Internal subscriber.
    */
-  private static class InternalSubscriber implements BiFunction<Address, byte[], CompletableFuture<byte[]>> {
+  private static class InternalSubscriber implements Function<byte[], CompletableFuture<byte[]>> {
     private final AtomicInteger counter = new AtomicInteger();
     private InternalSubscription[] subscriptions = new InternalSubscription[0];
 
@@ -565,7 +566,7 @@ public class ClusterEventManager implements ClusterEventService, Managed {
     }
 
     @Override
-    public CompletableFuture<byte[]> apply(Address address, byte[] payload) {
+    public CompletableFuture<byte[]> apply(byte[] payload) {
       InternalMessage message = SERIALIZER.decode(payload);
       switch (message.type()) {
         case DIRECT:
@@ -614,7 +615,10 @@ public class ClusterEventManager implements ClusterEventService, Managed {
 
     InternalSubscription(InternalTopic topic, Function<byte[], CompletableFuture<byte[]>> callback) {
       this.topic = topic;
-      this.metadata = new InternalSubscriptionInfo(membershipService.getLocalMember().id(), topic.topic, new LogicalTimestamp(logicalTime.incrementAndGet()));
+      this.metadata = new InternalSubscriptionInfo(
+          MemberId.from(membershipService.getLocalMember().getId(), membershipService.getLocalMember().getNamespace()),
+          topic.topic,
+          new LogicalTimestamp(logicalTime.incrementAndGet()));
       this.callback = callback;
     }
 

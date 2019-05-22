@@ -17,28 +17,22 @@ package io.atomix.cluster.discovery;
 
 import java.util.Set;
 
-import io.atomix.cluster.ClusterMembershipService;
-import io.atomix.cluster.Member;
-import io.atomix.cluster.Node;
 import io.atomix.utils.ConfiguredType;
 import io.atomix.utils.config.Configured;
-import io.atomix.utils.event.ListenerService;
-import io.atomix.utils.net.Address;
+import io.atomix.utils.event.Listenable;
 
 /**
  * Cluster membership provider.
  * <p>
- * The membership provider is an SPI that the {@link ClusterMembershipService} uses to locate new members joining
- * the cluster. It provides a simple TCP {@link Address} for members which will be used by the
- * {@link ClusterMembershipService} to exchange higher level {@link Member} information. Membership providers are
- * responsible for providing an actively managed view of cluster membership.
+ * The membership provider is an SPI that the {@link io.atomix.cluster.ClusterMembershipService} uses to locate new
+ * members joining the cluster. It provides a simple TCP {@link io.atomix.utils.net.Address} for members which will be
+ * used by the {@link io.atomix.cluster.ClusterMembershipService} to exchange higher level {@link io.atomix.utils.net.Address}
+ * information. Membership providers are responsible for providing an actively managed view of cluster membership.
  *
  * @see BootstrapDiscoveryProvider
  * @see MulticastDiscoveryProvider
  */
-public interface NodeDiscoveryProvider
-    extends ListenerService<NodeDiscoveryEvent, NodeDiscoveryEventListener>,
-    Configured<NodeDiscoveryConfig> {
+public interface NodeDiscoveryProvider extends Listenable<DiscoveryEvent>, Configured<NodeDiscoveryConfig> {
 
   /**
    * Membership provider type.

@@ -131,7 +131,7 @@ public class RaftPartition implements Partition {
   CompletableFuture<Partition> open(PartitionMetadata metadata, PartitionManagementService managementService) {
     this.partition = metadata;
     this.client = createClient(managementService);
-    if (partition.members().contains(managementService.getMembershipService().getLocalMember().id())) {
+    if (partition.members().contains(managementService.getMembershipService().getLocalMemberId())) {
       server = createServer(managementService);
       return server.start(new ServiceManagerStateMachine(metadata.id(), managementService))
           .thenCompose(v -> client.start())
@@ -172,7 +172,7 @@ public class RaftPartition implements Partition {
     return new RaftPartitionServer(
         this,
         config,
-        managementService.getMembershipService().getLocalMember().id(),
+        managementService.getMembershipService().getLocalMemberId(),
         managementService.getMessagingService(),
         managementService.getStreamingService(),
         threadContextFactory);

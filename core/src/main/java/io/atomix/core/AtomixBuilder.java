@@ -23,7 +23,6 @@ import java.util.Properties;
 import io.atomix.cluster.AbstractClusterBuilder;
 import io.atomix.cluster.MemberId;
 import io.atomix.cluster.discovery.NodeDiscoveryProvider;
-import io.atomix.cluster.protocol.GroupMembershipProtocol;
 import io.atomix.primitive.partition.ManagedPartitionGroup;
 import io.atomix.utils.component.Component;
 import io.atomix.utils.net.Address;
@@ -391,50 +390,68 @@ public class AtomixBuilder extends AbstractClusterBuilder<Atomix> {
   }
 
   @Override
-  public AtomixBuilder withMulticastEnabled() {
-    super.withMulticastEnabled();
-    return this;
-  }
-
-  @Override
-  public AtomixBuilder withMulticastEnabled(boolean multicastEnabled) {
-    super.withMulticastEnabled(multicastEnabled);
-    return this;
-  }
-
-  @Override
-  public AtomixBuilder withMulticastAddress(Address address) {
-    super.withMulticastAddress(address);
-    return this;
-  }
-
-  @Override
-  public AtomixBuilder withMembershipProtocol(GroupMembershipProtocol protocol) {
-    super.withMembershipProtocol(protocol);
-    return this;
-  }
-
-  @Override
   public AtomixBuilder withMembershipProvider(NodeDiscoveryProvider locationProvider) {
     super.withMembershipProvider(locationProvider);
     return this;
   }
 
   @Override
-  public AtomixBuilder setBroadcastInterval(Duration interval) {
-    super.setBroadcastInterval(interval);
+  public AtomixBuilder withBroadcastUpdates(boolean broadcastUpdates) {
+    super.withBroadcastUpdates(broadcastUpdates);
     return this;
   }
 
   @Override
-  public AtomixBuilder setReachabilityThreshold(int threshold) {
-    super.setReachabilityThreshold(threshold);
+  public AtomixBuilder withBroadcastDisputes(boolean broadcastDisputes) {
+    super.withBroadcastDisputes(broadcastDisputes);
     return this;
   }
 
   @Override
-  public AtomixBuilder withReachabilityTimeout(Duration timeout) {
-    super.withReachabilityTimeout(timeout);
+  public AtomixBuilder withNotifySuspect(boolean notifySuspect) {
+    super.withNotifySuspect(notifySuspect);
+    return this;
+  }
+
+  @Override
+  public AtomixBuilder withGossipInterval(Duration gossipInterval) {
+    super.withGossipInterval(gossipInterval);
+    return this;
+  }
+
+  @Override
+  public AtomixBuilder withGossipFanout(int gossipFanout) {
+    super.withGossipFanout(gossipFanout);
+    return this;
+  }
+
+  @Override
+  public AtomixBuilder withProbeInterval(Duration probeInterval) {
+    super.withProbeInterval(probeInterval);
+    return this;
+  }
+
+  @Override
+  public AtomixBuilder withSuspectProbes(int suspectProbes) {
+    super.withSuspectProbes(suspectProbes);
+    return this;
+  }
+
+  @Override
+  public AtomixBuilder withFailureTimeout(Duration failureTimeout) {
+    super.withFailureTimeout(failureTimeout);
+    return this;
+  }
+
+  @Override
+  public AtomixBuilder withCertPath(String certPath) {
+    super.withCertPath(certPath);
+    return this;
+  }
+
+  @Override
+  public AtomixBuilder withKeyPath(String keyPath) {
+    super.withKeyPath(keyPath);
     return this;
   }
 
@@ -447,30 +464,6 @@ public class AtomixBuilder extends AbstractClusterBuilder<Atomix> {
   @Override
   public AtomixBuilder withTlsEnabled(boolean tlsEnabled) {
     super.withTlsEnabled(tlsEnabled);
-    return this;
-  }
-
-  @Override
-  public AtomixBuilder withKeyStore(String keyStore) {
-    super.withKeyStore(keyStore);
-    return this;
-  }
-
-  @Override
-  public AtomixBuilder withKeyStorePassword(String keyStorePassword) {
-    super.withKeyStorePassword(keyStorePassword);
-    return this;
-  }
-
-  @Override
-  public AtomixBuilder withTrustStore(String trustStore) {
-    super.withTrustStore(trustStore);
-    return this;
-  }
-
-  @Override
-  public AtomixBuilder withTrustStorePassword(String trustStorePassword) {
-    super.withTrustStorePassword(trustStorePassword);
     return this;
   }
 

@@ -17,24 +17,19 @@ package io.atomix.cluster.messaging.impl;
 
 import java.net.ConnectException;
 import java.time.Duration;
-import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
-import java.util.function.BiConsumer;
-import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import com.google.common.base.Objects;
-import com.google.common.collect.Maps;
 import io.atomix.cluster.ClusterMembershipService;
 import io.atomix.cluster.Member;
 import io.atomix.cluster.MemberId;
 import io.atomix.cluster.messaging.ClusterCommunicationService;
 import io.atomix.cluster.messaging.MessagingService;
-import io.atomix.cluster.messaging.UnicastService;
 import io.atomix.utils.component.Component;
 import io.atomix.utils.component.Dependency;
 import io.atomix.utils.concurrent.Futures;
@@ -55,35 +50,32 @@ public class DefaultClusterCommunicationService implements ClusterCommunicationS
   protected ClusterMembershipService membershipService;
   @Dependency
   protected MessagingService messagingService;
-  @Dependency
-  protected UnicastService unicastService;
-  private final Map<String, BiConsumer<Address, byte[]>> unicastConsumers = Maps.newConcurrentMap();
+
+  private MemberId getMemberId(Member member) {
+    return MemberId.from(member.getId(), member.getNamespace());
+  }
 
   @Override
   public <M> void broadcast(
       String subject,
       M message,
-      Function<M, byte[]> encoder,
-      boolean reliable) {
+      Function<M, byte[]> encoder) {
     multicast(subject, message, encoder, membershipService.getMembers()
-            .stream()
-            .filter(node -> !Objects.equal(node, membershipService.getLocalMember()))
-            .map(Member::id)
-            .collect(Collectors.toSet()),
-        reliable);
+        .stream()
+        .filter(node -> !Objects.equal(getMemberId(node), getMemberId(membershipService.getLocalMember())))
+        .map(this::getMemberId)
+        .collect(Collectors.toSet()));
   }
 
   @Override
   public <M> void broadcastIncludeSelf(
       String subject,
       M message,
-      Function<M, byte[]> encoder,
-      boolean reliable) {
+      Function<M, byte[]> encoder) {
     multicast(subject, message, encoder, membershipService.getMembers()
-            .stream()
-            .map(Member::id)
-            .collect(Collectors.toSet()),
-        reliable);
+        .stream()
+        .map(this::getMemberId)
+        .collect(Collectors.toSet()));
   }
 
   @Override
@@ -91,10 +83,9 @@ public class DefaultClusterCommunicationService implements ClusterCommunicationS
       String subject,
       M message,
       Function<M, byte[]> encoder,
-      MemberId toMemberId,
-      boolean reliable) {
+      MemberId toMemberId) {
     try {
-      return doUnicast(subject, encoder.apply(message), toMemberId, reliable);
+      return doUnicast(subject, encoder.apply(message), toMemberId);
     } catch (Exception e) {
       return Futures.exceptionalFuture(e);
     }
@@ -105,10 +96,9 @@ public class DefaultClusterCommunicationService implements ClusterCommunicationS
       String subject,
       M message,
       Function<M, byte[]> encoder,
-      Set<MemberId> nodes,
-      boolean reliable) {
+      Set<MemberId> nodes) {
     byte[] payload = encoder.apply(message);
-    nodes.forEach(memberId -> doUnicast(subject, payload, memberId, reliable));
+    nodes.forEach(memberId -> doUnicast(subject, payload, memberId));
   }
 
   @Override
@@ -126,17 +116,12 @@ public class DefaultClusterCommunicationService implements ClusterCommunicationS
     }
   }
 
-  private CompletableFuture<Void> doUnicast(String subject, byte[] payload, MemberId toMemberId, boolean reliable) {
+  private CompletableFuture<Void> doUnicast(String subject, byte[] payload, MemberId toMemberId) {
     Member member = membershipService.getMember(toMemberId);
     if (member == null) {
       return Futures.exceptionalFuture(CONNECT_EXCEPTION);
     }
-    if (reliable) {
-      return messagingService.sendAsync(member.address(), subject, payload);
-    } else {
-      unicastService.unicast(member.address(), subject, payload);
-      return CompletableFuture.completedFuture(null);
-    }
+    return messagingService.sendAsync(Address.from(member.getHost(), member.getPort()), subject, payload);
   }
 
   private CompletableFuture<byte[]> sendAndReceive(String subject, byte[] payload, MemberId toMemberId, Duration timeout) {
@@ -144,16 +129,12 @@ public class DefaultClusterCommunicationService implements ClusterCommunicationS
     if (member == null) {
       return Futures.exceptionalFuture(CONNECT_EXCEPTION);
     }
-    return messagingService.sendAndReceive(member.address(), subject, payload, timeout);
+    return messagingService.sendAndReceive(Address.from(member.getHost(), member.getPort()), subject, payload, timeout);
   }
 
   @Override
   public void unsubscribe(String subject) {
     messagingService.unregisterHandler(subject);
-    BiConsumer<Address, byte[]> consumer = unicastConsumers.get(subject);
-    if (consumer != null) {
-      unicastService.removeListener(subject, consumer);
-    }
   }
 
   @Override
@@ -192,22 +173,10 @@ public class DefaultClusterCommunicationService implements ClusterCommunicationS
       Consumer<M> handler,
       Executor executor) {
     messagingService.registerHandler(subject, new InternalMessageConsumer<>(decoder, handler), executor);
-    BiConsumer<Address, byte[]> unicastConsumer = new InternalMessageConsumer<>(decoder, handler);
-    unicastConsumers.put(subject, unicastConsumer);
-    unicastService.addListener(subject, unicastConsumer, executor);
     return CompletableFuture.completedFuture(null);
   }
 
-  @Override
-  public <M> CompletableFuture<Void> subscribe(String subject, Function<byte[], M> decoder, BiConsumer<MemberId, M> handler, Executor executor) {
-    messagingService.registerHandler(subject, new InternalMessageBiConsumer<>(decoder, handler), executor);
-    BiConsumer<Address, byte[]> unicastConsumer = new InternalMessageBiConsumer<>(decoder, handler);
-    unicastConsumers.put(subject, unicastConsumer);
-    unicastService.addListener(subject, unicastConsumer, executor);
-    return CompletableFuture.completedFuture(null);
-  }
-
-  private static class InternalMessageResponder<M, R> implements BiFunction<Address, byte[], CompletableFuture<byte[]>> {
+  private static class InternalMessageResponder<M, R> implements Function<byte[], CompletableFuture<byte[]>> {
     private final Function<byte[], M> decoder;
     private final Function<R, byte[]> encoder;
     private final Function<M, CompletableFuture<R>> handler;
@@ -221,30 +190,12 @@ public class DefaultClusterCommunicationService implements ClusterCommunicationS
     }
 
     @Override
-    public CompletableFuture<byte[]> apply(Address sender, byte[] bytes) {
+    public CompletableFuture<byte[]> apply(byte[] bytes) {
       return handler.apply(decoder.apply(bytes)).thenApply(encoder);
     }
   }
 
-  private class InternalMessageBiConsumer<M> implements BiConsumer<Address, byte[]> {
-    private final Function<byte[], M> decoder;
-    private final BiConsumer<MemberId, M> consumer;
-
-    InternalMessageBiConsumer(Function<byte[], M> decoder, BiConsumer<MemberId, M> consumer) {
-      this.decoder = decoder;
-      this.consumer = consumer;
-    }
-
-    @Override
-    public void accept(Address sender, byte[] bytes) {
-      Member member = membershipService.getMember(sender);
-      if (member != null) {
-        consumer.accept(member.id(), decoder.apply(bytes));
-      }
-    }
-  }
-
-  private static class InternalMessageConsumer<M> implements BiConsumer<Address, byte[]> {
+  private static class InternalMessageConsumer<M> implements Consumer<byte[]> {
     private final Function<byte[], M> decoder;
     private final Consumer<M> consumer;
 
@@ -254,7 +205,7 @@ public class DefaultClusterCommunicationService implements ClusterCommunicationS
     }
 
     @Override
-    public void accept(Address sender, byte[] bytes) {
+    public void accept(byte[] bytes) {
       consumer.accept(decoder.apply(bytes));
     }
   }

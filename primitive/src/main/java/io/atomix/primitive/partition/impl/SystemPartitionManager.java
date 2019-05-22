@@ -3,6 +3,7 @@ package io.atomix.primitive.partition.impl;
 import java.util.concurrent.CompletableFuture;
 
 import io.atomix.cluster.ClusterMembershipService;
+import io.atomix.cluster.MemberId;
 import io.atomix.cluster.messaging.ClusterCommunicationService;
 import io.atomix.cluster.messaging.ClusterStreamingService;
 import io.atomix.primitive.partition.ManagedPartitionGroup;
@@ -92,7 +93,7 @@ public class SystemPartitionManager implements SystemPartitionService, Partition
       if (partitionGroup == null) {
         partitionGroup = ((PartitionGroup.Type) systemGroupMembership.config().getType())
             .newPartitionGroup(systemGroupMembership.config());
-        if (systemGroupMembership.members().contains(clusterMembershipService.getLocalMember().id())) {
+        if (systemGroupMembership.members().contains(MemberId.from(clusterMembershipService.getLocalMember()))) {
           return partitionGroup.join(this).thenApply(v -> null);
         } else {
           return partitionGroup.connect(this).thenApply(v -> null);

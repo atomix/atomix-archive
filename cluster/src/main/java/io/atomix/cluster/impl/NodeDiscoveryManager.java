@@ -17,49 +17,36 @@ package io.atomix.cluster.impl;
 
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Consumer;
 
 import com.google.common.annotations.VisibleForTesting;
-import io.atomix.cluster.BootstrapService;
-import io.atomix.cluster.MemberService;
-import io.atomix.cluster.Node;
-import io.atomix.cluster.discovery.NodeDiscoveryEvent;
-import io.atomix.cluster.discovery.NodeDiscoveryEventListener;
+import io.atomix.cluster.discovery.DiscoveryEvent;
+import io.atomix.cluster.discovery.Node;
 import io.atomix.cluster.discovery.NodeDiscoveryProvider;
 import io.atomix.cluster.discovery.NodeDiscoveryService;
 import io.atomix.utils.component.Component;
 import io.atomix.utils.component.Dependency;
 import io.atomix.utils.component.Managed;
-import io.atomix.utils.event.AbstractListenerManager;
+import io.atomix.utils.event.AbstractListenable;
 
 /**
  * Default node discovery service.
  */
 @Component
 public class NodeDiscoveryManager
-    extends AbstractListenerManager<NodeDiscoveryEvent, NodeDiscoveryEventListener>
+    extends AbstractListenable<DiscoveryEvent>
     implements NodeDiscoveryService, Managed {
-
-  @Dependency
-  private MemberService memberService;
-
-  @Dependency
-  private BootstrapService bootstrapService;
 
   @Dependency
   private NodeDiscoveryProvider discoveryProvider;
 
-  private final NodeDiscoveryEventListener discoveryEventListener = this::post;
+  private final Consumer<DiscoveryEvent> discoveryEventListener = this::post;
 
   public NodeDiscoveryManager() {
   }
 
   @VisibleForTesting
-  public NodeDiscoveryManager(
-      MemberService memberService,
-      BootstrapService bootstrapService,
-      NodeDiscoveryProvider discoveryProvider) {
-    this.memberService = memberService;
-    this.bootstrapService = bootstrapService;
+  public NodeDiscoveryManager(NodeDiscoveryProvider discoveryProvider) {
     this.discoveryProvider = discoveryProvider;
     start();
   }

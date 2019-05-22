@@ -15,14 +15,14 @@
  */
 package io.atomix.cluster.discovery;
 
-import io.atomix.cluster.Node;
-import io.atomix.utils.net.Address;
-
 import java.time.Duration;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+
+import io.atomix.cluster.NodeConfig;
+import io.atomix.utils.net.Address;
 
 /**
  * Bootstrap discovery builder.
@@ -38,8 +38,9 @@ public class BootstrapDiscoveryBuilder extends NodeDiscoveryBuilder {
    */
   public BootstrapDiscoveryBuilder withNodes(Address... nodes) {
     return withNodes(Stream.of(nodes)
-        .map(address -> Node.builder()
-            .withAddress(address)
+        .map(address -> Node.newBuilder()
+            .setHost(address.host())
+            .setPort(address.port())
             .build())
         .collect(Collectors.toSet()));
   }
@@ -61,7 +62,12 @@ public class BootstrapDiscoveryBuilder extends NodeDiscoveryBuilder {
    * @return the location provider builder
    */
   public BootstrapDiscoveryBuilder withNodes(Collection<Node> locations) {
-    config.setNodes(locations.stream().map(Node::config).collect(Collectors.toList()));
+    config.setNodes(locations.stream().map(node -> new NodeConfig()
+        .setId(node.getId())
+        .setNamespace(node.getNamespace())
+        .setHost(node.getHost())
+        .setPort(node.getPort()))
+        .collect(Collectors.toList()));
     return this;
   }
 

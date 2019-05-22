@@ -42,7 +42,7 @@ public class NodeConfig implements Config {
    * @return the node configuration
    */
   public NodeConfig setId(String id) {
-    return setId(id != null ? NodeId.from(id) : null);
+    return setId(id != null ? NodeId.from(id, this.id.namespace()) : null);
   }
 
   /**
@@ -54,6 +54,16 @@ public class NodeConfig implements Config {
   public NodeConfig setId(NodeId id) {
     this.id = id != null ? id : NodeId.anonymous();
     return this;
+  }
+
+  /**
+   * Sets the node namespace.
+   *
+   * @param namespace the node namespace
+   * @return the node configuration
+   */
+  public NodeConfig setNamespace(String namespace) {
+    return setId(namespace != null ? NodeId.from(this.id.id(), namespace) : NodeId.from(this.id.id()));
   }
 
   /**

@@ -15,81 +15,222 @@
  */
 package io.atomix.cluster;
 
-import io.atomix.utils.config.Config;
-
 import java.time.Duration;
 
+import io.atomix.utils.config.Config;
+
+import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 
 /**
  * Cluster membership configuration.
  */
 public class MembershipConfig implements Config {
-  private static final int DEFAULT_BROADCAST_INTERVAL = 100;
-  private static final int DEFAULT_REACHABILITY_TIMEOUT = 10000;
-  private static final int DEFAULT_REACHABILITY_THRESHOLD = 10;
+  private static final boolean DEFAULT_BROADCAST_UPDATES = false;
+  private static final boolean DEFAULT_BROADCAST_DISPUTES = true;
+  private static final boolean DEFAULT_NOTIFY_SUSPECT = false;
+  private static final int DEFAULT_GOSSIP_INTERVAL = 250;
+  private static final int DEFAULT_GOSSIP_FANOUT = 2;
+  private static final int DEFAULT_PROBE_INTERVAL = 1000;
+  private static final int DEFAULT_PROBE_TIMEOUT = 2000;
+  private static final int DEFAULT_SUSPECT_PROBES = 3;
+  private static final int DEFAULT_FAILURE_TIMEOUT = 10000;
 
-  private Duration broadcastInterval = Duration.ofMillis(DEFAULT_BROADCAST_INTERVAL);
-  private int reachabilityThreshold = DEFAULT_REACHABILITY_THRESHOLD;
-  private Duration reachabilityTimeout = Duration.ofMillis(DEFAULT_REACHABILITY_TIMEOUT);
+  private boolean broadcastUpdates = DEFAULT_BROADCAST_UPDATES;
+  private boolean broadcastDisputes = DEFAULT_BROADCAST_DISPUTES;
+  private boolean notifySuspect = DEFAULT_NOTIFY_SUSPECT;
+  private Duration gossipInterval = Duration.ofMillis(DEFAULT_GOSSIP_INTERVAL);
+  private int gossipFanout = DEFAULT_GOSSIP_FANOUT;
+  private Duration probeInterval = Duration.ofMillis(DEFAULT_PROBE_INTERVAL);
+  private Duration probeTimeout = Duration.ofMillis(DEFAULT_PROBE_TIMEOUT);
+  private int suspectProbes = DEFAULT_SUSPECT_PROBES;
+  private Duration failureTimeout = Duration.ofMillis(DEFAULT_FAILURE_TIMEOUT);
 
   /**
-   * Returns the reachability broadcast interval.
+   * Returns whether to broadcast member updates to all peers.
    *
-   * @return the reachability broadcast interval
+   * @return whether to broadcast member updates to all peers
    */
-  public Duration getBroadcastInterval() {
-    return broadcastInterval;
+  public boolean isBroadcastUpdates() {
+    return broadcastUpdates;
   }
 
   /**
-   * Sets the reachability broadcast interval.
+   * Sets whether to broadcast member updates to all peers.
    *
-   * @param broadcastInterval the reachability broadcast interval
-   * @return the membership configuration
+   * @param broadcastUpdates whether to broadcast member updates to all peers
+   * @return the protocol configuration
    */
-  public MembershipConfig setBroadcastInterval(Duration broadcastInterval) {
-    this.broadcastInterval = checkNotNull(broadcastInterval);
+  public MembershipConfig setBroadcastUpdates(boolean broadcastUpdates) {
+    this.broadcastUpdates = broadcastUpdates;
     return this;
   }
 
   /**
-   * Returns the reachability failure detection threshold.
+   * Returns whether to broadcast disputes to all peers.
    *
-   * @return the reachability failure detection threshold
+   * @return whether to broadcast disputes to all peers
    */
-  public int getReachabilityThreshold() {
-    return reachabilityThreshold;
+  public boolean isBroadcastDisputes() {
+    return broadcastDisputes;
   }
 
   /**
-   * Sets the reachability failure detection threshold.
+   * Sets whether to broadcast disputes to all peers.
    *
-   * @param reachabilityThreshold the reachability failure detection threshold
-   * @return the membership configuration
+   * @param broadcastDisputes whether to broadcast disputes to all peers
+   * @return the protocol configuration
    */
-  public MembershipConfig setReachabilityThreshold(int reachabilityThreshold) {
-    this.reachabilityThreshold = reachabilityThreshold;
+  public MembershipConfig setBroadcastDisputes(boolean broadcastDisputes) {
+    this.broadcastDisputes = broadcastDisputes;
     return this;
   }
 
   /**
-   * Returns the reachability failure timeout.
+   * Returns whether to notify a suspect node on state changes.
    *
-   * @return the reachability failure timeout
+   * @return whether to notify a suspect node on state changes
    */
-  public Duration getReachabilityTimeout() {
-    return reachabilityTimeout;
+  public boolean isNotifySuspect() {
+    return notifySuspect;
   }
 
   /**
-   * Sets the reachability failure timeout.
+   * Sets whether to notify a suspect node on state changes.
    *
-   * @param reachabilityTimeout the reachability failure timeout
+   * @param notifySuspect whether to notify a suspect node on state changes
+   * @return the protocol configuration
+   */
+  public MembershipConfig setNotifySuspect(boolean notifySuspect) {
+    this.notifySuspect = notifySuspect;
+    return this;
+  }
+
+  /**
+   * Returns the gossip interval.
+   *
+   * @return the gossip interval
+   */
+  public Duration getGossipInterval() {
+    return gossipInterval;
+  }
+
+  /**
+   * Sets the gossip interval.
+   *
+   * @param gossipInterval the gossip interval
+   * @return the protocol configuration
+   */
+  public MembershipConfig setGossipInterval(Duration gossipInterval) {
+    this.gossipInterval = gossipInterval;
+    return this;
+  }
+
+  /**
+   * Returns the gossip fanout.
+   *
+   * @return the gossip fanout
+   */
+  public int getGossipFanout() {
+    return gossipFanout;
+  }
+
+  /**
+   * Sets the gossip fanout.
+   *
+   * @param gossipFanout the gossip fanout
+   * @return the protocol configuration
+   */
+  public MembershipConfig setGossipFanout(int gossipFanout) {
+    checkArgument(gossipFanout > 0, "gossipFanout must be positive");
+    this.gossipFanout = gossipFanout;
+    return this;
+  }
+
+  /**
+   * Returns the probe interval.
+   *
+   * @return the probe interval
+   */
+  public Duration getProbeInterval() {
+    return probeInterval;
+  }
+
+  /**
+   * Sets the probe interval.
+   *
+   * @param probeInterval the probe interval
    * @return the membership configuration
    */
-  public MembershipConfig setReachabilityTimeout(Duration reachabilityTimeout) {
-    this.reachabilityTimeout = checkNotNull(reachabilityTimeout);
+  public MembershipConfig setProbeInterval(Duration probeInterval) {
+    checkNotNull(probeInterval, "probeInterval cannot be null");
+    checkArgument(!probeInterval.isNegative() && !probeInterval.isZero(), "probeInterval must be positive");
+    this.probeInterval = probeInterval;
+    return this;
+  }
+
+  /**
+   * Returns the probe timeout.
+   *
+   * @return the probe timeout
+   */
+  public Duration getProbeTimeout() {
+    return probeTimeout;
+  }
+
+  /**
+   * Sets the probe timeout.
+   *
+   * @param probeTimeout the probe timeout
+   * @return the membership protocol configuration
+   */
+  public MembershipConfig setProbeTimeout(Duration probeTimeout) {
+    checkNotNull(probeTimeout, "probeTimeout cannot be null");
+    checkArgument(!probeTimeout.isNegative() && !probeTimeout.isZero(), "probeTimeout must be positive");
+    this.probeTimeout = probeTimeout;
+    return this;
+  }
+
+  /**
+   * Returns the number of probes to perform on suspect members.
+   *
+   * @return the number of probes to perform on suspect members
+   */
+  public int getSuspectProbes() {
+    return suspectProbes;
+  }
+
+  /**
+   * Sets the number of probes to perform on suspect members.
+   *
+   * @param suspectProbes the number of probes to perform on suspect members
+   * @return the membership configuration
+   */
+  public MembershipConfig setSuspectProbes(int suspectProbes) {
+    checkArgument(suspectProbes > 0, "suspectProbes must be positive");
+    this.suspectProbes = suspectProbes;
+    return this;
+  }
+
+  /**
+   * Returns the base failure timeout.
+   *
+   * @return the base failure timeout
+   */
+  public Duration getFailureTimeout() {
+    return failureTimeout;
+  }
+
+  /**
+   * Sets the base failure timeout.
+   *
+   * @param failureTimeout the base failure timeout
+   * @return the group membership configuration
+   */
+  public MembershipConfig setFailureTimeout(Duration failureTimeout) {
+    checkNotNull(failureTimeout, "failureTimeout cannot be null");
+    checkArgument(!failureTimeout.isNegative() && !failureTimeout.isZero(), "failureTimeout must be positive");
+    this.failureTimeout = checkNotNull(failureTimeout);
     return this;
   }
 }

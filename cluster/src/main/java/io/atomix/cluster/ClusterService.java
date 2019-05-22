@@ -1,39 +1,15 @@
 package io.atomix.cluster;
 
-import io.atomix.cluster.messaging.BroadcastService;
 import io.atomix.cluster.messaging.ClusterCommunicationService;
 import io.atomix.cluster.messaging.ClusterEventService;
 import io.atomix.cluster.messaging.ClusterStreamingService;
 import io.atomix.cluster.messaging.MessagingService;
-import io.atomix.cluster.messaging.UnicastService;
 import io.atomix.utils.net.Address;
 
 /**
  * Cluster service.
  */
 public interface ClusterService {
-
-  /**
-   * Returns the cluster unicast service.
-   * <p>
-   * The unicast service supports unreliable uni-directional messaging via UDP. This is a
-   * low-level cluster communication API. For higher level messaging, use the
-   * {@link #getCommunicationService() communication service} or {@link #getEventService() event service}.
-   *
-   * @return the cluster unicast service
-   */
-  UnicastService getUnicastService();
-
-  /**
-   * Returns the cluster broadcast service.
-   * <p>
-   * The broadcast service is used to broadcast messages to all nodes in the cluster via multicast.
-   * The broadcast service is disabled by default. To enable broadcast, the cluster must be configured with
-   * {@link AtomixClusterBuilder#withMulticastEnabled() multicast enabled}.
-   *
-   * @return the cluster broadcast service
-   */
-  BroadcastService getBroadcastService();
 
   /**
    * Returns the cluster messaging service.

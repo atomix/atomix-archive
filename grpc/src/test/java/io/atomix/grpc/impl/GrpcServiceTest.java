@@ -28,8 +28,8 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
-import io.atomix.cluster.Node;
 import io.atomix.cluster.discovery.BootstrapDiscoveryProvider;
+import io.atomix.cluster.discovery.Node;
 import io.atomix.core.Atomix;
 import io.atomix.protocols.log.partition.LogPartitionGroup;
 import io.atomix.protocols.raft.partition.RaftPartitionGroup;
@@ -75,7 +75,7 @@ public abstract class GrpcServiceTest<T extends AbstractStub<T>> {
    */
   protected T getStub(int instance) {
     Atomix atomix = atomix(instance);
-    return getStub(InProcessChannelBuilder.forName(atomix.getMembershipService().getLocalMember().id().id())
+    return getStub(InProcessChannelBuilder.forName(atomix.getMembershipService().getLocalMemberId().toString())
         .directExecutor().build());
   }
 
@@ -89,7 +89,7 @@ public abstract class GrpcServiceTest<T extends AbstractStub<T>> {
     Atomix atomix = buildClient(instances.size() + 1);
     instances.add(atomix);
     atomix.start().get(10, TimeUnit.SECONDS);
-    Server server = InProcessServerBuilder.forName(atomix.getMembershipService().getLocalMember().id().id())
+    Server server = InProcessServerBuilder.forName(atomix.getMembershipService().getLocalMemberId().toString())
         .directExecutor()
         .addService(getService(atomix))
         .build()
@@ -121,7 +121,7 @@ public abstract class GrpcServiceTest<T extends AbstractStub<T>> {
     CompletableFuture.allOf(instanceFutures.toArray(new CompletableFuture[0])).get(30, TimeUnit.SECONDS);
 
     for (Atomix atomix : instances) {
-      servers.add(InProcessServerBuilder.forName(atomix.getMembershipService().getLocalMember().id().id())
+      servers.add(InProcessServerBuilder.forName(atomix.getMembershipService().getLocalMemberId().toString())
           .directExecutor()
           .addService(getService(atomix))
           .build()
@@ -155,20 +155,20 @@ public abstract class GrpcServiceTest<T extends AbstractStub<T>> {
         .withHost("localhost")
         .withPort(5000 + memberId)
         .withMembershipProvider(new BootstrapDiscoveryProvider(
-            Node.builder()
-                .withId("1")
-                .withHost("localhost")
-                .withPort(5001)
+            Node.newBuilder()
+                .setId("1")
+                .setHost("localhost")
+                .setPort(5001)
                 .build(),
-            Node.builder()
-                .withId("2")
-                .withHost("localhost")
-                .withPort(5002)
+            Node.newBuilder()
+                .setId("2")
+                .setHost("localhost")
+                .setPort(5002)
                 .build(),
-            Node.builder()
-                .withId("3")
-                .withHost("localhost")
-                .withPort(5003)
+            Node.newBuilder()
+                .setId("3")
+                .setHost("localhost")
+                .setPort(5003)
                 .build()))
         .withManagementGroup(RaftPartitionGroup.builder("system")
             .withNumPartitions(1)
@@ -196,20 +196,20 @@ public abstract class GrpcServiceTest<T extends AbstractStub<T>> {
         .withHost("localhost")
         .withPort(5000 + memberId)
         .withMembershipProvider(new BootstrapDiscoveryProvider(
-            Node.builder()
-                .withId("1")
-                .withHost("localhost")
-                .withPort(5001)
+            Node.newBuilder()
+                .setId("1")
+                .setHost("localhost")
+                .setPort(5001)
                 .build(),
-            Node.builder()
-                .withId("2")
-                .withHost("localhost")
-                .withPort(5002)
+            Node.newBuilder()
+                .setId("2")
+                .setHost("localhost")
+                .setPort(5002)
                 .build(),
-            Node.builder()
-                .withId("3")
-                .withHost("localhost")
-                .withPort(5003)
+            Node.newBuilder()
+                .setId("3")
+                .setHost("localhost")
+                .setPort(5003)
                 .build()))
         .build();
   }

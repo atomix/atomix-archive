@@ -29,14 +29,10 @@ import com.google.common.collect.Lists;
 import io.atomix.cluster.ClusterMembershipService;
 import io.atomix.cluster.discovery.NodeDiscoveryConfig;
 import io.atomix.cluster.discovery.NodeDiscoveryProvider;
-import io.atomix.cluster.messaging.BroadcastService;
 import io.atomix.cluster.messaging.ClusterCommunicationService;
 import io.atomix.cluster.messaging.ClusterEventService;
 import io.atomix.cluster.messaging.ClusterStreamingService;
 import io.atomix.cluster.messaging.MessagingService;
-import io.atomix.cluster.messaging.UnicastService;
-import io.atomix.cluster.protocol.GroupMembershipProtocol;
-import io.atomix.cluster.protocol.GroupMembershipProtocolConfig;
 import io.atomix.core.impl.AtomixManager;
 import io.atomix.core.transaction.TransactionBuilder;
 import io.atomix.core.transaction.TransactionService;
@@ -269,8 +265,7 @@ public class Atomix implements AtomixService {
         new PolymorphicTypeMapper("type", PrimitiveConfig.class, PrimitiveType.class),
         new PolymorphicTypeMapper(null, PrimitiveConfig.class, PrimitiveType.class),
         new PolymorphicTypeMapper("type", PrimitiveProtocolConfig.class, PrimitiveProtocol.Type.class),
-        new PolymorphicTypeMapper("type", NodeDiscoveryConfig.class, NodeDiscoveryProvider.Type.class),
-        new PolymorphicTypeMapper("type", GroupMembershipProtocolConfig.class, GroupMembershipProtocol.Type.class));
+        new PolymorphicTypeMapper("type", NodeDiscoveryConfig.class, NodeDiscoveryProvider.Type.class));
     return mapper.loadFiles(AtomixConfig.class, files, Lists.newArrayList(RESOURCES));
   }
 
@@ -440,16 +435,6 @@ public class Atomix implements AtomixService {
   @Override
   public Version getVersion() {
     return atomixService.getVersion();
-  }
-
-  @Override
-  public UnicastService getUnicastService() {
-    return atomixService.getUnicastService();
-  }
-
-  @Override
-  public BroadcastService getBroadcastService() {
-    return atomixService.getBroadcastService();
   }
 
   @Override

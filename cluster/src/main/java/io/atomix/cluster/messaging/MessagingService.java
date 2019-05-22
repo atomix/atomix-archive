@@ -19,14 +19,14 @@ import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.function.BiConsumer;
-import java.util.function.BiFunction;
+import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.function.Supplier;
 
 import com.google.common.util.concurrent.MoreExecutors;
+import io.atomix.utils.net.Address;
 import io.atomix.utils.stream.StreamFunction;
 import io.atomix.utils.stream.StreamHandler;
-import io.atomix.utils.TriConsumer;
-import io.atomix.utils.net.Address;
 
 /**
  * Interface for low level messaging primitives.
@@ -44,26 +44,12 @@ public interface MessagingService {
    * Sends a message asynchronously to the specified communication address.
    * The message is specified using the type and payload.
    *
-   * @param address address to send the message to.
-   * @param type    type of message.
-   * @param payload message payload bytes.
-   * @return future that is completed when the message is sent
-   */
-  default CompletableFuture<Void> sendAsync(Address address, String type, byte[] payload) {
-    return sendAsync(address, type, payload, true);
-  }
-
-  /**
-   * Sends a message asynchronously to the specified communication address.
-   * The message is specified using the type and payload.
-   *
    * @param address   address to send the message to.
    * @param type      type of message.
    * @param payload   message payload bytes.
-   * @param keepAlive whether to keep the connection alive after usage
    * @return future that is completed when the message is sent
    */
-  CompletableFuture<Void> sendAsync(Address address, String type, byte[] payload, boolean keepAlive);
+  CompletableFuture<Void> sendAsync(Address address, String type, byte[] payload);
 
   /**
    * Sends a message asynchronously to the specified communication address.
@@ -78,37 +64,13 @@ public interface MessagingService {
   /**
    * Sends a message asynchronously and expects a response.
    *
-   * @param address address to send the message to.
-   * @param type    type of message.
-   * @param payload message payload.
+   * @param address   address to send the message to.
+   * @param type      type of message.
+   * @param payload   message payload.
    * @return a response future
    */
   default CompletableFuture<byte[]> sendAndReceive(Address address, String type, byte[] payload) {
-    return sendAndReceive(address, type, payload, true);
-  }
-
-  /**
-   * Sends a message asynchronously and expects a response.
-   *
-   * @param address   address to send the message to.
-   * @param type      type of message.
-   * @param payload   message payload.
-   * @param keepAlive whether to keep the connection alive after usage
-   * @return a response future
-   */
-  CompletableFuture<byte[]> sendAndReceive(Address address, String type, byte[] payload, boolean keepAlive);
-
-  /**
-   * Sends a message synchronously and expects a response.
-   *
-   * @param address  address to send the message to.
-   * @param type     type of message.
-   * @param payload  message payload.
-   * @param executor executor over which any follow up actions after completion will be executed.
-   * @return a response future
-   */
-  default CompletableFuture<byte[]> sendAndReceive(Address address, String type, byte[] payload, Executor executor) {
-    return sendAndReceive(address, type, payload, true, executor);
+    return sendAndReceive(address, type, payload, Duration.ZERO, MoreExecutors.directExecutor());
   }
 
   /**
@@ -117,11 +79,12 @@ public interface MessagingService {
    * @param address   address to send the message to.
    * @param type      type of message.
    * @param payload   message payload.
-   * @param keepAlive whether to keep the connection alive after usage
    * @param executor  executor over which any follow up actions after completion will be executed.
    * @return a response future
    */
-  CompletableFuture<byte[]> sendAndReceive(Address address, String type, byte[] payload, boolean keepAlive, Executor executor);
+  default CompletableFuture<byte[]> sendAndReceive(Address address, String type, byte[] payload, Executor executor) {
+    return sendAndReceive(address, type, payload, Duration.ZERO, executor);
+  }
 
   /**
    * Sends a message asynchronously and expects a response.
@@ -133,33 +96,7 @@ public interface MessagingService {
    * @return a response future
    */
   default CompletableFuture<byte[]> sendAndReceive(Address address, String type, byte[] payload, Duration timeout) {
-    return sendAndReceive(address, type, payload, true, timeout);
-  }
-
-  /**
-   * Sends a message asynchronously and expects a response.
-   *
-   * @param address   address to send the message to.
-   * @param type      type of message.
-   * @param payload   message payload.
-   * @param keepAlive whether to keep the connection alive after usage
-   * @param timeout   response timeout
-   * @return a response future
-   */
-  CompletableFuture<byte[]> sendAndReceive(Address address, String type, byte[] payload, boolean keepAlive, Duration timeout);
-
-  /**
-   * Sends a message synchronously and expects a response.
-   *
-   * @param address  address to send the message to.
-   * @param type     type of message.
-   * @param payload  message payload.
-   * @param timeout  response timeout
-   * @param executor executor over which any follow up actions after completion will be executed.
-   * @return a response future
-   */
-  default CompletableFuture<byte[]> sendAndReceive(Address address, String type, byte[] payload, Duration timeout, Executor executor) {
-    return sendAndReceive(address, type, payload, true, timeout, executor);
+    return sendAndReceive(address, type, payload, timeout, MoreExecutors.directExecutor());
   }
 
   /**
@@ -168,12 +105,11 @@ public interface MessagingService {
    * @param address   address to send the message to.
    * @param type      type of message.
    * @param payload   message payload.
-   * @param keepAlive whether to keep the connection alive after usage
    * @param timeout   response timeout
    * @param executor  executor over which any follow up actions after completion will be executed.
    * @return a response future
    */
-  CompletableFuture<byte[]> sendAndReceive(Address address, String type, byte[] payload, boolean keepAlive, Duration timeout, Executor executor);
+  CompletableFuture<byte[]> sendAndReceive(Address address, String type, byte[] payload, Duration timeout, Executor executor);
 
   default CompletableFuture<StreamFunction<byte[], CompletableFuture<byte[]>>> sendStreamAndReceive(Address address, String type) {
     return sendStreamAndReceive(address, type, null, MoreExecutors.directExecutor());
@@ -224,7 +160,7 @@ public interface MessagingService {
    * @param handler  message handler
    * @param executor executor to use for running message handler logic.
    */
-  void registerHandler(String type, BiConsumer<Address, byte[]> handler, Executor executor);
+  void registerHandler(String type, Consumer<byte[]> handler, Executor executor);
 
   /**
    * Registers a new message handler for message type.
@@ -233,7 +169,7 @@ public interface MessagingService {
    * @param handler  message handler
    * @param executor executor to use for running message handler logic.
    */
-  void registerHandler(String type, BiFunction<Address, byte[], byte[]> handler, Executor executor);
+  void registerHandler(String type, Function<byte[], byte[]> handler, Executor executor);
 
   /**
    * Registers a new message handler for message type.
@@ -241,13 +177,13 @@ public interface MessagingService {
    * @param type    message type.
    * @param handler message handler
    */
-  void registerHandler(String type, BiFunction<Address, byte[], CompletableFuture<byte[]>> handler);
+  void registerHandler(String type, Function<byte[], CompletableFuture<byte[]>> handler);
 
-  void registerStreamHandler(String type, Function<Address, StreamFunction<byte[], CompletableFuture<byte[]>>> handler);
+  void registerStreamHandler(String type, Supplier<StreamFunction<byte[], CompletableFuture<byte[]>>> handler);
 
-  void registerStreamingHandler(String type, TriConsumer<Address, byte[], StreamHandler<byte[]>> handler);
+  void registerStreamingHandler(String type, BiConsumer<byte[], StreamHandler<byte[]>> handler);
 
-  void registerStreamingStreamHandler(String type, BiFunction<Address, StreamHandler<byte[]>, StreamHandler<byte[]>> handler);
+  void registerStreamingStreamHandler(String type, Function<StreamHandler<byte[]>, StreamHandler<byte[]>> handler);
 
   /**
    * Unregister current handler, if one exists for message type.

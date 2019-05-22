@@ -21,10 +21,6 @@ import java.util.Properties;
 
 import com.google.common.collect.Lists;
 import io.atomix.cluster.discovery.NodeDiscoveryProvider;
-import io.atomix.cluster.protocol.GroupMembershipProtocol;
-import io.atomix.cluster.protocol.GroupMembershipProtocolConfig;
-import io.atomix.cluster.protocol.HeartbeatMembershipProtocol;
-import io.atomix.cluster.protocol.HeartbeatMembershipProtocolConfig;
 import io.atomix.utils.Builder;
 import io.atomix.utils.net.Address;
 
@@ -356,154 +352,6 @@ public abstract class AbstractClusterBuilder<T> implements Builder<T> {
   }
 
   /**
-   * Enables multicast communication.
-   * <p>
-   * Multicast is disabled by default. This method must be called to enable it. Enabling multicast enables the
-   * use of the {@link io.atomix.cluster.messaging.BroadcastService}.
-   *
-   * @return the cluster builder
-   * @see #withMulticastAddress(Address)
-   */
-  public AbstractClusterBuilder<T> withMulticastEnabled() {
-    return withMulticastEnabled(true);
-  }
-
-  /**
-   * Sets whether multicast communication is enabled.
-   * <p>
-   * Multicast is disabled by default. This method must be called to enable it. Enabling multicast enables the
-   * use of the {@link io.atomix.cluster.messaging.BroadcastService}.
-   *
-   * @param multicastEnabled whether to enable multicast
-   * @return the cluster builder
-   * @see #withMulticastAddress(Address)
-   */
-  public AbstractClusterBuilder<T> withMulticastEnabled(boolean multicastEnabled) {
-    config.getMulticastConfig().setEnabled(multicastEnabled);
-    return this;
-  }
-
-  /**
-   * Sets the multicast address.
-   * <p>
-   * Multicast is disabled by default. To enable multicast, first use {@link #withMulticastEnabled()}.
-   *
-   * @param address the multicast address
-   * @return the cluster builder
-   */
-  public AbstractClusterBuilder<T> withMulticastAddress(Address address) {
-    config.getMulticastConfig().setGroup(address.address());
-    config.getMulticastConfig().setPort(address.port());
-    return this;
-  }
-
-  /**
-   * Sets the reachability broadcast interval.
-   * <p>
-   * The broadcast interval is the interval at which heartbeats are sent to peers in the cluster.
-   *
-   * @param interval the reachability broadcast interval
-   * @return the cluster builder
-   * @deprecated since 3.0.2
-   */
-  @Deprecated
-  public AbstractClusterBuilder<T> setBroadcastInterval(Duration interval) {
-    GroupMembershipProtocolConfig protocolConfig = config.getProtocolConfig();
-    if (protocolConfig instanceof HeartbeatMembershipProtocolConfig) {
-      ((HeartbeatMembershipProtocolConfig) protocolConfig).setHeartbeatInterval(interval);
-    }
-    return this;
-  }
-
-  /**
-   * Sets the reachability broadcast interval.
-   * <p>
-   * The broadcast interval is the interval at which heartbeats are sent to peers in the cluster.
-   *
-   * @param interval the reachability broadcast interval
-   * @return the cluster builder
-   */
-  @Deprecated
-  public AbstractClusterBuilder<T> withBroadcastInterval(Duration interval) {
-    GroupMembershipProtocolConfig protocolConfig = config.getProtocolConfig();
-    if (protocolConfig instanceof HeartbeatMembershipProtocolConfig) {
-      ((HeartbeatMembershipProtocolConfig) protocolConfig).setHeartbeatInterval(interval);
-    }
-    return this;
-  }
-
-  /**
-   * Sets the reachability failure detection threshold.
-   * <p>
-   * Reachability of cluster members is determined using a phi-accrual failure detector. The reachability threshold
-   * is the phi threshold after which a peer will be determined to be unreachable.
-   *
-   * @param threshold the reachability failure detection threshold
-   * @return the cluster builder
-   * @deprecated since 3.0.2
-   */
-  @Deprecated
-  public AbstractClusterBuilder<T> setReachabilityThreshold(int threshold) {
-    GroupMembershipProtocolConfig protocolConfig = config.getProtocolConfig();
-    if (protocolConfig instanceof HeartbeatMembershipProtocolConfig) {
-      ((HeartbeatMembershipProtocolConfig) protocolConfig).setPhiFailureThreshold(threshold);
-    }
-    return this;
-  }
-
-  /**
-   * Sets the reachability failure detection threshold.
-   * <p>
-   * Reachability of cluster members is determined using a phi-accrual failure detector. The reachability threshold
-   * is the phi threshold after which a peer will be determined to be unreachable.
-   *
-   * @param threshold the reachability failure detection threshold
-   * @return the cluster builder
-   */
-  @Deprecated
-  public AbstractClusterBuilder<T> withReachabilityThreshold(int threshold) {
-    GroupMembershipProtocolConfig protocolConfig = config.getProtocolConfig();
-    if (protocolConfig instanceof HeartbeatMembershipProtocolConfig) {
-      ((HeartbeatMembershipProtocolConfig) protocolConfig).setPhiFailureThreshold(threshold);
-    }
-    return this;
-  }
-
-  /**
-   * Sets the reachability failure timeout.
-   * <p>
-   * The reachability timeout determines the maximum time after which a member will be marked unreachable if heartbeats
-   * have failed.
-   *
-   * @param timeout the reachability failure timeout
-   * @return the cluster builder
-   */
-  @Deprecated
-  public AbstractClusterBuilder<T> withReachabilityTimeout(Duration timeout) {
-    GroupMembershipProtocolConfig protocolConfig = config.getProtocolConfig();
-    if (protocolConfig instanceof HeartbeatMembershipProtocolConfig) {
-      ((HeartbeatMembershipProtocolConfig) protocolConfig).setFailureTimeout(timeout);
-    }
-    return this;
-  }
-
-  /**
-   * Sets the cluster membership protocol.
-   * <p>
-   * The membership protocol is responsible for determining the active set of members in the cluster, replicating
-   * member metadata, and detecting failures. The default is {@link HeartbeatMembershipProtocol}.
-   *
-   * @param protocol the cluster membership protocol
-   * @return the cluster builder
-   * @see HeartbeatMembershipProtocol
-   * @see io.atomix.cluster.protocol.SwimMembershipProtocol
-   */
-  public AbstractClusterBuilder<T> withMembershipProtocol(GroupMembershipProtocol protocol) {
-    config.setProtocolConfig(protocol.config());
-    return this;
-  }
-
-  /**
    * Sets the cluster membership provider.
    * <p>
    * The membership provider determines how peers are located and the cluster is bootstrapped.
@@ -511,10 +359,97 @@ public abstract class AbstractClusterBuilder<T> implements Builder<T> {
    * @param locationProvider the membership provider
    * @return the cluster builder
    * @see io.atomix.cluster.discovery.BootstrapDiscoveryProvider
-   * @see io.atomix.cluster.discovery.MulticastDiscoveryProvider
    */
   public AbstractClusterBuilder<T> withMembershipProvider(NodeDiscoveryProvider locationProvider) {
     config.setDiscoveryConfig(locationProvider.config());
+    return this;
+  }
+
+  /**
+   * Sets whether to broadcast member updates to all peers.
+   *
+   * @param broadcastUpdates whether to broadcast member updates to all peers
+   * @return the protocol builder
+   */
+  public AbstractClusterBuilder<T> withBroadcastUpdates(boolean broadcastUpdates) {
+    config.getMembershipConfig().setBroadcastUpdates(broadcastUpdates);
+    return this;
+  }
+
+  /**
+   * Sets whether to broadcast disputes to all peers.
+   *
+   * @param broadcastDisputes whether to broadcast disputes to all peers
+   * @return the protocol builder
+   */
+  public AbstractClusterBuilder<T> withBroadcastDisputes(boolean broadcastDisputes) {
+    config.getMembershipConfig().setBroadcastDisputes(broadcastDisputes);
+    return this;
+  }
+
+  /**
+   * Sets whether to notify a suspect node on state changes.
+   *
+   * @param notifySuspect whether to notify a suspect node on state changes
+   * @return the protocol builder
+   */
+  public AbstractClusterBuilder<T> withNotifySuspect(boolean notifySuspect) {
+    config.getMembershipConfig().setNotifySuspect(notifySuspect);
+    return this;
+  }
+
+  /**
+   * Sets the gossip interval.
+   *
+   * @param gossipInterval the gossip interval
+   * @return the protocol builder
+   */
+  public AbstractClusterBuilder<T> withGossipInterval(Duration gossipInterval) {
+    config.getMembershipConfig().setGossipInterval(gossipInterval);
+    return this;
+  }
+
+  /**
+   * Sets the gossip fanout.
+   *
+   * @param gossipFanout the gossip fanout
+   * @return the protocol builder
+   */
+  public AbstractClusterBuilder<T> withGossipFanout(int gossipFanout) {
+    config.getMembershipConfig().setGossipFanout(gossipFanout);
+    return this;
+  }
+
+  /**
+   * Sets the probe interval.
+   *
+   * @param probeInterval the probe interval
+   * @return the protocol builder
+   */
+  public AbstractClusterBuilder<T> withProbeInterval(Duration probeInterval) {
+    config.getMembershipConfig().setProbeInterval(probeInterval);
+    return this;
+  }
+
+  /**
+   * Sets the number of probes to perform on suspect members.
+   *
+   * @param suspectProbes the number of probes to perform on suspect members
+   * @return the protocol builder
+   */
+  public AbstractClusterBuilder<T> withSuspectProbes(int suspectProbes) {
+    config.getMembershipConfig().setSuspectProbes(suspectProbes);
+    return this;
+  }
+
+  /**
+   * Sets the failure timeout to use prior to phi failure detectors being populated.
+   *
+   * @param failureTimeout the failure timeout
+   * @return the protocol builder
+   */
+  public AbstractClusterBuilder<T> withFailureTimeout(Duration failureTimeout) {
+    config.getMembershipConfig().setFailureTimeout(failureTimeout);
     return this;
   }
 
@@ -527,8 +462,8 @@ public abstract class AbstractClusterBuilder<T> implements Builder<T> {
    * a keystore/truststore is provided.
    *
    * @return the cluster builder
-   * @see #withKeyStore(String)
-   * @see #withTrustStore(String)
+   * @see #withKeyPath(String)
+   * @see #withCertPath(String)
    */
   public AbstractClusterBuilder<T> withTlsEnabled() {
     return withTlsEnabled(true);
@@ -542,9 +477,10 @@ public abstract class AbstractClusterBuilder<T> implements Builder<T> {
    * When TLS is enabled, Atomix will look for an {@code atomix.jks} file in the {@code /conf} directory unless
    * a keystore/truststore is provided.
    *
+   * @param tlsEnabled whether to enable TLS
    * @return the cluster builder
-   * @see #withKeyStore(String)
-   * @see #withTrustStore(String)
+   * @see #withKeyPath(String)
+   * @see #withCertPath(String)
    */
   public AbstractClusterBuilder<T> withTlsEnabled(boolean tlsEnabled) {
     config.getMessagingConfig().getTlsConfig().setEnabled(tlsEnabled);
@@ -552,46 +488,24 @@ public abstract class AbstractClusterBuilder<T> implements Builder<T> {
   }
 
   /**
-   * Sets the key store to use for TLS in the Atomix messaging service.
+   * Sets the path to the certificate chain.
    *
-   * @param keyStore the key store path
+   * @param certPath the path to the certificate chain
    * @return the cluster builder
    */
-  public AbstractClusterBuilder<T> withKeyStore(String keyStore) {
-    config.getMessagingConfig().getTlsConfig().setKeyStore(keyStore);
+  public AbstractClusterBuilder<T> withCertPath(String certPath) {
+    config.getMessagingConfig().getTlsConfig().setCertPath(certPath);
     return this;
   }
 
   /**
-   * Sets the key store password for the Atomix messaging service.
+   * Sets the path to the private key.
    *
-   * @param keyStorePassword the key store password
+   * @param keyPath the path to the private key
    * @return the cluster builder
    */
-  public AbstractClusterBuilder<T> withKeyStorePassword(String keyStorePassword) {
-    config.getMessagingConfig().getTlsConfig().setKeyStorePassword(keyStorePassword);
-    return this;
-  }
-
-  /**
-   * Sets the trust store to use for TLS in the Atomix messaging service.
-   *
-   * @param trustStore the trust store path
-   * @return the cluster builder
-   */
-  public AbstractClusterBuilder<T> withTrustStore(String trustStore) {
-    config.getMessagingConfig().getTlsConfig().setTrustStore(trustStore);
-    return this;
-  }
-
-  /**
-   * Sets the trust store password for the Atomix messaging service.
-   *
-   * @param trustStorePassword the trust store password
-   * @return the cluster builder
-   */
-  public AbstractClusterBuilder<T> withTrustStorePassword(String trustStorePassword) {
-    config.getMessagingConfig().getTlsConfig().setTrustStorePassword(trustStorePassword);
+  public AbstractClusterBuilder<T> withKeyPath(String keyPath) {
+    config.getMessagingConfig().getTlsConfig().setKeyPath(keyPath);
     return this;
   }
 }

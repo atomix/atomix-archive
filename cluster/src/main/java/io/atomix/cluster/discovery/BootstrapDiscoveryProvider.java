@@ -22,11 +22,11 @@ import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
 import com.google.common.collect.ImmutableSet;
-import io.atomix.cluster.Node;
 import io.atomix.cluster.NodeConfig;
+import io.atomix.cluster.NodeId;
 import io.atomix.utils.component.Component;
 import io.atomix.utils.component.Managed;
-import io.atomix.utils.event.AbstractListenerManager;
+import io.atomix.utils.event.AbstractListenable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -41,12 +41,12 @@ import static com.google.common.base.Preconditions.checkNotNull;
  * propagating membership information using a gossip style protocol.
  * <p>
  * A phi accrual failure detector is used to detect failures and remove peers from the configuration. In order to avoid
- * flapping of membership following a {@link io.atomix.cluster.ClusterMembershipEvent.Type#MEMBER_ADDED} event, the implementation attempts
- * to heartbeat all newly discovered peers before triggering a {@link io.atomix.cluster.ClusterMembershipEvent.Type#MEMBER_REMOVED} event.
+ * flapping of membership following a {@link io.atomix.cluster.MemberEvent.Type#ADDED} event, the implementation attempts
+ * to heartbeat all newly discovered peers before triggering a {@link io.atomix.cluster.MemberEvent.Type#REMOVED} event.
  */
 @Component(BootstrapDiscoveryConfig.class)
 public class BootstrapDiscoveryProvider
-    extends AbstractListenerManager<NodeDiscoveryEvent, NodeDiscoveryEventListener>
+    extends AbstractListenable<DiscoveryEvent>
     implements NodeDiscoveryProvider, Managed<BootstrapDiscoveryConfig> {
 
   public static final Type TYPE = new Type();
@@ -96,8 +96,10 @@ public class BootstrapDiscoveryProvider
 
   public BootstrapDiscoveryProvider(Collection<Node> bootstrapNodes) {
     this(new BootstrapDiscoveryConfig().setNodes(bootstrapNodes.stream()
-        .map(node -> new NodeConfig().setId(node.id())
-            .setAddress(node.address()))
+        .map(node -> new NodeConfig()
+            .setId(NodeId.from(node.getId(), node.getNamespace()))
+            .setHost(node.getHost())
+            .setPort(node.getPort()))
         .collect(Collectors.toList())));
   }
 
@@ -119,7 +121,14 @@ public class BootstrapDiscoveryProvider
   public CompletableFuture<Void> start(BootstrapDiscoveryConfig config) {
     LOGGER.info("Joined");
     this.config = config;
-    this.bootstrapNodes = ImmutableSet.copyOf(config.getNodes().stream().map(Node::new).collect(Collectors.toList()));
+    this.bootstrapNodes = ImmutableSet.copyOf(config.getNodes().stream()
+        .map(c -> Node.newBuilder()
+            .setId(c.getId().id())
+            .setNamespace(c.getId().namespace())
+            .setHost(c.getHost())
+            .setPort(c.getPort())
+            .build())
+        .collect(Collectors.toList()));
     return CompletableFuture.completedFuture(null);
   }
 

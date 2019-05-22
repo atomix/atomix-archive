@@ -27,12 +27,12 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-import io.atomix.cluster.ClusterMembershipEvent;
-import io.atomix.cluster.ClusterMembershipEventListener;
-import io.atomix.cluster.Member;
+import io.atomix.cluster.MemberEvent;
+import io.atomix.cluster.MemberId;
 import io.atomix.core.counter.AtomicCounter;
 import io.atomix.core.counter.AtomicCounterType;
 import io.atomix.core.counter.DistributedCounterType;
@@ -56,7 +56,6 @@ import org.junit.Before;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
@@ -278,8 +277,8 @@ public class AtomixTest extends AbstractAtomixTest {
     assertEquals(1, client1.getPartitionService().getPartitionGroups().size());
 
     // client1 added to data node
-    ClusterMembershipEvent event1 = dataListener.event();
-    assertEquals(ClusterMembershipEvent.Type.MEMBER_ADDED, event1.type());
+    MemberEvent event1 = dataListener.event();
+    assertEquals(MemberEvent.Type.ADDED, event1.getType());
 
     Thread.sleep(1000);
 
@@ -290,50 +289,18 @@ public class AtomixTest extends AbstractAtomixTest {
     assertEquals(1, client2.getPartitionService().getPartitionGroups().size());
 
     // client2 added to data node
-    assertEquals(ClusterMembershipEvent.Type.MEMBER_ADDED, dataListener.event().type());
+    assertEquals(MemberEvent.Type.ADDED, dataListener.event().getType());
 
     // client2 added to client node
-    assertEquals(ClusterMembershipEvent.Type.MEMBER_ADDED, clientListener.event().type());
+    assertEquals(MemberEvent.Type.ADDED, clientListener.event().getType());
 
     client2.stop().get(30, TimeUnit.SECONDS);
 
     // client2 removed from data node
-    assertEquals(ClusterMembershipEvent.Type.REACHABILITY_CHANGED, dataListener.event().type());
-    assertEquals(ClusterMembershipEvent.Type.MEMBER_REMOVED, dataListener.event().type());
+    assertEquals(MemberEvent.Type.REMOVED, dataListener.event().getType());
 
     // client2 removed from client node
-    assertEquals(ClusterMembershipEvent.Type.REACHABILITY_CHANGED, clientListener.event().type());
-    assertEquals(ClusterMembershipEvent.Type.MEMBER_REMOVED, clientListener.event().type());
-  }
-
-  /**
-   * Tests a client properties.
-   */
-  @Test
-  public void testClientProperties() throws Exception {
-    List<CompletableFuture<Atomix>> futures = new ArrayList<>();
-    futures.add(startAtomix(1, Arrays.asList(1, 2, 3), consensus(1, Arrays.asList(1, 2, 3))));
-    futures.add(startAtomix(2, Arrays.asList(1, 2, 3), consensus(2, Arrays.asList(1, 2, 3))));
-    futures.add(startAtomix(3, Arrays.asList(1, 2, 3), consensus(3, Arrays.asList(1, 2, 3))));
-    Futures.allOf(futures).get(30, TimeUnit.SECONDS);
-
-    TestClusterMembershipEventListener dataListener = new TestClusterMembershipEventListener();
-    instances.get(0).getMembershipService().addListener(dataListener);
-
-    Properties properties = new Properties();
-    properties.setProperty("a-key", "a-value");
-    Atomix client1 = startAtomix(4, Arrays.asList(1, 2, 3), properties, AtomixBuilder::build).get(30, TimeUnit.SECONDS);
-    assertEquals(1, client1.getPartitionService().getPartitionGroups().size());
-
-    // client1 added to data node
-    ClusterMembershipEvent event1 = dataListener.event();
-    assertEquals(ClusterMembershipEvent.Type.MEMBER_ADDED, event1.type());
-
-    Member member = event1.subject();
-
-    assertNotNull(member.properties());
-    assertEquals(1, member.properties().size());
-    assertEquals("a-value", member.properties().get("a-key"));
+    assertEquals(MemberEvent.Type.REMOVED, clientListener.event().getType());
   }
 
   @Test
@@ -443,21 +410,21 @@ public class AtomixTest extends AbstractAtomixTest {
   private Function<AtomixBuilder, Atomix> consensus(int memberId, List<Integer> members) {
     return builder ->
         builder.withManagementGroup(RaftPartitionGroup.builder("system")
-            .withMembers(members.stream().map(String::valueOf).collect(Collectors.toList()))
+            .withMembers(members.stream().map(id -> MemberId.from(String.valueOf(id))).collect(Collectors.toList()))
             .withDataDirectory(new File(new File(DATA_DIR, "system"), String.valueOf(memberId)))
             .build())
             .addPartitionGroup(RaftPartitionGroup.builder("raft")
-                .withMembers(members.stream().map(String::valueOf).collect(Collectors.toList()))
+                .withMembers(members.stream().map(id -> MemberId.from(String.valueOf(id))).collect(Collectors.toList()))
                 .withDataDirectory(new File(new File(DATA_DIR, "raft"), String.valueOf(memberId)))
                 .build())
             .build();
   }
 
-  private static class TestClusterMembershipEventListener implements ClusterMembershipEventListener {
-    private final BlockingQueue<ClusterMembershipEvent> queue = new LinkedBlockingQueue<>();
+  private static class TestClusterMembershipEventListener implements Consumer<MemberEvent> {
+    private final BlockingQueue<MemberEvent> queue = new LinkedBlockingQueue<>();
 
     @Override
-    public void event(ClusterMembershipEvent event) {
+    public void accept(MemberEvent event) {
       try {
         queue.put(event);
       } catch (InterruptedException e) {
@@ -469,8 +436,8 @@ public class AtomixTest extends AbstractAtomixTest {
       return !queue.isEmpty();
     }
 
-    public ClusterMembershipEvent event() throws InterruptedException, TimeoutException {
-      ClusterMembershipEvent event = queue.poll(15, TimeUnit.SECONDS);
+    public MemberEvent event() throws InterruptedException, TimeoutException {
+      MemberEvent event = queue.poll(15, TimeUnit.SECONDS);
       if (event == null) {
         throw new TimeoutException();
       }

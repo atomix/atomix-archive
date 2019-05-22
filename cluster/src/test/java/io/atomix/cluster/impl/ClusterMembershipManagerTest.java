@@ -15,31 +15,28 @@
  */
 package io.atomix.cluster.impl;
 
-import java.time.Duration;
 import java.util.Collection;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
-import io.atomix.cluster.BootstrapService;
-import io.atomix.cluster.ClusterMembershipEvent;
-import io.atomix.cluster.ClusterMembershipEventListener;
+import io.atomix.cluster.ClusterConfig;
 import io.atomix.cluster.Member;
+import io.atomix.cluster.MemberConfig;
+import io.atomix.cluster.MemberEvent;
 import io.atomix.cluster.MemberId;
 import io.atomix.cluster.MemberService;
-import io.atomix.cluster.Node;
-import io.atomix.cluster.TestBootstrapService;
+import io.atomix.cluster.MembershipConfig;
+import io.atomix.cluster.NodeConfig;
+import io.atomix.cluster.NodeId;
+import io.atomix.cluster.discovery.BootstrapDiscoveryConfig;
 import io.atomix.cluster.discovery.BootstrapDiscoveryProvider;
-import io.atomix.cluster.messaging.impl.TestBroadcastServiceFactory;
+import io.atomix.cluster.discovery.Node;
 import io.atomix.cluster.messaging.impl.TestMessagingServiceFactory;
-import io.atomix.cluster.messaging.impl.TestUnicastServiceFactory;
-import io.atomix.cluster.protocol.HeartbeatMembershipProtocol;
-import io.atomix.cluster.protocol.HeartbeatMembershipProtocolConfig;
-import io.atomix.utils.Version;
-import io.atomix.utils.net.Address;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
@@ -51,44 +48,51 @@ import static org.junit.Assert.assertTrue;
  */
 public class ClusterMembershipManagerTest {
   private TestMessagingServiceFactory messagingServiceFactory = new TestMessagingServiceFactory();
-  private TestUnicastServiceFactory unicastServiceFactory = new TestUnicastServiceFactory();
-  private TestBroadcastServiceFactory broadcastServiceFactory = new TestBroadcastServiceFactory();
 
-  private Member buildMember(int memberId) {
-    return Member.builder(String.valueOf(memberId))
-        .withHost("localhost")
-        .withPort(memberId)
+  private Member buildMember(int memberId, String version) {
+    return Member.newBuilder()
+        .setId(String.valueOf(memberId))
+        .setHost("localhost")
+        .setPort(5000 + memberId)
+        .setVersion(version)
         .build();
   }
 
   private Collection<Node> buildBootstrapNodes(int nodes) {
     return IntStream.range(1, nodes + 1)
-        .mapToObj(id -> Node.builder()
-            .withId(String.valueOf(id))
-            .withAddress(Address.from("localhost", id))
+        .mapToObj(id -> Node.newBuilder()
+            .setId(String.valueOf(id))
+            .setHost("localhost")
+            .setPort(5000 + id)
             .build())
         .collect(Collectors.toList());
   }
 
-  private CompletableFuture<ClusterMembershipManager> createService(int memberId, Collection<Node> bootstrapLocations) {
-    Member localMember = buildMember(memberId);
+  private CompletableFuture<ClusterMembershipManager> createService(int memberId, String version, Collection<Node> bootstrapLocations) {
+    Member localMember = buildMember(memberId, version);
     MemberService memberService = new MemberManager(localMember);
-    BootstrapService bootstrapService = new TestBootstrapService(
-        messagingServiceFactory.newMessagingService(localMember.address()),
-        unicastServiceFactory.newUnicastService(localMember.address()),
-        broadcastServiceFactory.newBroadcastService());
-    NodeDiscoveryManager discoveryService = new NodeDiscoveryManager(
-        memberService, bootstrapService, new BootstrapDiscoveryProvider(bootstrapLocations));
-    return discoveryService.start()
+    BootstrapDiscoveryProvider discoveryProvider = new BootstrapDiscoveryProvider();
+    NodeDiscoveryManager discoveryService = new NodeDiscoveryManager(discoveryProvider);
+    GrpcServiceImpl grpcService = new GrpcServiceImpl();
+    return grpcService.start(new ClusterConfig()
+        .setNodeConfig(new MemberConfig()
+            .setId(String.valueOf(memberId))
+            .setHost("localhost")
+            .setPort(5000 + memberId)))
+        .thenCompose(v -> discoveryProvider.start(new BootstrapDiscoveryConfig()
+            .setNodes(bootstrapLocations.stream()
+                .map(node -> new NodeConfig()
+                    .setId(NodeId.from(node.getId(), node.getNamespace()))
+                    .setHost(node.getHost())
+                    .setPort(node.getPort()))
+                .collect(Collectors.toList()))))
+        .thenCompose(v -> discoveryService.start())
         .thenCompose(v -> {
-          HeartbeatMembershipProtocol membershipProtocol = new HeartbeatMembershipProtocol(
-              new MemberManager(localMember), discoveryService, bootstrapService);
-          return membershipProtocol.start(new HeartbeatMembershipProtocolConfig().setFailureTimeout(Duration.ofSeconds(2)))
-              .thenApply(v2 -> new ClusterMembershipManager(
-                  memberService,
-                  new VersionManager(Version.from("1.0.0")),
-                  discoveryService,
-                  membershipProtocol));
+          ClusterMembershipManager membershipManager = new ClusterMembershipManager(
+              grpcService,
+              memberService,
+              discoveryService);
+          return membershipManager.start(new MembershipConfig()).thenApply(v2 -> membershipManager);
         });
   }
 
@@ -96,9 +100,9 @@ public class ClusterMembershipManagerTest {
   public void testClusterService() throws Exception {
     Collection<Node> bootstrapLocations = buildBootstrapNodes(3);
 
-    CompletableFuture<ClusterMembershipManager> future1 = createService(1, bootstrapLocations);
-    CompletableFuture<ClusterMembershipManager> future2 = createService(2, bootstrapLocations);
-    CompletableFuture<ClusterMembershipManager> future3 = createService(3, bootstrapLocations);
+    CompletableFuture<ClusterMembershipManager> future1 = createService(1, "1.0.0", bootstrapLocations);
+    CompletableFuture<ClusterMembershipManager> future2 = createService(2, "1.0.0", bootstrapLocations);
+    CompletableFuture<ClusterMembershipManager> future3 = createService(3, "1.0.1", bootstrapLocations);
 
     ClusterMembershipManager clusterService1 = future1.join();
     ClusterMembershipManager clusterService2 = future2.join();
@@ -110,16 +114,16 @@ public class ClusterMembershipManagerTest {
     assertEquals(3, clusterService2.getMembers().size());
     assertEquals(3, clusterService3.getMembers().size());
 
-    assertTrue(clusterService1.getLocalMember().isActive());
-    assertTrue(clusterService1.getMember(MemberId.from("1")).isActive());
-    assertTrue(clusterService1.getMember(MemberId.from("2")).isActive());
-    assertTrue(clusterService1.getMember(MemberId.from("3")).isActive());
+    assertTrue(clusterService1.getLocalMember().getState() == Member.State.ALIVE);
+    assertTrue(clusterService1.getMember(MemberId.from("1")).getState() == Member.State.ALIVE);
+    assertTrue(clusterService1.getMember(MemberId.from("2")).getState() == Member.State.ALIVE);
+    assertTrue(clusterService1.getMember(MemberId.from("3")).getState() == Member.State.ALIVE);
 
-    assertEquals("1.0.0", clusterService1.getMember("1").version().toString());
-    assertEquals("1.0.0", clusterService1.getMember("2").version().toString());
-    assertEquals("1.0.1", clusterService1.getMember("3").version().toString());
+    assertEquals("1.0.0", clusterService1.getMember("1").getVersion());
+    assertEquals("1.0.0", clusterService1.getMember("2").getVersion());
+    assertEquals("1.0.1", clusterService1.getMember("3").getVersion());
 
-    ClusterMembershipManager ephemeralClusterService = createService(4, bootstrapLocations).join();
+    ClusterMembershipManager ephemeralClusterService = createService(4, "1.1.0", bootstrapLocations).join();
 
     Thread.sleep(1000);
 
@@ -128,10 +132,10 @@ public class ClusterMembershipManagerTest {
     assertEquals(4, clusterService3.getMembers().size());
     assertEquals(4, ephemeralClusterService.getMembers().size());
 
-    assertEquals("1.0.0", clusterService1.getMember("1").version().toString());
-    assertEquals("1.0.0", clusterService1.getMember("2").version().toString());
-    assertEquals("1.0.1", clusterService1.getMember("3").version().toString());
-    assertEquals("1.1.0", clusterService1.getMember("4").version().toString());
+    assertEquals("1.0.0", clusterService1.getMember("1").getVersion());
+    assertEquals("1.0.0", clusterService1.getMember("2").getVersion());
+    assertEquals("1.0.1", clusterService1.getMember("3").getVersion());
+    assertEquals("1.1.0", clusterService1.getMember("4").getVersion());
 
     clusterService1.stop().join();
 
@@ -140,9 +144,9 @@ public class ClusterMembershipManagerTest {
     assertEquals(3, clusterService2.getMembers().size());
 
     assertNull(clusterService2.getMember(MemberId.from("1")));
-    assertTrue(clusterService2.getMember(MemberId.from("2")).isActive());
-    assertTrue(clusterService2.getMember(MemberId.from("3")).isActive());
-    assertTrue(clusterService2.getMember(MemberId.from("4")).isActive());
+    assertTrue(clusterService2.getMember(MemberId.from("2")).getState() == Member.State.ALIVE);
+    assertTrue(clusterService2.getMember(MemberId.from("3")).getState() == Member.State.ALIVE);
+    assertTrue(clusterService2.getMember(MemberId.from("4")).getState() == Member.State.ALIVE);
 
     ephemeralClusterService.stop().join();
 
@@ -150,8 +154,8 @@ public class ClusterMembershipManagerTest {
 
     assertEquals(2, clusterService2.getMembers().size());
     assertNull(clusterService2.getMember(MemberId.from("1")));
-    assertTrue(clusterService2.getMember(MemberId.from("2")).isActive());
-    assertTrue(clusterService2.getMember(MemberId.from("3")).isActive());
+    assertTrue(clusterService2.getMember(MemberId.from("2")).getState() == Member.State.ALIVE);
+    assertTrue(clusterService2.getMember(MemberId.from("3")).getState() == Member.State.ALIVE);
     assertNull(clusterService2.getMember(MemberId.from("4")));
 
     Thread.sleep(2500);
@@ -159,39 +163,26 @@ public class ClusterMembershipManagerTest {
     assertEquals(2, clusterService2.getMembers().size());
 
     assertNull(clusterService2.getMember(MemberId.from("1")));
-    assertTrue(clusterService2.getMember(MemberId.from("2")).isActive());
-    assertTrue(clusterService2.getMember(MemberId.from("3")).isActive());
+    assertTrue(clusterService2.getMember(MemberId.from("2")).getState() == Member.State.ALIVE);
+    assertTrue(clusterService2.getMember(MemberId.from("3")).getState() == Member.State.ALIVE);
     assertNull(clusterService2.getMember(MemberId.from("4")));
 
     TestClusterMembershipEventListener eventListener = new TestClusterMembershipEventListener();
     clusterService2.addListener(eventListener);
 
-    ClusterMembershipEvent event;
-    clusterService3.getLocalMember().properties().put("foo", "bar");
-
-    event = eventListener.nextEvent();
-    assertEquals(ClusterMembershipEvent.Type.METADATA_CHANGED, event.type());
-    assertEquals("bar", event.subject().properties().get("foo"));
-
-    clusterService3.getLocalMember().properties().put("foo", "baz");
-
-    event = eventListener.nextEvent();
-    assertEquals(ClusterMembershipEvent.Type.METADATA_CHANGED, event.type());
-    assertEquals("baz", event.subject().properties().get("foo"));
-
     CompletableFuture.allOf(new CompletableFuture[]{clusterService1.stop(), clusterService2.stop(),
         clusterService3.stop()}).join();
   }
 
-  private class TestClusterMembershipEventListener implements ClusterMembershipEventListener {
-    private BlockingQueue<ClusterMembershipEvent> queue = new ArrayBlockingQueue<ClusterMembershipEvent>(10);
+  private class TestClusterMembershipEventListener implements Consumer<MemberEvent> {
+    private BlockingQueue<MemberEvent> queue = new ArrayBlockingQueue<>(10);
 
     @Override
-    public void event(ClusterMembershipEvent event) {
+    public void accept(MemberEvent event) {
       queue.add(event);
     }
 
-    ClusterMembershipEvent nextEvent() {
+    MemberEvent nextEvent() {
       try {
         return queue.poll(5, TimeUnit.SECONDS);
       } catch (InterruptedException e) {

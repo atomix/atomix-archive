@@ -21,6 +21,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.BiFunction;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
@@ -28,8 +29,7 @@ import java.util.stream.Collectors;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.io.BaseEncoding;
-import io.atomix.cluster.ClusterMembershipEvent;
-import io.atomix.cluster.ClusterMembershipEventListener;
+import io.atomix.cluster.MemberEvent;
 import io.atomix.cluster.MemberId;
 import io.atomix.core.iterator.AsyncIterator;
 import io.atomix.core.map.AsyncAtomicMap;
@@ -87,7 +87,7 @@ public class TransactionManager implements TransactionService, Managed {
   private PrimitiveManagementService managementService;
 
   private MemberId localMemberId;
-  private final ClusterMembershipEventListener clusterEventListener = this::onMembershipChange;
+  private final Consumer<MemberEvent> clusterEventListener = this::onMembershipChange;
   private volatile AsyncAtomicMap<TransactionId, TransactionInfo> transactions;
 
   @Override
@@ -182,9 +182,9 @@ public class TransactionManager implements TransactionService, Managed {
   /**
    * Handles a cluster membership change event.
    */
-  private void onMembershipChange(ClusterMembershipEvent event) {
-    if (event.type() == ClusterMembershipEvent.Type.MEMBER_REMOVED) {
-      recoverTransactions(transactions.entrySet().iterator(), event.subject().id());
+  private void onMembershipChange(MemberEvent event) {
+    if (event.getType() == MemberEvent.Type.REMOVED) {
+      recoverTransactions(transactions.entrySet().iterator(), MemberId.from(event.getMember()));
     }
   }
 
@@ -371,7 +371,7 @@ public class TransactionManager implements TransactionService, Managed {
   @Override
   @SuppressWarnings("unchecked")
   public CompletableFuture<Void> start() {
-    this.localMemberId = managementService.getMembershipService().getLocalMember().id();
+    this.localMemberId = managementService.getMembershipService().getLocalMemberId();
     Map<PartitionId, RawAsyncAtomicMap> partitions = managementService.getPartitionService()
         .getSystemPartitionGroup()
         .getPartitions()

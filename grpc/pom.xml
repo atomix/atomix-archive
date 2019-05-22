@@ -103,7 +103,7 @@
         <configuration>
           <instructions>
             <Export-Package>
-              io.atomix.rest.*
+              io.atomix.grpc.*
             </Export-Package>
             <Import-Package>
               !sun.nio.ch,!sun.misc,*

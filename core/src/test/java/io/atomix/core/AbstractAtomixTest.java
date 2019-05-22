@@ -29,10 +29,8 @@ import java.util.Properties;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-import io.atomix.cluster.Node;
 import io.atomix.cluster.discovery.BootstrapDiscoveryProvider;
-import io.atomix.cluster.discovery.MulticastDiscoveryProvider;
-import io.atomix.utils.net.Address;
+import io.atomix.cluster.discovery.Node;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 
@@ -57,9 +55,7 @@ public abstract class AbstractAtomixTest {
         .withMemberId(String.valueOf(id))
         .withHost("localhost")
         .withPort(BASE_PORT + id)
-        .withProperties(properties)
-        .withMulticastEnabled()
-        .withMembershipProvider(new MulticastDiscoveryProvider());
+        .withProperties(properties);
   }
 
   /**
@@ -67,9 +63,10 @@ public abstract class AbstractAtomixTest {
    */
   protected static AtomixBuilder buildAtomix(int id, List<Integer> memberIds, Properties properties) {
     Collection<Node> nodes = memberIds.stream()
-        .map(memberId -> Node.builder()
-            .withId(String.valueOf(memberId))
-            .withAddress(Address.from("localhost", BASE_PORT + memberId))
+        .map(memberId -> Node.newBuilder()
+            .setId(String.valueOf(memberId))
+            .setHost("localhost")
+            .setPort(BASE_PORT + memberId)
             .build())
         .collect(Collectors.toList());
 
@@ -79,8 +76,7 @@ public abstract class AbstractAtomixTest {
         .withHost("localhost")
         .withPort(BASE_PORT + id)
         .withProperties(properties)
-        .withMulticastEnabled()
-        .withMembershipProvider(!nodes.isEmpty() ? new BootstrapDiscoveryProvider(nodes) : new MulticastDiscoveryProvider());
+        .withMembershipProvider(new BootstrapDiscoveryProvider(nodes));
   }
 
   /**

@@ -84,14 +84,14 @@ public class LogPartitionSession implements LogSession, Managed<LogPartitionSess
         .findAny()
         .orElse(null);
     return DistributedLogClient.builder()
-        .withClientId(managementService.getMembershipService().getLocalMember().id().id())
+        .withClientId(managementService.getMembershipService().getLocalMemberId().toString())
         .withProtocol(new LogClientCommunicator(
             partition.name(),
             managementService.getMessagingService()))
         .withTermProvider(new LogPartitionTermProvider(
             managementService.getElectionService().getElectionFor(partition.id()),
             GroupMember.newBuilder()
-                .setMemberId(managementService.getMembershipService().getLocalMember().id().id())
+                .setMemberId(managementService.getMembershipService().getLocalMemberId().toString())
                 .setMemberGroupId(memberGroup.id().id())
                 .build(),
             metadata.getReplicationFactor()))

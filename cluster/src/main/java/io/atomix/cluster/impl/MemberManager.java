@@ -1,11 +1,14 @@
 package io.atomix.cluster.impl;
 
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
 import io.atomix.cluster.Member;
 import io.atomix.cluster.MemberConfig;
 import io.atomix.cluster.MemberService;
+import io.atomix.cluster.VersionService;
 import io.atomix.utils.component.Component;
+import io.atomix.utils.component.Dependency;
 import io.atomix.utils.component.Managed;
 
 /**
@@ -13,6 +16,10 @@ import io.atomix.utils.component.Managed;
  */
 @Component(MemberConfig.class)
 public class MemberManager implements MemberService, Managed<MemberConfig> {
+
+  @Dependency
+  private VersionService versionService;
+
   private Member localMember;
 
   private MemberManager() {
@@ -28,8 +35,19 @@ public class MemberManager implements MemberService, Managed<MemberConfig> {
   }
 
   @Override
+  @SuppressWarnings("unchecked")
   public CompletableFuture<Void> start(MemberConfig config) {
-    this.localMember = new Member(config);
+    this.localMember = Member.newBuilder()
+        .setId(config.getId().id())
+        .setNamespace(config.getId().namespace())
+        .setHost(config.getHost())
+        .setPort(config.getPort())
+        .setHostId(config.getHostId())
+        .setRackId(config.getRackId())
+        .setZoneId(config.getZoneId())
+        .putAllProperties((Map) config.getProperties())
+        .setVersion(versionService.version().toString())
+        .build();
     return CompletableFuture.completedFuture(null);
   }
 }

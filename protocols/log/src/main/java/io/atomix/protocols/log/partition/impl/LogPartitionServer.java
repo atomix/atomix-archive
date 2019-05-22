@@ -81,14 +81,14 @@ public class LogPartitionServer implements Managed<LogPartitionServer> {
         .findAny()
         .orElse(null);
     return DistributedLogServer.builder()
-        .withServerId(managementService.getMembershipService().getLocalMember().id().id())
+        .withServerId(managementService.getMembershipService().getLocalMemberId().toString())
         .withProtocol(new LogServerCommunicator(
             partition.name(),
             managementService.getMessagingService()))
         .withTermProvider(new LogPartitionTermProvider(
             managementService.getElectionService().getElectionFor(partition.id()),
             GroupMember.newBuilder()
-                .setMemberId(managementService.getMembershipService().getLocalMember().id().id())
+                .setMemberId(managementService.getMembershipService().getLocalMemberId().toString())
                 .setMemberGroupId(memberGroup.id().id())
                 .build(),
             metadata.getReplicationFactor()))

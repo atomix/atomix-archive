@@ -17,6 +17,8 @@ package io.atomix.cluster;
 
 import java.util.UUID;
 
+import com.google.common.base.Strings;
+
 /**
  * Controller cluster identity.
  */
@@ -28,7 +30,7 @@ public class MemberId extends NodeId {
    * @return node id
    */
   public static MemberId anonymous() {
-    return new MemberId(UUID.randomUUID().toString());
+    return new MemberId(UUID.randomUUID().toString(), DEFAULT_NAMESPACE);
   }
 
   /**
@@ -38,10 +40,31 @@ public class MemberId extends NodeId {
    * @return node id
    */
   public static MemberId from(String id) {
-    return new MemberId(id);
+    return new MemberId(id, DEFAULT_NAMESPACE);
   }
 
-  public MemberId(String id) {
-    super(id);
+  /**
+   * Creates a new cluster node identifier from the specified string.
+   *
+   * @param id        string identifier
+   * @param namespace member namespace
+   * @return node id
+   */
+  public static MemberId from(String id, String namespace) {
+    return new MemberId(id, !Strings.isNullOrEmpty(namespace) ? namespace : DEFAULT_NAMESPACE);
+  }
+
+  /**
+   * Returns the member ID for the given member.
+   *
+   * @param member the member for which to return the ID
+   * @return the member ID for the given member
+   */
+  public static MemberId from(Member member) {
+    return new MemberId(member.getId(), member.getNamespace());
+  }
+
+  public MemberId(String id, String namespace) {
+    super(id, namespace);
   }
 }

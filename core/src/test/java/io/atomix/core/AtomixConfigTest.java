@@ -19,12 +19,7 @@ import java.time.Duration;
 
 import io.atomix.cluster.ClusterConfig;
 import io.atomix.cluster.MemberConfig;
-import io.atomix.cluster.MembershipConfig;
-import io.atomix.cluster.MulticastConfig;
-import io.atomix.cluster.discovery.MulticastDiscoveryConfig;
-import io.atomix.cluster.discovery.MulticastDiscoveryProvider;
 import io.atomix.cluster.messaging.MessagingConfig;
-import io.atomix.cluster.protocol.HeartbeatMembershipProtocolConfig;
 import io.atomix.protocols.raft.partition.RaftPartitionGroup;
 import io.atomix.protocols.raft.partition.RaftPartitionGroupConfig;
 import io.atomix.utils.memory.MemorySize;
@@ -59,27 +54,6 @@ public class AtomixConfigTest {
     assertEquals("bar", node.getProperties().getProperty("foo"));
     assertEquals("baz", node.getProperties().getProperty("bar"));
 
-    MulticastConfig multicast = cluster.getMulticastConfig();
-    assertTrue(multicast.isEnabled());
-    assertEquals("230.0.1.1", multicast.getGroup().getHostAddress());
-    assertEquals(56789, multicast.getPort());
-
-    HeartbeatMembershipProtocolConfig protocol = (HeartbeatMembershipProtocolConfig) cluster.getProtocolConfig();
-    assertEquals(Duration.ofMillis(200), protocol.getHeartbeatInterval());
-    assertEquals(12, protocol.getPhiFailureThreshold());
-    assertEquals(Duration.ofSeconds(15), protocol.getFailureTimeout());
-
-    MembershipConfig membership = cluster.getMembershipConfig();
-    assertEquals(Duration.ofSeconds(1), membership.getBroadcastInterval());
-    assertEquals(12, membership.getReachabilityThreshold());
-    assertEquals(Duration.ofSeconds(15), membership.getReachabilityTimeout());
-
-    MulticastDiscoveryConfig discovery = (MulticastDiscoveryConfig) cluster.getDiscoveryConfig();
-    assertEquals(MulticastDiscoveryProvider.TYPE, discovery.getType());
-    assertEquals(Duration.ofSeconds(1), discovery.getBroadcastInterval());
-    assertEquals(12, discovery.getFailureThreshold());
-    assertEquals(Duration.ofSeconds(15), discovery.getFailureTimeout());
-
     MessagingConfig messaging = cluster.getMessagingConfig();
     assertEquals(2, messaging.getInterfaces().size());
     assertEquals("127.0.0.1", messaging.getInterfaces().get(0));
@@ -87,10 +61,6 @@ public class AtomixConfigTest {
     assertEquals(5000, messaging.getPort().intValue());
     assertEquals(Duration.ofSeconds(10), messaging.getConnectTimeout());
     assertTrue(messaging.getTlsConfig().isEnabled());
-    assertEquals("keystore.jks", messaging.getTlsConfig().getKeyStore());
-    assertEquals("foo", messaging.getTlsConfig().getKeyStorePassword());
-    assertEquals("truststore.jks", messaging.getTlsConfig().getTrustStore());
-    assertEquals("bar", messaging.getTlsConfig().getTrustStorePassword());
 
     RaftPartitionGroupConfig managementGroup = (RaftPartitionGroupConfig) config.getSystemGroup();
     assertEquals(RaftPartitionGroup.TYPE, managementGroup.getType());

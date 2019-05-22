@@ -15,15 +15,14 @@
  */
 package io.atomix.cluster.discovery;
 
-import io.atomix.cluster.Node;
-import io.atomix.utils.event.ListenerService;
-
 import java.util.Set;
+
+import io.atomix.utils.event.Listenable;
 
 /**
  * Node discovery service.
  */
-public interface NodeDiscoveryService extends ListenerService<NodeDiscoveryEvent, NodeDiscoveryEventListener> {
+public interface NodeDiscoveryService extends Listenable<DiscoveryEvent> {
 
   /**
    * Returns the set of active nodes.

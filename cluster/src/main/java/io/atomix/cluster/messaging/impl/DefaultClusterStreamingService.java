@@ -15,6 +15,7 @@ import io.atomix.cluster.messaging.MessagingService;
 import io.atomix.utils.component.Component;
 import io.atomix.utils.component.Dependency;
 import io.atomix.utils.concurrent.Futures;
+import io.atomix.utils.net.Address;
 import io.atomix.utils.stream.EncodingStreamHandler;
 import io.atomix.utils.stream.StreamFunction;
 import io.atomix.utils.stream.StreamHandler;
@@ -49,7 +50,7 @@ public class DefaultClusterStreamingService implements ClusterStreamingService {
     if (member == null) {
       return Futures.exceptionalFuture(CONNECT_EXCEPTION);
     }
-    return messagingService.sendStreamAsync(member.address(), type)
+    return messagingService.sendStreamAsync(Address.from(member.getHost(), member.getPort()), type)
         .thenApply(stream -> new EncodingStreamHandler<>(stream, encoder));
   }
 
@@ -64,7 +65,7 @@ public class DefaultClusterStreamingService implements ClusterStreamingService {
     if (member == null) {
       return Futures.exceptionalFuture(CONNECT_EXCEPTION);
     }
-    return messagingService.sendStreamAndReceive(member.address(), type, timeout)
+    return messagingService.sendStreamAndReceive(Address.from(member.getHost(), member.getPort()), type, timeout)
         .thenApply(function -> new TranscodingStreamFunction<>(function, encoder, f -> f.thenApply(decoder)));
   }
 
@@ -82,7 +83,7 @@ public class DefaultClusterStreamingService implements ClusterStreamingService {
       return Futures.exceptionalFuture(CONNECT_EXCEPTION);
     }
     return messagingService.sendAndReceiveStream(
-        member.address(), type, encoder.apply(message), new EncodingStreamHandler<>(handler, decoder), timeout);
+        Address.from(member.getHost(), member.getPort()), type, encoder.apply(message), new EncodingStreamHandler<>(handler, decoder), timeout);
   }
 
   @Override
@@ -98,7 +99,7 @@ public class DefaultClusterStreamingService implements ClusterStreamingService {
       return Futures.exceptionalFuture(CONNECT_EXCEPTION);
     }
     return messagingService.sendStreamAndReceiveStream(
-        member.address(), type, new EncodingStreamHandler<>(handler, decoder), timeout)
+        Address.from(member.getHost(), member.getPort()), type, new EncodingStreamHandler<>(handler, decoder), timeout)
         .thenApply(h -> new EncodingStreamHandler<>(h, encoder));
   }
 
@@ -108,7 +109,7 @@ public class DefaultClusterStreamingService implements ClusterStreamingService {
       Function<byte[], M> decoder,
       Supplier<StreamFunction<M, CompletableFuture<R>>> handler,
       Function<R, byte[]> encoder) {
-    messagingService.registerStreamHandler(type, address ->
+    messagingService.registerStreamHandler(type, () ->
         new TranscodingStreamFunction<>(handler.get(), decoder, f -> f.thenApply(encoder)));
     return CompletableFuture.completedFuture(null);
   }
@@ -119,7 +120,7 @@ public class DefaultClusterStreamingService implements ClusterStreamingService {
       Function<byte[], M> decoder,
       BiConsumer<M, StreamHandler<R>> handler,
       Function<R, byte[]> encoder) {
-    messagingService.registerStreamingHandler(type, (address, payload, stream) ->
+    messagingService.registerStreamingHandler(type, (payload, stream) ->
         handler.accept(decoder.apply(payload), new EncodingStreamHandler<>(stream, encoder)));
     return CompletableFuture.completedFuture(null);
   }
@@ -130,7 +131,7 @@ public class DefaultClusterStreamingService implements ClusterStreamingService {
       Function<byte[], M> decoder,
       Function<StreamHandler<R>, StreamHandler<M>> handler,
       Function<R, byte[]> encoder) {
-    messagingService.registerStreamingStreamHandler(type, (address, stream) ->
+    messagingService.registerStreamingStreamHandler(type, stream ->
         new EncodingStreamHandler<>(handler.apply(new EncodingStreamHandler<>(stream, encoder)), decoder));
     return CompletableFuture.completedFuture(null);
   }

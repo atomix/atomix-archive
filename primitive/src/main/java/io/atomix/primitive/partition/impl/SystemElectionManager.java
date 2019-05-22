@@ -24,7 +24,7 @@ import java.util.function.Consumer;
 import com.google.common.collect.Maps;
 import io.atomix.cluster.ClusterMembershipService;
 import io.atomix.cluster.messaging.ClusterCommunicationService;
-import io.atomix.primitive.event.AbstractListenable;
+import io.atomix.utils.event.AbstractListenable;
 import io.atomix.primitive.partition.PartitionGroupMembershipService;
 import io.atomix.primitive.partition.PartitionId;
 import io.atomix.primitive.partition.PrimaryElection;

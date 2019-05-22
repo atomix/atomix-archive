@@ -25,13 +25,14 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
+import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.function.Supplier;
 
 import com.google.common.collect.Sets;
 import io.atomix.cluster.MemberService;
 import io.atomix.cluster.messaging.MessagingException.NoRemoteHandler;
 import io.atomix.cluster.messaging.MessagingService;
-import io.atomix.utils.TriConsumer;
 import io.atomix.utils.component.Component;
 import io.atomix.utils.component.Dependency;
 import io.atomix.utils.component.Managed;
@@ -56,12 +57,12 @@ public class TestMessagingService implements MessagingService, Managed {
   private TestMessagingSubstrate substrate;
 
   private Address address;
-  private final Map<String, BiFunction> handlers = new ConcurrentHashMap<>();
+  private final Map<String, Function> handlers = new ConcurrentHashMap<>();
   private final Set<Address> partitions = Sets.newConcurrentHashSet();
 
   @Override
   public CompletableFuture<Void> start() {
-    this.address = memberService.getLocalMember().address();
+    this.address = Address.from(memberService.getLocalMember().getHost(), memberService.getLocalMember().getPort());
     substrate.register(address, this);
     return CompletableFuture.completedFuture(null);
   }
@@ -119,7 +120,7 @@ public class TestMessagingService implements MessagingService, Managed {
   }
 
   @Override
-  public CompletableFuture<Void> sendAsync(Address address, String type, byte[] payload, boolean keepAlive) {
+  public CompletableFuture<Void> sendAsync(Address address, String type, byte[] payload) {
     if (isPartitioned(address)) {
       return Futures.exceptionalFuture(new ConnectException());
     }
@@ -135,7 +136,7 @@ public class TestMessagingService implements MessagingService, Managed {
   }
 
   @Override
-  public CompletableFuture<byte[]> sendAndReceive(Address address, String type, byte[] payload, boolean keepAlive) {
+  public CompletableFuture<byte[]> sendAndReceive(Address address, String type, byte[] payload) {
     if (isPartitioned(address)) {
       return Futures.exceptionalFuture(new ConnectException());
     }
@@ -143,7 +144,7 @@ public class TestMessagingService implements MessagingService, Managed {
   }
 
   @Override
-  public CompletableFuture<byte[]> sendAndReceive(Address address, String type, byte[] payload, boolean keepAlive, Executor executor) {
+  public CompletableFuture<byte[]> sendAndReceive(Address address, String type, byte[] payload, Executor executor) {
     if (isPartitioned(address)) {
       return Futures.exceptionalFuture(new ConnectException());
     }
@@ -153,7 +154,7 @@ public class TestMessagingService implements MessagingService, Managed {
   }
 
   @Override
-  public CompletableFuture<byte[]> sendAndReceive(Address address, String type, byte[] payload, boolean keepAlive, Duration timeout) {
+  public CompletableFuture<byte[]> sendAndReceive(Address address, String type, byte[] payload, Duration timeout) {
     if (isPartitioned(address)) {
       return Futures.exceptionalFuture(new ConnectException());
     }
@@ -161,7 +162,7 @@ public class TestMessagingService implements MessagingService, Managed {
   }
 
   @Override
-  public CompletableFuture<byte[]> sendAndReceive(Address address, String type, byte[] payload, boolean keepAlive, Duration timeout, Executor executor) {
+  public CompletableFuture<byte[]> sendAndReceive(Address address, String type, byte[] payload, Duration timeout, Executor executor) {
     if (isPartitioned(address)) {
       return Futures.exceptionalFuture(new ConnectException());
     }
@@ -195,12 +196,12 @@ public class TestMessagingService implements MessagingService, Managed {
   }
 
   @Override
-  public void registerHandler(String type, BiConsumer<Address, byte[]> handler, Executor executor) {
+  public void registerHandler(String type, Consumer<byte[]> handler, Executor executor) {
     checkNotNull(type);
     checkNotNull(handler);
-    handlers.put(type, (BiFunction<Address, byte[], CompletableFuture<byte[]>>) (e, p) -> {
+    handlers.put(type, (Function<byte[], CompletableFuture<byte[]>>) p -> {
       try {
-        executor.execute(() -> handler.accept(e, p));
+        executor.execute(() -> handler.accept(p));
         return CompletableFuture.completedFuture(new byte[0]);
       } catch (RejectedExecutionException e2) {
         return Futures.exceptionalFuture(e2);
@@ -209,13 +210,13 @@ public class TestMessagingService implements MessagingService, Managed {
   }
 
   @Override
-  public void registerHandler(String type, BiFunction<Address, byte[], byte[]> handler, Executor executor) {
+  public void registerHandler(String type, Function<byte[], byte[]> handler, Executor executor) {
     checkNotNull(type);
     checkNotNull(handler);
-    handlers.put(type, (BiFunction<Address, byte[], CompletableFuture<byte[]>>) (e, p) -> {
+    handlers.put(type, (Function<byte[], CompletableFuture<byte[]>>) p -> {
       CompletableFuture<byte[]> future = new CompletableFuture<>();
       try {
-        executor.execute(() -> future.complete(handler.apply(e, p)));
+        executor.execute(() -> future.complete(handler.apply(p)));
       } catch (RejectedExecutionException e2) {
         future.completeExceptionally(e2);
       }
@@ -224,35 +225,35 @@ public class TestMessagingService implements MessagingService, Managed {
   }
 
   @Override
-  public void registerHandler(String type, BiFunction<Address, byte[], CompletableFuture<byte[]>> handler) {
+  public void registerHandler(String type, Function<byte[], CompletableFuture<byte[]>> handler) {
     checkNotNull(type);
     checkNotNull(handler);
     handlers.put(type, handler);
   }
 
   @Override
-  public void registerStreamHandler(String type, Function<Address, StreamFunction<byte[], CompletableFuture<byte[]>>> handler) {
+  public void registerStreamHandler(String type, Supplier<StreamFunction<byte[], CompletableFuture<byte[]>>> handler) {
     checkNotNull(type);
     checkNotNull(handler);
-    handlers.put(type, (a, p) -> CompletableFuture.completedFuture(handler.apply(address)));
+    handlers.put(type, p -> CompletableFuture.completedFuture(handler.get()));
   }
 
   @Override
-  public void registerStreamingHandler(String type, TriConsumer<Address, byte[], StreamHandler<byte[]>> handler) {
+  public void registerStreamingHandler(String type, BiConsumer<byte[], StreamHandler<byte[]>> handler) {
     checkNotNull(type);
     checkNotNull(handler);
-    handlers.put(type, (BiFunction<Address, Pair<byte[], StreamHandler<byte[]>>, CompletableFuture<Void>>) (a, p) -> {
-      handler.accept(a, p.getLeft(), p.getRight());
+    handlers.put(type, (Function<Pair<byte[], StreamHandler<byte[]>>, CompletableFuture<Void>>) p -> {
+      handler.accept(p.getLeft(), p.getRight());
       return CompletableFuture.completedFuture(null);
     });
   }
 
   @Override
-  public void registerStreamingStreamHandler(String type, BiFunction<Address, StreamHandler<byte[]>, StreamHandler<byte[]>> handler) {
+  public void registerStreamingStreamHandler(String type, Function<StreamHandler<byte[]>, StreamHandler<byte[]>> handler) {
     checkNotNull(type);
     checkNotNull(handler);
-    handlers.put(type, (BiFunction<Address, StreamHandler<byte[]>, CompletableFuture<StreamHandler<byte[]>>>) (a, h) ->
-        CompletableFuture.completedFuture(handler.apply(a, h)));
+    handlers.put(type, (Function<StreamHandler<byte[]>, CompletableFuture<StreamHandler<byte[]>>>) h ->
+        CompletableFuture.completedFuture(handler.apply(h)));
   }
 
   @Override

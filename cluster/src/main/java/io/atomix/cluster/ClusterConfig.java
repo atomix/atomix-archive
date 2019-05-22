@@ -17,8 +17,6 @@ package io.atomix.cluster;
 
 import io.atomix.cluster.discovery.NodeDiscoveryConfig;
 import io.atomix.cluster.messaging.MessagingConfig;
-import io.atomix.cluster.protocol.GroupMembershipProtocolConfig;
-import io.atomix.cluster.protocol.SwimMembershipProtocolConfig;
 import io.atomix.utils.config.Config;
 
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -32,8 +30,6 @@ public class ClusterConfig implements Config {
   private String clusterId = DEFAULT_CLUSTER_NAME;
   private MemberConfig nodeConfig = new MemberConfig();
   private NodeDiscoveryConfig discoveryConfig;
-  private MulticastConfig multicastConfig = new MulticastConfig();
-  private GroupMembershipProtocolConfig protocolConfig = new SwimMembershipProtocolConfig();
   private MembershipConfig membershipConfig = new MembershipConfig();
   private MessagingConfig messagingConfig = new MessagingConfig();
 
@@ -98,52 +94,10 @@ public class ClusterConfig implements Config {
   }
 
   /**
-   * Returns the multicast configuration.
-   *
-   * @return the multicast configuration
-   */
-  public MulticastConfig getMulticastConfig() {
-    return multicastConfig;
-  }
-
-  /**
-   * Sets the multicast configuration.
-   *
-   * @param multicastConfig the multicast configuration
-   * @return the cluster configuration
-   */
-  public ClusterConfig setMulticastConfig(MulticastConfig multicastConfig) {
-    this.multicastConfig = checkNotNull(multicastConfig);
-    return this;
-  }
-
-  /**
-   * Returns the group membership protocol configuration.
-   *
-   * @return the group membership protocol configuration
-   */
-  public GroupMembershipProtocolConfig getProtocolConfig() {
-    return protocolConfig;
-  }
-
-  /**
-   * Sets the group membership protocol configuration.
-   *
-   * @param protocolConfig the group membership protocol configuration
-   * @return the cluster configuration
-   */
-  public ClusterConfig setProtocolConfig(GroupMembershipProtocolConfig protocolConfig) {
-    this.protocolConfig = protocolConfig;
-    return this;
-  }
-
-  /**
    * Returns the cluster membership configuration.
    *
    * @return the cluster membership configuration
-   * @deprecated since 3.1
    */
-  @Deprecated
   public MembershipConfig getMembershipConfig() {
     return membershipConfig;
   }
@@ -153,9 +107,7 @@ public class ClusterConfig implements Config {
    *
    * @param membershipConfig the cluster membership configuration
    * @return the cluster configuration
-   * @deprecated since 3.1
    */
-  @Deprecated
   public ClusterConfig setMembershipConfig(MembershipConfig membershipConfig) {
     this.membershipConfig = checkNotNull(membershipConfig);
     return this;

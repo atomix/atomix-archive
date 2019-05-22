@@ -54,7 +54,6 @@ import io.atomix.raft.protocol.RaftPrimitiveMetadata;
 import io.atomix.storage.StorageLevel;
 import io.atomix.utils.component.Component;
 import io.atomix.utils.concurrent.BlockingAwareThreadPoolContextFactory;
-import io.atomix.utils.concurrent.Futures;
 import io.atomix.utils.concurrent.ThreadContextFactory;
 import io.atomix.utils.logging.ContextualLoggerFactory;
 import io.atomix.utils.logging.LoggerContext;
@@ -65,7 +64,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
-import static com.google.common.base.Preconditions.checkNotNull;
 
 /**
  * Raft partition group.
@@ -214,37 +212,11 @@ public class RaftPartitionGroup implements ManagedPartitionGroup {
     return sortedPartitionIds;
   }
 
-  /**
-   * Takes snapshots of all Raft partitions.
-   *
-   * @return a future to be completed once snapshots have been taken
-   */
-  public CompletableFuture<Void> snapshot() {
-    return Futures.allOf(config.getMembers().stream()
-        .map(MemberId::from)
-        .map(id -> communicationService.send(snapshotSubject, null, id, SNAPSHOT_TIMEOUT))
-        .collect(Collectors.toList()))
-        .thenApply(v -> null);
-  }
-
-  /**
-   * Handles a snapshot request from a peer.
-   *
-   * @return a future to be completed once the snapshot is complete
-   */
-  private CompletableFuture<Void> handleSnapshot() {
-    return Futures.allOf(partitions.values().stream()
-        .map(partition -> partition.snapshot())
-        .collect(Collectors.toList()))
-        .thenApply(v -> null);
-  }
-
   @Override
   public CompletableFuture<ManagedPartitionGroup> join(PartitionManagementService managementService) {
     this.metadata = buildPartitions();
     this.managementService = managementService;
     this.communicationService = managementService.getMessagingService();
-    communicationService.<Void, Void>subscribe(snapshotSubject, m -> handleSnapshot());
     List<CompletableFuture<Partition>> futures = metadata.stream()
         .map(metadata -> {
           RaftPartition partition = partitions.get(metadata.id());
@@ -351,7 +323,7 @@ public class RaftPartitionGroup implements ManagedPartitionGroup {
      * @throws NullPointerException if the members are null
      */
     public Builder withMembers(String... members) {
-      return withMembers(Arrays.asList(members));
+      return withMembers(Stream.of(members).map(MemberId::from).collect(Collectors.toSet()));
     }
 
     /**
@@ -362,7 +334,7 @@ public class RaftPartitionGroup implements ManagedPartitionGroup {
      * @throws NullPointerException if the members are null
      */
     public Builder withMembers(MemberId... members) {
-      return withMembers(Stream.of(members).map(nodeId -> nodeId.id()).collect(Collectors.toList()));
+      return withMembers(Arrays.asList(members));
     }
 
     /**
@@ -373,7 +345,7 @@ public class RaftPartitionGroup implements ManagedPartitionGroup {
      * @throws NullPointerException if the members are null
      */
     public Builder withMembers(Member... members) {
-      return withMembers(Stream.of(members).map(node -> node.id().id()).collect(Collectors.toList()));
+      return withMembers(Stream.of(members).map(MemberId::from).collect(Collectors.toList()));
     }
 
     /**
@@ -383,8 +355,8 @@ public class RaftPartitionGroup implements ManagedPartitionGroup {
      * @return the Raft partition group builder
      * @throws NullPointerException if the members are null
      */
-    public Builder withMembers(Collection<String> members) {
-      config.setMembers(Sets.newHashSet(checkNotNull(members, "members cannot be null")));
+    public Builder withMembers(Collection<MemberId> members) {
+      config.setMembers(members.stream().map(MemberId::toString).collect(Collectors.toSet()));
       return this;
     }
 

@@ -354,6 +354,7 @@
             </property>
           </javaApiLinks>
           <quiet>true</quiet>
+          <doclint>none</doclint>
           <additionalparam>${argLine.javadocs}</additionalparam>
           <show>public</show>
           <doctitle>Atomix API Reference (${jv})</doctitle>
