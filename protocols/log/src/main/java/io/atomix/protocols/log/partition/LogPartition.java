@@ -17,6 +17,7 @@ package io.atomix.protocols.log.partition;
 
 import java.util.Collection;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
 import io.atomix.cluster.MemberId;
@@ -50,6 +51,7 @@ public class LogPartition implements Partition {
   private volatile LogPartitionServer server;
   private volatile LogPartitionClient client;
   private volatile LogPartitionSession session;
+  private final AtomicBoolean started = new AtomicBoolean();
 
   public LogPartition(
       PartitionId partitionId,
@@ -146,24 +148,24 @@ public class LogPartition implements Partition {
    * Joins the log partition.
    */
   CompletableFuture<Partition> join(PartitionManagementService managementService) {
-    if (server == null) {
-      synchronized (this) {
-        if (server == null) {
-          this.managementService = managementService;
-          election = managementService.getElectionService().getElectionFor(partitionId);
-          server = new LogPartitionServer(
-              this,
-              managementService,
-              config,
-              metadata,
-              threadContextFactory);
-          return server.start()
-              .thenCompose(v -> {
-                session = new LogPartitionSession(this, managementService, config, metadata, threadContextFactory);
-                return session.start();
-              }).thenApply(v -> this);
-        }
-      }
+    if (started.compareAndSet(false, true)) {
+      this.managementService = managementService;
+      return managementService.getElectionService().getElectionFor(partitionId)
+          .thenCompose(election -> {
+            this.election = election;
+            server = new LogPartitionServer(
+                this,
+                managementService,
+                election,
+                config,
+                metadata,
+                threadContextFactory);
+            return server.start()
+                .thenCompose(v -> {
+                  session = new LogPartitionSession(this, managementService, election, config, metadata, threadContextFactory);
+                  return session.start();
+                }).thenApply(v -> this);
+          });
     }
     return CompletableFuture.completedFuture(null);
   }
@@ -172,14 +174,13 @@ public class LogPartition implements Partition {
    * Connects to the log partition.
    */
   CompletableFuture<Partition> connect(PartitionManagementService managementService) {
-    if (session == null) {
-      synchronized (this) {
-        if (session == null) {
-          election = managementService.getElectionService().getElectionFor(partitionId);
-          session = new LogPartitionSession(this, managementService, config, metadata, threadContextFactory);
-          return session.start().thenApply(v -> this);
-        }
-      }
+    if (started.compareAndSet(false, true)) {
+      return managementService.getElectionService().getElectionFor(partitionId)
+          .thenCompose(election -> {
+            this.election = election;
+            session = new LogPartitionSession(this, managementService, election, config, metadata, threadContextFactory);
+            return session.start().thenApply(v -> this);
+          });
     }
     return CompletableFuture.completedFuture(this);
   }

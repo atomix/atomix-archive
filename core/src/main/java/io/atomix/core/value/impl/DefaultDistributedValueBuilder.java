@@ -17,15 +17,16 @@ package io.atomix.core.value.impl;
 
 import java.util.concurrent.CompletableFuture;
 
+import com.google.common.io.BaseEncoding;
 import io.atomix.core.value.AsyncDistributedValue;
 import io.atomix.core.value.DistributedValue;
 import io.atomix.core.value.DistributedValueBuilder;
 import io.atomix.core.value.DistributedValueConfig;
-import io.atomix.primitive.ManagedAsyncPrimitive;
+import io.atomix.core.value.ValueId;
 import io.atomix.primitive.PrimitiveManagementService;
-import io.atomix.primitive.protocol.ServiceProtocol;
-import io.atomix.primitive.service.impl.ServiceId;
-import io.atomix.primitive.session.impl.DefaultSessionClient;
+import io.atomix.primitive.partition.Partitioner;
+import io.atomix.primitive.protocol.DistributedLogProtocol;
+import io.atomix.primitive.protocol.MultiRaftProtocol;
 import io.atomix.utils.serializer.Serializer;
 
 /**
@@ -38,24 +39,34 @@ public class DefaultDistributedValueBuilder<V> extends DistributedValueBuilder<V
     super(name, config, managementService);
   }
 
+  private ValueId createValueId() {
+    ValueId.Builder builder = ValueId.newBuilder().setName(name);
+    protocol = protocol();
+    if (protocol instanceof io.atomix.protocols.raft.MultiRaftProtocol) {
+      builder.setRaft(MultiRaftProtocol.newBuilder()
+          .setGroup(((io.atomix.protocols.raft.MultiRaftProtocol) protocol).group())
+          .build());
+    } else if (protocol instanceof io.atomix.protocols.log.DistributedLogProtocol) {
+      builder.setLog(DistributedLogProtocol.newBuilder()
+          .setGroup(((io.atomix.protocols.log.DistributedLogProtocol) protocol).group())
+          .setPartitions(((io.atomix.protocols.log.DistributedLogProtocol) protocol).config().getPartitions())
+          .setReplicationFactor(((io.atomix.protocols.log.DistributedLogProtocol) protocol).config().getReplicationFactor())
+          .build());
+    }
+    return builder.build();
+  }
+
   @Override
   @SuppressWarnings("unchecked")
   public CompletableFuture<DistributedValue<V>> buildAsync() {
-    ServiceProtocol protocol = (ServiceProtocol) protocol();
-    ServiceId serviceId = ServiceId.newBuilder()
-        .setName(name)
-        .setType(ValueService.TYPE.name())
-        .build();
-    return protocol.createService(name, managementService.getPartitionService())
-        .thenApply(client -> new ValueProxy(new DefaultSessionClient(serviceId, client.getPartition(name))))
-        .thenApply(proxy -> new RawAsyncAtomicValue(proxy, config.getSessionTimeout(), managementService))
-        .thenCompose(ManagedAsyncPrimitive::connect)
+    return new DefaultAsyncAtomicValue(createValueId(), getChannelFactory(), managementService, Partitioner.MURMUR3, config.getSessionTimeout())
+        .connect()
         .thenApply(rawValue -> {
           Serializer serializer = serializer();
-          return new TranscodingAsyncAtomicValue<V, byte[]>(
+          return new TranscodingAsyncAtomicValue<V, String>(
               rawValue,
-              key -> serializer.encode(key),
-              bytes -> serializer.decode(bytes));
+              value -> BaseEncoding.base16().encode(serializer.encode(value)),
+              string -> serializer.decode(BaseEncoding.base16().decode(string)));
         })
         .thenApply(DelegatingAsyncDistributedValue::new)
         .thenApply(AsyncDistributedValue::sync);

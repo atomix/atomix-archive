@@ -15,22 +15,18 @@
  */
 package io.atomix.core.set.impl;
 
-import java.util.Map;
 import java.util.concurrent.CompletableFuture;
-import java.util.stream.Collectors;
 
-import com.google.common.collect.Maps;
 import com.google.common.io.BaseEncoding;
 import io.atomix.core.set.AsyncDistributedSet;
 import io.atomix.core.set.DistributedSet;
 import io.atomix.core.set.DistributedSetBuilder;
 import io.atomix.core.set.DistributedSetConfig;
-import io.atomix.primitive.ManagedAsyncPrimitive;
+import io.atomix.core.set.SetId;
 import io.atomix.primitive.PrimitiveManagementService;
-import io.atomix.primitive.partition.PartitionId;
-import io.atomix.primitive.protocol.ServiceProtocol;
-import io.atomix.primitive.service.impl.ServiceId;
-import io.atomix.primitive.session.impl.DefaultSessionClient;
+import io.atomix.primitive.partition.Partitioner;
+import io.atomix.primitive.protocol.DistributedLogProtocol;
+import io.atomix.primitive.protocol.MultiRaftProtocol;
 import io.atomix.utils.serializer.Serializer;
 
 /**
@@ -43,24 +39,28 @@ public class DefaultDistributedSetBuilder<E> extends DistributedSetBuilder<E> {
     super(name, config, managementService);
   }
 
+  private SetId createSetId() {
+    SetId.Builder builder = SetId.newBuilder().setName(name);
+    protocol = protocol();
+    if (protocol instanceof io.atomix.protocols.raft.MultiRaftProtocol) {
+      builder.setRaft(MultiRaftProtocol.newBuilder()
+          .setGroup(((io.atomix.protocols.raft.MultiRaftProtocol) protocol).group())
+          .build());
+    } else if (protocol instanceof io.atomix.protocols.log.DistributedLogProtocol) {
+      builder.setLog(DistributedLogProtocol.newBuilder()
+          .setGroup(((io.atomix.protocols.log.DistributedLogProtocol) protocol).group())
+          .setPartitions(((io.atomix.protocols.log.DistributedLogProtocol) protocol).config().getPartitions())
+          .setReplicationFactor(((io.atomix.protocols.log.DistributedLogProtocol) protocol).config().getReplicationFactor())
+          .build());
+    }
+    return builder.build();
+  }
+
   @Override
   @SuppressWarnings("unchecked")
   public CompletableFuture<DistributedSet<E>> buildAsync() {
-    ServiceProtocol protocol = (ServiceProtocol) protocol();
-    ServiceId serviceId = ServiceId.newBuilder()
-        .setName(name)
-        .setType(SetService.TYPE.name())
-        .build();
-    return protocol.createService(name, managementService.getPartitionService())
-        .thenApply(client -> {
-          Map<PartitionId, AsyncDistributedSet<String>> partitions = client.getPartitionIds().stream()
-              .map(id -> Maps.immutableEntry(id, new DefaultSessionClient(serviceId, client.getPartition(id))))
-              .map(e -> Maps.immutableEntry(e.getKey(), new SetProxy(e.getValue())))
-              .map(e -> Maps.immutableEntry(e.getKey(), new RawAsyncDistributedSet(e.getValue(), config.getSessionTimeout(), managementService)))
-              .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
-          return new PartitionedAsyncDistributedSet(name, type, partitions, client.getPartitioner());
-        })
-        .thenCompose(ManagedAsyncPrimitive::connect)
+    return new DefaultAsyncDistributedSet(createSetId(), getChannelFactory(), managementService, Partitioner.MURMUR3, config.getSessionTimeout())
+        .connect()
         .thenApply(rawSet -> {
           Serializer serializer = serializer();
           return new TranscodingAsyncDistributedSet<E, String>(

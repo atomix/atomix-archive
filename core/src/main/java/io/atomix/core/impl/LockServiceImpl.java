@@ -35,15 +35,15 @@ import io.atomix.core.lock.UnlockRequest;
 import io.atomix.core.lock.UnlockResponse;
 import io.atomix.core.lock.impl.LockProxy;
 import io.atomix.core.lock.impl.LockService;
-import io.atomix.grpc.headers.SessionCommandHeader;
-import io.atomix.grpc.headers.SessionHeader;
-import io.atomix.grpc.headers.SessionQueryHeader;
-import io.atomix.grpc.headers.SessionResponseHeader;
-import io.atomix.grpc.headers.SessionStreamHeader;
-import io.atomix.grpc.protocol.DistributedLogProtocol;
-import io.atomix.grpc.protocol.MultiPrimaryProtocol;
-import io.atomix.grpc.protocol.MultiRaftProtocol;
+import io.atomix.primitive.headers.SessionCommandHeader;
+import io.atomix.primitive.headers.SessionHeader;
+import io.atomix.primitive.headers.SessionQueryHeader;
+import io.atomix.primitive.headers.SessionResponseHeader;
+import io.atomix.primitive.headers.SessionStreamHeader;
 import io.atomix.primitive.partition.PartitionService;
+import io.atomix.primitive.protocol.DistributedLogProtocol;
+import io.atomix.primitive.protocol.MultiPrimaryProtocol;
+import io.atomix.primitive.protocol.MultiRaftProtocol;
 import io.atomix.primitive.session.impl.DefaultSessionClient;
 import io.atomix.primitive.session.impl.OpenSessionRequest;
 import io.atomix.primitive.session.impl.SessionCommandContext;
@@ -79,15 +79,14 @@ public class LockServiceImpl extends LockServiceGrpc.LockServiceImplBase {
   @Override
   public void create(CreateRequest request, StreamObserver<CreateResponse> responseObserver) {
     create.createBy(request, request.getId().getName(), responseObserver,
-        (partitionId, sessionId, lock) -> lock.openSession(OpenSessionRequest.newBuilder()
-            .setSessionId(sessionId)
+        (partitionId, lock) -> lock.openSession(OpenSessionRequest.newBuilder()
             .setTimeout(Duration.ofSeconds(request.getTimeout().getSeconds())
                 .plusNanos(request.getTimeout().getNanos())
                 .toMillis())
             .build())
             .thenApply(response -> CreateResponse.newBuilder()
                 .setHeader(SessionHeader.newBuilder()
-                    .setSessionId(sessionId)
+                    .setSessionId(response.getSessionId())
                     .setPartitionId(partitionId.getPartition())
                     .build())
                 .build()));
@@ -206,7 +205,7 @@ public class LockServiceImpl extends LockServiceGrpc.LockServiceImplBase {
                 .build()));
   }
 
-  private static final PrimitiveFactory.PrimitiveIdDescriptor<LockId> LOCK_ID_DESCRIPTOR = new PrimitiveFactory.PrimitiveIdDescriptor<LockId>() {
+  private static final PrimitiveIdDescriptor<LockId> LOCK_ID_DESCRIPTOR = new PrimitiveIdDescriptor<LockId>() {
     @Override
     public String getName(LockId id) {
       return id.getName();

@@ -136,6 +136,18 @@ message ClearResponse {
     repeated atomix.headers.SessionResponseHeader headers = 1;
 }
 
+message EntriesRequest {
+    MapId id = 1;
+    repeated atomix.headers.SessionQueryHeader headers = 2;
+}
+
+message EntriesResponse {
+    atomix.headers.SessionResponseHeader header = 1;
+    string key = 2;
+    bytes value = 3;
+    int64 version = 4;
+}
+
 message EventRequest {
     MapId id = 1;
     repeated atomix.headers.SessionCommandHeader headers = 2;
@@ -188,5 +200,7 @@ service MapService {
     rpc Clear (ClearRequest) returns (ClearResponse) {}
 
     rpc Events (EventRequest) returns (stream EventResponse) {}
+
+    rpc Entries (EntriesRequest) returns (stream EntriesResponse) {}
 
 }

@@ -143,7 +143,7 @@ public class ClusterMembershipManager extends MembershipServiceGrpc.MembershipSe
   private MemberStream getStream(Member member) {
     MemberId memberId = getMemberId(member);
     return streams.computeIfAbsent(memberId, id -> {
-      MembershipServiceGrpc.MembershipServiceStub stub = grpc.getService(member.getHost(), member.getPort(), MembershipServiceGrpc::newStub);
+      MembershipServiceGrpc.MembershipServiceStub stub = MembershipServiceGrpc.newStub(grpc.getChannel(member.getHost(), member.getPort()));
       MemberStream s = new MemberStream(memberId, null);
       s.stream = stub.join(s);
       return s;

@@ -29,15 +29,15 @@ import io.atomix.core.election.WithdrawResponse;
 import io.atomix.core.election.impl.LeaderElectionProxy;
 import io.atomix.core.election.impl.LeaderElectionService;
 import io.atomix.core.election.impl.ListenResponse;
-import io.atomix.grpc.headers.SessionCommandHeader;
-import io.atomix.grpc.headers.SessionHeader;
-import io.atomix.grpc.headers.SessionQueryHeader;
-import io.atomix.grpc.headers.SessionResponseHeader;
-import io.atomix.grpc.headers.SessionStreamHeader;
-import io.atomix.grpc.protocol.DistributedLogProtocol;
-import io.atomix.grpc.protocol.MultiPrimaryProtocol;
-import io.atomix.grpc.protocol.MultiRaftProtocol;
+import io.atomix.primitive.headers.SessionCommandHeader;
+import io.atomix.primitive.headers.SessionHeader;
+import io.atomix.primitive.headers.SessionQueryHeader;
+import io.atomix.primitive.headers.SessionResponseHeader;
+import io.atomix.primitive.headers.SessionStreamHeader;
 import io.atomix.primitive.partition.PartitionService;
+import io.atomix.primitive.protocol.DistributedLogProtocol;
+import io.atomix.primitive.protocol.MultiPrimaryProtocol;
+import io.atomix.primitive.protocol.MultiRaftProtocol;
 import io.atomix.primitive.session.impl.DefaultSessionClient;
 import io.atomix.primitive.session.impl.OpenSessionRequest;
 import io.atomix.primitive.session.impl.SessionCommandContext;
@@ -83,15 +83,14 @@ public class LeaderElectionServiceImpl extends LeaderElectionServiceGrpc.LeaderE
   @Override
   public void create(CreateRequest request, StreamObserver<CreateResponse> responseObserver) {
     create.createBy(request, request.getId().getName(), responseObserver,
-        (partitionId, sessionId, lock) -> lock.openSession(OpenSessionRequest.newBuilder()
-            .setSessionId(sessionId)
+        (partitionId, election) -> election.openSession(OpenSessionRequest.newBuilder()
             .setTimeout(Duration.ofSeconds(request.getTimeout().getSeconds())
                 .plusNanos(request.getTimeout().getNanos())
                 .toMillis())
             .build())
             .thenApply(response -> CreateResponse.newBuilder()
                 .setHeader(SessionHeader.newBuilder()
-                    .setSessionId(sessionId)
+                    .setSessionId(response.getSessionId())
                     .setPartitionId(partitionId.getPartition())
                     .build())
                 .build()));
@@ -100,7 +99,7 @@ public class LeaderElectionServiceImpl extends LeaderElectionServiceGrpc.LeaderE
   @Override
   public void keepAlive(KeepAliveRequest request, StreamObserver<KeepAliveResponse> responseObserver) {
     keepAlive.executeBy(request, request.getHeader(), responseObserver,
-        (partitionId, header, lock) -> lock.keepAlive(io.atomix.primitive.session.impl.KeepAliveRequest.newBuilder()
+        (partitionId, header, election) -> election.keepAlive(io.atomix.primitive.session.impl.KeepAliveRequest.newBuilder()
             .setSessionId(header.getSessionId())
             .setCommandSequence(header.getLastSequenceNumber())
             .build())
@@ -115,7 +114,7 @@ public class LeaderElectionServiceImpl extends LeaderElectionServiceGrpc.LeaderE
   @Override
   public void close(CloseRequest request, StreamObserver<CloseResponse> responseObserver) {
     close.executeBy(request, request.getHeader(), responseObserver,
-        (partitionId, header, lock) -> lock.closeSession(io.atomix.primitive.session.impl.CloseSessionRequest.newBuilder()
+        (partitionId, header, election) -> election.closeSession(io.atomix.primitive.session.impl.CloseSessionRequest.newBuilder()
             .setSessionId(header.getSessionId())
             .build()).thenApply(response -> CloseResponse.newBuilder().build()));
   }
@@ -327,7 +326,7 @@ public class LeaderElectionServiceImpl extends LeaderElectionServiceGrpc.LeaderE
             .build());
   }
 
-  private static final PrimitiveFactory.PrimitiveIdDescriptor<ElectionId> ELECTION_ID_DESCRIPTOR = new PrimitiveFactory.PrimitiveIdDescriptor<ElectionId>() {
+  private static final PrimitiveIdDescriptor<ElectionId> ELECTION_ID_DESCRIPTOR = new PrimitiveIdDescriptor<ElectionId>() {
     @Override
     public String getName(ElectionId id) {
       return id.getName();

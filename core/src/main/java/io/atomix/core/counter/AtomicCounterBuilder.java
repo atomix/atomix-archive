@@ -15,7 +15,7 @@
  */
 package io.atomix.core.counter;
 
-import io.atomix.primitive.PrimitiveBuilder;
+import io.atomix.core.impl.AbstractPrimitiveBuilder;
 import io.atomix.primitive.PrimitiveManagementService;
 import io.atomix.primitive.protocol.PrimitiveProtocol;
 import io.atomix.primitive.protocol.ProxyCompatibleBuilder;
@@ -25,7 +25,7 @@ import io.atomix.primitive.protocol.ServiceProtocol;
  * Builder for AtomicCounter.
  */
 public abstract class AtomicCounterBuilder
-    extends PrimitiveBuilder<AtomicCounterBuilder, AtomicCounterConfig, AtomicCounter>
+    extends AbstractPrimitiveBuilder<AtomicCounterBuilder, AtomicCounterConfig, AtomicCounter>
     implements ProxyCompatibleBuilder<AtomicCounterBuilder> {
 
   protected AtomicCounterBuilder(String name, AtomicCounterConfig config, PrimitiveManagementService managementService) {

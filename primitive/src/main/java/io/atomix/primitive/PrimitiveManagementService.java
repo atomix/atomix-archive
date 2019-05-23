@@ -16,8 +16,10 @@
 package io.atomix.primitive;
 
 import io.atomix.cluster.ClusterMembershipService;
+import io.atomix.cluster.GrpcService;
 import io.atomix.cluster.messaging.ClusterCommunicationService;
 import io.atomix.cluster.messaging.ClusterEventService;
+import io.atomix.primitive.partition.PartitionGroupMembershipService;
 import io.atomix.primitive.partition.PartitionGroupTypeRegistry;
 import io.atomix.primitive.partition.PartitionService;
 import io.atomix.primitive.protocol.PrimitiveProtocolTypeRegistry;
@@ -56,6 +58,13 @@ public interface PrimitiveManagementService {
    * @return the partition service
    */
   PartitionService getPartitionService();
+
+  /**
+   * Returns the partition group membership service.
+   *
+   * @return the partition group membership service
+   */
+  PartitionGroupMembershipService getGroupMembershipService();
 
   /**
    * Returns the local primitive cache.
@@ -105,5 +114,12 @@ public interface PrimitiveManagementService {
    * @return the thread context factory
    */
   ThreadContextFactory getThreadFactory();
+
+  /**
+   * Returns the gRPC service.
+   *
+   * @return the gRPC service
+   */
+  GrpcService getGrpcService();
 
 }

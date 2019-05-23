@@ -294,7 +294,7 @@ public abstract class SessionManagedPrimitiveService extends AbstractPrimitiveSe
   }
 
   private CompletableFuture<OpenSessionResponse> applyOpenSession(Command<OpenSessionRequest> openSession) {
-    SessionId sessionId = SessionId.from(openSession.value().getSessionId());
+    SessionId sessionId = SessionId.from(getCurrentIndex());
     sessions.computeIfAbsent(sessionId, id -> {
       PrimitiveSession session = new PrimitiveSession(
           sessionId,
@@ -306,7 +306,9 @@ public abstract class SessionManagedPrimitiveService extends AbstractPrimitiveSe
       onOpen(session);
       return session;
     });
-    return CompletableFuture.completedFuture(OpenSessionResponse.newBuilder().build());
+    return CompletableFuture.completedFuture(OpenSessionResponse.newBuilder()
+        .setSessionId(sessionId.id())
+        .build());
   }
 
   private CompletableFuture<KeepAliveResponse> applyKeepAlive(Command<KeepAliveRequest> keepAlive) {

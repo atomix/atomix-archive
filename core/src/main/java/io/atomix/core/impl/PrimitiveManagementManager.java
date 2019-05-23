@@ -16,12 +16,14 @@
 package io.atomix.core.impl;
 
 import io.atomix.cluster.ClusterMembershipService;
+import io.atomix.cluster.GrpcService;
 import io.atomix.cluster.messaging.ClusterCommunicationService;
 import io.atomix.cluster.messaging.ClusterEventService;
 import io.atomix.primitive.PrimitiveCache;
 import io.atomix.primitive.PrimitiveManagementService;
 import io.atomix.primitive.PrimitiveRegistry;
 import io.atomix.primitive.PrimitiveTypeRegistry;
+import io.atomix.primitive.partition.PartitionGroupMembershipService;
 import io.atomix.primitive.partition.PartitionGroupTypeRegistry;
 import io.atomix.primitive.partition.PartitionService;
 import io.atomix.primitive.protocol.PrimitiveProtocolTypeRegistry;
@@ -37,43 +39,46 @@ import io.atomix.utils.concurrent.ThreadService;
  */
 @Component
 public class PrimitiveManagementManager implements PrimitiveManagementService {
-
   @Dependency
   private ClusterMembershipService membershipService;
-
+  @Dependency
+  private PartitionGroupMembershipService groupMembershipService;
+  @Dependency
+  private GrpcService grpcService;
   @Dependency
   private ClusterCommunicationService communicationService;
-
   @Dependency
   private ClusterEventService eventService;
-
   @Dependency
   private PartitionService partitionService;
-
   @Dependency
   private PrimitiveCache primitiveCache;
-
   @Dependency
   private PrimitiveRegistry primitiveRegistry;
-
   @Dependency
   private PrimitiveTypeRegistry primitiveTypeRegistry;
-
   @Dependency
   private PrimitiveProtocolTypeRegistry protocolTypeRegistry;
-
   @Dependency
   private PartitionGroupTypeRegistry partitionGroupTypeRegistry;
-
   @Dependency
   private PrimitiveSessionIdManager sessionIdService;
-
   @Dependency
   private ThreadService threadService;
 
   @Override
   public ClusterMembershipService getMembershipService() {
     return membershipService;
+  }
+
+  @Override
+  public PartitionGroupMembershipService getGroupMembershipService() {
+    return groupMembershipService;
+  }
+
+  @Override
+  public GrpcService getGrpcService() {
+    return grpcService;
   }
 
   @Override

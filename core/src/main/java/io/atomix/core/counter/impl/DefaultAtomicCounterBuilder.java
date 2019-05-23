@@ -21,10 +21,10 @@ import io.atomix.core.counter.AsyncAtomicCounter;
 import io.atomix.core.counter.AtomicCounter;
 import io.atomix.core.counter.AtomicCounterBuilder;
 import io.atomix.core.counter.AtomicCounterConfig;
+import io.atomix.core.counter.CounterId;
 import io.atomix.primitive.PrimitiveManagementService;
-import io.atomix.primitive.protocol.ServiceProtocol;
-import io.atomix.primitive.service.impl.DefaultServiceClient;
-import io.atomix.primitive.service.impl.ServiceId;
+import io.atomix.primitive.protocol.DistributedLogProtocol;
+import io.atomix.primitive.protocol.MultiRaftProtocol;
 
 /**
  * Atomic counter proxy builder.
@@ -34,17 +34,28 @@ public class DefaultAtomicCounterBuilder extends AtomicCounterBuilder {
     super(name, config, managementService);
   }
 
+  private CounterId createCounterId() {
+    CounterId.Builder builder = CounterId.newBuilder().setName(name);
+    protocol = protocol();
+    if (protocol instanceof io.atomix.protocols.raft.MultiRaftProtocol) {
+      builder.setRaft(MultiRaftProtocol.newBuilder()
+          .setGroup(((io.atomix.protocols.raft.MultiRaftProtocol) protocol).group())
+          .build());
+    } else if (protocol instanceof io.atomix.protocols.log.DistributedLogProtocol) {
+      builder.setLog(DistributedLogProtocol.newBuilder()
+          .setGroup(((io.atomix.protocols.log.DistributedLogProtocol) protocol).group())
+          .setPartitions(((io.atomix.protocols.log.DistributedLogProtocol) protocol).config().getPartitions())
+          .setReplicationFactor(((io.atomix.protocols.log.DistributedLogProtocol) protocol).config().getReplicationFactor())
+          .build());
+    }
+    return builder.build();
+  }
+
   @Override
   @SuppressWarnings("unchecked")
   public CompletableFuture<AtomicCounter> buildAsync() {
-    ServiceProtocol protocol = (ServiceProtocol) protocol();
-    ServiceId serviceId = ServiceId.newBuilder()
-        .setName(name)
-        .setType(CounterService.TYPE.name())
-        .build();
-    return protocol.createService(name, managementService.getPartitionService())
-        .thenApply(client -> new CounterProxy(new DefaultServiceClient(serviceId, client.getPartition(name))))
-        .thenApply(proxy -> new DefaultAsyncAtomicCounter(proxy, managementService))
+    return new DefaultAsyncAtomicCounter(createCounterId(), getChannelFactory(), managementService)
+        .connect()
         .thenApply(AsyncAtomicCounter::sync);
   }
 }

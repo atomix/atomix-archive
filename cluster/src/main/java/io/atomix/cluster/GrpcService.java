@@ -1,7 +1,5 @@
 package io.atomix.cluster;
 
-import java.util.function.Function;
-
 import io.grpc.BindableService;
 import io.grpc.Channel;
 
@@ -18,14 +16,12 @@ public interface GrpcService {
   void register(BindableService service);
 
   /**
-   * Gets a remote service for the given node.
+   * Gets a channel for the given node.
    *
-   * @param host    the node host
-   * @param port    the node port
-   * @param factory the service factory
-   * @param <T>     the service type
-   * @return the service
+   * @param host the node host
+   * @param port the node port
+   * @return the channel
    */
-  <T> T getService(String host, int port, Function<Channel, T> factory);
+  Channel getChannel(String host, int port);
 
 }

@@ -47,15 +47,15 @@ import io.atomix.core.map.SizeResponse;
 import io.atomix.core.map.impl.ListenResponse;
 import io.atomix.core.map.impl.MapProxy;
 import io.atomix.core.map.impl.MapService;
-import io.atomix.grpc.headers.SessionCommandHeader;
-import io.atomix.grpc.headers.SessionHeader;
-import io.atomix.grpc.headers.SessionQueryHeader;
-import io.atomix.grpc.headers.SessionResponseHeader;
-import io.atomix.grpc.headers.SessionStreamHeader;
-import io.atomix.grpc.protocol.DistributedLogProtocol;
-import io.atomix.grpc.protocol.MultiPrimaryProtocol;
-import io.atomix.grpc.protocol.MultiRaftProtocol;
+import io.atomix.primitive.headers.SessionCommandHeader;
+import io.atomix.primitive.headers.SessionHeader;
+import io.atomix.primitive.headers.SessionQueryHeader;
+import io.atomix.primitive.headers.SessionResponseHeader;
+import io.atomix.primitive.headers.SessionStreamHeader;
 import io.atomix.primitive.partition.PartitionService;
+import io.atomix.primitive.protocol.DistributedLogProtocol;
+import io.atomix.primitive.protocol.MultiPrimaryProtocol;
+import io.atomix.primitive.protocol.MultiRaftProtocol;
 import io.atomix.primitive.session.impl.CloseSessionRequest;
 import io.atomix.primitive.session.impl.DefaultSessionClient;
 import io.atomix.primitive.session.impl.OpenSessionRequest;
@@ -100,17 +100,16 @@ public class MapServiceImpl extends MapServiceGrpc.MapServiceImplBase {
   @Override
   public void create(CreateRequest request, StreamObserver<CreateResponse> responseObserver) {
     create.createAll(request, responseObserver,
-        (partitionId, sessionId, map) -> map.openSession(OpenSessionRequest.newBuilder()
-            .setSessionId(sessionId)
+        (partitionId, map) -> map.openSession(OpenSessionRequest.newBuilder()
             .setTimeout(Duration.ofSeconds(request.getTimeout().getSeconds())
                 .plusNanos(request.getTimeout().getNanos())
                 .toMillis())
             .build())
             .thenApply(response -> SessionHeader.newBuilder()
-                .setSessionId(sessionId)
+                .setSessionId(response.getSessionId())
                 .setPartitionId(partitionId.getPartition())
                 .build()),
-        (sessionId, responses) -> CreateResponse.newBuilder()
+        responses -> CreateResponse.newBuilder()
             .addAllHeaders(responses)
             .build());
   }
@@ -380,7 +379,7 @@ public class MapServiceImpl extends MapServiceGrpc.MapServiceImplBase {
             .build());
   }
 
-  private static final PrimitiveFactory.PrimitiveIdDescriptor<MapId> MAP_ID_DESCRIPTOR = new PrimitiveFactory.PrimitiveIdDescriptor<MapId>() {
+  private static final PrimitiveIdDescriptor<MapId> MAP_ID_DESCRIPTOR = new PrimitiveIdDescriptor<MapId>() {
     @Override
     public String getName(MapId id) {
       return id.getName();

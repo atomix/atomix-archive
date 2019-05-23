@@ -38,15 +38,15 @@ import io.atomix.core.value.ValueServiceGrpc;
 import io.atomix.core.value.impl.ListenResponse;
 import io.atomix.core.value.impl.ValueProxy;
 import io.atomix.core.value.impl.ValueService;
-import io.atomix.grpc.headers.SessionCommandHeader;
-import io.atomix.grpc.headers.SessionHeader;
-import io.atomix.grpc.headers.SessionQueryHeader;
-import io.atomix.grpc.headers.SessionResponseHeader;
-import io.atomix.grpc.headers.SessionStreamHeader;
-import io.atomix.grpc.protocol.DistributedLogProtocol;
-import io.atomix.grpc.protocol.MultiPrimaryProtocol;
-import io.atomix.grpc.protocol.MultiRaftProtocol;
+import io.atomix.primitive.headers.SessionCommandHeader;
+import io.atomix.primitive.headers.SessionHeader;
+import io.atomix.primitive.headers.SessionQueryHeader;
+import io.atomix.primitive.headers.SessionResponseHeader;
+import io.atomix.primitive.headers.SessionStreamHeader;
 import io.atomix.primitive.partition.PartitionService;
+import io.atomix.primitive.protocol.DistributedLogProtocol;
+import io.atomix.primitive.protocol.MultiPrimaryProtocol;
+import io.atomix.primitive.protocol.MultiRaftProtocol;
 import io.atomix.primitive.session.impl.DefaultSessionClient;
 import io.atomix.primitive.session.impl.OpenSessionRequest;
 import io.atomix.primitive.session.impl.SessionCommandContext;
@@ -86,15 +86,14 @@ public class ValueServiceImpl extends ValueServiceGrpc.ValueServiceImplBase {
   @Override
   public void create(CreateRequest request, StreamObserver<CreateResponse> responseObserver) {
     create.createBy(request, request.getId().getName(), responseObserver,
-        (partitionId, sessionId, value) -> value.openSession(OpenSessionRequest.newBuilder()
-            .setSessionId(sessionId)
+        (partitionId, value) -> value.openSession(OpenSessionRequest.newBuilder()
             .setTimeout(Duration.ofSeconds(request.getTimeout().getSeconds())
                 .plusNanos(request.getTimeout().getNanos())
                 .toMillis())
             .build())
             .thenApply(response -> CreateResponse.newBuilder()
                 .setHeader(SessionHeader.newBuilder()
-                    .setSessionId(sessionId)
+                    .setSessionId(response.getSessionId())
                     .setPartitionId(partitionId.getPartition())
                     .build())
                 .build()));
@@ -245,7 +244,7 @@ public class ValueServiceImpl extends ValueServiceGrpc.ValueServiceImplBase {
             .build());
   }
 
-  private static final PrimitiveFactory.PrimitiveIdDescriptor<ValueId> VALUE_ID_DESCRIPTOR = new PrimitiveFactory.PrimitiveIdDescriptor<ValueId>() {
+  private static final PrimitiveIdDescriptor<ValueId> VALUE_ID_DESCRIPTOR = new PrimitiveIdDescriptor<ValueId>() {
     @Override
     public String getName(ValueId id) {
       return id.getName();

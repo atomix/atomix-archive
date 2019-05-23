@@ -23,6 +23,7 @@ import io.atomix.log.protocol.LogTopicMetadata;
 import io.atomix.primitive.partition.GroupMember;
 import io.atomix.primitive.partition.MemberGroup;
 import io.atomix.primitive.partition.PartitionManagementService;
+import io.atomix.primitive.partition.PrimaryElection;
 import io.atomix.protocols.log.partition.LogPartition;
 import io.atomix.protocols.log.partition.LogPartitionGroupConfig;
 import io.atomix.utils.Managed;
@@ -37,6 +38,7 @@ public class LogPartitionServer implements Managed<LogPartitionServer> {
   private final Logger log = LoggerFactory.getLogger(getClass());
   private final LogPartition partition;
   private final PartitionManagementService managementService;
+  private final PrimaryElection election;
   private final LogPartitionGroupConfig config;
   private final LogTopicMetadata metadata;
   private final ThreadContextFactory threadFactory;
@@ -46,10 +48,12 @@ public class LogPartitionServer implements Managed<LogPartitionServer> {
   public LogPartitionServer(
       LogPartition partition,
       PartitionManagementService managementService,
+      PrimaryElection election,
       LogPartitionGroupConfig config,
       LogTopicMetadata metadata,
       ThreadContextFactory threadFactory) {
     this.partition = partition;
+    this.election = election;
     this.managementService = managementService;
     this.config = config;
     this.metadata = metadata;
@@ -86,7 +90,7 @@ public class LogPartitionServer implements Managed<LogPartitionServer> {
             partition.name(),
             managementService.getMessagingService()))
         .withTermProvider(new LogPartitionTermProvider(
-            managementService.getElectionService().getElectionFor(partition.id()),
+            election,
             GroupMember.newBuilder()
                 .setMemberId(managementService.getMembershipService().getLocalMemberId().toString())
                 .setMemberGroupId(memberGroup.id().id())

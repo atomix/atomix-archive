@@ -15,7 +15,7 @@
  */
 package io.atomix.core.lock;
 
-import io.atomix.primitive.ManagedPrimitiveBuilder;
+import io.atomix.core.impl.ManagedPrimitiveBuilder;
 import io.atomix.primitive.PrimitiveManagementService;
 import io.atomix.primitive.protocol.PrimitiveProtocol;
 import io.atomix.primitive.protocol.ProxyCompatibleBuilder;

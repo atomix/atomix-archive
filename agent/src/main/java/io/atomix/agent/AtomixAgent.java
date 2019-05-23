@@ -29,8 +29,6 @@ import io.atomix.cluster.NodeConfig;
 import io.atomix.cluster.discovery.BootstrapDiscoveryConfig;
 import io.atomix.core.Atomix;
 import io.atomix.core.AtomixConfig;
-import io.atomix.grpc.GrpcService;
-import io.atomix.grpc.ManagedGrpcService;
 import io.atomix.utils.net.Address;
 import io.atomix.utils.net.MalformedAddressException;
 import net.sourceforge.argparse4j.ArgumentParsers;
@@ -66,11 +64,6 @@ public class AtomixAgent {
     final Atomix atomix = buildAtomix(namespace);
     atomix.start().join();
     logger.info("Atomix listening at {}", atomix.getMembershipService().getLocalMember().getPort());
-
-    final ManagedGrpcService grpc = buildGrpcService(atomix, namespace);
-    grpc.start().join();
-    logger.warn("The Atomix gRPC API is BETA and is intended for development and debugging purposes only!");
-    logger.info("gRPC server listening at {}", grpc.address());
 
     synchronized (Atomix.class) {
       while (atomix.isRunning()) {
@@ -238,18 +231,6 @@ public class AtomixAgent {
         .metavar("NAME@HOST:PORT")
         .required(false)
         .help("The set of static members to join. When provided, bootstrap node discovery will be used.");
-    parser.addArgument("--grpc-host")
-        .type(String.class)
-        .metavar("HOST")
-        .required(false)
-        .setDefault("0.0.0.0")
-        .help("Sets the host to which to bind the gRPC server. Defaults to 0.0.0.0 (all interfaces)");
-    parser.addArgument("--grpc-port")
-        .type(Integer.class)
-        .metavar("PORT")
-        .required(false)
-        .setDefault(5680)
-        .help("Sets the port on which to run the gRPC server. Defaults to 5680");
     return parser;
   }
 
@@ -329,22 +310,6 @@ public class AtomixAgent {
    */
   private static Atomix buildAtomix(Namespace namespace) {
     return Atomix.builder(createConfig(namespace)).withShutdownHookEnabled().build();
-  }
-
-  /**
-   * Builds a gRPC service for the given Atomix instance from the given namespace.
-   *
-   * @param atomix the Atomix instance
-   * @param namespace the namespace from which to build the service
-   * @return the managed gRPC service
-   */
-  private static ManagedGrpcService buildGrpcService(Atomix atomix, Namespace namespace) {
-    final String grpcHost = namespace.getString("grpc_host");
-    final Integer grpcPort = namespace.getInt("grpc_port");
-    return GrpcService.builder()
-        .withAtomix(atomix)
-        .withAddress(Address.from(grpcHost, grpcPort))
-        .build();
   }
 
   static MemberId parseMemberId(String address) {

@@ -111,6 +111,15 @@ public class DistributedLogProtocol implements LogProtocol {
     return config.getGroup();
   }
 
+  /**
+   * Returns the protocol configuration.
+   *
+   * @return the protocol configuration
+   */
+  public DistributedLogProtocolConfig config() {
+    return config;
+  }
+
   @Override
   public CompletableFuture<LogClient> createTopic(String topic, PartitionService partitionService) {
     LogPartitionGroup partitionGroup = (LogPartitionGroup) partitionService.getPartitionGroup(this);

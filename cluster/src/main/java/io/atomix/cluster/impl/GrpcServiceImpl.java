@@ -3,7 +3,6 @@ package io.atomix.cluster.impl;
 import java.io.File;
 import java.io.IOException;
 import java.util.concurrent.CompletableFuture;
-import java.util.function.Function;
 
 import io.atomix.cluster.ClusterConfig;
 import io.atomix.cluster.GrpcService;
@@ -32,14 +31,14 @@ public class GrpcServiceImpl implements GrpcService, Managed<ClusterConfig> {
   }
 
   @Override
-  public <T> T getService(String host, int port, Function<Channel, T> factory) {
+  public Channel getChannel(String host, int port) {
     ManagedChannelBuilder builder;
     if (config.getMessagingConfig().getTlsConfig().isEnabled()) {
       builder = ManagedChannelBuilder.forAddress(host, port).useTransportSecurity();
     } else {
       builder = ManagedChannelBuilder.forAddress(host, port).usePlaintext();
     }
-    return factory.apply(builder.build());
+    return builder.build();
   }
 
   @Override

@@ -37,6 +37,7 @@ public class GrpcMessagingService extends MessagingServiceGrpc.MessagingServiceI
   @Dependency
   private GrpcService grpc;
 
+  private final Map<Address, MessagingServiceGrpc.MessagingServiceStub> services = new ConcurrentHashMap<>();
   private final Map<String, BiConsumer<Message, StreamObserver<Message>>> handlers = new ConcurrentHashMap<>();
   private final Map<String, Function<StreamObserver<Message>, StreamObserver<Message>>> streamHandlers = new ConcurrentHashMap<>();
   private Address address;
@@ -106,49 +107,55 @@ public class GrpcMessagingService extends MessagingServiceGrpc.MessagingServiceI
     };
   }
 
+  private MessagingServiceGrpc.MessagingServiceStub getService(Address address) {
+    MessagingServiceGrpc.MessagingServiceStub service = services.get(address);
+    if (service == null) {
+      service = services.computeIfAbsent(address, a -> MessagingServiceGrpc.newStub(grpc.getChannel(address.host(), address.port())));
+    }
+    return service;
+  }
+
   @Override
   public CompletableFuture<Void> sendAsync(Address address, String type, byte[] payload) {
     CompletableFuture<Void> future = new CompletableFuture<>();
-    grpc.getService(address.host(), address.port(), MessagingServiceGrpc::newStub)
-        .sendAndReceive(Message.newBuilder()
-            .setPayload(ByteString.copyFrom(payload))
-            .build(), new StreamObserver<Message>() {
-          @Override
-          public void onNext(Message message) {
-          }
+    getService(address).sendAndReceive(Message.newBuilder()
+        .setPayload(ByteString.copyFrom(payload))
+        .build(), new StreamObserver<Message>() {
+      @Override
+      public void onNext(Message message) {
+      }
 
-          @Override
-          public void onError(Throwable t) {
-            future.completeExceptionally(t);
-          }
+      @Override
+      public void onError(Throwable t) {
+        future.completeExceptionally(t);
+      }
 
-          @Override
-          public void onCompleted() {
-            future.complete(null);
-          }
-        });
+      @Override
+      public void onCompleted() {
+        future.complete(null);
+      }
+    });
     return future;
   }
 
   @Override
   public CompletableFuture<StreamHandler<byte[]>> sendStreamAsync(Address address, String type) {
     CompletableFuture<StreamHandler<byte[]>> future = new CompletableFuture<>();
-    StreamObserver<Message> stream = grpc.getService(address.host(), address.port(), MessagingServiceGrpc::newStub)
-        .sendStream(new StreamObserver<Message>() {
-          @Override
-          public void onNext(Message value) {
+    StreamObserver<Message> stream = getService(address).sendStream(new StreamObserver<Message>() {
+      @Override
+      public void onNext(Message value) {
 
-          }
+      }
 
-          @Override
-          public void onError(Throwable t) {
-            future.completeExceptionally(t);
-          }
+      @Override
+      public void onError(Throwable t) {
+        future.completeExceptionally(t);
+      }
 
-          @Override
-          public void onCompleted() {
-          }
-        });
+      @Override
+      public void onCompleted() {
+      }
+    });
     future.complete(new StreamHandler<byte[]>() {
       @Override
       public void next(byte[] value) {
@@ -173,46 +180,44 @@ public class GrpcMessagingService extends MessagingServiceGrpc.MessagingServiceI
   @Override
   public CompletableFuture<byte[]> sendAndReceive(Address address, String type, byte[] payload, Duration timeout, Executor executor) {
     CompletableFuture<byte[]> future = new CompletableFuture<>();
-    grpc.getService(address.host(), address.port(), MessagingServiceGrpc::newStub)
-        .sendAndReceive(Message.newBuilder()
-            .setPayload(ByteString.copyFrom(payload))
-            .build(), new StreamObserver<Message>() {
-          @Override
-          public void onNext(Message message) {
-            future.complete(message.getPayload().toByteArray());
-          }
+    getService(address).sendAndReceive(Message.newBuilder()
+        .setPayload(ByteString.copyFrom(payload))
+        .build(), new StreamObserver<Message>() {
+      @Override
+      public void onNext(Message message) {
+        future.complete(message.getPayload().toByteArray());
+      }
 
-          @Override
-          public void onError(Throwable t) {
-            future.completeExceptionally(t);
-          }
+      @Override
+      public void onError(Throwable t) {
+        future.completeExceptionally(t);
+      }
 
-          @Override
-          public void onCompleted() {
-          }
-        });
+      @Override
+      public void onCompleted() {
+      }
+    });
     return future;
   }
 
   @Override
   public CompletableFuture<StreamFunction<byte[], CompletableFuture<byte[]>>> sendStreamAndReceive(Address address, String type, Duration timeout, Executor executor) {
     CompletableFuture<byte[]> future = new CompletableFuture<>();
-    StreamObserver<Message> stream = grpc.getService(address.host(), address.port(), MessagingServiceGrpc::newStub)
-        .sendStream(new StreamObserver<Message>() {
-          @Override
-          public void onNext(Message message) {
-            future.complete(message.getPayload().toByteArray());
-          }
+    StreamObserver<Message> stream = getService(address).sendStream(new StreamObserver<Message>() {
+      @Override
+      public void onNext(Message message) {
+        future.complete(message.getPayload().toByteArray());
+      }
 
-          @Override
-          public void onError(Throwable t) {
-            future.completeExceptionally(t);
-          }
+      @Override
+      public void onError(Throwable t) {
+        future.completeExceptionally(t);
+      }
 
-          @Override
-          public void onCompleted() {
-          }
-        });
+      @Override
+      public void onCompleted() {
+      }
+    });
     return CompletableFuture.completedFuture(new StreamFunction<byte[], CompletableFuture<byte[]>>() {
       @Override
       public void next(byte[] value) {
@@ -237,23 +242,22 @@ public class GrpcMessagingService extends MessagingServiceGrpc.MessagingServiceI
 
   @Override
   public CompletableFuture<Void> sendAndReceiveStream(Address address, String type, byte[] payload, StreamHandler<byte[]> handler, Duration timeout, Executor executor) {
-    StreamObserver<Message> stream = grpc.getService(address.host(), address.port(), MessagingServiceGrpc::newStub)
-        .sendAndReceiveStream(new StreamObserver<Message>() {
-          @Override
-          public void onNext(Message message) {
-            handler.next(message.getPayload().toByteArray());
-          }
+    StreamObserver<Message> stream = getService(address).sendAndReceiveStream(new StreamObserver<Message>() {
+      @Override
+      public void onNext(Message message) {
+        handler.next(message.getPayload().toByteArray());
+      }
 
-          @Override
-          public void onError(Throwable t) {
-            handler.error(t);
-          }
+      @Override
+      public void onError(Throwable t) {
+        handler.error(t);
+      }
 
-          @Override
-          public void onCompleted() {
-            handler.complete();
-          }
-        });
+      @Override
+      public void onCompleted() {
+        handler.complete();
+      }
+    });
     stream.onNext(Message.newBuilder()
         .setPayload(ByteString.copyFrom(payload))
         .build());
@@ -263,23 +267,22 @@ public class GrpcMessagingService extends MessagingServiceGrpc.MessagingServiceI
 
   @Override
   public CompletableFuture<StreamHandler<byte[]>> sendStreamAndReceiveStream(Address address, String type, StreamHandler<byte[]> handler, Duration timeout, Executor executor) {
-    StreamObserver<Message> stream = grpc.getService(address.host(), address.port(), MessagingServiceGrpc::newStub)
-        .sendAndReceiveStream(new StreamObserver<Message>() {
-          @Override
-          public void onNext(Message message) {
-            handler.next(message.getPayload().toByteArray());
-          }
+    StreamObserver<Message> stream = getService(address).sendAndReceiveStream(new StreamObserver<Message>() {
+      @Override
+      public void onNext(Message message) {
+        handler.next(message.getPayload().toByteArray());
+      }
 
-          @Override
-          public void onError(Throwable t) {
-            handler.error(t);
-          }
+      @Override
+      public void onError(Throwable t) {
+        handler.error(t);
+      }
 
-          @Override
-          public void onCompleted() {
-            handler.complete();
-          }
-        });
+      @Override
+      public void onCompleted() {
+        handler.complete();
+      }
+    });
     return CompletableFuture.completedFuture(new StreamHandler<byte[]>() {
       @Override
       public void next(byte[] value) {

@@ -7,46 +7,37 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
-import java.util.stream.Collectors;
 
 import io.atomix.cluster.ClusterMembershipService;
+import io.atomix.cluster.GrpcService;
 import io.atomix.cluster.messaging.ClusterCommunicationService;
 import io.atomix.cluster.messaging.ClusterEventService;
 import io.atomix.core.map.AsyncAtomicMap;
+import io.atomix.core.map.AtomicMapConfig;
 import io.atomix.core.map.AtomicMapEvent;
 import io.atomix.core.map.AtomicMapEventListener;
-import io.atomix.core.map.AtomicMapType;
-import io.atomix.core.map.impl.MapProxy;
-import io.atomix.core.map.impl.MapService;
-import io.atomix.core.map.impl.PartitionedAsyncAtomicMap;
-import io.atomix.core.map.impl.RawAsyncAtomicMap;
-import io.atomix.core.map.impl.TranscodingAsyncAtomicMap;
+import io.atomix.core.map.impl.DefaultAtomicMapBuilder;
 import io.atomix.primitive.PrimitiveCache;
 import io.atomix.primitive.PrimitiveManagementService;
 import io.atomix.primitive.PrimitiveRegistry;
 import io.atomix.primitive.PrimitiveTypeRegistry;
+import io.atomix.primitive.partition.PartitionGroupMembershipService;
 import io.atomix.primitive.partition.PartitionGroupTypeRegistry;
-import io.atomix.primitive.partition.PartitionId;
 import io.atomix.primitive.partition.PartitionMetadataEvent;
 import io.atomix.primitive.partition.PartitionMetadataService;
 import io.atomix.primitive.partition.PartitionService;
-import io.atomix.primitive.partition.Partitioner;
 import io.atomix.primitive.partition.SystemPartitionService;
 import io.atomix.primitive.protocol.PrimitiveProtocolTypeRegistry;
-import io.atomix.primitive.service.impl.ServiceId;
 import io.atomix.primitive.session.SessionIdService;
-import io.atomix.primitive.session.impl.DefaultSessionClient;
 import io.atomix.primitive.session.impl.PrimitiveSessionIdManager;
 import io.atomix.primitive.util.ByteArrayDecoder;
 import io.atomix.primitive.util.ByteArrayEncoder;
 import io.atomix.utils.component.Component;
 import io.atomix.utils.component.Dependency;
 import io.atomix.utils.component.Managed;
-import io.atomix.utils.concurrent.Futures;
 import io.atomix.utils.concurrent.ThreadContext;
 import io.atomix.utils.concurrent.ThreadContextFactory;
 import io.atomix.utils.concurrent.ThreadService;
-import org.apache.commons.lang3.tuple.Pair;
 
 import static io.atomix.primitive.util.ByteArrayDecoder.decode;
 import static io.atomix.primitive.util.ByteArrayEncoder.encode;
@@ -60,6 +51,10 @@ public class PartitionMetadataManager implements PartitionMetadataService, Manag
   private SystemPartitionService systemPartitionService;
   @Dependency
   private ClusterMembershipService membershipService;
+  @Dependency
+  private PartitionGroupMembershipService groupMembershipService;
+  @Dependency
+  private GrpcService grpcService;
   @Dependency
   private PrimitiveSessionIdManager sessionIdManager;
   @Dependency
@@ -217,30 +212,12 @@ public class PartitionMetadataManager implements PartitionMetadataService, Manag
   @SuppressWarnings("unchecked")
   public CompletableFuture<Void> start() {
     threadContext = threadService.createContext();
-    Map<PartitionId, RawAsyncAtomicMap> partitions = systemPartitionService.getSystemPartitionGroup()
-        .getPartitions()
-        .stream()
-        .map(partition -> {
-          ServiceId serviceId = ServiceId.newBuilder()
-              .setName("atomix-partition-metadata")
-              .setType(MapService.TYPE.name())
-              .build();
-          MapProxy proxy = new MapProxy(new DefaultSessionClient(serviceId, partition.getClient()));
-          return Pair.of(partition.id(), new RawAsyncAtomicMap(proxy, Duration.ofSeconds(30), new PartialPrimitiveManagementService()));
-        }).collect(Collectors.toMap(Pair::getKey, Pair::getValue));
-    return Futures.allOf(partitions.values().stream().map(RawAsyncAtomicMap::connect))
-        .thenApply(v -> new TranscodingAsyncAtomicMap<String, byte[], String, byte[]>(
-            new PartitionedAsyncAtomicMap(
-                "atomix-partition-metadata",
-                AtomicMapType.instance(),
-                (Map) partitions,
-                Partitioner.MURMUR3),
-            key -> key,
-            string -> string,
-            bytes -> bytes,
-            bytes -> bytes))
+    return new DefaultAtomicMapBuilder<String, byte[]>(
+        "atomix-partition-metadata", new AtomicMapConfig(), new PartialPrimitiveManagementService())
+        .withProtocol(systemPartitionService.getSystemPartitionGroup().newProtocol())
+        .buildAsync()
         .thenAccept(metadata -> {
-          this.metadatas = metadata;
+          this.metadatas = metadata.async();
         });
   }
 
@@ -303,6 +280,16 @@ public class PartitionMetadataManager implements PartitionMetadataService, Manag
     @Override
     public ThreadContextFactory getThreadFactory() {
       return threadService.getFactory();
+    }
+
+    @Override
+    public PartitionGroupMembershipService getGroupMembershipService() {
+      return groupMembershipService;
+    }
+
+    @Override
+    public GrpcService getGrpcService() {
+      return grpcService;
     }
   }
 }

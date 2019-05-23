@@ -55,16 +55,16 @@ message SessionResponse {
 }
 
 message OpenSessionRequest {
-    int64 session_id = 1;
-    int64 timeout = 2;
+    int64 timeout = 1;
 }
 
 message OpenSessionResponse {
+    uint64 session_id = 1;
 }
 
 message KeepAliveRequest {
-    int64 session_id = 1;
-    int64 command_sequence = 2;
+    uint64 session_id = 1;
+    uint64 command_sequence = 2;
     map<int64, int64> streams = 3;
 }
 
@@ -72,7 +72,7 @@ message KeepAliveResponse {
 }
 
 message CloseSessionRequest {
-    int64 session_id = 1;
+    uint64 session_id = 1;
 }
 
 message CloseSessionResponse {

@@ -44,15 +44,15 @@ import io.atomix.core.set.SizeResponse;
 import io.atomix.core.set.impl.ListenResponse;
 import io.atomix.core.set.impl.SetProxy;
 import io.atomix.core.set.impl.SetService;
-import io.atomix.grpc.headers.SessionCommandHeader;
-import io.atomix.grpc.headers.SessionHeader;
-import io.atomix.grpc.headers.SessionQueryHeader;
-import io.atomix.grpc.headers.SessionResponseHeader;
-import io.atomix.grpc.headers.SessionStreamHeader;
-import io.atomix.grpc.protocol.DistributedLogProtocol;
-import io.atomix.grpc.protocol.MultiPrimaryProtocol;
-import io.atomix.grpc.protocol.MultiRaftProtocol;
+import io.atomix.primitive.headers.SessionCommandHeader;
+import io.atomix.primitive.headers.SessionHeader;
+import io.atomix.primitive.headers.SessionQueryHeader;
+import io.atomix.primitive.headers.SessionResponseHeader;
+import io.atomix.primitive.headers.SessionStreamHeader;
 import io.atomix.primitive.partition.PartitionService;
+import io.atomix.primitive.protocol.DistributedLogProtocol;
+import io.atomix.primitive.protocol.MultiPrimaryProtocol;
+import io.atomix.primitive.protocol.MultiRaftProtocol;
 import io.atomix.primitive.session.impl.CloseSessionRequest;
 import io.atomix.primitive.session.impl.DefaultSessionClient;
 import io.atomix.primitive.session.impl.OpenSessionRequest;
@@ -99,17 +99,16 @@ public class SetServiceImpl extends SetServiceGrpc.SetServiceImplBase {
   @Override
   public void create(CreateRequest request, StreamObserver<CreateResponse> responseObserver) {
     create.createAll(request, responseObserver,
-        (partitionId, sessionId, set) -> set.openSession(OpenSessionRequest.newBuilder()
-            .setSessionId(sessionId)
+        (partitionId, set) -> set.openSession(OpenSessionRequest.newBuilder()
             .setTimeout(Duration.ofSeconds(request.getTimeout().getSeconds())
                 .plusNanos(request.getTimeout().getNanos())
                 .toMillis())
             .build())
             .thenApply(response -> SessionHeader.newBuilder()
-                .setSessionId(sessionId)
+                .setSessionId(response.getSessionId())
                 .setPartitionId(partitionId.getPartition())
                 .build()),
-        (sessionId, responses) -> CreateResponse.newBuilder()
+        responses -> CreateResponse.newBuilder()
             .addAllHeaders(responses)
             .build());
   }
@@ -351,7 +350,7 @@ public class SetServiceImpl extends SetServiceGrpc.SetServiceImplBase {
             .build());
   }
 
-  private static final PrimitiveFactory.PrimitiveIdDescriptor<SetId> SET_ID_DESCRIPTOR = new PrimitiveFactory.PrimitiveIdDescriptor<SetId>() {
+  private static final PrimitiveIdDescriptor<SetId> SET_ID_DESCRIPTOR = new PrimitiveIdDescriptor<SetId>() {
     @Override
     public String getName(SetId id) {
       return id.getName();

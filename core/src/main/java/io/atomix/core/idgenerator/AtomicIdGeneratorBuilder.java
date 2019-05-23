@@ -15,7 +15,7 @@
  */
 package io.atomix.core.idgenerator;
 
-import io.atomix.primitive.PrimitiveBuilder;
+import io.atomix.core.impl.AbstractPrimitiveBuilder;
 import io.atomix.primitive.PrimitiveManagementService;
 import io.atomix.primitive.protocol.PrimitiveProtocol;
 import io.atomix.primitive.protocol.ProxyCompatibleBuilder;
@@ -25,7 +25,7 @@ import io.atomix.primitive.protocol.ServiceProtocol;
  * Builder for AtomicIdGenerator.
  */
 public abstract class AtomicIdGeneratorBuilder
-    extends PrimitiveBuilder<AtomicIdGeneratorBuilder, AtomicIdGeneratorConfig, AtomicIdGenerator>
+    extends AbstractPrimitiveBuilder<AtomicIdGeneratorBuilder, AtomicIdGeneratorConfig, AtomicIdGenerator>
     implements ProxyCompatibleBuilder<AtomicIdGeneratorBuilder> {
 
   protected AtomicIdGeneratorBuilder(String name, AtomicIdGeneratorConfig config, PrimitiveManagementService managementService) {

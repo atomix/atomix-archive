@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package atomix.headers;
 
-option java_package = "io.atomix.grpc.headers";
+option java_package = "io.atomix.primitive.headers";
 option java_multiple_files = true;
 
 message RequestHeaders {

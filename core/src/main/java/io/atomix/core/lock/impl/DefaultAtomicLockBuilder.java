@@ -21,11 +21,11 @@ import io.atomix.core.lock.AsyncAtomicLock;
 import io.atomix.core.lock.AtomicLock;
 import io.atomix.core.lock.AtomicLockBuilder;
 import io.atomix.core.lock.AtomicLockConfig;
-import io.atomix.primitive.ManagedAsyncPrimitive;
+import io.atomix.core.lock.LockId;
 import io.atomix.primitive.PrimitiveManagementService;
-import io.atomix.primitive.protocol.ServiceProtocol;
-import io.atomix.primitive.service.impl.ServiceId;
-import io.atomix.primitive.session.impl.DefaultSessionClient;
+import io.atomix.primitive.partition.Partitioner;
+import io.atomix.primitive.protocol.DistributedLogProtocol;
+import io.atomix.primitive.protocol.MultiRaftProtocol;
 
 /**
  * Default distributed lock builder implementation.
@@ -35,18 +35,28 @@ public class DefaultAtomicLockBuilder extends AtomicLockBuilder {
     super(name, config, managementService);
   }
 
+  private LockId createLockId() {
+    LockId.Builder builder = LockId.newBuilder().setName(name);
+    protocol = protocol();
+    if (protocol instanceof io.atomix.protocols.raft.MultiRaftProtocol) {
+      builder.setRaft(MultiRaftProtocol.newBuilder()
+          .setGroup(((io.atomix.protocols.raft.MultiRaftProtocol) protocol).group())
+          .build());
+    } else if (protocol instanceof io.atomix.protocols.log.DistributedLogProtocol) {
+      builder.setLog(DistributedLogProtocol.newBuilder()
+          .setGroup(((io.atomix.protocols.log.DistributedLogProtocol) protocol).group())
+          .setPartitions(((io.atomix.protocols.log.DistributedLogProtocol) protocol).config().getPartitions())
+          .setReplicationFactor(((io.atomix.protocols.log.DistributedLogProtocol) protocol).config().getReplicationFactor())
+          .build());
+    }
+    return builder.build();
+  }
+
   @Override
   @SuppressWarnings("unchecked")
   public CompletableFuture<AtomicLock> buildAsync() {
-    ServiceProtocol protocol = (ServiceProtocol) protocol();
-    ServiceId serviceId = ServiceId.newBuilder()
-        .setName(name)
-        .setType(LockService.TYPE.name())
-        .build();
-    return protocol.createService(name, managementService.getPartitionService())
-        .thenApply(client -> new LockProxy(new DefaultSessionClient(serviceId, client.getPartition(name))))
-        .thenApply(proxy -> new DefaultAsyncAtomicLock(proxy, config.getSessionTimeout(), managementService))
-        .thenCompose(ManagedAsyncPrimitive::connect)
+    return new DefaultAsyncAtomicLock(createLockId(), getChannelFactory(), managementService, Partitioner.MURMUR3, config.getSessionTimeout())
+        .connect()
         .thenApply(AsyncAtomicLock::sync);
   }
 }

@@ -15,6 +15,7 @@
  */
 package io.atomix.primitive.partition.impl;
 
+import java.util.ArrayList;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executors;
@@ -24,7 +25,6 @@ import java.util.function.Consumer;
 import com.google.common.collect.Maps;
 import io.atomix.cluster.ClusterMembershipService;
 import io.atomix.cluster.messaging.ClusterCommunicationService;
-import io.atomix.utils.event.AbstractListenable;
 import io.atomix.primitive.partition.PartitionGroupMembershipService;
 import io.atomix.primitive.partition.PartitionId;
 import io.atomix.primitive.partition.PrimaryElection;
@@ -33,7 +33,9 @@ import io.atomix.primitive.partition.PrimaryElectionService;
 import io.atomix.utils.component.Component;
 import io.atomix.utils.component.Dependency;
 import io.atomix.utils.component.Managed;
+import io.atomix.utils.concurrent.Futures;
 import io.atomix.utils.concurrent.Threads;
+import io.atomix.utils.event.AbstractListenable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -54,18 +56,18 @@ public class SystemElectionManager
   @Dependency
   private ClusterCommunicationService messagingService;
 
-  private final Map<PartitionId, HashBasedPrimaryElection> elections = Maps.newConcurrentMap();
+  private final Map<PartitionId, CompletableFuture<PrimaryElection>> elections = Maps.newConcurrentMap();
   private final Consumer<PrimaryElectionEvent> primaryElectionListener = this::post;
   private final ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor(
       Threads.namedThreads("primary-election-%d", log));
 
   @Override
-  public PrimaryElection getElectionFor(PartitionId partitionId) {
+  public CompletableFuture<PrimaryElection> getElectionFor(PartitionId partitionId) {
     return elections.computeIfAbsent(partitionId, id -> {
       HashBasedPrimaryElection election = new HashBasedPrimaryElection(
           partitionId, clusterMembershipService, groupMembershipService, messagingService, executor);
       election.addListener(primaryElectionListener);
-      return election;
+      return CompletableFuture.completedFuture(election);
     });
   }
 
@@ -77,8 +79,10 @@ public class SystemElectionManager
 
   @Override
   public CompletableFuture<Void> stop() {
-    elections.values().forEach(election -> election.close());
-    executor.shutdownNow();
-    return CompletableFuture.completedFuture(null);
+    return Futures.allOf(new ArrayList<>(elections.values()))
+        .thenAccept(elections -> {
+          elections.forEach(election -> ((HashBasedPrimaryElection) election).close());
+          executor.shutdownNow();
+        });
   }
 }

@@ -186,7 +186,6 @@
     <module>codegen</module>
     <module>core</module>
     <module>dist</module>
-    <module>grpc</module>
     <module>log</module>
     <module>primitive</module>
     <module>protocols</module>

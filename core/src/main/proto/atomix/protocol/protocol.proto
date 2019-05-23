@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package atomix.protocol;
 
-option java_package = "io.atomix.grpc.protocol";
+option java_package = "io.atomix.primitive.protocol";
 option java_multiple_files = true;
 
 // Multi-Raft protocol

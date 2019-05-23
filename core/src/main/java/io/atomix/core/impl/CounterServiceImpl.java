@@ -35,12 +35,12 @@ import io.atomix.core.counter.SetRequest;
 import io.atomix.core.counter.SetResponse;
 import io.atomix.core.counter.impl.CounterProxy;
 import io.atomix.core.counter.impl.CounterService;
-import io.atomix.grpc.headers.RequestHeader;
-import io.atomix.grpc.headers.ResponseHeader;
-import io.atomix.grpc.protocol.DistributedLogProtocol;
-import io.atomix.grpc.protocol.MultiPrimaryProtocol;
-import io.atomix.grpc.protocol.MultiRaftProtocol;
+import io.atomix.primitive.headers.RequestHeader;
+import io.atomix.primitive.headers.ResponseHeader;
 import io.atomix.primitive.partition.PartitionService;
+import io.atomix.primitive.protocol.DistributedLogProtocol;
+import io.atomix.primitive.protocol.MultiPrimaryProtocol;
+import io.atomix.primitive.protocol.MultiRaftProtocol;
 import io.atomix.primitive.service.impl.DefaultServiceClient;
 import io.atomix.primitive.service.impl.RequestContext;
 import io.grpc.stub.StreamObserver;
@@ -186,7 +186,7 @@ public class CounterServiceImpl extends CounterServiceGrpc.CounterServiceImplBas
                 .build()));
   }
 
-  private static final PrimitiveFactory.PrimitiveIdDescriptor<CounterId> COUNTER_ID_DESCRIPTOR = new PrimitiveFactory.PrimitiveIdDescriptor<CounterId>() {
+  private static final PrimitiveIdDescriptor<CounterId> COUNTER_ID_DESCRIPTOR = new PrimitiveIdDescriptor<CounterId>() {
     @Override
     public String getName(CounterId id) {
       return id.getName();

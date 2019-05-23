@@ -19,53 +19,87 @@ import java.time.Duration;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Supplier;
 
+import io.atomix.core.impl.AbstractAsyncPrimitive;
+import io.atomix.core.impl.PrimitiveIdDescriptor;
+import io.atomix.core.impl.PrimitivePartition;
 import io.atomix.core.lock.AsyncAtomicLock;
 import io.atomix.core.lock.AtomicLock;
+import io.atomix.core.lock.CloseRequest;
+import io.atomix.core.lock.CloseResponse;
+import io.atomix.core.lock.CreateRequest;
+import io.atomix.core.lock.CreateResponse;
+import io.atomix.core.lock.IsLockedRequest;
+import io.atomix.core.lock.IsLockedResponse;
+import io.atomix.core.lock.KeepAliveRequest;
+import io.atomix.core.lock.KeepAliveResponse;
+import io.atomix.core.lock.LockId;
+import io.atomix.core.lock.LockRequest;
+import io.atomix.core.lock.LockResponse;
+import io.atomix.core.lock.LockServiceGrpc;
+import io.atomix.core.lock.UnlockRequest;
+import io.atomix.core.lock.UnlockResponse;
 import io.atomix.primitive.PrimitiveManagementService;
-import io.atomix.primitive.PrimitiveState;
-import io.atomix.primitive.impl.SessionEnabledAsyncPrimitive;
+import io.atomix.primitive.partition.Partitioner;
+import io.atomix.primitive.protocol.DistributedLogProtocol;
+import io.atomix.primitive.protocol.MultiPrimaryProtocol;
+import io.atomix.primitive.protocol.MultiRaftProtocol;
+import io.atomix.utils.concurrent.Futures;
 import io.atomix.utils.concurrent.Scheduled;
 import io.atomix.utils.time.Version;
+import io.grpc.Channel;
 
 /**
  * Raft lock.
  */
-public class DefaultAsyncAtomicLock extends SessionEnabledAsyncPrimitive<LockProxy, AsyncAtomicLock> implements AsyncAtomicLock {
-  private final AtomicLong lock = new AtomicLong();
+public class DefaultAsyncAtomicLock extends AbstractAsyncPrimitive<LockId, AsyncAtomicLock> implements AsyncAtomicLock {
+  private final LockServiceGrpc.LockServiceStub lock;
+  private final AtomicLong lockId = new AtomicLong();
 
-  public DefaultAsyncAtomicLock(LockProxy proxy, Duration timeout, PrimitiveManagementService managementService) {
-    super(proxy, timeout, managementService);
+  public DefaultAsyncAtomicLock(LockId id, Supplier<Channel> channelFactory, PrimitiveManagementService managementService, Partitioner<String> partitioner, Duration timeout) {
+    super(id, LOCK_ID_DESCRIPTOR, managementService, partitioner, timeout);
+    this.lock = LockServiceGrpc.newStub(channelFactory.get());
   }
 
   @Override
   public CompletableFuture<Version> lock() {
-    return execute(LockProxy::lock, LockRequest.newBuilder()
-        .setTimeout(-1)
-        .build())
-        .thenApply(response -> {
-          lock.set(response.getIndex());
-          return new Version(response.getIndex());
+    PrimitivePartition partition = getPartition();
+    return this.<LockResponse>execute(observer -> lock.lock(LockRequest.newBuilder()
+        .setId(id())
+        .setHeader(partition.getCommandHeader())
+        .setTimeout(com.google.protobuf.Duration.newBuilder()
+            .setSeconds(-1)
+            .build())
+        .build(), observer))
+        .thenCompose(response -> partition.order(new Version(response.getVersion()), response.getHeader()))
+        .thenApply(version -> {
+          lockId.set(version.value());
+          return version;
         });
   }
 
   @Override
   public CompletableFuture<Optional<Version>> tryLock() {
-    // If the proxy is currently disconnected from the cluster, we can just fail the lock attempt here.
-    PrimitiveState state = getState();
-    if (state != PrimitiveState.CONNECTED) {
-      return CompletableFuture.completedFuture(Optional.empty());
-    }
-
-    return execute(LockProxy::lock, LockRequest.newBuilder()
-        .setTimeout(0)
-        .build())
-        .thenApply(response -> {
-          if (response.getAcquired()) {
-            lock.set(response.getIndex());
-            return Optional.of(new Version(response.getIndex()));
+    PrimitivePartition partition = getPartition();
+    return this.<LockResponse>execute(observer -> lock.lock(LockRequest.newBuilder()
+        .setId(id())
+        .setHeader(partition.getCommandHeader())
+        .setTimeout(com.google.protobuf.Duration.newBuilder()
+            .setSeconds(0)
+            .setNanos(0)
+            .build())
+        .build(), observer))
+        .thenCompose(response -> partition.order(
+            Optional.ofNullable(response.getVersion() > 0
+                ? new Version(response.getVersion())
+                : null),
+            response.getHeader()))
+        .thenApply(version -> {
+          if (version.isPresent()) {
+            lockId.set(version.get().value());
           }
-          return Optional.empty();
+          return version;
         });
   }
 
@@ -73,18 +107,27 @@ public class DefaultAsyncAtomicLock extends SessionEnabledAsyncPrimitive<LockPro
   public CompletableFuture<Optional<Version>> tryLock(Duration timeout) {
     CompletableFuture<Optional<Version>> future = new CompletableFuture<>();
     Scheduled timer = context().schedule(timeout, () -> future.complete(Optional.empty()));
-    execute(LockProxy::lock, LockRequest.newBuilder()
-        .setTimeout(timeout.toMillis())
-        .build())
-        .thenAccept(response -> {
+    PrimitivePartition partition = getPartition();
+    this.<LockResponse>execute(observer -> lock.lock(LockRequest.newBuilder()
+        .setId(id())
+        .setHeader(partition.getCommandHeader())
+        .setTimeout(com.google.protobuf.Duration.newBuilder()
+            .setSeconds(timeout.getSeconds())
+            .setNanos(timeout.getNano())
+            .build())
+        .build(), observer))
+        .thenCompose(response -> partition.order(
+            Optional.ofNullable(response.getVersion() > 0
+                ? new Version(response.getVersion())
+                : null),
+            response.getHeader()))
+        .thenAccept(version -> {
           timer.cancel();
           if (!future.isDone()) {
-            if (response.getAcquired()) {
-              lock.set(response.getIndex());
-              future.complete(Optional.of(new Version(response.getIndex())));
-            } else {
-              future.complete(Optional.empty());
+            if (version.isPresent()) {
+              lockId.set(version.get().value());
             }
+            future.complete(version);
           }
         })
         .whenComplete((result, error) -> {
@@ -98,22 +141,28 @@ public class DefaultAsyncAtomicLock extends SessionEnabledAsyncPrimitive<LockPro
   @Override
   public CompletableFuture<Void> unlock() {
     // Use the current lock ID to ensure we only unlock the lock currently held by this process.
-    long lock = this.lock.getAndSet(0);
+    long lock = this.lockId.getAndSet(0);
     if (lock != 0) {
-      return execute(LockProxy::unlock, UnlockRequest.newBuilder()
-          .setIndex(lock)
-          .build())
-          .thenApply(response -> null);
+      PrimitivePartition partition = getPartition();
+      return this.<UnlockResponse>execute(observer -> this.lock.unlock(UnlockRequest.newBuilder()
+          .setId(id())
+          .setHeader(partition.getCommandHeader())
+          .setVersion(lock)
+          .build(), observer))
+          .thenCompose(response -> partition.order(null, response.getHeader()));
     }
     return CompletableFuture.completedFuture(null);
   }
 
   @Override
   public CompletableFuture<Boolean> unlock(Version version) {
-    return execute(LockProxy::unlock, UnlockRequest.newBuilder()
-        .setIndex(version.value())
-        .build())
-        .thenApply(response -> response.getSucceeded());
+    PrimitivePartition partition = getPartition();
+    return this.<UnlockResponse>execute(observer -> this.lock.unlock(UnlockRequest.newBuilder()
+        .setId(id())
+        .setHeader(partition.getCommandHeader())
+        .setVersion(version.value())
+        .build(), observer))
+        .thenCompose(response -> partition.order(response.getUnlocked(), response.getHeader()));
   }
 
   @Override
@@ -123,14 +172,94 @@ public class DefaultAsyncAtomicLock extends SessionEnabledAsyncPrimitive<LockPro
 
   @Override
   public CompletableFuture<Boolean> isLocked(Version version) {
-    return execute(LockProxy::isLocked, IsLockedRequest.newBuilder()
-        .setIndex(version.value())
-        .build())
-        .thenApply(response -> response.getLocked());
+    PrimitivePartition partition = getPartition();
+    return this.<IsLockedResponse>execute(observer -> this.lock.isLocked(IsLockedRequest.newBuilder()
+        .setId(id())
+        .setHeader(partition.getQueryHeader())
+        .setVersion(version.value())
+        .build(), observer))
+        .thenCompose(response -> partition.order(response.getIsLocked(), response.getHeader()));
+  }
+
+  @Override
+  public CompletableFuture<AsyncAtomicLock> connect() {
+    return this.<CreateResponse>execute(stream -> lock.create(CreateRequest.newBuilder()
+        .setId(id())
+        .setTimeout(com.google.protobuf.Duration.newBuilder()
+            .setSeconds(timeout.getSeconds())
+            .setNanos(timeout.getNano())
+            .build())
+        .build(), stream))
+        .thenAccept(response -> {
+          startKeepAlive(response.getHeader());
+        })
+        .thenApply(v -> this);
+  }
+
+  @Override
+  protected CompletableFuture<Void> keepAlive() {
+    PrimitivePartition partition = getPartition();
+    return this.<KeepAliveResponse>execute(stream -> lock.keepAlive(KeepAliveRequest.newBuilder()
+        .setId(id())
+        .setHeader(partition.getSessionHeader())
+        .build(), stream))
+        .thenAccept(response -> completeKeepAlive(response.getHeader()));
+  }
+
+  @Override
+  public CompletableFuture<Void> close() {
+    PrimitivePartition partition = getPartition();
+    return this.<CloseResponse>execute(stream -> lock.close(CloseRequest.newBuilder()
+        .setId(id())
+        .setHeader(partition.getSessionHeader())
+        .build(), stream))
+        .thenApply(response -> null);
+  }
+
+  @Override
+  public CompletableFuture<Void> delete() {
+    return Futures.exceptionalFuture(new UnsupportedOperationException());
   }
 
   @Override
   public AtomicLock sync(Duration operationTimeout) {
     return new BlockingAtomicLock(this, operationTimeout.toMillis());
   }
+
+  private static final PrimitiveIdDescriptor<LockId> LOCK_ID_DESCRIPTOR = new PrimitiveIdDescriptor<LockId>() {
+    @Override
+    public String getName(LockId id) {
+      return id.getName();
+    }
+
+    @Override
+    public boolean hasMultiRaftProtocol(LockId id) {
+      return id.hasRaft();
+    }
+
+    @Override
+    public MultiRaftProtocol getMultiRaftProtocol(LockId id) {
+      return id.getRaft();
+    }
+
+    @Override
+    public boolean hasMultiPrimaryProtocol(LockId id) {
+      return id.hasMultiPrimary();
+    }
+
+    @Override
+    public MultiPrimaryProtocol getMultiPrimaryProtocol(LockId id) {
+      return id.getMultiPrimary();
+    }
+
+    @Override
+    public boolean hasDistributedLogProtocol(LockId id) {
+      return id.hasLog();
+    }
+
+    @Override
+    public DistributedLogProtocol getDistributedLogProtocol(LockId id) {
+      return id.getLog();
+    }
+  };
 }

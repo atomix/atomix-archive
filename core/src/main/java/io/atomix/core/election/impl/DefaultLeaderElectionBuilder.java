@@ -19,14 +19,14 @@ import java.util.concurrent.CompletableFuture;
 
 import com.google.common.io.BaseEncoding;
 import io.atomix.core.election.AsyncLeaderElection;
+import io.atomix.core.election.ElectionId;
 import io.atomix.core.election.LeaderElection;
 import io.atomix.core.election.LeaderElectionBuilder;
 import io.atomix.core.election.LeaderElectionConfig;
-import io.atomix.primitive.ManagedAsyncPrimitive;
 import io.atomix.primitive.PrimitiveManagementService;
-import io.atomix.primitive.protocol.ServiceProtocol;
-import io.atomix.primitive.service.impl.ServiceId;
-import io.atomix.primitive.session.impl.DefaultSessionClient;
+import io.atomix.primitive.partition.Partitioner;
+import io.atomix.primitive.protocol.DistributedLogProtocol;
+import io.atomix.primitive.protocol.MultiRaftProtocol;
 import io.atomix.utils.serializer.Serializer;
 
 /**
@@ -37,18 +37,28 @@ public class DefaultLeaderElectionBuilder<T> extends LeaderElectionBuilder<T> {
     super(name, config, managementService);
   }
 
+  private ElectionId createElectionId() {
+    ElectionId.Builder builder = ElectionId.newBuilder().setName(name);
+    protocol = protocol();
+    if (protocol instanceof io.atomix.protocols.raft.MultiRaftProtocol) {
+      builder.setRaft(MultiRaftProtocol.newBuilder()
+          .setGroup(((io.atomix.protocols.raft.MultiRaftProtocol) protocol).group())
+          .build());
+    } else if (protocol instanceof io.atomix.protocols.log.DistributedLogProtocol) {
+      builder.setLog(DistributedLogProtocol.newBuilder()
+          .setGroup(((io.atomix.protocols.log.DistributedLogProtocol) protocol).group())
+          .setPartitions(((io.atomix.protocols.log.DistributedLogProtocol) protocol).config().getPartitions())
+          .setReplicationFactor(((io.atomix.protocols.log.DistributedLogProtocol) protocol).config().getReplicationFactor())
+          .build());
+    }
+    return builder.build();
+  }
+
   @Override
   @SuppressWarnings("unchecked")
   public CompletableFuture<LeaderElection<T>> buildAsync() {
-    ServiceProtocol protocol = (ServiceProtocol) protocol();
-    ServiceId serviceId = ServiceId.newBuilder()
-        .setName(name)
-        .setType(LeaderElectionService.TYPE.name())
-        .build();
-    return protocol.createService(name, managementService.getPartitionService())
-        .thenApply(client -> new LeaderElectionProxy(new DefaultSessionClient(serviceId, client.getPartition(name))))
-        .thenApply(proxy -> new DefaultAsyncLeaderElection(proxy, config.getSessionTimeout(), managementService))
-        .thenCompose(ManagedAsyncPrimitive::connect)
+    return new DefaultAsyncLeaderElection(createElectionId(), getChannelFactory(), managementService, Partitioner.MURMUR3, config.getSessionTimeout())
+        .connect()
         .thenApply(election -> {
           Serializer serializer = serializer();
           return new TranscodingAsyncLeaderElection<T, String>(

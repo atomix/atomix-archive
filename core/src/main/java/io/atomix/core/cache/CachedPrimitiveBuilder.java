@@ -15,7 +15,7 @@
  */
 package io.atomix.core.cache;
 
-import io.atomix.primitive.ManagedPrimitiveBuilder;
+import io.atomix.core.impl.ManagedPrimitiveBuilder;
 import io.atomix.primitive.PrimitiveManagementService;
 import io.atomix.primitive.PrimitiveType;
 import io.atomix.primitive.SyncPrimitive;

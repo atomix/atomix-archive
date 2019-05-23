@@ -10,10 +10,10 @@ import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 import com.google.protobuf.Message;
-import io.atomix.grpc.headers.RequestHeader;
-import io.atomix.grpc.headers.SessionCommandHeader;
-import io.atomix.grpc.headers.SessionHeader;
-import io.atomix.grpc.headers.SessionQueryHeader;
+import io.atomix.primitive.headers.RequestHeader;
+import io.atomix.primitive.headers.SessionCommandHeader;
+import io.atomix.primitive.headers.SessionHeader;
+import io.atomix.primitive.headers.SessionQueryHeader;
 import io.atomix.primitive.partition.PartitionId;
 import io.atomix.primitive.proxy.PrimitiveProxy;
 import io.atomix.primitive.session.impl.SessionResponseContext;
@@ -150,44 +150,6 @@ public class RequestExecutor<P extends PrimitiveProxy, I extends Message, H exte
    * Creates a new session ID and applies it to the given function.
    *
    * @param request          the request
-   * @param key              the request key
-   * @param responseObserver the response observer
-   * @param function         the function to which to apply the session ID
-   */
-  public void createBy(
-      T request,
-      String key,
-      StreamObserver<R> responseObserver,
-      TriFunction<PartitionId, Long, P, CompletableFuture<R>> function) {
-    I id = getId(request);
-    if (isValidId(id, responseObserver)) {
-      primitiveFactory.createSession().whenComplete((sessionId, sessionError) -> {
-        if (sessionError == null) {
-          primitiveFactory.getPrimitive(id, key).whenComplete((primitive, primitiveError) -> {
-            if (primitiveError == null) {
-              function.apply(primitive.getLeft(), sessionId, primitive.getRight()).whenComplete((result, funcError) -> {
-                if (funcError == null) {
-                  responseObserver.onNext(result);
-                  responseObserver.onCompleted();
-                } else {
-                  responseObserver.onError(funcError);
-                }
-              });
-            } else {
-              responseObserver.onError(primitiveError);
-            }
-          });
-        } else {
-          responseObserver.onError(sessionError);
-        }
-      });
-    }
-  }
-
-  /**
-   * Creates a new session ID and applies it to the given function.
-   *
-   * @param request          the request
    * @param responseObserver the response observer
    * @param function         the function to which to apply the session ID
    * @param responseFunction the response function
@@ -195,29 +157,23 @@ public class RequestExecutor<P extends PrimitiveProxy, I extends Message, H exte
   public <V> void createAll(
       T request,
       StreamObserver<R> responseObserver,
-      TriFunction<PartitionId, Long, P, CompletableFuture<V>> function,
-      BiFunction<Long, List<V>, R> responseFunction) {
+      BiFunction<PartitionId, P, CompletableFuture<V>> function,
+      Function<List<V>, R> responseFunction) {
     I id = getId(request);
     if (isValidId(id, responseObserver)) {
-      primitiveFactory.createSession().whenComplete((sessionId, sessionError) -> {
-        if (sessionError == null) {
-          primitiveFactory.getPrimitives(id)
-              .thenCompose(partitions -> Futures.allOf(partitions.entrySet().stream()
-                  .map(e -> function.apply(e.getKey(), sessionId, e.getValue()))))
-              .thenApply(results -> results.collect(Collectors.toList()))
-              .thenApply(results -> responseFunction.apply(sessionId, results))
-              .whenComplete((result, funcError) -> {
-                if (funcError == null) {
-                  responseObserver.onNext(result);
-                  responseObserver.onCompleted();
-                } else {
-                  responseObserver.onError(funcError);
-                }
-              });
-        } else {
-          responseObserver.onError(sessionError);
-        }
-      });
+      primitiveFactory.getPrimitives(id)
+          .thenCompose(partitions -> Futures.allOf(partitions.entrySet().stream()
+              .map(e -> function.apply(e.getKey(), e.getValue()))))
+          .thenApply(results -> results.collect(Collectors.toList()))
+          .thenApply(results -> responseFunction.apply(results))
+          .whenComplete((result, funcError) -> {
+            if (funcError == null) {
+              responseObserver.onNext(result);
+              responseObserver.onCompleted();
+            } else {
+              responseObserver.onError(funcError);
+            }
+          });
     }
   }
 

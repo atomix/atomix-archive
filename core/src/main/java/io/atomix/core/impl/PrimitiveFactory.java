@@ -11,9 +11,6 @@ import java.util.stream.Collectors;
 import com.google.common.base.Strings;
 import com.google.common.collect.Maps;
 import com.google.protobuf.Message;
-import io.atomix.grpc.protocol.DistributedLogProtocol;
-import io.atomix.grpc.protocol.MultiPrimaryProtocol;
-import io.atomix.grpc.protocol.MultiRaftProtocol;
 import io.atomix.primitive.partition.PartitionClient;
 import io.atomix.primitive.partition.PartitionId;
 import io.atomix.primitive.partition.PartitionService;
@@ -222,67 +219,5 @@ public class PrimitiveFactory<P extends PrimitiveProxy, I extends Message> {
               .map(e -> Maps.immutableEntry(e.getKey(), Pair.of(e.getValue(), primitiveFactory.apply(getServiceId(id), client.getPartition(e.getKey())))))
               .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
         });
-  }
-
-  /**
-   * Primitive identifier descriptor.
-   */
-  public interface PrimitiveIdDescriptor<I extends Message> {
-
-    /**
-     * Returns the name for the given ID.
-     *
-     * @param id the primitive ID
-     * @return the primitive name
-     */
-    String getName(I id);
-
-    /**
-     * Returns a boolean indicating whether the given ID contains a multi-Raft protocol configuration.
-     *
-     * @param id the ID to check
-     * @return indicates whether the given ID contains a multi-Raft protocol configuration
-     */
-    boolean hasMultiRaftProtocol(I id);
-
-    /**
-     * Returns the multi-Raft protocol configuration for the given ID.
-     *
-     * @param id the primitive ID
-     * @return the multi-Raft protocol configuration for the given ID
-     */
-    MultiRaftProtocol getMultiRaftProtocol(I id);
-
-    /**
-     * Returns a boolean indicating whether the given ID contains a multi-primary protocol configuration.
-     *
-     * @param id the ID to check
-     * @return indicates whether the given ID contains a multi-primary protocol configuration
-     */
-    boolean hasMultiPrimaryProtocol(I id);
-
-    /**
-     * Returns the multi-primary protocol configuration for the given ID.
-     *
-     * @param id the primitive ID
-     * @return the multi-primary protocol configuration for the given ID
-     */
-    MultiPrimaryProtocol getMultiPrimaryProtocol(I id);
-
-    /**
-     * Returns a boolean indicating whether the given ID contains a distributed log protocol configuration.
-     *
-     * @param id the ID to check
-     * @return indicates whether the given ID contains a distributed log protocol configuration
-     */
-    boolean hasDistributedLogProtocol(I id);
-
-    /**
-     * Returns the distributed log protocol configuration for the given ID.
-     *
-     * @param id the primitive ID
-     * @return the distributed log protocol configuration for the given ID
-     */
-    DistributedLogProtocol getDistributedLogProtocol(I id);
   }
 }

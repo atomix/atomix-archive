@@ -15,10 +15,7 @@
  */
 package io.atomix.core.impl;
 
-import java.nio.charset.StandardCharsets;
-import java.time.Duration;
 import java.util.Collection;
-import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -26,15 +23,12 @@ import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
 import io.atomix.cluster.ClusterMembershipService;
+import io.atomix.cluster.GrpcService;
 import io.atomix.cluster.messaging.ClusterCommunicationService;
 import io.atomix.cluster.messaging.ClusterEventService;
 import io.atomix.core.map.AsyncAtomicMap;
-import io.atomix.core.map.AtomicMapType;
-import io.atomix.core.map.impl.MapProxy;
-import io.atomix.core.map.impl.MapService;
-import io.atomix.core.map.impl.PartitionedAsyncAtomicMap;
-import io.atomix.core.map.impl.RawAsyncAtomicMap;
-import io.atomix.core.map.impl.TranscodingAsyncAtomicMap;
+import io.atomix.core.map.AtomicMapConfig;
+import io.atomix.core.map.impl.DefaultAtomicMapBuilder;
 import io.atomix.primitive.DistributedPrimitive;
 import io.atomix.primitive.PrimitiveCache;
 import io.atomix.primitive.PrimitiveException;
@@ -43,43 +37,37 @@ import io.atomix.primitive.PrimitiveManagementService;
 import io.atomix.primitive.PrimitiveRegistry;
 import io.atomix.primitive.PrimitiveType;
 import io.atomix.primitive.PrimitiveTypeRegistry;
+import io.atomix.primitive.partition.PartitionGroupMembershipService;
 import io.atomix.primitive.partition.PartitionGroupTypeRegistry;
-import io.atomix.primitive.partition.PartitionId;
 import io.atomix.primitive.partition.PartitionService;
-import io.atomix.primitive.partition.Partitioner;
 import io.atomix.primitive.protocol.PrimitiveProtocolTypeRegistry;
-import io.atomix.primitive.service.impl.ServiceId;
 import io.atomix.primitive.session.SessionIdService;
-import io.atomix.primitive.session.impl.DefaultSessionClient;
 import io.atomix.primitive.session.impl.PrimitiveSessionIdManager;
 import io.atomix.utils.component.Component;
 import io.atomix.utils.component.Dependency;
 import io.atomix.utils.component.Managed;
 import io.atomix.utils.concurrent.ThreadContextFactory;
 import io.atomix.utils.concurrent.ThreadService;
-import org.apache.commons.lang3.tuple.Pair;
 
 /**
  * Core primitive registry.
  */
 @Component
 public class PrimitiveRegistryImpl implements PrimitiveRegistry, Managed {
-
   @Dependency
   private PartitionService partitionService;
-
   @Dependency
   private ClusterMembershipService membershipService;
-
+  @Dependency
+  private PartitionGroupMembershipService groupMembershipService;
+  @Dependency
+  private GrpcService grpcService;
   @Dependency
   private ClusterCommunicationService communicationService;
-
   @Dependency
   private PrimitiveTypeRegistry primitiveTypeRegistry;
-
   @Dependency
   private PrimitiveSessionIdManager sessionIdManager;
-
   @Dependency
   private ThreadService threadService;
 
@@ -140,29 +128,12 @@ public class PrimitiveRegistryImpl implements PrimitiveRegistry, Managed {
   @Override
   @SuppressWarnings("unchecked")
   public CompletableFuture<Void> start() {
-    Map<PartitionId, RawAsyncAtomicMap> partitions = partitionService.getSystemPartitionGroup().getPartitions().stream()
-        .map(partition -> {
-          ServiceId serviceId = ServiceId.newBuilder()
-              .setName("atomix-primitives")
-              .setType(MapService.TYPE.name())
-              .build();
-          MapProxy proxy = new MapProxy(new DefaultSessionClient(serviceId, partition.getClient()));
-          return Pair.of(partition.id(), new RawAsyncAtomicMap(proxy, Duration.ofSeconds(30), new PartialPrimitiveManagementService()));
-        }).collect(Collectors.toMap(Pair::getKey, Pair::getValue));
-    return new PartitionedAsyncAtomicMap(
-        "primitives",
-        AtomicMapType.instance(),
-        (Map) partitions,
-        Partitioner.MURMUR3)
-        .connect()
-        .thenApply(map -> new TranscodingAsyncAtomicMap<String, String, String, byte[]>(
-            map,
-            key -> key,
-            key -> key,
-            value -> value.getBytes(StandardCharsets.UTF_8),
-            bytes -> new String(bytes, StandardCharsets.UTF_8)))
+    return new DefaultAtomicMapBuilder<String, String>(
+        "atomix-primitives", new AtomicMapConfig(), new PartialPrimitiveManagementService())
+        .withProtocol(partitionService.getSystemPartitionGroup().newProtocol())
+        .buildAsync()
         .thenAccept(map -> {
-          this.primitives = map;
+          this.primitives = map.async();
         });
   }
 
@@ -225,6 +196,16 @@ public class PrimitiveRegistryImpl implements PrimitiveRegistry, Managed {
     @Override
     public ThreadContextFactory getThreadFactory() {
       return threadService.getFactory();
+    }
+
+    @Override
+    public PartitionGroupMembershipService getGroupMembershipService() {
+      return groupMembershipService;
+    }
+
+    @Override
+    public GrpcService getGrpcService() {
+      return grpcService;
     }
   }
 }

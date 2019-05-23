@@ -16,7 +16,7 @@
 package io.atomix.core.collection;
 
 import com.google.common.collect.Lists;
-import io.atomix.primitive.ManagedPrimitiveBuilder;
+import io.atomix.core.impl.ManagedPrimitiveBuilder;
 import io.atomix.primitive.PrimitiveManagementService;
 import io.atomix.primitive.PrimitiveType;
 import io.atomix.utils.serializer.Namespaces;
