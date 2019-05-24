@@ -36,6 +36,8 @@ import io.atomix.cluster.NodeId;
 import io.atomix.cluster.discovery.BootstrapDiscoveryConfig;
 import io.atomix.cluster.discovery.BootstrapDiscoveryProvider;
 import io.atomix.cluster.discovery.Node;
+import io.atomix.cluster.grpc.impl.ChannelServiceImpl;
+import io.atomix.cluster.grpc.impl.ServiceRegistryImpl;
 import io.atomix.cluster.messaging.impl.TestMessagingServiceFactory;
 import org.junit.Test;
 
@@ -73,12 +75,15 @@ public class ClusterMembershipManagerTest {
     MemberService memberService = new MemberManager(localMember);
     BootstrapDiscoveryProvider discoveryProvider = new BootstrapDiscoveryProvider();
     NodeDiscoveryManager discoveryService = new NodeDiscoveryManager(discoveryProvider);
-    GrpcServiceImpl grpcService = new GrpcServiceImpl();
-    return grpcService.start(new ClusterConfig()
+    ServiceRegistryImpl serviceRegistry = new ServiceRegistryImpl();
+    ChannelServiceImpl channelService = new ChannelServiceImpl();
+    ClusterConfig config = new ClusterConfig()
         .setNodeConfig(new MemberConfig()
             .setId(String.valueOf(memberId))
             .setHost("localhost")
-            .setPort(5000 + memberId)))
+            .setPort(5000 + memberId));
+    return serviceRegistry.start(config)
+        .thenCompose(v -> channelService.start(config))
         .thenCompose(v -> discoveryProvider.start(new BootstrapDiscoveryConfig()
             .setNodes(bootstrapLocations.stream()
                 .map(node -> new NodeConfig()
@@ -89,7 +94,8 @@ public class ClusterMembershipManagerTest {
         .thenCompose(v -> discoveryService.start())
         .thenCompose(v -> {
           ClusterMembershipManager membershipManager = new ClusterMembershipManager(
-              grpcService,
+              serviceRegistry,
+              channelService,
               memberService,
               discoveryService);
           return membershipManager.start(new MembershipConfig()).thenApply(v2 -> membershipManager);

@@ -30,7 +30,6 @@ import com.google.common.collect.Maps;
 import io.atomix.cluster.ClusterMembershipService;
 import io.atomix.cluster.ClusterMessage;
 import io.atomix.cluster.GossipMessage;
-import io.atomix.cluster.GrpcService;
 import io.atomix.cluster.JoinRequest;
 import io.atomix.cluster.JoinResponse;
 import io.atomix.cluster.LeaveRequest;
@@ -48,6 +47,8 @@ import io.atomix.cluster.VerifyResponse;
 import io.atomix.cluster.discovery.DiscoveryEvent;
 import io.atomix.cluster.discovery.Node;
 import io.atomix.cluster.discovery.NodeDiscoveryService;
+import io.atomix.cluster.grpc.ChannelService;
+import io.atomix.cluster.grpc.ServiceRegistry;
 import io.atomix.utils.component.Component;
 import io.atomix.utils.component.Dependency;
 import io.atomix.utils.component.Managed;
@@ -65,11 +66,11 @@ public class ClusterMembershipManager extends MembershipServiceGrpc.MembershipSe
   private static final Logger LOGGER = LoggerFactory.getLogger(ClusterMembershipManager.class);
 
   @Dependency
-  private GrpcService grpc;
-
+  private ServiceRegistry serviceRegistry;
+  @Dependency
+  private ChannelService channelService;
   @Dependency
   private MemberService memberService;
-
   @Dependency
   private NodeDiscoveryService discoveryService;
 
@@ -93,8 +94,13 @@ public class ClusterMembershipManager extends MembershipServiceGrpc.MembershipSe
   ClusterMembershipManager() {
   }
 
-  ClusterMembershipManager(GrpcService grpc, MemberService memberService, NodeDiscoveryService discoveryService) {
-    this.grpc = grpc;
+  ClusterMembershipManager(
+      ServiceRegistry serviceRegistry,
+      ChannelService channelService,
+      MemberService memberService,
+      NodeDiscoveryService discoveryService) {
+    this.serviceRegistry = serviceRegistry;
+    this.channelService = channelService;
     this.memberService = memberService;
     this.discoveryService = discoveryService;
   }
@@ -143,7 +149,7 @@ public class ClusterMembershipManager extends MembershipServiceGrpc.MembershipSe
   private MemberStream getStream(Member member) {
     MemberId memberId = getMemberId(member);
     return streams.computeIfAbsent(memberId, id -> {
-      MembershipServiceGrpc.MembershipServiceStub stub = MembershipServiceGrpc.newStub(grpc.getChannel(member.getHost(), member.getPort()));
+      MembershipServiceGrpc.MembershipServiceStub stub = MembershipServiceGrpc.newStub(channelService.getChannel(member.getHost(), member.getPort()));
       MemberStream s = new MemberStream(memberId, null);
       s.stream = stub.join(s);
       return s;
@@ -650,7 +656,7 @@ public class ClusterMembershipManager extends MembershipServiceGrpc.MembershipSe
   public CompletableFuture<Void> start(MembershipConfig config) {
     this.config = config;
     this.localMember = copy(memberService.getLocalMember());
-    grpc.register(this);
+    serviceRegistry.register(this);
     discoveryService.addListener(discoveryEventListener);
 
     LOGGER.info("{} - Member activated: {}", getLocalMemberId(), localMember);

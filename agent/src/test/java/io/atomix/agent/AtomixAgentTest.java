@@ -25,13 +25,10 @@ import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.List;
 
-import io.atomix.core.Atomix;
-import io.atomix.core.AtomixConfig;
-import io.atomix.core.map.AtomicMap;
+import io.atomix.server.AtomixConfig;
 import net.sourceforge.argparse4j.inf.Namespace;
 import org.junit.After;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
@@ -64,70 +61,6 @@ public class AtomixAgentTest {
     final AtomixConfig config = AtomixAgent.createConfig(namespace);
     assertEquals("member-1", config.getClusterConfig().getNodeConfig().getId().id());
     assertEquals("localhost:5000", config.getClusterConfig().getNodeConfig().getAddress().toString());
-  }
-
-  @Test
-  @Ignore
-  public void testFormCluster() throws Exception {
-    String path = getClass().getClassLoader().getResource("test.conf").getPath();
-
-    Thread thread1 = new Thread(() -> {
-      try {
-        AtomixAgent.main(new String[]{"-m", "node1", "-a", "localhost:5000", "-c", path, "-p", "6000"});
-      } catch (Exception e) {
-        e.printStackTrace();
-        Thread.currentThread().interrupt();
-      }
-    });
-
-    Thread thread2 = new Thread(() -> {
-      try {
-        AtomixAgent.main(new String[]{"-m", "node2", "-a", "localhost:5001", "-c", path, "-p", "6001"});
-        AtomixAgent.main(new String[]{"node2@localhost:5001", "-c", path});
-      } catch (Exception e) {
-        e.printStackTrace();
-        Thread.currentThread().interrupt();
-      }
-    });
-
-    Thread thread3 = new Thread(() -> {
-      try {
-        AtomixAgent.main(new String[]{"-m", "node3", "-a", "localhost:5002", "-c", path, "-p", "6002"});
-      } catch (Exception e) {
-        e.printStackTrace();
-        Thread.currentThread().interrupt();
-      }
-    });
-
-    thread1.start();
-    thread2.start();
-    thread3.start();
-
-    Thread.sleep(5000);
-
-    Atomix client1 = Atomix.builder(path)
-        .withMemberId("client1")
-        .withHost("localhost")
-        .withPort(5003)
-        .build();
-    client1.start().join();
-
-    Atomix client2 = Atomix.builder(path)
-        .withMemberId("client2")
-        .withHost("localhost")
-        .withPort(5004)
-        .build();
-    client2.start().join();
-
-    AtomicMap<String, String> map1 = client1.<String, String>atomicMapBuilder("test").build();
-    AtomicMap<String, String> map2 = client2.<String, String>atomicMapBuilder("test").build();
-
-    map1.put("foo", "bar");
-    assertEquals("bar", map2.get("foo").value());
-
-    thread1.interrupt();
-    thread2.interrupt();
-    thread3.interrupt();
   }
 
   @Before

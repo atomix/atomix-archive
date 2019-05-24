@@ -11,8 +11,9 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 
 import com.google.protobuf.ByteString;
-import io.atomix.cluster.GrpcService;
 import io.atomix.cluster.MemberService;
+import io.atomix.cluster.grpc.ChannelService;
+import io.atomix.cluster.grpc.ServiceRegistry;
 import io.atomix.cluster.messaging.Message;
 import io.atomix.cluster.messaging.MessagingConfig;
 import io.atomix.cluster.messaging.MessagingService;
@@ -30,12 +31,12 @@ import io.grpc.stub.StreamObserver;
  */
 @Component(MessagingConfig.class)
 public class GrpcMessagingService extends MessagingServiceGrpc.MessagingServiceImplBase implements MessagingService, Managed<MessagingConfig> {
-
   @Dependency
   private MemberService memberService;
-
   @Dependency
-  private GrpcService grpc;
+  private ServiceRegistry grpc;
+  @Dependency
+  private ChannelService channelService;
 
   private final Map<Address, MessagingServiceGrpc.MessagingServiceStub> services = new ConcurrentHashMap<>();
   private final Map<String, BiConsumer<Message, StreamObserver<Message>>> handlers = new ConcurrentHashMap<>();
@@ -110,7 +111,7 @@ public class GrpcMessagingService extends MessagingServiceGrpc.MessagingServiceI
   private MessagingServiceGrpc.MessagingServiceStub getService(Address address) {
     MessagingServiceGrpc.MessagingServiceStub service = services.get(address);
     if (service == null) {
-      service = services.computeIfAbsent(address, a -> MessagingServiceGrpc.newStub(grpc.getChannel(address.host(), address.port())));
+      service = services.computeIfAbsent(address, a -> MessagingServiceGrpc.newStub(channelService.getChannel(address.host(), address.port())));
     }
     return service;
   }

@@ -15,7 +15,6 @@
  */
 package ${proxyClass.packageName};
 
-import io.atomix.primitive.PrimitiveManagementService;
 import io.atomix.primitive.service.ServiceClient;
 import io.atomix.primitive.service.impl.ServiceId;
 import io.atomix.primitive.service.impl.RequestContext;

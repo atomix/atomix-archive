@@ -29,6 +29,11 @@
   <dependencies>
     <dependency>
       <groupId>io.atomix</groupId>
+      <artifactId>atomix-api</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>io.atomix</groupId>
       <artifactId>atomix-cluster</artifactId>
       <version>${project.version}</version>
     </dependency>

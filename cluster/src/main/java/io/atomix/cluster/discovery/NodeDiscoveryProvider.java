@@ -30,7 +30,6 @@ import io.atomix.utils.event.Listenable;
  * information. Membership providers are responsible for providing an actively managed view of cluster membership.
  *
  * @see BootstrapDiscoveryProvider
- * @see MulticastDiscoveryProvider
  */
 public interface NodeDiscoveryProvider extends Listenable<DiscoveryEvent>, Configured<NodeDiscoveryConfig> {
 

@@ -15,7 +15,6 @@
  */
 package ${proxyClass.packageName};
 
-import io.atomix.primitive.PrimitiveManagementService;
 import io.atomix.primitive.partition.PartitionId;
 import io.atomix.primitive.proxy.SessionEnabledPrimitiveProxy;
 import io.atomix.primitive.service.impl.ServiceId;

@@ -27,8 +27,8 @@ import com.google.common.collect.Lists;
 import io.atomix.cluster.MemberId;
 import io.atomix.cluster.NodeConfig;
 import io.atomix.cluster.discovery.BootstrapDiscoveryConfig;
-import io.atomix.core.Atomix;
-import io.atomix.core.AtomixConfig;
+import io.atomix.server.AtomixConfig;
+import io.atomix.server.AtomixServer;
 import io.atomix.utils.net.Address;
 import io.atomix.utils.net.MalformedAddressException;
 import net.sourceforge.argparse4j.ArgumentParsers;
@@ -61,13 +61,13 @@ public class AtomixAgent {
 
     final Logger logger = createLogger(namespace);
 
-    final Atomix atomix = buildAtomix(namespace);
+    final AtomixServer atomix = buildServer(namespace);
     atomix.start().join();
-    logger.info("Atomix listening at {}", atomix.getMembershipService().getLocalMember().getPort());
+    logger.info("Atomix listening at {}", atomix.getAddress().port());
 
-    synchronized (Atomix.class) {
+    synchronized (AtomixServer.class) {
       while (atomix.isRunning()) {
-        Atomix.class.wait();
+        AtomixServer.class.wait();
       }
     }
   }
@@ -273,9 +273,9 @@ public class AtomixAgent {
     AtomixConfig config;
     if (configFiles != null && !configFiles.isEmpty()) {
       System.setProperty("atomix.config.resources", "");
-      config = Atomix.config(configFiles);
+      config = AtomixServer.config(configFiles);
     } else {
-      config = Atomix.config();
+      config = AtomixServer.config();
     }
 
     if (memberId != null) {
@@ -308,8 +308,8 @@ public class AtomixAgent {
    * @param namespace the namespace from which to build the instance
    * @return the Atomix instance
    */
-  private static Atomix buildAtomix(Namespace namespace) {
-    return Atomix.builder(createConfig(namespace)).withShutdownHookEnabled().build();
+  private static AtomixServer buildServer(Namespace namespace) {
+    return AtomixServer.builder(createConfig(namespace)).withShutdownHookEnabled().build();
   }
 
   static MemberId parseMemberId(String address) {
