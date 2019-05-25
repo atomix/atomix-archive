@@ -69,6 +69,7 @@ public abstract class AbstractPrimitiveTest {
   @Before
   public void setupTest() throws Exception {
     deleteData();
+    clients = new CopyOnWriteArrayList<>();
     server = AtomixServer.builder()
         .withMemberId("test")
         .withHost("localhost")
@@ -89,7 +90,7 @@ public abstract class AbstractPrimitiveTest {
             .withDataDirectory(new File("target/test-data/log"))
             .build())
         .build();
-    clients = new CopyOnWriteArrayList<>();
+    server.start().get(30, TimeUnit.SECONDS);
   }
 
   @After

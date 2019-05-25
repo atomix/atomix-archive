@@ -96,7 +96,7 @@ public class LogPartitionSession implements LogSession, Managed<LogPartitionSess
             election,
             GroupMember.newBuilder()
                 .setMemberId(managementService.getMembershipService().getLocalMemberId().toString())
-                .setMemberGroupId(memberGroup.id().id())
+                .setMemberGroupId(memberGroup.id().toString())
                 .build(),
             metadata.getReplicationFactor()))
         .withThreadContextFactory(threadFactory)

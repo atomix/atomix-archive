@@ -233,7 +233,7 @@ public class LogPartitionGroup implements ManagedPartitionGroup, ServiceProvider
       }
 
       if (managementService.getGroupMembershipService().getMembership(name).members().contains(localMemberId)) {
-        if (!topic.getReadyList().contains(localMemberId.id())) {
+        if (!topic.getReadyList().contains(localMemberId.toString())) {
           Futures.allOf(partitions.values().stream().map(p -> p.join(managementService)))
               .thenRun(() -> {
                 managementService.getMetadataService().update(
@@ -245,10 +245,10 @@ public class LogPartitionGroup implements ManagedPartitionGroup, ServiceProvider
                       }
 
                       LogTopicMetadata topicMetadata = metadata.getTopicsMap().get(topic.getTopic());
-                      if (topicMetadata != null && !topicMetadata.getReadyList().contains(localMemberId.id())) {
+                      if (topicMetadata != null && !topicMetadata.getReadyList().contains(localMemberId.toString())) {
                         return LogPartitionGroupMetadata.newBuilder(metadata)
                             .putTopics(topicMetadata.getTopic(), LogTopicMetadata.newBuilder(topic)
-                                .addReady(localMemberId.id())
+                                .addReady(localMemberId.toString())
                                 .build())
                             .build();
                       }

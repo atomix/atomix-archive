@@ -9,6 +9,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
@@ -294,20 +295,25 @@ public abstract class AbstractAsyncPrimitive<P extends AsyncPrimitive> implement
    */
   protected <T> CompletableFuture<T> execute(Consumer<StreamObserver<T>> callback) {
     CompletableFuture<T> future = new CompletableFuture<>();
+    AtomicBoolean complete = new AtomicBoolean();
     callback.accept(new StreamObserver<T>() {
       @Override
       public void onNext(T response) {
-        context.execute(() -> future.complete(response));
+        if (complete.compareAndSet(false, true)) {
+          context.execute(() -> future.complete(response));
+        }
       }
 
       @Override
       public void onError(Throwable t) {
-        context.execute(() -> future.completeExceptionally(t));
+        if (complete.compareAndSet(false, true)) {
+          context.execute(() -> future.completeExceptionally(t));
+        }
       }
 
       @Override
       public void onCompleted() {
-        if (!future.isDone()) {
+        if (complete.compareAndSet(false, true)) {
           future.complete(null);
         }
       }

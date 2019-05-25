@@ -3,6 +3,7 @@ package io.atomix.cluster.impl;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
+import com.google.common.base.Strings;
 import io.atomix.cluster.Member;
 import io.atomix.cluster.MemberConfig;
 import io.atomix.cluster.MemberService;
@@ -42,9 +43,9 @@ public class MemberManager implements MemberService, Managed<MemberConfig> {
         .setNamespace(config.getId().namespace())
         .setHost(config.getHost())
         .setPort(config.getPort())
-        .setHostId(config.getHostId())
-        .setRackId(config.getRackId())
-        .setZoneId(config.getZoneId())
+        .setHostId(Strings.nullToEmpty(config.getHostId()))
+        .setRackId(Strings.nullToEmpty(config.getRackId()))
+        .setZoneId(Strings.nullToEmpty(config.getZoneId()))
         .putAllProperties((Map) config.getProperties())
         .setVersion(versionService.version().toString())
         .build();

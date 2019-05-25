@@ -31,7 +31,7 @@ import io.atomix.primitive.partition.PartitionGroup;
 import io.atomix.primitive.partition.PartitionGroupConfig;
 import io.atomix.primitive.protocol.PrimitiveProtocol;
 import io.atomix.primitive.protocol.PrimitiveProtocolConfig;
-import io.atomix.server.impl.AtomixManager;
+import io.atomix.server.impl.AtomixServerManager;
 import io.atomix.server.utils.PolymorphicConfigMapper;
 import io.atomix.server.utils.PolymorphicTypeMapper;
 import io.atomix.utils.Version;
@@ -323,7 +323,7 @@ public class AtomixServer {
   private final AtomixConfig config;
   private final ClassLoader classLoader;
   private final Component.Scope scope;
-  private volatile ComponentManager<AtomixConfig, AtomixManager> manager;
+  private volatile ComponentManager<AtomixConfig, AtomixServerManager> manager;
   private volatile AtomixService atomixService;
   private final boolean enableShutdownHook;
   private final AtomicBoolean started = new AtomicBoolean();
@@ -394,7 +394,7 @@ public class AtomixServer {
    * @return a future to be completed once the instance has completed startup
    */
   public synchronized CompletableFuture<AtomixServer> start() {
-    manager = new ComponentManager<>(AtomixManager.class, classLoader, scope);
+    manager = new ComponentManager<>(AtomixServerManager.class, classLoader, scope);
     return manager.start(config).thenAccept(atomixManager -> {
       this.atomixService = atomixManager;
       LOGGER.info(atomixService.getVersion().toString());

@@ -96,7 +96,7 @@ public class RaftPartitionServer {
       }
       serverOpenFuture = server.bootstrap(partition.members()
           .stream()
-          .map(MemberId::id)
+          .map(MemberId::toString)
           .collect(Collectors.toList()));
     } else {
       serverOpenFuture = CompletableFuture.completedFuture(null);
@@ -161,7 +161,7 @@ public class RaftPartitionServer {
   }
 
   private RaftServer buildServer(StateMachine stateMachine) {
-    return RaftServer.builder(localMemberId.id())
+    return RaftServer.builder(localMemberId.toString())
         .withName(partition.name())
         .withProtocol(new RaftServerCommunicator(
             partition.name(),

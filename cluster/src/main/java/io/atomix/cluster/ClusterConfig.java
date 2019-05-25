@@ -15,6 +15,7 @@
  */
 package io.atomix.cluster;
 
+import io.atomix.cluster.discovery.BootstrapDiscoveryConfig;
 import io.atomix.cluster.discovery.NodeDiscoveryConfig;
 import io.atomix.cluster.messaging.MessagingConfig;
 import io.atomix.utils.config.Config;
@@ -29,7 +30,7 @@ public class ClusterConfig implements Config {
 
   private String clusterId = DEFAULT_CLUSTER_NAME;
   private MemberConfig nodeConfig = new MemberConfig();
-  private NodeDiscoveryConfig discoveryConfig;
+  private NodeDiscoveryConfig discoveryConfig = new BootstrapDiscoveryConfig();
   private MembershipConfig membershipConfig = new MembershipConfig();
   private MessagingConfig messagingConfig = new MessagingConfig();
 

@@ -434,8 +434,10 @@ public abstract class SessionManagedPrimitiveService extends AbstractPrimitiveSe
     }
 
     long sequenceNumber = command.value().getContext().getSequenceNumber();
-    session.registerResultFuture(sequenceNumber, future);
-    session.setCommandSequence(sequenceNumber);
+    if (sequenceNumber > 0) {
+      session.registerResultFuture(sequenceNumber, future);
+      session.setCommandSequence(sequenceNumber);
+    }
     session.setLastApplied(getCurrentIndex());
 
     future.complete(SessionCommandResponse.newBuilder()
@@ -520,7 +522,7 @@ public abstract class SessionManagedPrimitiveService extends AbstractPrimitiveSe
     // Prepend the stream to the list of streams so it's easily identifiable by the client.
     List<SessionStreamContext> streams = new LinkedList<>();
     streams.add(SessionStreamContext.newBuilder()
-        .setStreamId(sequenceNumber)
+        .setStreamId(getCurrentIndex())
         .setIndex(getCurrentIndex())
         .build());
     session.getStreams().forEach(stream -> streams.add(SessionStreamContext.newBuilder()
@@ -534,7 +536,7 @@ public abstract class SessionManagedPrimitiveService extends AbstractPrimitiveSe
     OperationExecutor operation = executor.getExecutor(commandId);
     OperationCodec codec = this.codec.getOperation(commandId);
     StreamType<?> streamType = executor.getStreamType(commandId);
-    PrimitiveSessionStream stream = session.addStream(sequenceNumber, streamType);
+    PrimitiveSessionStream stream = session.addStream(getCurrentIndex(), streamType);
 
     // Add the stream handler to the stream.
     stream.handler(new EncodingStreamHandler<SessionStreamResponse, SessionResponse>(
@@ -547,7 +549,7 @@ public abstract class SessionManagedPrimitiveService extends AbstractPrimitiveSe
     SessionCommandResponse response = SessionCommandResponse.newBuilder()
         .setContext(SessionResponseContext.newBuilder()
             .setIndex(getCurrentIndex())
-            .setSequence(sequenceNumber)
+            .setSequence(session.getCommandSequence())
             .addAllStreams(streams)
             .build())
         .build();
@@ -565,9 +567,11 @@ public abstract class SessionManagedPrimitiveService extends AbstractPrimitiveSe
     }
 
     // Update the session's sequence number and last applied index.
-    session.setCommandSequence(sequenceNumber);
+    if (sequenceNumber > 0) {
+      session.setCommandSequence(sequenceNumber);
+      session.registerResultFuture(sequenceNumber, CompletableFuture.completedFuture(response));
+    }
     session.setLastApplied(getCurrentIndex());
-    session.registerResultFuture(sequenceNumber, CompletableFuture.completedFuture(response));
     future.complete(null);
   }
 

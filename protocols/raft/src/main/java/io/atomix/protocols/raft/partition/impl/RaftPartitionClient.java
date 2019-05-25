@@ -119,7 +119,7 @@ public class RaftPartitionClient implements PartitionClient, Managed<RaftPartiti
     }
     return client.connect(partition.members()
         .stream()
-        .map(MemberId::id)
+        .map(MemberId::toString)
         .collect(Collectors.toList()))
         .whenComplete((r, e) -> {
           if (e == null) {

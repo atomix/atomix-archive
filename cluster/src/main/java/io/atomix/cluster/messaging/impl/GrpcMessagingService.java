@@ -1,5 +1,6 @@
 package io.atomix.cluster.messaging.impl;
 
+import java.net.ConnectException;
 import java.time.Duration;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -87,6 +88,8 @@ public class GrpcMessagingService extends MessagingServiceGrpc.MessagingServiceI
         }
         if (streamObserver != null) {
           streamObserver.onNext(message);
+        } else {
+          responseObserver.onError(new ConnectException());
         }
       }
 
@@ -120,6 +123,7 @@ public class GrpcMessagingService extends MessagingServiceGrpc.MessagingServiceI
   public CompletableFuture<Void> sendAsync(Address address, String type, byte[] payload) {
     CompletableFuture<Void> future = new CompletableFuture<>();
     getService(address).sendAndReceive(Message.newBuilder()
+        .setType(type)
         .setPayload(ByteString.copyFrom(payload))
         .build(), new StreamObserver<Message>() {
       @Override
@@ -161,6 +165,7 @@ public class GrpcMessagingService extends MessagingServiceGrpc.MessagingServiceI
       @Override
       public void next(byte[] value) {
         stream.onNext(Message.newBuilder()
+            .setType(type)
             .setPayload(ByteString.copyFrom(value))
             .build());
       }
@@ -182,6 +187,7 @@ public class GrpcMessagingService extends MessagingServiceGrpc.MessagingServiceI
   public CompletableFuture<byte[]> sendAndReceive(Address address, String type, byte[] payload, Duration timeout, Executor executor) {
     CompletableFuture<byte[]> future = new CompletableFuture<>();
     getService(address).sendAndReceive(Message.newBuilder()
+        .setType(type)
         .setPayload(ByteString.copyFrom(payload))
         .build(), new StreamObserver<Message>() {
       @Override
@@ -223,6 +229,7 @@ public class GrpcMessagingService extends MessagingServiceGrpc.MessagingServiceI
       @Override
       public void next(byte[] value) {
         stream.onNext(Message.newBuilder()
+            .setType(type)
             .setPayload(ByteString.copyFrom(value))
             .build());
       }
@@ -243,10 +250,13 @@ public class GrpcMessagingService extends MessagingServiceGrpc.MessagingServiceI
 
   @Override
   public CompletableFuture<Void> sendAndReceiveStream(Address address, String type, byte[] payload, StreamHandler<byte[]> handler, Duration timeout, Executor executor) {
-    StreamObserver<Message> stream = getService(address).sendAndReceiveStream(new StreamObserver<Message>() {
+    getService(address).receiveStream(Message.newBuilder()
+        .setType(type)
+        .setPayload(ByteString.copyFrom(payload))
+        .build(), new StreamObserver<Message>() {
       @Override
-      public void onNext(Message message) {
-        handler.next(message.getPayload().toByteArray());
+      public void onNext(Message value) {
+        handler.next(value.getPayload().toByteArray());
       }
 
       @Override
@@ -259,10 +269,6 @@ public class GrpcMessagingService extends MessagingServiceGrpc.MessagingServiceI
         handler.complete();
       }
     });
-    stream.onNext(Message.newBuilder()
-        .setPayload(ByteString.copyFrom(payload))
-        .build());
-    stream.onCompleted();
     return CompletableFuture.completedFuture(null);
   }
 
@@ -288,6 +294,7 @@ public class GrpcMessagingService extends MessagingServiceGrpc.MessagingServiceI
       @Override
       public void next(byte[] value) {
         stream.onNext(Message.newBuilder()
+            .setType(type)
             .setPayload(ByteString.copyFrom(value))
             .build());
       }
@@ -320,6 +327,7 @@ public class GrpcMessagingService extends MessagingServiceGrpc.MessagingServiceI
     handlers.put(type, (message, stream) -> {
       try {
         stream.onNext(Message.newBuilder()
+            .setType(type)
             .setPayload(ByteString.copyFrom(handler.apply(message.getPayload().toByteArray())))
             .build());
         stream.onCompleted();
@@ -336,6 +344,7 @@ public class GrpcMessagingService extends MessagingServiceGrpc.MessagingServiceI
           .whenComplete((result, error) -> {
             if (error == null) {
               stream.onNext(Message.newBuilder()
+                  .setType(type)
                   .setPayload(ByteString.copyFrom(result))
                   .build());
               stream.onCompleted();
@@ -362,6 +371,7 @@ public class GrpcMessagingService extends MessagingServiceGrpc.MessagingServiceI
             if (error == null) {
               if (result != null) {
                 stream.onNext(Message.newBuilder()
+                    .setType(type)
                     .setPayload(ByteString.copyFrom(result))
                     .build());
               }
@@ -378,6 +388,7 @@ public class GrpcMessagingService extends MessagingServiceGrpc.MessagingServiceI
             if (error == null) {
               if (result != null) {
                 stream.onNext(Message.newBuilder()
+                    .setType(type)
                     .setPayload(ByteString.copyFrom(result))
                     .build());
               }
@@ -398,6 +409,7 @@ public class GrpcMessagingService extends MessagingServiceGrpc.MessagingServiceI
         @Override
         public void next(byte[] value) {
           stream.onNext(Message.newBuilder()
+              .setType(type)
               .setPayload(ByteString.copyFrom(value))
               .build());
         }
@@ -422,6 +434,7 @@ public class GrpcMessagingService extends MessagingServiceGrpc.MessagingServiceI
         @Override
         public void next(byte[] value) {
           stream.onNext(Message.newBuilder()
+              .setType(type)
               .setPayload(ByteString.copyFrom(value))
               .build());
         }

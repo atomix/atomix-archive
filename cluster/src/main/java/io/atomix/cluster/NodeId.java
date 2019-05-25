@@ -44,7 +44,10 @@ public class NodeId implements Identifier<String>, Comparable<NodeId> {
    * @return node id
    */
   public static NodeId from(String id) {
-    return new NodeId(id, DEFAULT_NAMESPACE);
+    int index = id.indexOf('.');
+    return index != -1
+        ? new NodeId(id.substring(index + 1), id.substring(0, index))
+        : new NodeId(id, DEFAULT_NAMESPACE);
   }
 
   /**

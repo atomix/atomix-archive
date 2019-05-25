@@ -94,7 +94,7 @@ public class LogPartitionServer implements Managed<LogPartitionServer> {
             election,
             GroupMember.newBuilder()
                 .setMemberId(managementService.getMembershipService().getLocalMemberId().toString())
-                .setMemberGroupId(memberGroup.id().id())
+                .setMemberGroupId(memberGroup.id().toString())
                 .build(),
             metadata.getReplicationFactor()))
         .withReplicationFactor(metadata.getReplicationFactor())

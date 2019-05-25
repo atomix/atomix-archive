@@ -191,8 +191,8 @@ public class HashBasedPrimaryElection implements PrimaryElection {
       Member member = clusterMembershipService.getMember(memberId);
       if (member != null && member.getState() != Member.State.DEAD) {
         candidates.add(GroupMember.newBuilder()
-            .setMemberId(memberId.id())
-            .setMemberGroupId(memberId.id())
+            .setMemberId(memberId.toString())
+            .setMemberGroupId(memberId.toString())
             .build());
       }
     }

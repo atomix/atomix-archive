@@ -15,9 +15,12 @@
  */
 package io.atomix.server.impl;
 
+import java.util.concurrent.CompletableFuture;
+
 import io.atomix.cluster.ClusterMembershipService;
 import io.atomix.cluster.ClusterService;
 import io.atomix.cluster.VersionService;
+import io.atomix.cluster.grpc.ServiceRegistry;
 import io.atomix.cluster.messaging.ClusterCommunicationService;
 import io.atomix.cluster.messaging.ClusterEventService;
 import io.atomix.cluster.messaging.ClusterStreamingService;
@@ -27,6 +30,13 @@ import io.atomix.primitive.partition.PartitionService;
 import io.atomix.primitive.protocol.PrimitiveProtocolTypeRegistry;
 import io.atomix.server.AtomixConfig;
 import io.atomix.server.AtomixService;
+import io.atomix.server.counter.CounterServiceImpl;
+import io.atomix.server.election.LeaderElectionServiceImpl;
+import io.atomix.server.lock.LockServiceImpl;
+import io.atomix.server.log.LogServiceImpl;
+import io.atomix.server.map.MapServiceImpl;
+import io.atomix.server.set.SetServiceImpl;
+import io.atomix.server.value.ValueServiceImpl;
 import io.atomix.utils.Version;
 import io.atomix.utils.component.Component;
 import io.atomix.utils.component.Dependency;
@@ -38,7 +48,7 @@ import io.atomix.utils.concurrent.ThreadService;
  * Default primitives service.
  */
 @Component(AtomixConfig.class)
-public class AtomixManager implements AtomixService, Managed<AtomixConfig> {
+public class AtomixServerManager implements AtomixService, Managed<AtomixConfig> {
   @Dependency
   private VersionService versionService;
   @Dependency
@@ -51,6 +61,8 @@ public class AtomixManager implements AtomixService, Managed<AtomixConfig> {
   private ThreadService threadService;
   @Dependency
   private ClusterService clusterService;
+  @Dependency
+  private ServiceRegistry registry;
 
   @Override
   public Version getVersion() {
@@ -100,5 +112,17 @@ public class AtomixManager implements AtomixService, Managed<AtomixConfig> {
   @Override
   public PartitionGroupTypeRegistry getPartitionGroupTypes() {
     return partitionGroupTypes;
+  }
+
+  @Override
+  public CompletableFuture<Void> start(AtomixConfig config) {
+    registry.register(new CounterServiceImpl(partitions));
+    registry.register(new LeaderElectionServiceImpl(partitions));
+    registry.register(new LockServiceImpl(partitions));
+    registry.register(new LogServiceImpl(partitions));
+    registry.register(new MapServiceImpl(partitions));
+    registry.register(new SetServiceImpl(partitions));
+    registry.register(new ValueServiceImpl(partitions));
+    return CompletableFuture.completedFuture(null);
   }
 }

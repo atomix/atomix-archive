@@ -40,7 +40,10 @@ public class MemberId extends NodeId {
    * @return node id
    */
   public static MemberId from(String id) {
-    return new MemberId(id, DEFAULT_NAMESPACE);
+    int index = id.indexOf('.');
+    return index != -1
+        ? new MemberId(id.substring(index + 1), id.substring(0, index))
+        : new MemberId(id, DEFAULT_NAMESPACE);
   }
 
   /**

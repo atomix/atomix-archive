@@ -71,7 +71,7 @@ public class RaftServerCommunicator implements RaftServerProtocol {
 
   private <T, U> CompletableFuture<U> sendAndReceive(
       String subject, T request, Function<T, byte[]> encoder, Function<byte[], U> decoder, MemberId memberId) {
-    return clusterCommunicator.send(subject, request, encoder, decoder, MemberId.from(memberId.id()));
+    return clusterCommunicator.send(subject, request, encoder, decoder, memberId);
   }
 
   @Override
