@@ -1,5 +1,5 @@
 /*
- * Copyright 2019-present Open Networking Foundation
+ * Copyright 2018-present Open Networking Foundation
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,8 +13,25 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package io.atomix.client.types;
 
 /**
- * Extension registry implementations.
+ * Serializable type for use in tests.
  */
-package io.atomix.client.registry;
+public class Type2 {
+  private String value1;
+  private int value2;
+
+  public Type2(String value1, int value2) {
+    this.value1 = value1;
+    this.value2 = value2;
+  }
+
+  public String value1() {
+    return value1;
+  }
+
+  public int value2() {
+    return value2;
+  }
+}
