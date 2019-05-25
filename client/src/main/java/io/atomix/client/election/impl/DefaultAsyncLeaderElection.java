@@ -25,7 +25,6 @@ import io.atomix.api.election.CloseRequest;
 import io.atomix.api.election.CloseResponse;
 import io.atomix.api.election.CreateRequest;
 import io.atomix.api.election.CreateResponse;
-import io.atomix.api.election.ElectionId;
 import io.atomix.api.election.EnterRequest;
 import io.atomix.api.election.EnterResponse;
 import io.atomix.api.election.EventRequest;
@@ -41,11 +40,8 @@ import io.atomix.api.election.PromoteRequest;
 import io.atomix.api.election.PromoteResponse;
 import io.atomix.api.election.WithdrawRequest;
 import io.atomix.api.election.WithdrawResponse;
-import io.atomix.api.protocol.DistributedLogProtocol;
-import io.atomix.api.protocol.MultiPrimaryProtocol;
-import io.atomix.api.protocol.MultiRaftProtocol;
+import io.atomix.api.primitive.PrimitiveId;
 import io.atomix.client.PrimitiveManagementService;
-import io.atomix.client.channel.ChannelFactory;
 import io.atomix.client.election.AsyncLeaderElection;
 import io.atomix.client.election.Leader;
 import io.atomix.client.election.LeaderElection;
@@ -53,9 +49,7 @@ import io.atomix.client.election.Leadership;
 import io.atomix.client.election.LeadershipEvent;
 import io.atomix.client.election.LeadershipEventListener;
 import io.atomix.client.impl.AbstractAsyncPrimitive;
-import io.atomix.client.impl.PrimitiveIdDescriptor;
 import io.atomix.client.impl.PrimitivePartition;
-import io.atomix.primitive.partition.Partitioner;
 import io.atomix.utils.concurrent.Futures;
 import io.grpc.stub.StreamObserver;
 
@@ -63,13 +57,16 @@ import io.grpc.stub.StreamObserver;
  * Distributed resource providing the {@link AsyncLeaderElection} primitive.
  */
 public class DefaultAsyncLeaderElection
-    extends AbstractAsyncPrimitive<ElectionId, AsyncLeaderElection<String>>
+    extends AbstractAsyncPrimitive<AsyncLeaderElection<String>>
     implements AsyncLeaderElection<String> {
   private final LeaderElectionServiceGrpc.LeaderElectionServiceStub election;
 
-  public DefaultAsyncLeaderElection(ElectionId id, ChannelFactory channelFactory, PrimitiveManagementService managementService, Partitioner<String> partitioner, Duration timeout) {
-    super(id, ELECTION_ID_DESCRIPTOR, managementService, partitioner, timeout);
-    this.election = LeaderElectionServiceGrpc.newStub(channelFactory.getChannel());
+  public DefaultAsyncLeaderElection(
+      PrimitiveId id,
+      PrimitiveManagementService managementService,
+      Duration timeout) {
+    super(id, managementService, timeout);
+    this.election = LeaderElectionServiceGrpc.newStub(managementService.getChannelFactory().getChannel());
   }
 
   @Override
@@ -231,41 +228,4 @@ public class DefaultAsyncLeaderElection
   public LeaderElection<String> sync(Duration operationTimeout) {
     return new BlockingLeaderElection<>(this, operationTimeout.toMillis());
   }
-
-  private static final PrimitiveIdDescriptor<ElectionId> ELECTION_ID_DESCRIPTOR = new PrimitiveIdDescriptor<ElectionId>() {
-    @Override
-    public String getName(ElectionId id) {
-      return id.getName();
-    }
-
-    @Override
-    public boolean hasMultiRaftProtocol(ElectionId id) {
-      return id.hasRaft();
-    }
-
-    @Override
-    public MultiRaftProtocol getMultiRaftProtocol(ElectionId id) {
-      return id.getRaft();
-    }
-
-    @Override
-    public boolean hasMultiPrimaryProtocol(ElectionId id) {
-      return id.hasMultiPrimary();
-    }
-
-    @Override
-    public MultiPrimaryProtocol getMultiPrimaryProtocol(ElectionId id) {
-      return id.getMultiPrimary();
-    }
-
-    @Override
-    public boolean hasDistributedLogProtocol(ElectionId id) {
-      return id.hasLog();
-    }
-
-    @Override
-    public DistributedLogProtocol getDistributedLogProtocol(ElectionId id) {
-      return id.getLog();
-    }
-  };
 }

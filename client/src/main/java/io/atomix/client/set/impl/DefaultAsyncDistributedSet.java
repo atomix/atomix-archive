@@ -6,9 +6,7 @@ import java.util.Collections;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 
-import io.atomix.api.protocol.DistributedLogProtocol;
-import io.atomix.api.protocol.MultiPrimaryProtocol;
-import io.atomix.api.protocol.MultiRaftProtocol;
+import io.atomix.api.primitive.PrimitiveId;
 import io.atomix.api.set.AddRequest;
 import io.atomix.api.set.AddResponse;
 import io.atomix.api.set.ClearRequest;
@@ -27,23 +25,19 @@ import io.atomix.api.set.KeepAliveRequest;
 import io.atomix.api.set.KeepAliveResponse;
 import io.atomix.api.set.RemoveRequest;
 import io.atomix.api.set.RemoveResponse;
-import io.atomix.api.set.SetId;
 import io.atomix.api.set.SetServiceGrpc;
 import io.atomix.api.set.SizeRequest;
 import io.atomix.api.set.SizeResponse;
 import io.atomix.client.PrimitiveManagementService;
-import io.atomix.client.channel.ChannelFactory;
 import io.atomix.client.collection.CollectionEvent;
 import io.atomix.client.collection.CollectionEventListener;
 import io.atomix.client.impl.AbstractAsyncPrimitive;
-import io.atomix.client.impl.PrimitiveIdDescriptor;
 import io.atomix.client.impl.PrimitivePartition;
 import io.atomix.client.impl.TranscodingStreamObserver;
 import io.atomix.client.iterator.AsyncIterator;
 import io.atomix.client.iterator.impl.StreamObserverIterator;
 import io.atomix.client.set.AsyncDistributedSet;
 import io.atomix.client.set.DistributedSet;
-import io.atomix.primitive.partition.Partitioner;
 import io.atomix.utils.concurrent.Futures;
 import io.grpc.stub.StreamObserver;
 
@@ -51,18 +45,16 @@ import io.grpc.stub.StreamObserver;
  * Default distributed set primitive.
  */
 public class DefaultAsyncDistributedSet
-    extends AbstractAsyncPrimitive<SetId, AsyncDistributedSet<String>>
+    extends AbstractAsyncPrimitive<AsyncDistributedSet<String>>
     implements AsyncDistributedSet<String> {
   private final SetServiceGrpc.SetServiceStub set;
 
   public DefaultAsyncDistributedSet(
-      SetId id,
-      ChannelFactory channelFactory,
+      PrimitiveId id,
       PrimitiveManagementService managementService,
-      Partitioner<String> partitioner,
       Duration timeout) {
-    super(id, SET_ID_DESCRIPTOR, managementService, partitioner, timeout);
-    this.set = SetServiceGrpc.newStub(channelFactory.getChannel());
+    super(id, managementService, timeout);
+    this.set = SetServiceGrpc.newStub(managementService.getChannelFactory().getChannel());
   }
 
   @Override
@@ -237,41 +229,4 @@ public class DefaultAsyncDistributedSet
   public DistributedSet<String> sync(Duration operationTimeout) {
     return new BlockingDistributedSet<>(this, operationTimeout.toMillis());
   }
-
-  private static final PrimitiveIdDescriptor<SetId> SET_ID_DESCRIPTOR = new PrimitiveIdDescriptor<SetId>() {
-    @Override
-    public String getName(SetId id) {
-      return id.getName();
-    }
-
-    @Override
-    public boolean hasMultiRaftProtocol(SetId id) {
-      return id.hasRaft();
-    }
-
-    @Override
-    public MultiRaftProtocol getMultiRaftProtocol(SetId id) {
-      return id.getRaft();
-    }
-
-    @Override
-    public boolean hasMultiPrimaryProtocol(SetId id) {
-      return id.hasMultiPrimary();
-    }
-
-    @Override
-    public MultiPrimaryProtocol getMultiPrimaryProtocol(SetId id) {
-      return id.getMultiPrimary();
-    }
-
-    @Override
-    public boolean hasDistributedLogProtocol(SetId id) {
-      return id.hasLog();
-    }
-
-    @Override
-    public DistributedLogProtocol getDistributedLogProtocol(SetId id) {
-      return id.getLog();
-    }
-  };
 }

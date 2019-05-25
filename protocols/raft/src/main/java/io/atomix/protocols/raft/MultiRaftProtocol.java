@@ -15,20 +15,8 @@
  */
 package io.atomix.protocols.raft;
 
-import java.util.Map;
-import java.util.concurrent.CompletableFuture;
-import java.util.stream.Collectors;
-
-import com.google.common.collect.Maps;
-import io.atomix.primitive.PrimitiveClient;
-import io.atomix.primitive.impl.DefaultPrimitiveClient;
-import io.atomix.primitive.partition.PartitionClient;
-import io.atomix.primitive.partition.PartitionId;
-import io.atomix.primitive.partition.PartitionService;
 import io.atomix.primitive.protocol.PrimitiveProtocol;
 import io.atomix.primitive.protocol.ServiceProtocol;
-import io.atomix.protocols.raft.partition.RaftPartitionGroup;
-import io.atomix.raft.protocol.RaftPrimitiveMetadata;
 import io.atomix.utils.component.Component;
 
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -36,7 +24,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
 /**
  * Multi-Raft protocol.
  */
-public class MultiRaftProtocol implements ServiceProtocol {
+public class MultiRaftProtocol implements ServiceProtocol<MultiRaft> {
   public static final Type TYPE = new Type();
 
   /**
@@ -107,16 +95,9 @@ public class MultiRaftProtocol implements ServiceProtocol {
   }
 
   @Override
-  public CompletableFuture<PrimitiveClient> createService(String name, PartitionService partitionService) {
-    RaftPartitionGroup partitionGroup = (RaftPartitionGroup) partitionService.getPartitionGroup(this);
-    return partitionGroup.createPrimitive(RaftPrimitiveMetadata.newBuilder()
-        .setName(name)
-        .build())
-        .thenApply(metadata -> {
-          Map<PartitionId, PartitionClient> partitions = partitionGroup.getPartitions().stream()
-              .map(partition -> Maps.immutableEntry(partition.id(), partition.getClient()))
-              .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
-          return new DefaultPrimitiveClient(partitions, config.getPartitioner());
-        });
+  public MultiRaft toProto() {
+    return MultiRaft.newBuilder()
+        .setGroup(group())
+        .build();
   }
 }

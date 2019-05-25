@@ -18,7 +18,6 @@ package io.atomix.protocols.log.partition.impl;
 import java.util.concurrent.CompletableFuture;
 
 import io.atomix.log.DistributedLogClient;
-import io.atomix.log.protocol.LogTopicMetadata;
 import io.atomix.primitive.log.LogConsumer;
 import io.atomix.primitive.log.LogProducer;
 import io.atomix.primitive.log.LogSession;
@@ -26,6 +25,7 @@ import io.atomix.primitive.partition.GroupMember;
 import io.atomix.primitive.partition.MemberGroup;
 import io.atomix.primitive.partition.PartitionManagementService;
 import io.atomix.primitive.partition.PrimaryElection;
+import io.atomix.protocols.log.LogTopicMetadata;
 import io.atomix.protocols.log.partition.LogPartition;
 import io.atomix.protocols.log.partition.LogPartitionGroupConfig;
 import io.atomix.utils.Managed;

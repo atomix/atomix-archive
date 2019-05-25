@@ -6,11 +6,6 @@ option java_package = "io.atomix.log.protocol";
 option java_outer_classname = "LogProto";
 option java_multiple_files = true;
 
-enum Replication {
-    SYNCHRONOUS = 0;
-    ASYNCHRONOUS = 1;
-}
-
 message AppendRequest {
     bytes value = 1;
 }
@@ -68,17 +63,4 @@ message BackupOperation {
 enum ResponseStatus {
     OK = 0;
     ERROR = 1;
-}
-
-message LogPartitionGroupMetadata {
-    map<string, LogTopicMetadata> topics = 1;
-}
-
-message LogTopicMetadata {
-    string topic = 1;
-    int32 partitions = 2;
-    repeated int32 partition_ids = 3;
-    int32 replication_factor = 4;
-    Replication replication_strategy = 5;
-    repeated string ready = 6;
 }

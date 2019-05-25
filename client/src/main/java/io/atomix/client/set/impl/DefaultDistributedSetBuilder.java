@@ -18,15 +18,11 @@ package io.atomix.client.set.impl;
 import java.util.concurrent.CompletableFuture;
 
 import com.google.common.io.BaseEncoding;
-import io.atomix.api.protocol.DistributedLogProtocol;
-import io.atomix.api.protocol.MultiRaftProtocol;
-import io.atomix.api.set.SetId;
 import io.atomix.client.PrimitiveManagementService;
 import io.atomix.client.set.AsyncDistributedSet;
 import io.atomix.client.set.DistributedSet;
 import io.atomix.client.set.DistributedSetBuilder;
 import io.atomix.client.set.DistributedSetConfig;
-import io.atomix.primitive.partition.Partitioner;
 import io.atomix.utils.serializer.Serializer;
 
 /**
@@ -39,27 +35,10 @@ public class DefaultDistributedSetBuilder<E> extends DistributedSetBuilder<E> {
     super(name, config, managementService);
   }
 
-  private SetId createSetId() {
-    SetId.Builder builder = SetId.newBuilder().setName(name);
-    protocol = protocol();
-    if (protocol instanceof io.atomix.protocols.raft.MultiRaftProtocol) {
-      builder.setRaft(MultiRaftProtocol.newBuilder()
-          .setGroup(((io.atomix.protocols.raft.MultiRaftProtocol) protocol).group())
-          .build());
-    } else if (protocol instanceof io.atomix.protocols.log.DistributedLogProtocol) {
-      builder.setLog(DistributedLogProtocol.newBuilder()
-          .setGroup(((io.atomix.protocols.log.DistributedLogProtocol) protocol).group())
-          .setPartitions(((io.atomix.protocols.log.DistributedLogProtocol) protocol).config().getPartitions())
-          .setReplicationFactor(((io.atomix.protocols.log.DistributedLogProtocol) protocol).config().getReplicationFactor())
-          .build());
-    }
-    return builder.build();
-  }
-
   @Override
   @SuppressWarnings("unchecked")
   public CompletableFuture<DistributedSet<E>> buildAsync() {
-    return new DefaultAsyncDistributedSet(createSetId(), managementService.getChannelFactory(), managementService, Partitioner.MURMUR3, config.getSessionTimeout())
+    return new DefaultAsyncDistributedSet(getPrimitiveId(), managementService, config.getSessionTimeout())
         .connect()
         .thenApply(rawSet -> {
           Serializer serializer = serializer();

@@ -16,6 +16,7 @@
 package io.atomix.primitive.partition;
 
 import com.google.common.hash.Hashing;
+import com.google.protobuf.Descriptors;
 import io.atomix.primitive.protocol.PrimitiveProtocol;
 import io.atomix.primitive.protocol.ServiceProtocol;
 import io.atomix.utils.ConfiguredType;
@@ -35,6 +36,20 @@ public interface PartitionGroup extends Configured<PartitionGroupConfig> {
    * Partition group type.
    */
   interface Type<C extends PartitionGroupConfig<C>> extends ConfiguredType<C> {
+
+    /**
+     * Returns the protocol type.
+     *
+     * @return the protocol type
+     */
+    Class<?> getProtocolType();
+
+    /**
+     * Returns the partition group's protocol descriptor.
+     *
+     * @return the partition group's protocol descriptor
+     */
+    Descriptors.Descriptor getProtocolDescriptor();
 
     /**
      * Returns the partition group namespace.

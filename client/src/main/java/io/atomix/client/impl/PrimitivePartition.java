@@ -11,20 +11,19 @@ import io.atomix.api.headers.SessionHeader;
 import io.atomix.api.headers.SessionQueryHeader;
 import io.atomix.api.headers.SessionResponseHeader;
 import io.atomix.api.headers.SessionStreamHeader;
-import io.atomix.primitive.partition.PartitionId;
 
 /**
  * Primitive partition.
  */
 public class PrimitivePartition {
-  private final PartitionId partitionId;
+  private final int partitionId;
   private long sessionId;
   private long index;
   private long commandRequest;
   private long commandResponse;
   private final Map<Long, PrimitiveStream> streams = new ConcurrentHashMap<>();
 
-  public PrimitivePartition(PartitionId partitionId) {
+  public PrimitivePartition(int partitionId) {
     this.partitionId = partitionId;
   }
 
@@ -44,7 +43,7 @@ public class PrimitivePartition {
    */
   public RequestHeader getRequestHeader() {
     return RequestHeader.newBuilder()
-        .setPartitionId(partitionId.getPartition())
+        .setPartitionId(partitionId)
         .setIndex(index)
         .build();
   }
@@ -56,7 +55,7 @@ public class PrimitivePartition {
    */
   public SessionHeader getSessionHeader() {
     return SessionHeader.newBuilder()
-        .setPartitionId(partitionId.getPartition())
+        .setPartitionId(partitionId)
         .setSessionId(sessionId)
         .build();
   }
@@ -68,7 +67,7 @@ public class PrimitivePartition {
    */
   public SessionCommandHeader getCommandHeader() {
     return SessionCommandHeader.newBuilder()
-        .setPartitionId(partitionId.getPartition())
+        .setPartitionId(partitionId)
         .setSessionId(sessionId)
         .setSequenceNumber(++commandRequest)
         .build();
@@ -81,7 +80,7 @@ public class PrimitivePartition {
    */
   public SessionQueryHeader getQueryHeader() {
     return SessionQueryHeader.newBuilder()
-        .setPartitionId(partitionId.getPartition())
+        .setPartitionId(partitionId)
         .setSessionId(sessionId)
         .setLastIndex(index)
         .setLastSequenceNumber(commandRequest)

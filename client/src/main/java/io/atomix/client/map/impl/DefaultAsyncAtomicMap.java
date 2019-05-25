@@ -4,7 +4,6 @@ import java.time.Duration;
 import java.util.Collection;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
 import java.util.function.BiFunction;
 import java.util.function.Predicate;
@@ -27,7 +26,6 @@ import io.atomix.api.map.GetRequest;
 import io.atomix.api.map.GetResponse;
 import io.atomix.api.map.KeepAliveRequest;
 import io.atomix.api.map.KeepAliveResponse;
-import io.atomix.api.map.MapId;
 import io.atomix.api.map.MapServiceGrpc;
 import io.atomix.api.map.PutRequest;
 import io.atomix.api.map.PutResponse;
@@ -38,17 +36,13 @@ import io.atomix.api.map.ReplaceResponse;
 import io.atomix.api.map.ResponseStatus;
 import io.atomix.api.map.SizeRequest;
 import io.atomix.api.map.SizeResponse;
-import io.atomix.api.protocol.DistributedLogProtocol;
-import io.atomix.api.protocol.MultiPrimaryProtocol;
-import io.atomix.api.protocol.MultiRaftProtocol;
+import io.atomix.api.primitive.PrimitiveId;
 import io.atomix.client.PrimitiveManagementService;
-import io.atomix.client.channel.ChannelFactory;
 import io.atomix.client.collection.AsyncDistributedCollection;
 import io.atomix.client.collection.CollectionEvent;
 import io.atomix.client.collection.CollectionEventListener;
 import io.atomix.client.collection.impl.UnsupportedAsyncDistributedCollection;
 import io.atomix.client.impl.AbstractAsyncPrimitive;
-import io.atomix.client.impl.PrimitiveIdDescriptor;
 import io.atomix.client.impl.PrimitivePartition;
 import io.atomix.client.impl.TranscodingStreamObserver;
 import io.atomix.client.iterator.AsyncIterator;
@@ -60,7 +54,6 @@ import io.atomix.client.map.AtomicMapEventListener;
 import io.atomix.client.set.AsyncDistributedSet;
 import io.atomix.client.set.impl.UnsupportedAsyncDistributedSet;
 import io.atomix.primitive.PrimitiveException;
-import io.atomix.primitive.partition.Partitioner;
 import io.atomix.utils.concurrent.Futures;
 import io.atomix.utils.time.Versioned;
 import io.grpc.stub.StreamObserver;
@@ -68,18 +61,15 @@ import io.grpc.stub.StreamObserver;
 /**
  * Default asynchronous atomic map primitive.
  */
-public class DefaultAsyncAtomicMap extends AbstractAsyncPrimitive<MapId, AsyncAtomicMap<String, byte[]>> implements AsyncAtomicMap<String, byte[]> {
+public class DefaultAsyncAtomicMap extends AbstractAsyncPrimitive<AsyncAtomicMap<String, byte[]>> implements AsyncAtomicMap<String, byte[]> {
   private final MapServiceGrpc.MapServiceStub map;
-  private final Map<AtomicMapEventListener<String, byte[]>, Executor> eventListeners = new ConcurrentHashMap<>();
 
   public DefaultAsyncAtomicMap(
-      MapId mapId,
-      ChannelFactory channelFactory,
+      PrimitiveId mapId,
       PrimitiveManagementService managementService,
-      Partitioner<String> partitioner,
       Duration timeout) {
-    super(mapId, MAP_ID_DESCRIPTOR, managementService, partitioner, timeout);
-    this.map = MapServiceGrpc.newStub(channelFactory.getChannel());
+    super(mapId, managementService, timeout);
+    this.map = MapServiceGrpc.newStub(managementService.getChannelFactory().getChannel());
   }
 
   @Override
@@ -719,41 +709,4 @@ public class DefaultAsyncAtomicMap extends AbstractAsyncPrimitive<MapId, AsyncAt
       return iterator;
     }
   }
-
-  private static final PrimitiveIdDescriptor<MapId> MAP_ID_DESCRIPTOR = new PrimitiveIdDescriptor<MapId>() {
-    @Override
-    public String getName(MapId id) {
-      return id.getName();
-    }
-
-    @Override
-    public boolean hasMultiRaftProtocol(MapId id) {
-      return id.hasRaft();
-    }
-
-    @Override
-    public MultiRaftProtocol getMultiRaftProtocol(MapId id) {
-      return id.getRaft();
-    }
-
-    @Override
-    public boolean hasMultiPrimaryProtocol(MapId id) {
-      return id.hasMultiPrimary();
-    }
-
-    @Override
-    public MultiPrimaryProtocol getMultiPrimaryProtocol(MapId id) {
-      return id.getMultiPrimary();
-    }
-
-    @Override
-    public boolean hasDistributedLogProtocol(MapId id) {
-      return id.hasLog();
-    }
-
-    @Override
-    public DistributedLogProtocol getDistributedLogProtocol(MapId id) {
-      return id.getLog();
-    }
-  };
 }

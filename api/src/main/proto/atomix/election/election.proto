@@ -1,26 +1,16 @@
 syntax = "proto3";
 
 import "google/protobuf/duration.proto";
-import "atomix/protocol/protocol.proto";
 import "atomix/headers/headers.proto";
+import "atomix/primitive/primitive.proto";
 
 package atomix.election;
 
 option java_package = "io.atomix.api.election";
 option java_multiple_files = true;
 
-// Election ID
-message ElectionId {
-    string name = 1;
-    oneof proto {
-        protocol.MultiRaftProtocol raft = 2;
-        protocol.MultiPrimaryProtocol multi_primary = 3;
-        protocol.DistributedLogProtocol log = 4;
-    }
-}
-
 message CreateRequest {
-    ElectionId id = 1;
+    atomix.primitive.PrimitiveId id = 1;
     google.protobuf.Duration timeout = 2;
 }
 
@@ -29,7 +19,7 @@ message CreateResponse {
 }
 
 message KeepAliveRequest {
-    ElectionId id = 1;
+    atomix.primitive.PrimitiveId id = 1;
     atomix.headers.SessionHeader header = 2;
 }
 
@@ -38,8 +28,9 @@ message KeepAliveResponse {
 }
 
 message CloseRequest {
-    ElectionId id = 1;
+    atomix.primitive.PrimitiveId id = 1;
     atomix.headers.SessionHeader header = 2;
+    bool delete = 3;
 }
 
 message CloseResponse {
@@ -47,7 +38,7 @@ message CloseResponse {
 }
 
 message EnterRequest {
-    ElectionId id = 1;
+    atomix.primitive.PrimitiveId id = 1;
     atomix.headers.SessionCommandHeader header = 2;
     string candidate_id = 3;
 }
@@ -61,7 +52,7 @@ message EnterResponse {
 }
 
 message WithdrawRequest {
-    ElectionId id = 1;
+    atomix.primitive.PrimitiveId id = 1;
     atomix.headers.SessionCommandHeader header = 2;
     string candidate_id = 3;
 }
@@ -72,7 +63,7 @@ message WithdrawResponse {
 }
 
 message AnointRequest {
-    ElectionId id = 1;
+    atomix.primitive.PrimitiveId id = 1;
     atomix.headers.SessionCommandHeader header = 2;
     string candidate_id = 3;
 }
@@ -83,7 +74,7 @@ message AnointResponse {
 }
 
 message PromoteRequest {
-    ElectionId id = 1;
+    atomix.primitive.PrimitiveId id = 1;
     atomix.headers.SessionCommandHeader header = 2;
     string candidate_id = 3;
 }
@@ -94,7 +85,7 @@ message PromoteResponse {
 }
 
 message EvictRequest {
-    ElectionId id = 1;
+    atomix.primitive.PrimitiveId id = 1;
     atomix.headers.SessionCommandHeader header = 2;
     string candidate_id = 3;
 }
@@ -105,7 +96,7 @@ message EvictResponse {
 }
 
 message GetLeadershipRequest {
-    ElectionId id = 1;
+    atomix.primitive.PrimitiveId id = 1;
     atomix.headers.SessionQueryHeader header = 2;
 }
 
@@ -118,7 +109,7 @@ message GetLeadershipResponse {
 }
 
 message EventRequest {
-    ElectionId id = 1;
+    atomix.primitive.PrimitiveId id = 1;
     atomix.headers.SessionCommandHeader header = 2;
 }
 

@@ -15,15 +15,12 @@
  */
 package io.atomix.primitive.protocol;
 
-import java.util.concurrent.CompletableFuture;
-
-import io.atomix.primitive.log.LogClient;
-import io.atomix.primitive.partition.PartitionService;
+import com.google.protobuf.Message;
 
 /**
  * Log replication based primitive protocol.
  */
-public interface LogProtocol extends ServiceProtocol {
+public interface LogProtocol<T extends Message> extends ServiceProtocol<T> {
 
   /**
    * Returns the protocol partition group name.
@@ -31,14 +28,5 @@ public interface LogProtocol extends ServiceProtocol {
    * @return the protocol partition group name
    */
   String group();
-
-  /**
-   * Creates a new topic via the protocol.
-   *
-   * @param topic            the topic to create
-   * @param partitionService the partition service
-   * @return the log client
-   */
-  CompletableFuture<LogClient> createTopic(String topic, PartitionService partitionService);
 
 }

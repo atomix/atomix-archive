@@ -21,15 +21,18 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 
 import com.google.common.io.BaseEncoding;
+import com.google.protobuf.InvalidProtocolBufferException;
 import io.atomix.api.log.ConsumeRequest;
-import io.atomix.api.log.LogId;
 import io.atomix.api.log.LogRecord;
 import io.atomix.api.log.LogServiceGrpc;
 import io.atomix.api.log.ProduceRequest;
 import io.atomix.api.log.ProduceResponse;
+import io.atomix.api.primitive.PrimitiveId;
 import io.atomix.primitive.log.LogClient;
+import io.atomix.primitive.partition.LogProvider;
+import io.atomix.primitive.partition.PartitionGroup;
 import io.atomix.primitive.partition.PartitionService;
-import io.atomix.protocols.log.DistributedLogProtocol;
+import io.atomix.utils.concurrent.Futures;
 import io.grpc.stub.StreamObserver;
 
 /**
@@ -48,16 +51,22 @@ public class LogServiceImpl extends LogServiceGrpc.LogServiceImplBase {
    * @param id the log ID
    * @return the log client
    */
-  private CompletableFuture<LogClient> getClient(LogId id) {
-    return DistributedLogProtocol.builder(id.getLog().getGroup())
-        .withNumPartitions(id.getLog().getPartitions())
-        .build()
-        .createTopic(id.getName(), partitionService);
+  @SuppressWarnings("unchecked")
+  private CompletableFuture<LogClient> getClient(PrimitiveId id) {
+    String url = id.getProtocol().getTypeUrl();
+    String type = url.substring(url.lastIndexOf('/') + 1);
+    PartitionGroup partitionGroup = partitionService.getPartitionGroup(type);
+    try {
+      Object protocol = id.getProtocol().unpack(partitionGroup.type().getProtocolType());
+      return ((LogProvider<Object>) partitionGroup).createTopic(id.getName(), protocol);
+    } catch (InvalidProtocolBufferException e) {
+      return Futures.exceptionalFuture(e);
+    }
   }
 
   @Override
   public StreamObserver<ProduceRequest> produce(StreamObserver<ProduceResponse> responseObserver) {
-    Map<LogId, CompletableFuture<LogClient>> clients = new ConcurrentHashMap<>();
+    Map<PrimitiveId, CompletableFuture<LogClient>> clients = new ConcurrentHashMap<>();
     return new StreamObserver<ProduceRequest>() {
       @Override
       public void onNext(ProduceRequest request) {

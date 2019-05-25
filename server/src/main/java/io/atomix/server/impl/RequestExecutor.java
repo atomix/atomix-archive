@@ -9,11 +9,13 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
+import com.google.common.base.Strings;
 import com.google.protobuf.Message;
 import io.atomix.api.headers.RequestHeader;
 import io.atomix.api.headers.SessionCommandHeader;
 import io.atomix.api.headers.SessionHeader;
 import io.atomix.api.headers.SessionQueryHeader;
+import io.atomix.api.primitive.PrimitiveId;
 import io.atomix.primitive.partition.PartitionId;
 import io.atomix.primitive.proxy.PrimitiveProxy;
 import io.atomix.primitive.session.impl.SessionResponseContext;
@@ -30,14 +32,14 @@ import org.apache.commons.lang3.tuple.Pair;
 /**
  * Primitive factory.
  */
-public class RequestExecutor<P extends PrimitiveProxy, I extends Message, H extends Message, T extends Message, R extends Message> {
-  private final PrimitiveFactory<P, I> primitiveFactory;
-  private final RequestDescriptor<T, I, H> requestDescriptor;
+public class RequestExecutor<P extends PrimitiveProxy, H extends Message, T extends Message, R extends Message> {
+  private final PrimitiveFactory<P> primitiveFactory;
+  private final RequestDescriptor<T, H> requestDescriptor;
   private final Supplier<R> responseSupplier;
 
   public RequestExecutor(
-      PrimitiveFactory<P, I> primitiveFactory,
-      RequestDescriptor<T, I, H> requestDescriptor,
+      PrimitiveFactory<P> primitiveFactory,
+      RequestDescriptor<T, H> requestDescriptor,
       Supplier<R> responseSupplier) {
     this.primitiveFactory = primitiveFactory;
     this.requestDescriptor = requestDescriptor;
@@ -50,7 +52,7 @@ public class RequestExecutor<P extends PrimitiveProxy, I extends Message, H exte
    * @param request the request for which to return the primitive ID
    * @return the primitive ID for the given request
    */
-  private I getId(T request) {
+  private PrimitiveId getId(T request) {
     return requestDescriptor.getId(request);
   }
 
@@ -95,7 +97,7 @@ public class RequestExecutor<P extends PrimitiveProxy, I extends Message, H exte
       T request,
       StreamObserver<R> responseObserver,
       Function<P, CompletableFuture<R>> function) {
-    I id = getId(request);
+    PrimitiveId id = getId(request);
     if (isValidId(id, responseObserver)) {
       primitiveFactory.getPrimitive(id).whenComplete((primitive, primitiveError) -> {
         if (primitiveError == null) {
@@ -127,7 +129,7 @@ public class RequestExecutor<P extends PrimitiveProxy, I extends Message, H exte
       String key,
       StreamObserver<R> responseObserver,
       BiFunction<PartitionId, P, CompletableFuture<R>> function) {
-    I id = getId(request);
+    PrimitiveId id = getId(request);
     if (isValidId(id, responseObserver)) {
       primitiveFactory.getPrimitive(id, key).whenComplete((primitive, primitiveError) -> {
         if (primitiveError == null) {
@@ -159,7 +161,7 @@ public class RequestExecutor<P extends PrimitiveProxy, I extends Message, H exte
       StreamObserver<R> responseObserver,
       BiFunction<PartitionId, P, CompletableFuture<V>> function,
       Function<List<V>, R> responseFunction) {
-    I id = getId(request);
+    PrimitiveId id = getId(request);
     if (isValidId(id, responseObserver)) {
       primitiveFactory.getPrimitives(id)
           .thenCompose(partitions -> Futures.allOf(partitions.entrySet().stream()
@@ -190,7 +192,7 @@ public class RequestExecutor<P extends PrimitiveProxy, I extends Message, H exte
       StreamObserver<R> responseObserver,
       TriFunction<PartitionId, H, P, CompletableFuture<V>> function,
       Function<List<V>, R> aggregator) {
-    I id = getId(request);
+    PrimitiveId id = getId(request);
     if (isValidId(id, responseObserver)) {
       final String group = primitiveFactory.getPartitionGroup(id);
       Map<PartitionId, H> headerMap = getHeaders(request).stream()
@@ -231,7 +233,7 @@ public class RequestExecutor<P extends PrimitiveProxy, I extends Message, H exte
       StreamObserver<R> responseObserver,
       TriFunction<H, StreamHandler<V>, P, CompletableFuture<SessionResponseContext>> function,
       BiFunction<H, V, R> converter) {
-    I id = getId(request);
+    PrimitiveId id = getId(request);
     if (isValidId(id, responseObserver)) {
       final String group = primitiveFactory.getPartitionGroup(id);
       Map<PartitionId, H> headerMap = getHeaders(request).stream()
@@ -280,7 +282,7 @@ public class RequestExecutor<P extends PrimitiveProxy, I extends Message, H exte
       T request,
       StreamObserver<R> responseObserver,
       TriFunction<PartitionId, H, P, CompletableFuture<R>> function) {
-    I id = getId(request);
+    PrimitiveId id = getId(request);
     if (isValidId(id, responseObserver)) {
       final String group = primitiveFactory.getPartitionGroup(id);
       Map<PartitionId, H> headerMap = getHeaders(request).stream()
@@ -316,7 +318,7 @@ public class RequestExecutor<P extends PrimitiveProxy, I extends Message, H exte
       H header,
       StreamObserver<R> responseObserver,
       TriFunction<PartitionId, H, P, CompletableFuture<R>> function) {
-    I id = getId(request);
+    PrimitiveId id = getId(request);
     if (isValidId(id, responseObserver)) {
       primitiveFactory.getPrimitive(id, getPartitionId(header)).whenComplete((primitive, primitiveError) -> {
         if (primitiveError == null) {
@@ -349,7 +351,7 @@ public class RequestExecutor<P extends PrimitiveProxy, I extends Message, H exte
       StreamObserver<R> responseObserver,
       QuadFunction<PartitionId, H, StreamHandler<V>, P, CompletableFuture<SessionResponseContext>> function,
       TriFunction<PartitionId, H, V, R> converter) {
-    I id = getId(request);
+    PrimitiveId id = getId(request);
     if (isValidId(id, responseObserver)) {
       primitiveFactory.getPrimitive(id, getPartitionId(header)).whenComplete((primitive, primitiveError) -> {
         if (primitiveError == null) {
@@ -396,7 +398,7 @@ public class RequestExecutor<P extends PrimitiveProxy, I extends Message, H exte
       StreamObserver<R> responseObserver,
       QuadFunction<PartitionId, H, Collection<String>, P, CompletableFuture<V>> function,
       Function<List<V>, R> aggregator) {
-    I id = getId(request);
+    PrimitiveId id = getId(request);
     if (isValidId(id, responseObserver)) {
       final String group = primitiveFactory.getPartitionGroup(id);
       Map<PartitionId, H> headerMap = getHeaders(request).stream()
@@ -431,12 +433,12 @@ public class RequestExecutor<P extends PrimitiveProxy, I extends Message, H exte
    * @param responseObserver the response observer
    * @return indicates whether the ID is valid
    */
-  private boolean isValidId(I id, StreamObserver<R> responseObserver) {
-    if (!primitiveFactory.hasPrimitiveName(id)) {
+  private boolean isValidId(PrimitiveId id, StreamObserver<R> responseObserver) {
+    if (Strings.isNullOrEmpty(id.getName())) {
       fail(Status.INVALID_ARGUMENT, "Primitive name not specified", responseObserver);
       return false;
     }
-    if (!primitiveFactory.hasProtocol(id)) {
+    if (!id.hasProtocol()) {
       fail(Status.INVALID_ARGUMENT, "Primitive protocol not specified", responseObserver);
       return false;
     }
@@ -462,7 +464,7 @@ public class RequestExecutor<P extends PrimitiveProxy, I extends Message, H exte
   /**
    * Request descriptor.
    */
-  public interface RequestDescriptor<T extends Message, I extends Message, H extends Message> {
+  public interface RequestDescriptor<T extends Message, H extends Message> {
 
     /**
      * Returns the request ID for the given request.
@@ -470,7 +472,7 @@ public class RequestExecutor<P extends PrimitiveProxy, I extends Message, H exte
      * @param request the request for which to return the ID
      * @return the ID for the given request
      */
-    I getId(T request);
+    PrimitiveId getId(T request);
 
     /**
      * Returns the headers for the given request.
@@ -497,17 +499,17 @@ public class RequestExecutor<P extends PrimitiveProxy, I extends Message, H exte
     H getDefaultHeader(int partitionId);
   }
 
-  public static class BasicDescriptor<T extends Message, I extends Message> implements RequestExecutor.RequestDescriptor<T, I, RequestHeader> {
-    private final Function<T, I> idGetter;
+  public static class BasicDescriptor<T extends Message> implements RequestExecutor.RequestDescriptor<T, RequestHeader> {
+    private final Function<T, PrimitiveId> idGetter;
     private final Function<T, Collection<RequestHeader>> headerGetter;
 
-    public BasicDescriptor(Function<T, I> idGetter, Function<T, Collection<RequestHeader>> headerGetter) {
+    public BasicDescriptor(Function<T, PrimitiveId> idGetter, Function<T, Collection<RequestHeader>> headerGetter) {
       this.idGetter = idGetter;
       this.headerGetter = headerGetter;
     }
 
     @Override
-    public I getId(T request) {
+    public PrimitiveId getId(T request) {
       return idGetter.apply(request);
     }
 
@@ -529,17 +531,17 @@ public class RequestExecutor<P extends PrimitiveProxy, I extends Message, H exte
     }
   }
 
-  public static class SessionDescriptor<T extends Message, I extends Message> implements RequestExecutor.RequestDescriptor<T, I, SessionHeader> {
-    private final Function<T, I> idGetter;
+  public static class SessionDescriptor<T extends Message> implements RequestExecutor.RequestDescriptor<T, SessionHeader> {
+    private final Function<T, PrimitiveId> idGetter;
     private final Function<T, Collection<SessionHeader>> headerGetter;
 
-    public SessionDescriptor(Function<T, I> idGetter, Function<T, Collection<SessionHeader>> headerGetter) {
+    public SessionDescriptor(Function<T, PrimitiveId> idGetter, Function<T, Collection<SessionHeader>> headerGetter) {
       this.idGetter = idGetter;
       this.headerGetter = headerGetter;
     }
 
     @Override
-    public I getId(T request) {
+    public PrimitiveId getId(T request) {
       return idGetter.apply(request);
     }
 
@@ -561,17 +563,17 @@ public class RequestExecutor<P extends PrimitiveProxy, I extends Message, H exte
     }
   }
 
-  public static class SessionCommandDescriptor<T extends Message, I extends Message> implements RequestExecutor.RequestDescriptor<T, I, SessionCommandHeader> {
-    private final Function<T, I> idGetter;
+  public static class SessionCommandDescriptor<T extends Message> implements RequestExecutor.RequestDescriptor<T, SessionCommandHeader> {
+    private final Function<T, PrimitiveId> idGetter;
     private final Function<T, Collection<SessionCommandHeader>> headerGetter;
 
-    public SessionCommandDescriptor(Function<T, I> idGetter, Function<T, Collection<SessionCommandHeader>> headerGetter) {
+    public SessionCommandDescriptor(Function<T, PrimitiveId> idGetter, Function<T, Collection<SessionCommandHeader>> headerGetter) {
       this.idGetter = idGetter;
       this.headerGetter = headerGetter;
     }
 
     @Override
-    public I getId(T request) {
+    public PrimitiveId getId(T request) {
       return idGetter.apply(request);
     }
 
@@ -593,17 +595,17 @@ public class RequestExecutor<P extends PrimitiveProxy, I extends Message, H exte
     }
   }
 
-  public static class SessionQueryDescriptor<T extends Message, I extends Message> implements RequestExecutor.RequestDescriptor<T, I, SessionQueryHeader> {
-    private final Function<T, I> idGetter;
+  public static class SessionQueryDescriptor<T extends Message> implements RequestExecutor.RequestDescriptor<T, SessionQueryHeader> {
+    private final Function<T, PrimitiveId> idGetter;
     private final Function<T, Collection<SessionQueryHeader>> headerGetter;
 
-    public SessionQueryDescriptor(Function<T, I> idGetter, Function<T, Collection<SessionQueryHeader>> headerGetter) {
+    public SessionQueryDescriptor(Function<T, PrimitiveId> idGetter, Function<T, Collection<SessionQueryHeader>> headerGetter) {
       this.idGetter = idGetter;
       this.headerGetter = headerGetter;
     }
 
     @Override
-    public I getId(T request) {
+    public PrimitiveId getId(T request) {
       return idGetter.apply(request);
     }
 

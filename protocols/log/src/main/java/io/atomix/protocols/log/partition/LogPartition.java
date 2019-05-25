@@ -21,7 +21,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
 import io.atomix.cluster.MemberId;
-import io.atomix.log.protocol.LogTopicMetadata;
 import io.atomix.primitive.log.LogSession;
 import io.atomix.primitive.partition.GroupMember;
 import io.atomix.primitive.partition.Partition;
@@ -30,6 +29,7 @@ import io.atomix.primitive.partition.PartitionId;
 import io.atomix.primitive.partition.PartitionManagementService;
 import io.atomix.primitive.partition.PrimaryElection;
 import io.atomix.primitive.service.impl.ServiceManagerStateMachine;
+import io.atomix.protocols.log.LogTopicMetadata;
 import io.atomix.protocols.log.partition.impl.LogPartitionClient;
 import io.atomix.protocols.log.partition.impl.LogPartitionServer;
 import io.atomix.protocols.log.partition.impl.LogPartitionSession;

@@ -5,9 +5,7 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
 import com.google.protobuf.ByteString;
-import io.atomix.api.protocol.DistributedLogProtocol;
-import io.atomix.api.protocol.MultiPrimaryProtocol;
-import io.atomix.api.protocol.MultiRaftProtocol;
+import io.atomix.api.primitive.PrimitiveId;
 import io.atomix.api.value.CheckAndSetRequest;
 import io.atomix.api.value.CheckAndSetResponse;
 import io.atomix.api.value.CloseRequest;
@@ -22,18 +20,14 @@ import io.atomix.api.value.KeepAliveRequest;
 import io.atomix.api.value.KeepAliveResponse;
 import io.atomix.api.value.SetRequest;
 import io.atomix.api.value.SetResponse;
-import io.atomix.api.value.ValueId;
 import io.atomix.api.value.ValueServiceGrpc;
 import io.atomix.client.PrimitiveManagementService;
-import io.atomix.client.channel.ChannelFactory;
 import io.atomix.client.impl.AbstractAsyncPrimitive;
-import io.atomix.client.impl.PrimitiveIdDescriptor;
 import io.atomix.client.impl.PrimitivePartition;
 import io.atomix.client.value.AsyncAtomicValue;
 import io.atomix.client.value.AtomicValue;
 import io.atomix.client.value.AtomicValueEvent;
 import io.atomix.client.value.AtomicValueEventListener;
-import io.atomix.primitive.partition.Partitioner;
 import io.atomix.utils.concurrent.Futures;
 import io.atomix.utils.time.Versioned;
 import io.grpc.stub.StreamObserver;
@@ -42,18 +36,16 @@ import io.grpc.stub.StreamObserver;
  * Default asynchronous atomic value primitive.
  */
 public class DefaultAsyncAtomicValue
-    extends AbstractAsyncPrimitive<ValueId, AsyncAtomicValue<String>>
+    extends AbstractAsyncPrimitive<AsyncAtomicValue<String>>
     implements AsyncAtomicValue<String> {
   private final ValueServiceGrpc.ValueServiceStub value;
 
   public DefaultAsyncAtomicValue(
-      ValueId id,
-      ChannelFactory channelFactory,
+      PrimitiveId id,
       PrimitiveManagementService managementService,
-      Partitioner<String> partitioner,
       Duration timeout) {
-    super(id, VALUE_ID_DESCRIPTOR, managementService, partitioner, timeout);
-    this.value = ValueServiceGrpc.newStub(channelFactory.getChannel());
+    super(id, managementService, timeout);
+    this.value = ValueServiceGrpc.newStub(managementService.getChannelFactory().getChannel());
   }
 
   @Override
@@ -212,41 +204,4 @@ public class DefaultAsyncAtomicValue
   public AtomicValue<String> sync(Duration operationTimeout) {
     return new BlockingAtomicValue<>(this, operationTimeout.toMillis());
   }
-
-  private static final PrimitiveIdDescriptor<ValueId> VALUE_ID_DESCRIPTOR = new PrimitiveIdDescriptor<ValueId>() {
-    @Override
-    public String getName(ValueId id) {
-      return id.getName();
-    }
-
-    @Override
-    public boolean hasMultiRaftProtocol(ValueId id) {
-      return id.hasRaft();
-    }
-
-    @Override
-    public MultiRaftProtocol getMultiRaftProtocol(ValueId id) {
-      return id.getRaft();
-    }
-
-    @Override
-    public boolean hasMultiPrimaryProtocol(ValueId id) {
-      return id.hasMultiPrimary();
-    }
-
-    @Override
-    public MultiPrimaryProtocol getMultiPrimaryProtocol(ValueId id) {
-      return id.getMultiPrimary();
-    }
-
-    @Override
-    public boolean hasDistributedLogProtocol(ValueId id) {
-      return id.hasLog();
-    }
-
-    @Override
-    public DistributedLogProtocol getDistributedLogProtocol(ValueId id) {
-      return id.getLog();
-    }
-  };
 }

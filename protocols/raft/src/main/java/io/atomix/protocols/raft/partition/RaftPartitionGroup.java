@@ -33,24 +33,31 @@ import java.util.stream.Stream;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
+import com.google.protobuf.Descriptors;
 import io.atomix.cluster.Member;
 import io.atomix.cluster.MemberId;
 import io.atomix.cluster.messaging.ClusterCommunicationService;
+import io.atomix.primitive.PrimitiveClient;
 import io.atomix.primitive.Recovery;
+import io.atomix.primitive.impl.DefaultPrimitiveClient;
 import io.atomix.primitive.partition.ManagedPartitionGroup;
 import io.atomix.primitive.partition.Partition;
+import io.atomix.primitive.partition.PartitionClient;
 import io.atomix.primitive.partition.PartitionGroup;
 import io.atomix.primitive.partition.PartitionGroupConfig;
 import io.atomix.primitive.partition.PartitionId;
 import io.atomix.primitive.partition.PartitionManagementService;
 import io.atomix.primitive.partition.PartitionMetadata;
+import io.atomix.primitive.partition.Partitioner;
+import io.atomix.primitive.partition.ServiceProvider;
 import io.atomix.primitive.protocol.PrimitiveProtocol;
 import io.atomix.primitive.protocol.ServiceProtocol;
+import io.atomix.protocols.raft.MultiRaft;
 import io.atomix.protocols.raft.MultiRaftProtocol;
+import io.atomix.protocols.raft.RaftPartitionGroupMetadata;
+import io.atomix.protocols.raft.RaftPrimitiveMetadata;
 import io.atomix.raft.RaftClient;
 import io.atomix.raft.impl.DefaultRaftClient;
-import io.atomix.raft.protocol.RaftPartitionGroupMetadata;
-import io.atomix.raft.protocol.RaftPrimitiveMetadata;
 import io.atomix.storage.StorageLevel;
 import io.atomix.utils.component.Component;
 import io.atomix.utils.concurrent.BlockingAwareThreadPoolContextFactory;
@@ -68,7 +75,7 @@ import static com.google.common.base.MoreObjects.toStringHelper;
 /**
  * Raft partition group.
  */
-public class RaftPartitionGroup implements ManagedPartitionGroup {
+public class RaftPartitionGroup implements ManagedPartitionGroup, ServiceProvider<MultiRaft> {
   public static final Type TYPE = new Type();
 
   /**
@@ -91,6 +98,16 @@ public class RaftPartitionGroup implements ManagedPartitionGroup {
     @Override
     public String name() {
       return NAME;
+    }
+
+    @Override
+    public Class<?> getProtocolType() {
+      return MultiRaft.class;
+    }
+
+    @Override
+    public Descriptors.Descriptor getProtocolDescriptor() {
+      return MultiRaft.getDescriptor();
     }
 
     @Override
@@ -234,13 +251,26 @@ public class RaftPartitionGroup implements ManagedPartitionGroup {
     return join(managementService);
   }
 
+  @Override
+  public CompletableFuture<PrimitiveClient> createService(String name, MultiRaft protocol) {
+    return createPrimitive(RaftPrimitiveMetadata.newBuilder()
+        .setName(name)
+        .build())
+        .thenApply(metadata -> {
+          Map<PartitionId, PartitionClient> partitions = getPartitions().stream()
+              .map(partition -> Maps.immutableEntry(partition.id(), partition.getClient()))
+              .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+          return new DefaultPrimitiveClient(partitions, Partitioner.MURMUR3);
+        });
+  }
+
   /**
    * Creates a new Raft primitive.
    *
    * @param metadata the primitive metadata
    * @return a future to be completed once the primitive has been created
    */
-  public CompletableFuture<RaftPrimitiveMetadata> createPrimitive(RaftPrimitiveMetadata metadata) {
+  private CompletableFuture<RaftPrimitiveMetadata> createPrimitive(RaftPrimitiveMetadata metadata) {
     return managementService.getMetadataService().update(
         name,
         RaftPartitionGroupMetadata::parseFrom,

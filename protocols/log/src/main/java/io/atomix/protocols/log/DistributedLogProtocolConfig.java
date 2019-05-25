@@ -15,11 +15,6 @@
  */
 package io.atomix.protocols.log;
 
-import java.time.Duration;
-
-import io.atomix.primitive.Consistency;
-import io.atomix.primitive.Recovery;
-import io.atomix.log.protocol.Replication;
 import io.atomix.primitive.partition.Partitioner;
 import io.atomix.primitive.protocol.PrimitiveProtocol;
 import io.atomix.primitive.protocol.PrimitiveProtocolConfig;
@@ -33,12 +28,12 @@ import static com.google.common.base.Preconditions.checkNotNull;
 public class DistributedLogProtocolConfig extends PrimitiveProtocolConfig<DistributedLogProtocolConfig> {
   private static final int DEFAULT_PARTITIONS = 1;
   private static final int DEFAULT_REPLICATION_FACTOR = 1;
-  private static final Replication DEFAULT_REPLICATION_STRATEGY = Replication.ASYNCHRONOUS;
+  private static final ReplicationStrategy DEFAULT_REPLICATION_STRATEGY = ReplicationStrategy.ASYNCHRONOUS;
 
   private String group;
   private int partitions = DEFAULT_PARTITIONS;
   private int replicationFactor = DEFAULT_REPLICATION_FACTOR;
-  private Replication replicationStrategy = DEFAULT_REPLICATION_STRATEGY;
+  private ReplicationStrategy replicationStrategy = DEFAULT_REPLICATION_STRATEGY;
   private Partitioner<String> partitioner = Partitioner.MURMUR3;
 
   @Override
@@ -134,7 +129,7 @@ public class DistributedLogProtocolConfig extends PrimitiveProtocolConfig<Distri
    *
    * @return the replication strategy
    */
-  public Replication getReplicationStrategy() {
+  public ReplicationStrategy getReplicationStrategy() {
     return replicationStrategy;
   }
 
@@ -144,7 +139,7 @@ public class DistributedLogProtocolConfig extends PrimitiveProtocolConfig<Distri
    * @param replicationStrategy the replication strategy
    * @return the log protocol configuration
    */
-  public DistributedLogProtocolConfig setReplicationStrategy(Replication replicationStrategy) {
+  public DistributedLogProtocolConfig setReplicationStrategy(ReplicationStrategy replicationStrategy) {
     checkNotNull(replicationStrategy);
     this.replicationStrategy = replicationStrategy;
     return this;

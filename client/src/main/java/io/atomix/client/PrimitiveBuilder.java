@@ -18,6 +18,8 @@ package io.atomix.client;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 
+import com.google.protobuf.Any;
+import io.atomix.api.primitive.PrimitiveId;
 import io.atomix.primitive.protocol.PrimitiveProtocol;
 import io.atomix.primitive.protocol.PrimitiveProtocolConfig;
 import io.atomix.utils.Builder;
@@ -48,6 +50,18 @@ public abstract class PrimitiveBuilder<B extends PrimitiveBuilder<B, C, P>, C ex
     this.name = checkNotNull(name, "name cannot be null");
     this.config = checkNotNull(config, "config cannot be null");
     this.managementService = checkNotNull(managementService, "managementService cannot be null");
+  }
+
+  /**
+   * Returns the primitive ID for the primitive.
+   *
+   * @return the primitive ID
+   */
+  protected PrimitiveId getPrimitiveId() {
+    return PrimitiveId.newBuilder()
+        .setName(name)
+        .setProtocol(Any.pack(protocol().toProto()))
+        .build();
   }
 
   /**

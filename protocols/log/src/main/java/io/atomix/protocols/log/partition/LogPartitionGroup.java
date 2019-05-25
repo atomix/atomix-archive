@@ -29,20 +29,30 @@ import java.util.stream.Collectors;
 
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
+import com.google.protobuf.Descriptors;
 import io.atomix.cluster.MemberId;
-import io.atomix.log.protocol.LogPartitionGroupMetadata;
-import io.atomix.log.protocol.LogTopicMetadata;
+import io.atomix.primitive.PrimitiveClient;
+import io.atomix.primitive.impl.DefaultPrimitiveClient;
+import io.atomix.primitive.log.LogClient;
+import io.atomix.primitive.log.LogSession;
+import io.atomix.primitive.partition.LogProvider;
 import io.atomix.primitive.partition.ManagedPartitionGroup;
 import io.atomix.primitive.partition.MemberGroupStrategy;
 import io.atomix.primitive.partition.Partition;
+import io.atomix.primitive.partition.PartitionClient;
 import io.atomix.primitive.partition.PartitionGroup;
 import io.atomix.primitive.partition.PartitionGroupConfig;
 import io.atomix.primitive.partition.PartitionId;
 import io.atomix.primitive.partition.PartitionManagementService;
 import io.atomix.primitive.partition.PartitionMetadataEvent;
+import io.atomix.primitive.partition.Partitioner;
+import io.atomix.primitive.partition.ServiceProvider;
 import io.atomix.primitive.protocol.PrimitiveProtocol;
 import io.atomix.primitive.protocol.ServiceProtocol;
+import io.atomix.protocols.log.DistributedLog;
 import io.atomix.protocols.log.DistributedLogProtocol;
+import io.atomix.protocols.log.LogPartitionGroupMetadata;
+import io.atomix.protocols.log.LogTopicMetadata;
 import io.atomix.protocols.log.impl.DistributedLogClient;
 import io.atomix.storage.StorageLevel;
 import io.atomix.utils.component.Component;
@@ -64,7 +74,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
 /**
  * Log partition group.
  */
-public class LogPartitionGroup implements ManagedPartitionGroup {
+public class LogPartitionGroup implements ManagedPartitionGroup, ServiceProvider<DistributedLog>, LogProvider<DistributedLog> {
   public static final Type TYPE = new Type();
 
   /**
@@ -87,6 +97,16 @@ public class LogPartitionGroup implements ManagedPartitionGroup {
     @Override
     public String name() {
       return NAME;
+    }
+
+    @Override
+    public Class<?> getProtocolType() {
+      return DistributedLog.class;
+    }
+
+    @Override
+    public Descriptors.Descriptor getProtocolDescriptor() {
+      return DistributedLog.getDescriptor();
     }
 
     @Override
@@ -182,7 +202,7 @@ public class LogPartitionGroup implements ManagedPartitionGroup {
    * @return the partitions for the given topic
    */
   public Collection<Partition> getPartitions(String topic) {
-    Map<PartitionId, LogPartition> partitions =  topics.get(topic);
+    Map<PartitionId, LogPartition> partitions = topics.get(topic);
     return partitions != null ? (Collection) partitions.values() : null;
   }
 
@@ -257,25 +277,25 @@ public class LogPartitionGroup implements ManagedPartitionGroup {
   private CompletableFuture<Void> start(PartitionManagementService managementService) {
     this.managementService = managementService;
     return managementService.getMetadataService().addListener(name, LogPartitionGroupMetadata::parseFrom, metadataListener)
-    .thenCompose(v -> managementService.getMetadataService().get(
-        name,
-        LogPartitionGroupMetadata::parseFrom)
-        .thenAccept(metadata -> {
-          if (metadata != null) {
-            for (LogTopicMetadata topic : metadata.getTopicsMap().values()) {
-              Map<PartitionId, LogPartition> partitions = new HashMap<>();
-              for (int partitionId : topic.getPartitionIdsList()) {
-                LogPartition partition = new LogPartition(PartitionId.newBuilder()
-                    .setGroup(config.getName())
-                    .setPartition(++partitionId)
-                    .build(), config, topic, threadContextFactory);
-                partitions.put(partition.id(), partition);
+        .thenCompose(v -> managementService.getMetadataService().get(
+            name,
+            LogPartitionGroupMetadata::parseFrom)
+            .thenAccept(metadata -> {
+              if (metadata != null) {
+                for (LogTopicMetadata topic : metadata.getTopicsMap().values()) {
+                  Map<PartitionId, LogPartition> partitions = new HashMap<>();
+                  for (int partitionId : topic.getPartitionIdsList()) {
+                    LogPartition partition = new LogPartition(PartitionId.newBuilder()
+                        .setGroup(config.getName())
+                        .setPartition(++partitionId)
+                        .build(), config, topic, threadContextFactory);
+                    partitions.put(partition.id(), partition);
+                  }
+                  this.topics.put(topic.getTopic(), partitions);
+                  this.partitions.putAll(partitions);
+                }
               }
-              this.topics.put(topic.getTopic(), partitions);
-              this.partitions.putAll(partitions);
-            }
-          }
-        }));
+            }));
   }
 
   @Override
@@ -304,13 +324,45 @@ public class LogPartitionGroup implements ManagedPartitionGroup {
     });
   }
 
+  @Override
+  public CompletableFuture<LogClient> createTopic(String name, DistributedLog protocol) {
+    return createTopic(LogTopicMetadata.newBuilder()
+        .setTopic(name)
+        .setPartitions(protocol.getPartitions())
+        .setReplicationFactor(protocol.getReplicationFactor())
+        .setReplicationStrategy(protocol.getReplicationStrategy())
+        .build())
+        .thenApply(metadata -> {
+          Map<PartitionId, LogSession> partitions = getPartitions(metadata.getTopic()).stream()
+              .map(partition -> Maps.immutableEntry(partition.id(), ((LogPartition) partition).getSession()))
+              .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+          return new DistributedLogClient(partitions, Partitioner.MURMUR3);
+        });
+  }
+
+  @Override
+  public CompletableFuture<PrimitiveClient> createService(String name, DistributedLog protocol) {
+    return createTopic(LogTopicMetadata.newBuilder()
+        .setTopic(name)
+        .setPartitions(protocol.getPartitions())
+        .setReplicationFactor(protocol.getReplicationFactor())
+        .setReplicationStrategy(protocol.getReplicationStrategy())
+        .build())
+        .thenApply(metadata -> {
+          Map<PartitionId, PartitionClient> partitions = getPartitions(metadata.getTopic()).stream()
+              .map(partition -> Maps.immutableEntry(partition.id(), partition.getClient()))
+              .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+          return new DefaultPrimitiveClient(partitions, Partitioner.MURMUR3);
+        });
+  }
+
   /**
    * Creates a new topic in the partition group.
    *
    * @param topic the topic to create
    * @return a future to be completed once the topic has been created
    */
-  public CompletableFuture<LogTopicMetadata> createTopic(LogTopicMetadata topic) {
+  private CompletableFuture<LogTopicMetadata> createTopic(LogTopicMetadata topic) {
     CompletableFuture<LogTopicMetadata> future = new CompletableFuture<>();
     topicFutures.put(topic.getTopic(), future);
     managementService.getMetadataService().update(

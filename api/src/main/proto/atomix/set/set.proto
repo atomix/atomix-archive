@@ -2,25 +2,15 @@ syntax = "proto3";
 
 package atomix.set;
 
-import "atomix/protocol/protocol.proto";
-import "atomix/headers/headers.proto";
 import "google/protobuf/duration.proto";
+import "atomix/headers/headers.proto";
+import "atomix/primitive/primitive.proto";
 
 option java_package = "io.atomix.api.set";
 option java_multiple_files = true;
 
-// Set ID
-message SetId {
-    string name = 1;
-    oneof proto {
-        protocol.MultiRaftProtocol raft = 2;
-        protocol.MultiPrimaryProtocol multi_primary = 3;
-        protocol.DistributedLogProtocol log = 4;
-    }
-}
-
 message CreateRequest {
-    SetId id = 1;
+    atomix.primitive.PrimitiveId id = 1;
     google.protobuf.Duration timeout = 2;
 }
 
@@ -29,7 +19,7 @@ message CreateResponse {
 }
 
 message KeepAliveRequest {
-    SetId id = 1;
+    atomix.primitive.PrimitiveId id = 1;
     repeated atomix.headers.SessionHeader headers = 2;
 }
 
@@ -38,8 +28,9 @@ message KeepAliveResponse {
 }
 
 message CloseRequest {
-    SetId id = 1;
+    atomix.primitive.PrimitiveId id = 1;
     repeated atomix.headers.SessionHeader headers = 2;
+    bool delete = 3;
 }
 
 message CloseResponse {
@@ -47,7 +38,7 @@ message CloseResponse {
 }
 
 message SizeRequest {
-    SetId id = 1;
+    atomix.primitive.PrimitiveId id = 1;
     repeated atomix.headers.SessionQueryHeader headers = 2;
 }
 
@@ -57,7 +48,7 @@ message SizeResponse {
 }
 
 message ContainsRequest {
-    SetId id = 1;
+    atomix.primitive.PrimitiveId id = 1;
     repeated atomix.headers.SessionQueryHeader headers = 2;
     repeated string values = 3;
 }
@@ -68,7 +59,7 @@ message ContainsResponse {
 }
 
 message AddRequest {
-    SetId id = 1;
+    atomix.primitive.PrimitiveId id = 1;
     repeated atomix.headers.SessionCommandHeader headers = 2;
     repeated string values = 3;
 }
@@ -80,7 +71,7 @@ message AddResponse {
 }
 
 message RemoveRequest {
-    SetId id = 1;
+    atomix.primitive.PrimitiveId id = 1;
     repeated atomix.headers.SessionCommandHeader headers = 2;
     repeated string values = 3;
 }
@@ -92,7 +83,7 @@ message RemoveResponse {
 }
 
 message ClearRequest {
-    SetId id = 1;
+    atomix.primitive.PrimitiveId id = 1;
     repeated atomix.headers.SessionCommandHeader headers = 2;
 }
 
@@ -101,7 +92,7 @@ message ClearResponse {
 }
 
 message EventRequest {
-    SetId id = 1;
+    atomix.primitive.PrimitiveId id = 1;
     repeated atomix.headers.SessionCommandHeader headers = 2;
 }
 
@@ -117,7 +108,7 @@ message EventResponse {
 }
 
 message IterateRequest {
-    SetId id = 1;
+    atomix.primitive.PrimitiveId id = 1;
     repeated atomix.headers.SessionQueryHeader headers = 2;
 }
 

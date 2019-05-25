@@ -15,12 +15,13 @@
  */
 package io.atomix.primitive.protocol;
 
+import com.google.protobuf.Message;
 import io.atomix.utils.ConfiguredType;
 
 /**
  * Primitive protocol.
  */
-public interface PrimitiveProtocol {
+public interface PrimitiveProtocol<T extends Message> {
 
   /**
    * Distributed primitive protocol type.
@@ -47,5 +48,12 @@ public interface PrimitiveProtocol {
    * @return the protocol type
    */
   Type type();
+
+  /**
+   * Returns the protocol as a protobuf message.
+   *
+   * @return the protobuf message
+   */
+  T toProto();
 
 }

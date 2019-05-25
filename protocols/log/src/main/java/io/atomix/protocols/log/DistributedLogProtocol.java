@@ -15,25 +15,8 @@
  */
 package io.atomix.protocols.log;
 
-import java.util.Map;
-import java.util.concurrent.CompletableFuture;
-import java.util.stream.Collectors;
-
-import com.google.common.collect.Maps;
-import io.atomix.log.protocol.LogTopicMetadata;
-import io.atomix.primitive.PrimitiveClient;
-import io.atomix.primitive.impl.DefaultPrimitiveClient;
-import io.atomix.primitive.log.LogClient;
-import io.atomix.primitive.log.LogSession;
-import io.atomix.primitive.partition.PartitionClient;
-import io.atomix.primitive.partition.PartitionId;
-import io.atomix.primitive.partition.PartitionService;
 import io.atomix.primitive.protocol.LogProtocol;
 import io.atomix.primitive.protocol.PrimitiveProtocol;
-import io.atomix.primitive.service.impl.ServiceId;
-import io.atomix.protocols.log.impl.DistributedLogClient;
-import io.atomix.protocols.log.partition.LogPartition;
-import io.atomix.protocols.log.partition.LogPartitionGroup;
 import io.atomix.utils.component.Component;
 
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -41,7 +24,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
 /**
  * Distributed log protocol.
  */
-public class DistributedLogProtocol implements LogProtocol {
+public class DistributedLogProtocol implements LogProtocol<DistributedLog> {
   public static final Type TYPE = new Type();
 
   /**
@@ -121,36 +104,12 @@ public class DistributedLogProtocol implements LogProtocol {
   }
 
   @Override
-  public CompletableFuture<LogClient> createTopic(String topic, PartitionService partitionService) {
-    LogPartitionGroup partitionGroup = (LogPartitionGroup) partitionService.getPartitionGroup(this);
-    return partitionGroup.createTopic(LogTopicMetadata.newBuilder()
-        .setTopic(topic)
+  public DistributedLog toProto() {
+    return DistributedLog.newBuilder()
+        .setGroup(group())
         .setPartitions(config.getPartitions())
         .setReplicationFactor(config.getReplicationFactor())
         .setReplicationStrategy(config.getReplicationStrategy())
-        .build())
-        .thenApply(metadata -> {
-          Map<PartitionId, LogSession> partitions = partitionGroup.getPartitions(metadata.getTopic()).stream()
-              .map(partition -> Maps.immutableEntry(partition.id(), ((LogPartition) partition).getSession()))
-              .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
-          return new DistributedLogClient(partitions, config.getPartitioner());
-        });
-  }
-
-  @Override
-  public CompletableFuture<PrimitiveClient> createService(String name, PartitionService partitionService) {
-    LogPartitionGroup partitionGroup = (LogPartitionGroup) partitionService.getPartitionGroup(this);
-    return partitionGroup.createTopic(LogTopicMetadata.newBuilder()
-        .setTopic(name)
-        .setPartitions(config.getPartitions())
-        .setReplicationFactor(config.getReplicationFactor())
-        .setReplicationStrategy(config.getReplicationStrategy())
-        .build())
-        .thenApply(metadata -> {
-          Map<PartitionId, PartitionClient> partitions = partitionGroup.getPartitions(metadata.getTopic()).stream()
-              .map(partition -> Maps.immutableEntry(partition.id(), partition.getClient()))
-              .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
-          return new DefaultPrimitiveClient(partitions, config.getPartitioner());
-        });
+        .build();
   }
 }

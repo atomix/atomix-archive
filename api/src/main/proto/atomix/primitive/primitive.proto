@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+import "atomix/headers/headers.proto";
+import "google/protobuf/any.proto";
+
+package atomix.primitive;
+
+option java_package = "io.atomix.api.primitive";
+option java_multiple_files = true;
+
+// Primitive ID
+message PrimitiveId {
+    string name = 1;
+    string namespace = 2;
+    google.protobuf.Any protocol = 3;
+}

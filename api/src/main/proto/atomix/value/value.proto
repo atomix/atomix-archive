@@ -2,25 +2,15 @@ syntax = "proto3";
 
 package atomix.value;
 
-import "atomix/protocol/protocol.proto";
-import "atomix/headers/headers.proto";
 import "google/protobuf/duration.proto";
+import "atomix/headers/headers.proto";
+import "atomix/primitive/primitive.proto";
 
 option java_package = "io.atomix.api.value";
 option java_multiple_files = true;
 
-// Value ID
-message ValueId {
-    string name = 1;
-    oneof proto {
-        protocol.MultiRaftProtocol raft = 2;
-        protocol.MultiPrimaryProtocol multi_primary = 3;
-        protocol.DistributedLogProtocol log = 4;
-    }
-}
-
 message CreateRequest {
-    ValueId id = 1;
+    atomix.primitive.PrimitiveId id = 1;
     google.protobuf.Duration timeout = 2;
 }
 
@@ -29,7 +19,7 @@ message CreateResponse {
 }
 
 message KeepAliveRequest {
-    ValueId id = 1;
+    atomix.primitive.PrimitiveId id = 1;
     atomix.headers.SessionHeader header = 2;
 }
 
@@ -38,8 +28,9 @@ message KeepAliveResponse {
 }
 
 message CloseRequest {
-    ValueId id = 1;
+    atomix.primitive.PrimitiveId id = 1;
     atomix.headers.SessionHeader header = 2;
+    bool delete = 3;
 }
 
 message CloseResponse {
@@ -47,7 +38,7 @@ message CloseResponse {
 }
 
 message GetRequest {
-    ValueId id = 1;
+    atomix.primitive.PrimitiveId id = 1;
     atomix.headers.SessionQueryHeader header = 2;
 }
 
@@ -58,7 +49,7 @@ message GetResponse {
 }
 
 message SetRequest {
-    ValueId id = 1;
+    atomix.primitive.PrimitiveId id = 1;
     atomix.headers.SessionCommandHeader header = 2;
     bytes value = 3;
 }
@@ -71,7 +62,7 @@ message SetResponse {
 }
 
 message CheckAndSetRequest {
-    ValueId id = 1;
+    atomix.primitive.PrimitiveId id = 1;
     atomix.headers.SessionCommandHeader header = 2;
     bytes check = 3;
     bytes update = 4;
@@ -85,7 +76,7 @@ message CheckAndSetResponse {
 }
 
 message EventRequest {
-    ValueId id = 1;
+    atomix.primitive.PrimitiveId id = 1;
     atomix.headers.SessionCommandHeader header = 2;
 }
 

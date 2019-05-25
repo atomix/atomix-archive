@@ -18,15 +18,11 @@ package io.atomix.client.election.impl;
 import java.util.concurrent.CompletableFuture;
 
 import com.google.common.io.BaseEncoding;
-import io.atomix.api.election.ElectionId;
-import io.atomix.api.protocol.DistributedLogProtocol;
-import io.atomix.api.protocol.MultiRaftProtocol;
 import io.atomix.client.PrimitiveManagementService;
 import io.atomix.client.election.AsyncLeaderElection;
 import io.atomix.client.election.LeaderElection;
 import io.atomix.client.election.LeaderElectionBuilder;
 import io.atomix.client.election.LeaderElectionConfig;
-import io.atomix.primitive.partition.Partitioner;
 import io.atomix.utils.serializer.Serializer;
 
 /**
@@ -37,27 +33,10 @@ public class DefaultLeaderElectionBuilder<T> extends LeaderElectionBuilder<T> {
     super(name, config, managementService);
   }
 
-  private ElectionId createElectionId() {
-    ElectionId.Builder builder = ElectionId.newBuilder().setName(name);
-    protocol = protocol();
-    if (protocol instanceof io.atomix.protocols.raft.MultiRaftProtocol) {
-      builder.setRaft(MultiRaftProtocol.newBuilder()
-          .setGroup(((io.atomix.protocols.raft.MultiRaftProtocol) protocol).group())
-          .build());
-    } else if (protocol instanceof io.atomix.protocols.log.DistributedLogProtocol) {
-      builder.setLog(DistributedLogProtocol.newBuilder()
-          .setGroup(((io.atomix.protocols.log.DistributedLogProtocol) protocol).group())
-          .setPartitions(((io.atomix.protocols.log.DistributedLogProtocol) protocol).config().getPartitions())
-          .setReplicationFactor(((io.atomix.protocols.log.DistributedLogProtocol) protocol).config().getReplicationFactor())
-          .build());
-    }
-    return builder.build();
-  }
-
   @Override
   @SuppressWarnings("unchecked")
   public CompletableFuture<LeaderElection<T>> buildAsync() {
-    return new DefaultAsyncLeaderElection(createElectionId(), managementService.getChannelFactory(), managementService, Partitioner.MURMUR3, config.getSessionTimeout())
+    return new DefaultAsyncLeaderElection(getPrimitiveId(), managementService, config.getSessionTimeout())
         .connect()
         .thenApply(election -> {
           Serializer serializer = serializer();

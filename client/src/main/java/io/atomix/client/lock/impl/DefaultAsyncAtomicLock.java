@@ -28,23 +28,17 @@ import io.atomix.api.lock.IsLockedRequest;
 import io.atomix.api.lock.IsLockedResponse;
 import io.atomix.api.lock.KeepAliveRequest;
 import io.atomix.api.lock.KeepAliveResponse;
-import io.atomix.api.lock.LockId;
 import io.atomix.api.lock.LockRequest;
 import io.atomix.api.lock.LockResponse;
 import io.atomix.api.lock.LockServiceGrpc;
 import io.atomix.api.lock.UnlockRequest;
 import io.atomix.api.lock.UnlockResponse;
-import io.atomix.api.protocol.DistributedLogProtocol;
-import io.atomix.api.protocol.MultiPrimaryProtocol;
-import io.atomix.api.protocol.MultiRaftProtocol;
+import io.atomix.api.primitive.PrimitiveId;
 import io.atomix.client.PrimitiveManagementService;
-import io.atomix.client.channel.ChannelFactory;
 import io.atomix.client.impl.AbstractAsyncPrimitive;
-import io.atomix.client.impl.PrimitiveIdDescriptor;
 import io.atomix.client.impl.PrimitivePartition;
 import io.atomix.client.lock.AsyncAtomicLock;
 import io.atomix.client.lock.AtomicLock;
-import io.atomix.primitive.partition.Partitioner;
 import io.atomix.utils.concurrent.Futures;
 import io.atomix.utils.concurrent.Scheduled;
 import io.atomix.utils.time.Version;
@@ -52,13 +46,13 @@ import io.atomix.utils.time.Version;
 /**
  * Raft lock.
  */
-public class DefaultAsyncAtomicLock extends AbstractAsyncPrimitive<LockId, AsyncAtomicLock> implements AsyncAtomicLock {
+public class DefaultAsyncAtomicLock extends AbstractAsyncPrimitive<AsyncAtomicLock> implements AsyncAtomicLock {
   private final LockServiceGrpc.LockServiceStub lock;
   private final AtomicLong lockId = new AtomicLong();
 
-  public DefaultAsyncAtomicLock(LockId id, ChannelFactory channelFactory, PrimitiveManagementService managementService, Partitioner<String> partitioner, Duration timeout) {
-    super(id, LOCK_ID_DESCRIPTOR, managementService, partitioner, timeout);
-    this.lock = LockServiceGrpc.newStub(channelFactory.getChannel());
+  public DefaultAsyncAtomicLock(PrimitiveId id, PrimitiveManagementService managementService, Duration timeout) {
+    super(id, managementService, timeout);
+    this.lock = LockServiceGrpc.newStub(managementService.getChannelFactory().getChannel());
   }
 
   @Override
@@ -224,41 +218,4 @@ public class DefaultAsyncAtomicLock extends AbstractAsyncPrimitive<LockId, Async
   public AtomicLock sync(Duration operationTimeout) {
     return new BlockingAtomicLock(this, operationTimeout.toMillis());
   }
-
-  private static final PrimitiveIdDescriptor<LockId> LOCK_ID_DESCRIPTOR = new PrimitiveIdDescriptor<LockId>() {
-    @Override
-    public String getName(LockId id) {
-      return id.getName();
-    }
-
-    @Override
-    public boolean hasMultiRaftProtocol(LockId id) {
-      return id.hasRaft();
-    }
-
-    @Override
-    public MultiRaftProtocol getMultiRaftProtocol(LockId id) {
-      return id.getRaft();
-    }
-
-    @Override
-    public boolean hasMultiPrimaryProtocol(LockId id) {
-      return id.hasMultiPrimary();
-    }
-
-    @Override
-    public MultiPrimaryProtocol getMultiPrimaryProtocol(LockId id) {
-      return id.getMultiPrimary();
-    }
-
-    @Override
-    public boolean hasDistributedLogProtocol(LockId id) {
-      return id.hasLog();
-    }
-
-    @Override
-    public DistributedLogProtocol getDistributedLogProtocol(LockId id) {
-      return id.getLog();
-    }
-  };
 }

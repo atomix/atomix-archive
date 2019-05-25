@@ -15,15 +15,12 @@
  */
 package io.atomix.primitive.protocol;
 
-import java.util.concurrent.CompletableFuture;
-
-import io.atomix.primitive.PrimitiveClient;
-import io.atomix.primitive.partition.PartitionService;
+import com.google.protobuf.Message;
 
 /**
  * State machine replication-based primitive protocol.
  */
-public interface ServiceProtocol extends PrimitiveProtocol {
+public interface ServiceProtocol<T extends Message> extends PrimitiveProtocol<T> {
 
   /**
    * Returns the protocol partition group name.
@@ -31,14 +28,5 @@ public interface ServiceProtocol extends PrimitiveProtocol {
    * @return the protocol partition group name
    */
   String group();
-
-  /**
-   * Creates a new service via the protocol.
-   *
-   * @param name             the service name
-   * @param partitionService the partition service
-   * @return the service client
-   */
-  CompletableFuture<PrimitiveClient> createService(String name, PartitionService partitionService);
 
 }

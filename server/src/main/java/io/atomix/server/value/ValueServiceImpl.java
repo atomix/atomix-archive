@@ -24,10 +24,6 @@ import io.atomix.api.headers.SessionHeader;
 import io.atomix.api.headers.SessionQueryHeader;
 import io.atomix.api.headers.SessionResponseHeader;
 import io.atomix.api.headers.SessionStreamHeader;
-import io.atomix.api.protocol.DistributedLogProtocol;
-import io.atomix.api.protocol.MultiPrimaryProtocol;
-import io.atomix.api.protocol.MultiRaftProtocol;
-import io.atomix.api.value.ValueId;
 import io.atomix.primitive.partition.PartitionService;
 import io.atomix.primitive.session.impl.DefaultSessionClient;
 import io.atomix.primitive.session.impl.OpenSessionRequest;
@@ -35,7 +31,6 @@ import io.atomix.primitive.session.impl.SessionCommandContext;
 import io.atomix.primitive.session.impl.SessionQueryContext;
 import io.atomix.primitive.session.impl.SessionStreamContext;
 import io.atomix.server.impl.PrimitiveFactory;
-import io.atomix.server.impl.PrimitiveIdDescriptor;
 import io.atomix.server.impl.RequestExecutor;
 import io.grpc.stub.StreamObserver;
 import org.apache.commons.lang3.tuple.Pair;
@@ -44,21 +39,20 @@ import org.apache.commons.lang3.tuple.Pair;
  * Value service implementation.
  */
 public class ValueServiceImpl extends io.atomix.api.value.ValueServiceGrpc.ValueServiceImplBase {
-  private final PrimitiveFactory<ValueProxy, ValueId> primitiveFactory;
-  private final RequestExecutor<ValueProxy, ValueId, SessionHeader, io.atomix.api.value.CreateRequest, io.atomix.api.value.CreateResponse> create;
-  private final RequestExecutor<ValueProxy, ValueId, SessionHeader, io.atomix.api.value.KeepAliveRequest, io.atomix.api.value.KeepAliveResponse> keepAlive;
-  private final RequestExecutor<ValueProxy, ValueId, SessionHeader, io.atomix.api.value.CloseRequest, io.atomix.api.value.CloseResponse> close;
-  private final RequestExecutor<ValueProxy, ValueId, SessionQueryHeader, io.atomix.api.value.GetRequest, io.atomix.api.value.GetResponse> get;
-  private final RequestExecutor<ValueProxy, ValueId, SessionCommandHeader, io.atomix.api.value.SetRequest, io.atomix.api.value.SetResponse> set;
-  private final RequestExecutor<ValueProxy, ValueId, SessionCommandHeader, io.atomix.api.value.CheckAndSetRequest, io.atomix.api.value.CheckAndSetResponse> checkAndSet;
-  private final RequestExecutor<ValueProxy, ValueId, SessionCommandHeader, io.atomix.api.value.EventRequest, io.atomix.api.value.EventResponse> events;
+  private final PrimitiveFactory<ValueProxy> primitiveFactory;
+  private final RequestExecutor<ValueProxy, SessionHeader, io.atomix.api.value.CreateRequest, io.atomix.api.value.CreateResponse> create;
+  private final RequestExecutor<ValueProxy, SessionHeader, io.atomix.api.value.KeepAliveRequest, io.atomix.api.value.KeepAliveResponse> keepAlive;
+  private final RequestExecutor<ValueProxy, SessionHeader, io.atomix.api.value.CloseRequest, io.atomix.api.value.CloseResponse> close;
+  private final RequestExecutor<ValueProxy, SessionQueryHeader, io.atomix.api.value.GetRequest, io.atomix.api.value.GetResponse> get;
+  private final RequestExecutor<ValueProxy, SessionCommandHeader, io.atomix.api.value.SetRequest, io.atomix.api.value.SetResponse> set;
+  private final RequestExecutor<ValueProxy, SessionCommandHeader, io.atomix.api.value.CheckAndSetRequest, io.atomix.api.value.CheckAndSetResponse> checkAndSet;
+  private final RequestExecutor<ValueProxy, SessionCommandHeader, io.atomix.api.value.EventRequest, io.atomix.api.value.EventResponse> events;
 
   public ValueServiceImpl(PartitionService partitionService) {
     this.primitiveFactory = new PrimitiveFactory<>(
         partitionService,
         ValueService.TYPE,
-        (id, client) -> new ValueProxy(new DefaultSessionClient(id, client)),
-        VALUE_ID_DESCRIPTOR);
+        (id, client) -> new ValueProxy(new DefaultSessionClient(id, client)));
     this.create = new RequestExecutor<>(primitiveFactory, CREATE_DESCRIPTOR, io.atomix.api.value.CreateResponse::getDefaultInstance);
     this.keepAlive = new RequestExecutor<>(primitiveFactory, KEEP_ALIVE_DESCRIPTOR, io.atomix.api.value.KeepAliveResponse::getDefaultInstance);
     this.close = new RequestExecutor<>(primitiveFactory, CLOSE_DESCRIPTOR, io.atomix.api.value.CloseResponse::getDefaultInstance);
@@ -229,61 +223,24 @@ public class ValueServiceImpl extends io.atomix.api.value.ValueServiceGrpc.Value
             .build());
   }
 
-  private static final PrimitiveIdDescriptor<ValueId> VALUE_ID_DESCRIPTOR = new PrimitiveIdDescriptor<ValueId>() {
-    @Override
-    public String getName(ValueId id) {
-      return id.getName();
-    }
-
-    @Override
-    public boolean hasMultiRaftProtocol(ValueId id) {
-      return id.hasRaft();
-    }
-
-    @Override
-    public MultiRaftProtocol getMultiRaftProtocol(ValueId id) {
-      return id.getRaft();
-    }
-
-    @Override
-    public boolean hasMultiPrimaryProtocol(ValueId id) {
-      return id.hasMultiPrimary();
-    }
-
-    @Override
-    public MultiPrimaryProtocol getMultiPrimaryProtocol(ValueId id) {
-      return id.getMultiPrimary();
-    }
-
-    @Override
-    public boolean hasDistributedLogProtocol(ValueId id) {
-      return id.hasLog();
-    }
-
-    @Override
-    public DistributedLogProtocol getDistributedLogProtocol(ValueId id) {
-      return id.getLog();
-    }
-  };
-
-  private static final RequestExecutor.RequestDescriptor<io.atomix.api.value.CreateRequest, ValueId, SessionHeader> CREATE_DESCRIPTOR =
+  private static final RequestExecutor.RequestDescriptor<io.atomix.api.value.CreateRequest, SessionHeader> CREATE_DESCRIPTOR =
       new RequestExecutor.SessionDescriptor<>(io.atomix.api.value.CreateRequest::getId, r -> Collections.emptyList());
 
-  private static final RequestExecutor.RequestDescriptor<io.atomix.api.value.KeepAliveRequest, ValueId, SessionHeader> KEEP_ALIVE_DESCRIPTOR =
+  private static final RequestExecutor.RequestDescriptor<io.atomix.api.value.KeepAliveRequest, SessionHeader> KEEP_ALIVE_DESCRIPTOR =
       new RequestExecutor.SessionDescriptor<>(io.atomix.api.value.KeepAliveRequest::getId, request -> Collections.singletonList(request.getHeader()));
 
-  private static final RequestExecutor.RequestDescriptor<io.atomix.api.value.CloseRequest, ValueId, SessionHeader> CLOSE_DESCRIPTOR =
+  private static final RequestExecutor.RequestDescriptor<io.atomix.api.value.CloseRequest, SessionHeader> CLOSE_DESCRIPTOR =
       new RequestExecutor.SessionDescriptor<>(io.atomix.api.value.CloseRequest::getId, request -> Collections.singletonList(request.getHeader()));
 
-  private static final RequestExecutor.RequestDescriptor<io.atomix.api.value.GetRequest, ValueId, SessionQueryHeader> GET_DESCRIPTOR =
+  private static final RequestExecutor.RequestDescriptor<io.atomix.api.value.GetRequest, SessionQueryHeader> GET_DESCRIPTOR =
       new RequestExecutor.SessionQueryDescriptor<>(io.atomix.api.value.GetRequest::getId, request -> Collections.singletonList(request.getHeader()));
 
-  private static final RequestExecutor.RequestDescriptor<io.atomix.api.value.SetRequest, ValueId, SessionCommandHeader> SET_DESCRIPTOR =
+  private static final RequestExecutor.RequestDescriptor<io.atomix.api.value.SetRequest, SessionCommandHeader> SET_DESCRIPTOR =
       new RequestExecutor.SessionCommandDescriptor<>(io.atomix.api.value.SetRequest::getId, request -> Collections.singletonList(request.getHeader()));
 
-  private static final RequestExecutor.RequestDescriptor<io.atomix.api.value.CheckAndSetRequest, ValueId, SessionCommandHeader> CHECK_AND_SET_DESCRIPTOR =
+  private static final RequestExecutor.RequestDescriptor<io.atomix.api.value.CheckAndSetRequest, SessionCommandHeader> CHECK_AND_SET_DESCRIPTOR =
       new RequestExecutor.SessionCommandDescriptor<>(io.atomix.api.value.CheckAndSetRequest::getId, request -> Collections.singletonList(request.getHeader()));
 
-  private static final RequestExecutor.RequestDescriptor<io.atomix.api.value.EventRequest, ValueId, SessionCommandHeader> EVENT_DESCRIPTOR =
+  private static final RequestExecutor.RequestDescriptor<io.atomix.api.value.EventRequest, SessionCommandHeader> EVENT_DESCRIPTOR =
       new RequestExecutor.SessionCommandDescriptor<>(io.atomix.api.value.EventRequest::getId, request -> Collections.singletonList(request.getHeader()));
 }

@@ -20,43 +20,38 @@ import java.util.concurrent.CompletableFuture;
 
 import io.atomix.api.counter.CheckAndSetRequest;
 import io.atomix.api.counter.CheckAndSetResponse;
-import io.atomix.api.counter.CounterId;
+import io.atomix.api.counter.CloseRequest;
+import io.atomix.api.counter.CloseResponse;
 import io.atomix.api.counter.CounterServiceGrpc;
 import io.atomix.api.counter.CreateRequest;
 import io.atomix.api.counter.CreateResponse;
 import io.atomix.api.counter.DecrementRequest;
 import io.atomix.api.counter.DecrementResponse;
-import io.atomix.api.counter.DeleteRequest;
-import io.atomix.api.counter.DeleteResponse;
 import io.atomix.api.counter.GetRequest;
 import io.atomix.api.counter.GetResponse;
 import io.atomix.api.counter.IncrementRequest;
 import io.atomix.api.counter.IncrementResponse;
 import io.atomix.api.counter.SetRequest;
 import io.atomix.api.counter.SetResponse;
-import io.atomix.api.protocol.DistributedLogProtocol;
-import io.atomix.api.protocol.MultiPrimaryProtocol;
-import io.atomix.api.protocol.MultiRaftProtocol;
+import io.atomix.api.primitive.PrimitiveId;
 import io.atomix.client.PrimitiveManagementService;
 import io.atomix.client.counter.AsyncAtomicCounter;
 import io.atomix.client.counter.AtomicCounter;
 import io.atomix.client.impl.AbstractAsyncPrimitive;
-import io.atomix.client.impl.PrimitiveIdDescriptor;
 import io.atomix.client.impl.PrimitivePartition;
-import io.atomix.primitive.partition.Partitioner;
 
 /**
  * Atomix counter implementation.
  */
 public class DefaultAsyncAtomicCounter
-    extends AbstractAsyncPrimitive<CounterId, AsyncAtomicCounter>
+    extends AbstractAsyncPrimitive<AsyncAtomicCounter>
     implements AsyncAtomicCounter {
   private final CounterServiceGrpc.CounterServiceStub counter;
 
   public DefaultAsyncAtomicCounter(
-      CounterId id,
+      PrimitiveId id,
       PrimitiveManagementService managementService) {
-    super(id, COUNTER_ID_DESCRIPTOR, managementService, Partitioner.MURMUR3, Duration.ZERO);
+    super(id, managementService, Duration.ZERO);
     this.counter = CounterServiceGrpc.newStub(managementService.getChannelFactory().getChannel());
   }
 
@@ -173,15 +168,21 @@ public class DefaultAsyncAtomicCounter
 
   @Override
   public CompletableFuture<Void> close() {
-    return CompletableFuture.completedFuture(null);
+    PrimitivePartition partition = getPartition();
+    return this.<CloseResponse>execute(observer -> counter.close(CloseRequest.newBuilder()
+        .setId(id())
+        .setHeader(partition.getRequestHeader())
+        .build(), observer))
+        .thenApply(v -> null);
   }
 
   @Override
   public CompletableFuture<Void> delete() {
     PrimitivePartition partition = getPartition();
-    return this.<DeleteResponse>execute(observer -> counter.delete(DeleteRequest.newBuilder()
+    return this.<CloseResponse>execute(observer -> counter.close(CloseRequest.newBuilder()
         .setId(id())
         .setHeader(partition.getRequestHeader())
+        .setDelete(true)
         .build(), observer))
         .thenApply(v -> null);
   }
@@ -190,41 +191,4 @@ public class DefaultAsyncAtomicCounter
   public AtomicCounter sync(Duration operationTimeout) {
     return new BlockingAtomicCounter(this, operationTimeout.toMillis());
   }
-
-  private static final PrimitiveIdDescriptor<CounterId> COUNTER_ID_DESCRIPTOR = new PrimitiveIdDescriptor<CounterId>() {
-    @Override
-    public String getName(CounterId id) {
-      return id.getName();
-    }
-
-    @Override
-    public boolean hasMultiRaftProtocol(CounterId id) {
-      return id.hasRaft();
-    }
-
-    @Override
-    public MultiRaftProtocol getMultiRaftProtocol(CounterId id) {
-      return id.getRaft();
-    }
-
-    @Override
-    public boolean hasMultiPrimaryProtocol(CounterId id) {
-      return id.hasMultiPrimary();
-    }
-
-    @Override
-    public MultiPrimaryProtocol getMultiPrimaryProtocol(CounterId id) {
-      return id.getMultiPrimary();
-    }
-
-    @Override
-    public boolean hasDistributedLogProtocol(CounterId id) {
-      return id.hasLog();
-    }
-
-    @Override
-    public DistributedLogProtocol getDistributedLogProtocol(CounterId id) {
-      return id.getLog();
-    }
-  };
 }

@@ -24,11 +24,7 @@ import io.atomix.api.headers.SessionHeader;
 import io.atomix.api.headers.SessionQueryHeader;
 import io.atomix.api.headers.SessionResponseHeader;
 import io.atomix.api.headers.SessionStreamHeader;
-import io.atomix.api.map.MapId;
 import io.atomix.api.map.ResponseStatus;
-import io.atomix.api.protocol.DistributedLogProtocol;
-import io.atomix.api.protocol.MultiPrimaryProtocol;
-import io.atomix.api.protocol.MultiRaftProtocol;
 import io.atomix.primitive.partition.PartitionService;
 import io.atomix.primitive.session.impl.CloseSessionRequest;
 import io.atomix.primitive.session.impl.DefaultSessionClient;
@@ -37,7 +33,6 @@ import io.atomix.primitive.session.impl.SessionCommandContext;
 import io.atomix.primitive.session.impl.SessionQueryContext;
 import io.atomix.primitive.session.impl.SessionStreamContext;
 import io.atomix.server.impl.PrimitiveFactory;
-import io.atomix.server.impl.PrimitiveIdDescriptor;
 import io.atomix.server.impl.RequestExecutor;
 import io.grpc.stub.StreamObserver;
 import org.apache.commons.lang3.tuple.Pair;
@@ -46,21 +41,21 @@ import org.apache.commons.lang3.tuple.Pair;
  * Map service implementation.
  */
 public class MapServiceImpl extends io.atomix.api.map.MapServiceGrpc.MapServiceImplBase {
-  private final PrimitiveFactory<MapProxy, MapId> primitiveFactory;
-  private final RequestExecutor<MapProxy, MapId, SessionHeader, io.atomix.api.map.CreateRequest, io.atomix.api.map.CreateResponse> create;
-  private final RequestExecutor<MapProxy, MapId, SessionHeader, io.atomix.api.map.KeepAliveRequest, io.atomix.api.map.KeepAliveResponse> keepAlive;
-  private final RequestExecutor<MapProxy, MapId, SessionHeader, io.atomix.api.map.CloseRequest, io.atomix.api.map.CloseResponse> close;
-  private final RequestExecutor<MapProxy, MapId, SessionQueryHeader, io.atomix.api.map.SizeRequest, io.atomix.api.map.SizeResponse> size;
-  private final RequestExecutor<MapProxy, MapId, SessionCommandHeader, io.atomix.api.map.PutRequest, io.atomix.api.map.PutResponse> put;
-  private final RequestExecutor<MapProxy, MapId, SessionQueryHeader, io.atomix.api.map.ExistsRequest, io.atomix.api.map.ExistsResponse> exists;
-  private final RequestExecutor<MapProxy, MapId, SessionQueryHeader, io.atomix.api.map.GetRequest, io.atomix.api.map.GetResponse> get;
-  private final RequestExecutor<MapProxy, MapId, SessionCommandHeader, io.atomix.api.map.ReplaceRequest, io.atomix.api.map.ReplaceResponse> replace;
-  private final RequestExecutor<MapProxy, MapId, SessionCommandHeader, io.atomix.api.map.RemoveRequest, io.atomix.api.map.RemoveResponse> remove;
-  private final RequestExecutor<MapProxy, MapId, SessionCommandHeader, io.atomix.api.map.ClearRequest, io.atomix.api.map.ClearResponse> clear;
-  private final RequestExecutor<MapProxy, MapId, SessionCommandHeader, io.atomix.api.map.EventRequest, io.atomix.api.map.EventResponse> events;
+  private final PrimitiveFactory<MapProxy> primitiveFactory;
+  private final RequestExecutor<MapProxy, SessionHeader, io.atomix.api.map.CreateRequest, io.atomix.api.map.CreateResponse> create;
+  private final RequestExecutor<MapProxy, SessionHeader, io.atomix.api.map.KeepAliveRequest, io.atomix.api.map.KeepAliveResponse> keepAlive;
+  private final RequestExecutor<MapProxy, SessionHeader, io.atomix.api.map.CloseRequest, io.atomix.api.map.CloseResponse> close;
+  private final RequestExecutor<MapProxy, SessionQueryHeader, io.atomix.api.map.SizeRequest, io.atomix.api.map.SizeResponse> size;
+  private final RequestExecutor<MapProxy, SessionCommandHeader, io.atomix.api.map.PutRequest, io.atomix.api.map.PutResponse> put;
+  private final RequestExecutor<MapProxy, SessionQueryHeader, io.atomix.api.map.ExistsRequest, io.atomix.api.map.ExistsResponse> exists;
+  private final RequestExecutor<MapProxy, SessionQueryHeader, io.atomix.api.map.GetRequest, io.atomix.api.map.GetResponse> get;
+  private final RequestExecutor<MapProxy, SessionCommandHeader, io.atomix.api.map.ReplaceRequest, io.atomix.api.map.ReplaceResponse> replace;
+  private final RequestExecutor<MapProxy, SessionCommandHeader, io.atomix.api.map.RemoveRequest, io.atomix.api.map.RemoveResponse> remove;
+  private final RequestExecutor<MapProxy, SessionCommandHeader, io.atomix.api.map.ClearRequest, io.atomix.api.map.ClearResponse> clear;
+  private final RequestExecutor<MapProxy, SessionCommandHeader, io.atomix.api.map.EventRequest, io.atomix.api.map.EventResponse> events;
 
   public MapServiceImpl(PartitionService partitionService) {
-    this.primitiveFactory = new PrimitiveFactory<>(partitionService, MapService.TYPE, (id, client) -> new MapProxy(new DefaultSessionClient(id, client)), MAP_ID_DESCRIPTOR);
+    this.primitiveFactory = new PrimitiveFactory<>(partitionService, MapService.TYPE, (id, client) -> new MapProxy(new DefaultSessionClient(id, client)));
     this.create = new RequestExecutor<>(primitiveFactory, CREATE_DESCRIPTOR, io.atomix.api.map.CreateResponse::getDefaultInstance);
     this.keepAlive = new RequestExecutor<>(primitiveFactory, KEEP_ALIVE_DESCRIPTOR, io.atomix.api.map.KeepAliveResponse::getDefaultInstance);
     this.close = new RequestExecutor<>(primitiveFactory, CLOSE_DESCRIPTOR, io.atomix.api.map.CloseResponse::getDefaultInstance);
@@ -356,73 +351,36 @@ public class MapServiceImpl extends io.atomix.api.map.MapServiceGrpc.MapServiceI
             .build());
   }
 
-  private static final PrimitiveIdDescriptor<MapId> MAP_ID_DESCRIPTOR = new PrimitiveIdDescriptor<MapId>() {
-    @Override
-    public String getName(MapId id) {
-      return id.getName();
-    }
-
-    @Override
-    public boolean hasMultiRaftProtocol(MapId id) {
-      return id.hasRaft();
-    }
-
-    @Override
-    public MultiRaftProtocol getMultiRaftProtocol(MapId id) {
-      return id.getRaft();
-    }
-
-    @Override
-    public boolean hasMultiPrimaryProtocol(MapId id) {
-      return id.hasMultiPrimary();
-    }
-
-    @Override
-    public MultiPrimaryProtocol getMultiPrimaryProtocol(MapId id) {
-      return id.getMultiPrimary();
-    }
-
-    @Override
-    public boolean hasDistributedLogProtocol(MapId id) {
-      return id.hasLog();
-    }
-
-    @Override
-    public DistributedLogProtocol getDistributedLogProtocol(MapId id) {
-      return id.getLog();
-    }
-  };
-
-  private static final RequestExecutor.RequestDescriptor<io.atomix.api.map.CreateRequest, MapId, SessionHeader> CREATE_DESCRIPTOR =
+  private static final RequestExecutor.RequestDescriptor<io.atomix.api.map.CreateRequest, SessionHeader> CREATE_DESCRIPTOR =
       new RequestExecutor.SessionDescriptor<>(io.atomix.api.map.CreateRequest::getId, r -> Collections.emptyList());
 
-  private static final RequestExecutor.RequestDescriptor<io.atomix.api.map.KeepAliveRequest, MapId, SessionHeader> KEEP_ALIVE_DESCRIPTOR =
+  private static final RequestExecutor.RequestDescriptor<io.atomix.api.map.KeepAliveRequest, SessionHeader> KEEP_ALIVE_DESCRIPTOR =
       new RequestExecutor.SessionDescriptor<>(io.atomix.api.map.KeepAliveRequest::getId, io.atomix.api.map.KeepAliveRequest::getHeadersList);
 
-  private static final RequestExecutor.RequestDescriptor<io.atomix.api.map.CloseRequest, MapId, SessionHeader> CLOSE_DESCRIPTOR =
+  private static final RequestExecutor.RequestDescriptor<io.atomix.api.map.CloseRequest, SessionHeader> CLOSE_DESCRIPTOR =
       new RequestExecutor.SessionDescriptor<>(io.atomix.api.map.CloseRequest::getId, io.atomix.api.map.CloseRequest::getHeadersList);
 
-  private static final RequestExecutor.RequestDescriptor<io.atomix.api.map.SizeRequest, MapId, SessionQueryHeader> SIZE_DESCRIPTOR =
+  private static final RequestExecutor.RequestDescriptor<io.atomix.api.map.SizeRequest, SessionQueryHeader> SIZE_DESCRIPTOR =
       new RequestExecutor.SessionQueryDescriptor<>(io.atomix.api.map.SizeRequest::getId, io.atomix.api.map.SizeRequest::getHeadersList);
 
-  private static final RequestExecutor.RequestDescriptor<io.atomix.api.map.PutRequest, MapId, SessionCommandHeader> PUT_DESCRIPTOR =
+  private static final RequestExecutor.RequestDescriptor<io.atomix.api.map.PutRequest, SessionCommandHeader> PUT_DESCRIPTOR =
       new RequestExecutor.SessionCommandDescriptor<>(io.atomix.api.map.PutRequest::getId, request -> Collections.singletonList(request.getHeader()));
 
-  private static final RequestExecutor.RequestDescriptor<io.atomix.api.map.ExistsRequest, MapId, SessionQueryHeader> EXISTS_DESCRIPTOR =
+  private static final RequestExecutor.RequestDescriptor<io.atomix.api.map.ExistsRequest, SessionQueryHeader> EXISTS_DESCRIPTOR =
       new RequestExecutor.SessionQueryDescriptor<>(io.atomix.api.map.ExistsRequest::getId, request -> Collections.singletonList(request.getHeader()));
 
-  private static final RequestExecutor.RequestDescriptor<io.atomix.api.map.GetRequest, MapId, SessionQueryHeader> GET_DESCRIPTOR =
+  private static final RequestExecutor.RequestDescriptor<io.atomix.api.map.GetRequest, SessionQueryHeader> GET_DESCRIPTOR =
       new RequestExecutor.SessionQueryDescriptor<>(io.atomix.api.map.GetRequest::getId, request -> Collections.singletonList(request.getHeader()));
 
-  private static final RequestExecutor.RequestDescriptor<io.atomix.api.map.ReplaceRequest, MapId, SessionCommandHeader> REPLACE_DESCRIPTOR =
+  private static final RequestExecutor.RequestDescriptor<io.atomix.api.map.ReplaceRequest, SessionCommandHeader> REPLACE_DESCRIPTOR =
       new RequestExecutor.SessionCommandDescriptor<>(io.atomix.api.map.ReplaceRequest::getId, request -> Collections.singletonList(request.getHeader()));
 
-  private static final RequestExecutor.RequestDescriptor<io.atomix.api.map.RemoveRequest, MapId, SessionCommandHeader> REMOVE_DESCRIPTOR =
+  private static final RequestExecutor.RequestDescriptor<io.atomix.api.map.RemoveRequest, SessionCommandHeader> REMOVE_DESCRIPTOR =
       new RequestExecutor.SessionCommandDescriptor<>(io.atomix.api.map.RemoveRequest::getId, request -> Collections.singletonList(request.getHeader()));
 
-  private static final RequestExecutor.RequestDescriptor<io.atomix.api.map.ClearRequest, MapId, SessionCommandHeader> CLEAR_DESCRIPTOR =
+  private static final RequestExecutor.RequestDescriptor<io.atomix.api.map.ClearRequest, SessionCommandHeader> CLEAR_DESCRIPTOR =
       new RequestExecutor.SessionCommandDescriptor<>(io.atomix.api.map.ClearRequest::getId, io.atomix.api.map.ClearRequest::getHeadersList);
 
-  private static final RequestExecutor.RequestDescriptor<io.atomix.api.map.EventRequest, MapId, SessionCommandHeader> EVENTS_DESCRIPTOR =
+  private static final RequestExecutor.RequestDescriptor<io.atomix.api.map.EventRequest, SessionCommandHeader> EVENTS_DESCRIPTOR =
       new RequestExecutor.SessionCommandDescriptor<>(io.atomix.api.map.EventRequest::getId, io.atomix.api.map.EventRequest::getHeadersList);
 }

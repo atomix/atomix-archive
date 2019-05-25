@@ -19,11 +19,12 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import io.atomix.log.DistributedLogServer;
-import io.atomix.log.protocol.LogTopicMetadata;
+import io.atomix.log.ReplicationStrategy;
 import io.atomix.primitive.partition.GroupMember;
 import io.atomix.primitive.partition.MemberGroup;
 import io.atomix.primitive.partition.PartitionManagementService;
 import io.atomix.primitive.partition.PrimaryElection;
+import io.atomix.protocols.log.LogTopicMetadata;
 import io.atomix.protocols.log.partition.LogPartition;
 import io.atomix.protocols.log.partition.LogPartitionGroupConfig;
 import io.atomix.utils.Managed;
@@ -97,7 +98,7 @@ public class LogPartitionServer implements Managed<LogPartitionServer> {
                 .build(),
             metadata.getReplicationFactor()))
         .withReplicationFactor(metadata.getReplicationFactor())
-        .withReplicationStrategy(metadata.getReplicationStrategy())
+        .withReplicationStrategy(ReplicationStrategy.valueOf(metadata.getReplicationStrategy().name()))
         .withStorageLevel(config.getStorageConfig().getLevel())
         .withDirectory(config.getStorageConfig().getDirectory(partition.name()))
         .withMaxSegmentSize((int) config.getStorageConfig().getSegmentSize().bytes())

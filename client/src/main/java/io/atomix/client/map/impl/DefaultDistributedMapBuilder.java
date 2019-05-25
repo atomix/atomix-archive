@@ -18,16 +18,12 @@ package io.atomix.client.map.impl;
 import java.util.concurrent.CompletableFuture;
 
 import com.google.common.io.BaseEncoding;
-import io.atomix.api.map.MapId;
-import io.atomix.api.protocol.DistributedLogProtocol;
-import io.atomix.api.protocol.MultiRaftProtocol;
 import io.atomix.client.PrimitiveManagementService;
 import io.atomix.client.map.AsyncAtomicMap;
 import io.atomix.client.map.AsyncDistributedMap;
 import io.atomix.client.map.DistributedMap;
 import io.atomix.client.map.DistributedMapBuilder;
 import io.atomix.client.map.DistributedMapConfig;
-import io.atomix.primitive.partition.Partitioner;
 import io.atomix.utils.serializer.Serializer;
 
 /**
@@ -38,27 +34,10 @@ public class DefaultDistributedMapBuilder<K, V> extends DistributedMapBuilder<K,
     super(name, config, managementService);
   }
 
-  private MapId createMapId() {
-    MapId.Builder builder = MapId.newBuilder().setName(name);
-    protocol = protocol();
-    if (protocol instanceof io.atomix.protocols.raft.MultiRaftProtocol) {
-      builder.setRaft(MultiRaftProtocol.newBuilder()
-          .setGroup(((io.atomix.protocols.raft.MultiRaftProtocol) protocol).group())
-          .build());
-    } else if (protocol instanceof io.atomix.protocols.log.DistributedLogProtocol) {
-      builder.setLog(DistributedLogProtocol.newBuilder()
-          .setGroup(((io.atomix.protocols.log.DistributedLogProtocol) protocol).group())
-          .setPartitions(((io.atomix.protocols.log.DistributedLogProtocol) protocol).config().getPartitions())
-          .setReplicationFactor(((io.atomix.protocols.log.DistributedLogProtocol) protocol).config().getReplicationFactor())
-          .build());
-    }
-    return builder.build();
-  }
-
   @Override
   @SuppressWarnings("unchecked")
   public CompletableFuture<DistributedMap<K, V>> buildAsync() {
-    return new DefaultAsyncAtomicMap(createMapId(), managementService.getChannelFactory(), managementService, Partitioner.MURMUR3, config.getSessionTimeout())
+    return new DefaultAsyncAtomicMap(getPrimitiveId(), managementService, config.getSessionTimeout())
         .connect()
         .thenApply(rawMap -> {
           Serializer serializer = serializer();

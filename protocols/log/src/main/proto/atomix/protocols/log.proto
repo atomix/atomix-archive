@@ -1,0 +1,33 @@
+syntax = "proto3";
+
+package atomix.protocols;
+
+option java_package = "io.atomix.protocols.log";
+option java_multiple_files = true;
+
+// Distributed log protocol
+message DistributedLog {
+    string group = 1;
+    int32 partitions = 2;
+    int32 replication_factor = 3;
+    ReplicationStrategy replication_strategy = 4;
+}
+
+// Distributed log replication strategy
+enum ReplicationStrategy {
+    SYNCHRONOUS = 0;
+    ASYNCHRONOUS = 1;
+}
+
+message LogPartitionGroupMetadata {
+    map<string, LogTopicMetadata> topics = 1;
+}
+
+message LogTopicMetadata {
+    string topic = 1;
+    int32 partitions = 2;
+    repeated int32 partition_ids = 3;
+    int32 replication_factor = 4;
+    ReplicationStrategy replication_strategy = 5;
+    repeated string ready = 6;
+}

@@ -24,17 +24,12 @@ import io.atomix.api.headers.SessionHeader;
 import io.atomix.api.headers.SessionQueryHeader;
 import io.atomix.api.headers.SessionResponseHeader;
 import io.atomix.api.headers.SessionStreamHeader;
-import io.atomix.api.lock.LockId;
-import io.atomix.api.protocol.DistributedLogProtocol;
-import io.atomix.api.protocol.MultiPrimaryProtocol;
-import io.atomix.api.protocol.MultiRaftProtocol;
 import io.atomix.primitive.partition.PartitionService;
 import io.atomix.primitive.session.impl.DefaultSessionClient;
 import io.atomix.primitive.session.impl.OpenSessionRequest;
 import io.atomix.primitive.session.impl.SessionCommandContext;
 import io.atomix.primitive.session.impl.SessionQueryContext;
 import io.atomix.server.impl.PrimitiveFactory;
-import io.atomix.server.impl.PrimitiveIdDescriptor;
 import io.atomix.server.impl.RequestExecutor;
 import io.grpc.stub.StreamObserver;
 
@@ -42,20 +37,19 @@ import io.grpc.stub.StreamObserver;
  * Lock service implementation.
  */
 public class LockServiceImpl extends io.atomix.api.lock.LockServiceGrpc.LockServiceImplBase {
-  private final PrimitiveFactory<LockProxy, LockId> primitiveFactory;
-  private final RequestExecutor<LockProxy, LockId, SessionHeader, io.atomix.api.lock.CreateRequest, io.atomix.api.lock.CreateResponse> create;
-  private final RequestExecutor<LockProxy, LockId, SessionHeader, io.atomix.api.lock.KeepAliveRequest, io.atomix.api.lock.KeepAliveResponse> keepAlive;
-  private final RequestExecutor<LockProxy, LockId, SessionHeader, io.atomix.api.lock.CloseRequest, io.atomix.api.lock.CloseResponse> close;
-  private final RequestExecutor<LockProxy, LockId, SessionCommandHeader, io.atomix.api.lock.LockRequest, io.atomix.api.lock.LockResponse> lock;
-  private final RequestExecutor<LockProxy, LockId, SessionCommandHeader, io.atomix.api.lock.UnlockRequest, io.atomix.api.lock.UnlockResponse> unlock;
-  private final RequestExecutor<LockProxy, LockId, SessionQueryHeader, io.atomix.api.lock.IsLockedRequest, io.atomix.api.lock.IsLockedResponse> isLocked;
+  private final PrimitiveFactory<LockProxy> primitiveFactory;
+  private final RequestExecutor<LockProxy, SessionHeader, io.atomix.api.lock.CreateRequest, io.atomix.api.lock.CreateResponse> create;
+  private final RequestExecutor<LockProxy, SessionHeader, io.atomix.api.lock.KeepAliveRequest, io.atomix.api.lock.KeepAliveResponse> keepAlive;
+  private final RequestExecutor<LockProxy, SessionHeader, io.atomix.api.lock.CloseRequest, io.atomix.api.lock.CloseResponse> close;
+  private final RequestExecutor<LockProxy, SessionCommandHeader, io.atomix.api.lock.LockRequest, io.atomix.api.lock.LockResponse> lock;
+  private final RequestExecutor<LockProxy, SessionCommandHeader, io.atomix.api.lock.UnlockRequest, io.atomix.api.lock.UnlockResponse> unlock;
+  private final RequestExecutor<LockProxy, SessionQueryHeader, io.atomix.api.lock.IsLockedRequest, io.atomix.api.lock.IsLockedResponse> isLocked;
 
   public LockServiceImpl(PartitionService partitionService) {
     this.primitiveFactory = new PrimitiveFactory<>(
         partitionService,
         LockService.TYPE,
-        (id, client) -> new LockProxy(new DefaultSessionClient(id, client)),
-        LOCK_ID_DESCRIPTOR);
+        (id, client) -> new LockProxy(new DefaultSessionClient(id, client)));
     this.create = new RequestExecutor<>(primitiveFactory, CREATE_DESCRIPTOR, io.atomix.api.lock.CreateResponse::getDefaultInstance);
     this.keepAlive = new RequestExecutor<>(primitiveFactory, KEEP_ALIVE_DESCRIPTOR, io.atomix.api.lock.KeepAliveResponse::getDefaultInstance);
     this.close = new RequestExecutor<>(primitiveFactory, CLOSE_DESCRIPTOR, io.atomix.api.lock.CloseResponse::getDefaultInstance);
@@ -193,58 +187,21 @@ public class LockServiceImpl extends io.atomix.api.lock.LockServiceGrpc.LockServ
                 .build()));
   }
 
-  private static final PrimitiveIdDescriptor<LockId> LOCK_ID_DESCRIPTOR = new PrimitiveIdDescriptor<LockId>() {
-    @Override
-    public String getName(LockId id) {
-      return id.getName();
-    }
-
-    @Override
-    public boolean hasMultiRaftProtocol(LockId id) {
-      return id.hasRaft();
-    }
-
-    @Override
-    public MultiRaftProtocol getMultiRaftProtocol(LockId id) {
-      return id.getRaft();
-    }
-
-    @Override
-    public boolean hasMultiPrimaryProtocol(LockId id) {
-      return id.hasMultiPrimary();
-    }
-
-    @Override
-    public MultiPrimaryProtocol getMultiPrimaryProtocol(LockId id) {
-      return id.getMultiPrimary();
-    }
-
-    @Override
-    public boolean hasDistributedLogProtocol(LockId id) {
-      return id.hasLog();
-    }
-
-    @Override
-    public DistributedLogProtocol getDistributedLogProtocol(LockId id) {
-      return id.getLog();
-    }
-  };
-
-  private static final RequestExecutor.RequestDescriptor<io.atomix.api.lock.CreateRequest, LockId, SessionHeader> CREATE_DESCRIPTOR =
+  private static final RequestExecutor.RequestDescriptor<io.atomix.api.lock.CreateRequest, SessionHeader> CREATE_DESCRIPTOR =
       new RequestExecutor.SessionDescriptor<>(io.atomix.api.lock.CreateRequest::getId, r -> Collections.emptyList());
 
-  private static final RequestExecutor.RequestDescriptor<io.atomix.api.lock.KeepAliveRequest, LockId, SessionHeader> KEEP_ALIVE_DESCRIPTOR =
+  private static final RequestExecutor.RequestDescriptor<io.atomix.api.lock.KeepAliveRequest, SessionHeader> KEEP_ALIVE_DESCRIPTOR =
       new RequestExecutor.SessionDescriptor<>(io.atomix.api.lock.KeepAliveRequest::getId, request -> Collections.singletonList(request.getHeader()));
 
-  private static final RequestExecutor.RequestDescriptor<io.atomix.api.lock.CloseRequest, LockId, SessionHeader> CLOSE_DESCRIPTOR =
+  private static final RequestExecutor.RequestDescriptor<io.atomix.api.lock.CloseRequest, SessionHeader> CLOSE_DESCRIPTOR =
       new RequestExecutor.SessionDescriptor<>(io.atomix.api.lock.CloseRequest::getId, request -> Collections.singletonList(request.getHeader()));
 
-  private static final RequestExecutor.RequestDescriptor<io.atomix.api.lock.LockRequest, LockId, SessionCommandHeader> LOCK_DESCRIPTOR =
+  private static final RequestExecutor.RequestDescriptor<io.atomix.api.lock.LockRequest, SessionCommandHeader> LOCK_DESCRIPTOR =
       new RequestExecutor.SessionCommandDescriptor<>(io.atomix.api.lock.LockRequest::getId, request -> Collections.singletonList(request.getHeader()));
 
-  private static final RequestExecutor.RequestDescriptor<io.atomix.api.lock.UnlockRequest, LockId, SessionCommandHeader> UNLOCK_DESCRIPTOR =
+  private static final RequestExecutor.RequestDescriptor<io.atomix.api.lock.UnlockRequest, SessionCommandHeader> UNLOCK_DESCRIPTOR =
       new RequestExecutor.SessionCommandDescriptor<>(io.atomix.api.lock.UnlockRequest::getId, request -> Collections.singletonList(request.getHeader()));
 
-  private static final RequestExecutor.RequestDescriptor<io.atomix.api.lock.IsLockedRequest, LockId, SessionQueryHeader> IS_LOCKED_DESCRIPTOR =
+  private static final RequestExecutor.RequestDescriptor<io.atomix.api.lock.IsLockedRequest, SessionQueryHeader> IS_LOCKED_DESCRIPTOR =
       new RequestExecutor.SessionQueryDescriptor<>(io.atomix.api.lock.IsLockedRequest::getId, request -> Collections.singletonList(request.getHeader()));
 }

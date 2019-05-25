@@ -17,9 +17,6 @@ package io.atomix.client.counter.impl;
 
 import java.util.concurrent.CompletableFuture;
 
-import io.atomix.api.counter.CounterId;
-import io.atomix.api.protocol.DistributedLogProtocol;
-import io.atomix.api.protocol.MultiRaftProtocol;
 import io.atomix.client.PrimitiveManagementService;
 import io.atomix.client.counter.AsyncAtomicCounter;
 import io.atomix.client.counter.AtomicCounter;
@@ -34,27 +31,10 @@ public class DefaultAtomicCounterBuilder extends AtomicCounterBuilder {
     super(name, config, managementService);
   }
 
-  private CounterId createCounterId() {
-    CounterId.Builder builder = CounterId.newBuilder().setName(name);
-    protocol = protocol();
-    if (protocol instanceof io.atomix.protocols.raft.MultiRaftProtocol) {
-      builder.setRaft(MultiRaftProtocol.newBuilder()
-          .setGroup(((io.atomix.protocols.raft.MultiRaftProtocol) protocol).group())
-          .build());
-    } else if (protocol instanceof io.atomix.protocols.log.DistributedLogProtocol) {
-      builder.setLog(DistributedLogProtocol.newBuilder()
-          .setGroup(((io.atomix.protocols.log.DistributedLogProtocol) protocol).group())
-          .setPartitions(((io.atomix.protocols.log.DistributedLogProtocol) protocol).config().getPartitions())
-          .setReplicationFactor(((io.atomix.protocols.log.DistributedLogProtocol) protocol).config().getReplicationFactor())
-          .build());
-    }
-    return builder.build();
-  }
-
   @Override
   @SuppressWarnings("unchecked")
   public CompletableFuture<AtomicCounter> buildAsync() {
-    return new DefaultAsyncAtomicCounter(createCounterId(), managementService)
+    return new DefaultAsyncAtomicCounter(getPrimitiveId(), managementService)
         .connect()
         .thenApply(AsyncAtomicCounter::sync);
   }

@@ -1,26 +1,16 @@
 syntax = "proto3";
 
 import "google/protobuf/duration.proto";
-import "atomix/protocol/protocol.proto";
 import "atomix/headers/headers.proto";
+import "atomix/primitive/primitive.proto";
 
 package atomix.lock;
 
 option java_package = "io.atomix.api.lock";
 option java_multiple_files = true;
 
-// Lock ID
-message LockId {
-    string name = 1;
-    oneof proto {
-        protocol.MultiRaftProtocol raft = 2;
-        protocol.MultiPrimaryProtocol multi_primary = 3;
-        protocol.DistributedLogProtocol log = 4;
-    }
-}
-
 message CreateRequest {
-    LockId id = 1;
+    atomix.primitive.PrimitiveId id = 1;
     google.protobuf.Duration timeout = 2;
 }
 
@@ -29,7 +19,7 @@ message CreateResponse {
 }
 
 message KeepAliveRequest {
-    LockId id = 1;
+    atomix.primitive.PrimitiveId id = 1;
     atomix.headers.SessionHeader header = 2;
 }
 
@@ -38,8 +28,9 @@ message KeepAliveResponse {
 }
 
 message CloseRequest {
-    LockId id = 1;
+    atomix.primitive.PrimitiveId id = 1;
     atomix.headers.SessionHeader header = 2;
+    bool delete = 3;
 }
 
 message CloseResponse {
@@ -47,7 +38,7 @@ message CloseResponse {
 }
 
 message LockRequest {
-    LockId id = 1;
+    atomix.primitive.PrimitiveId id = 1;
     atomix.headers.SessionCommandHeader header = 2;
     google.protobuf.Duration timeout = 3;
 }
@@ -58,7 +49,7 @@ message LockResponse {
 }
 
 message UnlockRequest {
-    LockId id = 1;
+    atomix.primitive.PrimitiveId id = 1;
     atomix.headers.SessionCommandHeader header = 2;
     uint64 version = 3;
 }
@@ -69,7 +60,7 @@ message UnlockResponse {
 }
 
 message IsLockedRequest {
-    LockId id = 1;
+    atomix.primitive.PrimitiveId id = 1;
     atomix.headers.SessionQueryHeader header = 2;
     uint64 version = 3;
 }

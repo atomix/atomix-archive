@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+package atomix.protocols;
+
+option java_package = "io.atomix.protocols.raft";
+option java_multiple_files = true;
+
+// Multi-Raft protocol
+message MultiRaft {
+    string group = 1;
+}
+
+message RaftPartitionGroupMetadata {
+    map<string, RaftPrimitiveMetadata> primitives = 1;
+}
+
+message RaftPrimitiveMetadata {
+    string name = 1;
+}

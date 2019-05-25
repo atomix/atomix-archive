@@ -10,44 +10,35 @@ import java.util.stream.Collectors;
 
 import com.google.common.base.Strings;
 import com.google.common.collect.Maps;
-import com.google.protobuf.Message;
+import com.google.protobuf.Any;
+import io.atomix.api.primitive.PrimitiveId;
+import io.atomix.primitive.PrimitiveClient;
 import io.atomix.primitive.partition.PartitionClient;
+import io.atomix.primitive.partition.PartitionGroup;
 import io.atomix.primitive.partition.PartitionId;
 import io.atomix.primitive.partition.PartitionService;
-import io.atomix.primitive.protocol.ServiceProtocol;
+import io.atomix.primitive.partition.ServiceProvider;
 import io.atomix.primitive.proxy.PrimitiveProxy;
 import io.atomix.primitive.service.ServiceType;
 import io.atomix.primitive.service.impl.ServiceId;
+import io.atomix.utils.concurrent.Futures;
 import org.apache.commons.lang3.tuple.Pair;
 
 /**
  * Primitive executor.
  */
-public class PrimitiveFactory<P extends PrimitiveProxy, I extends Message> {
+public class PrimitiveFactory<P extends PrimitiveProxy> {
   private final PartitionService partitionService;
   private final ServiceType serviceType;
   private final BiFunction<ServiceId, PartitionClient, P> primitiveFactory;
-  private final PrimitiveIdDescriptor<I> primitiveIdDescriptor;
 
   public PrimitiveFactory(
       PartitionService partitionService,
       ServiceType serviceType,
-      BiFunction<ServiceId, PartitionClient, P> primitiveFactory,
-      PrimitiveIdDescriptor<I> primitiveIdDescriptor) {
+      BiFunction<ServiceId, PartitionClient, P> primitiveFactory) {
     this.partitionService = partitionService;
     this.serviceType = serviceType;
     this.primitiveFactory = primitiveFactory;
-    this.primitiveIdDescriptor = primitiveIdDescriptor;
-  }
-
-  /**
-   * Returns a boolean indicating whether the given ID has a name.
-   *
-   * @param id the ID to check
-   * @return indicates whether the given ID has a name
-   */
-  public boolean hasPrimitiveName(I id) {
-    return getPrimitiveName(id) != null;
   }
 
   /**
@@ -56,56 +47,21 @@ public class PrimitiveFactory<P extends PrimitiveProxy, I extends Message> {
    * @param id the primitive ID
    * @return the primitive name
    */
-  public String getPrimitiveName(I id) {
-    String name = primitiveIdDescriptor.getName(id);
+  public String getPrimitiveName(PrimitiveId id) {
+    String name = id.getName();
     return !Strings.isNullOrEmpty(name) ? name : null;
-  }
-
-  /**
-   * Returns a boolean indicating whether the given ID has a protocol configuration.
-   *
-   * @param id the ID to check
-   * @return indicates whether the given ID has a protocol configuration
-   */
-  public boolean hasProtocol(I id) {
-    return primitiveIdDescriptor.hasMultiRaftProtocol(id)
-        || primitiveIdDescriptor.hasMultiPrimaryProtocol(id)
-        || primitiveIdDescriptor.hasDistributedLogProtocol(id);
   }
 
   /**
    * Converts the given primitive Id to a protocol.
    *
-   * @param id the primitive ID
+   * @param protocol the protocol configuration
    * @return the primitive protocol
    */
-  private ServiceProtocol toProtocol(I id) {
-    if (primitiveIdDescriptor.hasMultiRaftProtocol(id)) {
-      String group = primitiveIdDescriptor.getMultiRaftProtocol(id).getGroup();
-      if (Strings.isNullOrEmpty(group)) {
-        group = partitionService.getPartitionGroup(io.atomix.protocols.raft.MultiRaftProtocol.TYPE)
-            .name();
-      }
-      return io.atomix.protocols.raft.MultiRaftProtocol.builder(group).build();
-    }
-
-    if (primitiveIdDescriptor.hasMultiPrimaryProtocol(id)) {
-      // TODO
-      throw new UnsupportedOperationException();
-    }
-
-    if (primitiveIdDescriptor.hasDistributedLogProtocol(id)) {
-      String group = primitiveIdDescriptor.getDistributedLogProtocol(id).getGroup();
-      if (Strings.isNullOrEmpty(group)) {
-        group = partitionService.getPartitionGroup(io.atomix.protocols.log.DistributedLogProtocol.TYPE)
-            .name();
-      }
-      return io.atomix.protocols.log.DistributedLogProtocol.builder(group)
-          .withNumPartitions(primitiveIdDescriptor.getDistributedLogProtocol(id).getPartitions())
-          .withReplicationFactor(primitiveIdDescriptor.getDistributedLogProtocol(id).getReplicationFactor())
-          .build();
-    }
-    return null;
+  private PartitionGroup getPartitionGroup(Any protocol) {
+    String url = protocol.getTypeUrl();
+    String type = url.substring(url.lastIndexOf('/') + 1);
+    return partitionService.getPartitionGroup(type);
   }
 
   /**
@@ -114,9 +70,9 @@ public class PrimitiveFactory<P extends PrimitiveProxy, I extends Message> {
    * @param id the primitive ID
    * @return the service ID
    */
-  private ServiceId getServiceId(I id) {
+  private ServiceId getServiceId(PrimitiveId id) {
     return ServiceId.newBuilder()
-        .setName(primitiveIdDescriptor.getName(id))
+        .setName(id.getName())
         .setType(serviceType.name())
         .build();
   }
@@ -127,9 +83,25 @@ public class PrimitiveFactory<P extends PrimitiveProxy, I extends Message> {
    * @param id the ID for which to return the partition group
    * @return the partition group name
    */
-  public String getPartitionGroup(I id) {
-    ServiceProtocol protocol = toProtocol(id);
-    return protocol != null ? protocol.group() : null;
+  public String getPartitionGroup(PrimitiveId id) {
+    return getPartitionGroup(id.getProtocol()).name();
+  }
+
+  /**
+   * Returns the client for the given primitive.
+   *
+   * @param id the primitive ID
+   * @return the client for the given primitive
+   */
+  @SuppressWarnings("unchecked")
+  private CompletableFuture<PrimitiveClient> getClient(PrimitiveId id) {
+    PartitionGroup partitionGroup = getPartitionGroup(id.getProtocol());
+    try {
+      Object protocol = id.getProtocol().unpack(partitionGroup.type().getProtocolType());
+      return ((ServiceProvider<Object>) partitionGroup).createService(id.getName(), protocol);
+    } catch (Exception e) {
+      return Futures.exceptionalFuture(e);
+    }
   }
 
   /**
@@ -139,13 +111,12 @@ public class PrimitiveFactory<P extends PrimitiveProxy, I extends Message> {
    * @param partitionKey the partition key
    * @return the primitive
    */
-  public CompletableFuture<Pair<PartitionId, P>> getPrimitive(I id, String partitionKey) {
-    ServiceProtocol protocol = toProtocol(id);
-    return protocol.createService(getPrimitiveName(id), partitionService)
-        .thenApply(client -> {
-          PartitionId partitionId = client.getPartitionId(partitionKey);
-          return Pair.of(partitionId, primitiveFactory.apply(getServiceId(id), client.getPartition(partitionId)));
-        });
+  @SuppressWarnings("unchecked")
+  public CompletableFuture<Pair<PartitionId, P>> getPrimitive(PrimitiveId id, String partitionKey) {
+    return getClient(id).thenApply(client -> {
+      PartitionId partitionId = client.getPartitionId(partitionKey);
+      return Pair.of(partitionId, primitiveFactory.apply(getServiceId(id), client.getPartition(partitionId)));
+    });
   }
 
   /**
@@ -155,7 +126,7 @@ public class PrimitiveFactory<P extends PrimitiveProxy, I extends Message> {
    * @param partitionId the partition ID
    * @return the primitive
    */
-  public CompletableFuture<Pair<PartitionId, P>> getPrimitive(I id, int partitionId) {
+  public CompletableFuture<Pair<PartitionId, P>> getPrimitive(PrimitiveId id, int partitionId) {
     return getPrimitive(id, PartitionId.newBuilder()
         .setPartition(partitionId)
         .setGroup(getPartitionGroup(id))
@@ -169,10 +140,8 @@ public class PrimitiveFactory<P extends PrimitiveProxy, I extends Message> {
    * @param partitionId the partition ID
    * @return the primitive
    */
-  public CompletableFuture<Pair<PartitionId, P>> getPrimitive(I id, PartitionId partitionId) {
-    ServiceProtocol protocol = toProtocol(id);
-    return protocol.createService(getPrimitiveName(id), partitionService)
-        .thenApply(client -> Pair.of(partitionId, primitiveFactory.apply(getServiceId(id), client.getPartition(partitionId))));
+  public CompletableFuture<Pair<PartitionId, P>> getPrimitive(PrimitiveId id, PartitionId partitionId) {
+    return getClient(id).thenApply(client -> Pair.of(partitionId, primitiveFactory.apply(getServiceId(id), client.getPartition(partitionId))));
   }
 
   /**
@@ -181,7 +150,7 @@ public class PrimitiveFactory<P extends PrimitiveProxy, I extends Message> {
    * @param id the primitive ID
    * @return the primitive proxy
    */
-  public CompletableFuture<Pair<PartitionId, P>> getPrimitive(I id) {
+  public CompletableFuture<Pair<PartitionId, P>> getPrimitive(PrimitiveId id) {
     return getPrimitive(id, getPrimitiveName(id));
   }
 
@@ -191,12 +160,18 @@ public class PrimitiveFactory<P extends PrimitiveProxy, I extends Message> {
    * @param id the primitive ID
    * @return the primitive partitions
    */
-  public CompletableFuture<Map<PartitionId, P>> getPrimitives(I id) {
-    ServiceProtocol protocol = toProtocol(id);
-    return protocol.createService(getPrimitiveName(id), partitionService)
-        .thenApply(client -> client.getPartitionIds().stream()
-            .map(partitionId -> Maps.immutableEntry(partitionId, primitiveFactory.apply(getServiceId(id), client.getPartition(partitionId))))
-            .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue)));
+  @SuppressWarnings("unchecked")
+  public CompletableFuture<Map<PartitionId, P>> getPrimitives(PrimitiveId id) {
+    PartitionGroup partitionGroup = getPartitionGroup(id.getProtocol());
+    try {
+      Object protocol = id.getProtocol().unpack(partitionGroup.type().getProtocolType());
+      return ((ServiceProvider<Object>) partitionGroup).createService(id.getName(), protocol)
+          .thenApply(client -> client.getPartitionIds().stream()
+              .map(partitionId -> Maps.immutableEntry(partitionId, primitiveFactory.apply(getServiceId(id), client.getPartition(partitionId))))
+              .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue)));
+    } catch (Exception e) {
+      return Futures.exceptionalFuture(e);
+    }
   }
 
   /**
@@ -206,18 +181,16 @@ public class PrimitiveFactory<P extends PrimitiveProxy, I extends Message> {
    * @param keys the keys to partition
    * @return the primitive partitions
    */
-  public CompletableFuture<Map<PartitionId, Pair<Collection<String>, P>>> getPrimitives(I id, Collection<String> keys) {
-    ServiceProtocol protocol = toProtocol(id);
-    return protocol.createService(getPrimitiveName(id), partitionService)
-        .thenApply(client -> {
-          Map<PartitionId, Collection<String>> partitions = new HashMap<>();
-          for (String key : keys) {
-            PartitionId partitionId = client.getPartitionId(key);
-            partitions.computeIfAbsent(partitionId, i -> new LinkedList<>()).add(key);
-          }
-          return partitions.entrySet().stream()
-              .map(e -> Maps.immutableEntry(e.getKey(), Pair.of(e.getValue(), primitiveFactory.apply(getServiceId(id), client.getPartition(e.getKey())))))
-              .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
-        });
+  public CompletableFuture<Map<PartitionId, Pair<Collection<String>, P>>> getPrimitives(PrimitiveId id, Collection<String> keys) {
+    return getClient(id).thenApply(client -> {
+      Map<PartitionId, Collection<String>> partitions = new HashMap<>();
+      for (String key : keys) {
+        PartitionId partitionId = client.getPartitionId(key);
+        partitions.computeIfAbsent(partitionId, i -> new LinkedList<>()).add(key);
+      }
+      return partitions.entrySet().stream()
+          .map(e -> Maps.immutableEntry(e.getKey(), Pair.of(e.getValue(), primitiveFactory.apply(getServiceId(id), client.getPartition(e.getKey())))))
+          .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+    });
   }
 }

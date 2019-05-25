@@ -24,10 +24,6 @@ import io.atomix.api.headers.SessionHeader;
 import io.atomix.api.headers.SessionQueryHeader;
 import io.atomix.api.headers.SessionResponseHeader;
 import io.atomix.api.headers.SessionStreamHeader;
-import io.atomix.api.protocol.DistributedLogProtocol;
-import io.atomix.api.protocol.MultiPrimaryProtocol;
-import io.atomix.api.protocol.MultiRaftProtocol;
-import io.atomix.api.set.SetId;
 import io.atomix.primitive.partition.PartitionService;
 import io.atomix.primitive.session.impl.CloseSessionRequest;
 import io.atomix.primitive.session.impl.DefaultSessionClient;
@@ -36,7 +32,6 @@ import io.atomix.primitive.session.impl.SessionCommandContext;
 import io.atomix.primitive.session.impl.SessionQueryContext;
 import io.atomix.primitive.session.impl.SessionStreamContext;
 import io.atomix.server.impl.PrimitiveFactory;
-import io.atomix.server.impl.PrimitiveIdDescriptor;
 import io.atomix.server.impl.RequestExecutor;
 import io.grpc.stub.StreamObserver;
 import org.apache.commons.lang3.tuple.Pair;
@@ -45,24 +40,23 @@ import org.apache.commons.lang3.tuple.Pair;
  * Set service implementation.
  */
 public class SetServiceImpl extends io.atomix.api.set.SetServiceGrpc.SetServiceImplBase {
-  private final PrimitiveFactory<SetProxy, SetId> primitiveFactory;
-  private final RequestExecutor<SetProxy, SetId, SessionHeader, io.atomix.api.set.CreateRequest, io.atomix.api.set.CreateResponse> create;
-  private final RequestExecutor<SetProxy, SetId, SessionHeader, io.atomix.api.set.KeepAliveRequest, io.atomix.api.set.KeepAliveResponse> keepAlive;
-  private final RequestExecutor<SetProxy, SetId, SessionHeader, io.atomix.api.set.CloseRequest, io.atomix.api.set.CloseResponse> close;
-  private final RequestExecutor<SetProxy, SetId, SessionCommandHeader, io.atomix.api.set.AddRequest, io.atomix.api.set.AddResponse> add;
-  private final RequestExecutor<SetProxy, SetId, SessionCommandHeader, io.atomix.api.set.RemoveRequest, io.atomix.api.set.RemoveResponse> remove;
-  private final RequestExecutor<SetProxy, SetId, SessionQueryHeader, io.atomix.api.set.ContainsRequest, io.atomix.api.set.ContainsResponse> contains;
-  private final RequestExecutor<SetProxy, SetId, SessionQueryHeader, io.atomix.api.set.SizeRequest, io.atomix.api.set.SizeResponse> size;
-  private final RequestExecutor<SetProxy, SetId, SessionCommandHeader, io.atomix.api.set.ClearRequest, io.atomix.api.set.ClearResponse> clear;
-  private final RequestExecutor<SetProxy, SetId, SessionCommandHeader, io.atomix.api.set.EventRequest, io.atomix.api.set.EventResponse> listen;
-  private final RequestExecutor<SetProxy, SetId, SessionQueryHeader, io.atomix.api.set.IterateRequest, io.atomix.api.set.IterateResponse> iterate;
+  private final PrimitiveFactory<SetProxy> primitiveFactory;
+  private final RequestExecutor<SetProxy, SessionHeader, io.atomix.api.set.CreateRequest, io.atomix.api.set.CreateResponse> create;
+  private final RequestExecutor<SetProxy, SessionHeader, io.atomix.api.set.KeepAliveRequest, io.atomix.api.set.KeepAliveResponse> keepAlive;
+  private final RequestExecutor<SetProxy, SessionHeader, io.atomix.api.set.CloseRequest, io.atomix.api.set.CloseResponse> close;
+  private final RequestExecutor<SetProxy, SessionCommandHeader, io.atomix.api.set.AddRequest, io.atomix.api.set.AddResponse> add;
+  private final RequestExecutor<SetProxy, SessionCommandHeader, io.atomix.api.set.RemoveRequest, io.atomix.api.set.RemoveResponse> remove;
+  private final RequestExecutor<SetProxy, SessionQueryHeader, io.atomix.api.set.ContainsRequest, io.atomix.api.set.ContainsResponse> contains;
+  private final RequestExecutor<SetProxy, SessionQueryHeader, io.atomix.api.set.SizeRequest, io.atomix.api.set.SizeResponse> size;
+  private final RequestExecutor<SetProxy, SessionCommandHeader, io.atomix.api.set.ClearRequest, io.atomix.api.set.ClearResponse> clear;
+  private final RequestExecutor<SetProxy, SessionCommandHeader, io.atomix.api.set.EventRequest, io.atomix.api.set.EventResponse> listen;
+  private final RequestExecutor<SetProxy, SessionQueryHeader, io.atomix.api.set.IterateRequest, io.atomix.api.set.IterateResponse> iterate;
 
   public SetServiceImpl(PartitionService partitionService) {
     this.primitiveFactory = new PrimitiveFactory<>(
         partitionService,
         SetService.TYPE,
-        (id, client) -> new SetProxy(new DefaultSessionClient(id, client)),
-        SET_ID_DESCRIPTOR);
+        (id, client) -> new SetProxy(new DefaultSessionClient(id, client)));
     this.create = new RequestExecutor<>(primitiveFactory, CREATE_DESCRIPTOR, io.atomix.api.set.CreateResponse::getDefaultInstance);
     this.keepAlive = new RequestExecutor<>(primitiveFactory, KEEP_ALIVE_DESCRIPTOR, io.atomix.api.set.KeepAliveResponse::getDefaultInstance);
     this.close = new RequestExecutor<>(primitiveFactory, CLOSE_DESCRIPTOR, io.atomix.api.set.CloseResponse::getDefaultInstance);
@@ -329,70 +323,33 @@ public class SetServiceImpl extends io.atomix.api.set.SetServiceGrpc.SetServiceI
             .build());
   }
 
-  private static final PrimitiveIdDescriptor<SetId> SET_ID_DESCRIPTOR = new PrimitiveIdDescriptor<SetId>() {
-    @Override
-    public String getName(SetId id) {
-      return id.getName();
-    }
-
-    @Override
-    public boolean hasMultiRaftProtocol(SetId id) {
-      return id.hasRaft();
-    }
-
-    @Override
-    public MultiRaftProtocol getMultiRaftProtocol(SetId id) {
-      return id.getRaft();
-    }
-
-    @Override
-    public boolean hasMultiPrimaryProtocol(SetId id) {
-      return id.hasMultiPrimary();
-    }
-
-    @Override
-    public MultiPrimaryProtocol getMultiPrimaryProtocol(SetId id) {
-      return id.getMultiPrimary();
-    }
-
-    @Override
-    public boolean hasDistributedLogProtocol(SetId id) {
-      return id.hasLog();
-    }
-
-    @Override
-    public DistributedLogProtocol getDistributedLogProtocol(SetId id) {
-      return id.getLog();
-    }
-  };
-
-  private static final RequestExecutor.RequestDescriptor<io.atomix.api.set.CreateRequest, SetId, SessionHeader> CREATE_DESCRIPTOR =
+  private static final RequestExecutor.RequestDescriptor<io.atomix.api.set.CreateRequest, SessionHeader> CREATE_DESCRIPTOR =
       new RequestExecutor.SessionDescriptor<>(io.atomix.api.set.CreateRequest::getId, r -> Collections.emptyList());
 
-  private static final RequestExecutor.RequestDescriptor<io.atomix.api.set.KeepAliveRequest, SetId, SessionHeader> KEEP_ALIVE_DESCRIPTOR =
+  private static final RequestExecutor.RequestDescriptor<io.atomix.api.set.KeepAliveRequest, SessionHeader> KEEP_ALIVE_DESCRIPTOR =
       new RequestExecutor.SessionDescriptor<>(io.atomix.api.set.KeepAliveRequest::getId, io.atomix.api.set.KeepAliveRequest::getHeadersList);
 
-  private static final RequestExecutor.RequestDescriptor<io.atomix.api.set.CloseRequest, SetId, SessionHeader> CLOSE_DESCRIPTOR =
+  private static final RequestExecutor.RequestDescriptor<io.atomix.api.set.CloseRequest, SessionHeader> CLOSE_DESCRIPTOR =
       new RequestExecutor.SessionDescriptor<>(io.atomix.api.set.CloseRequest::getId, io.atomix.api.set.CloseRequest::getHeadersList);
 
-  private static final RequestExecutor.RequestDescriptor<io.atomix.api.set.AddRequest, SetId, SessionCommandHeader> ADD_DESCRIPTOR =
+  private static final RequestExecutor.RequestDescriptor<io.atomix.api.set.AddRequest, SessionCommandHeader> ADD_DESCRIPTOR =
       new RequestExecutor.SessionCommandDescriptor<>(io.atomix.api.set.AddRequest::getId, io.atomix.api.set.AddRequest::getHeadersList);
 
-  private static final RequestExecutor.RequestDescriptor<io.atomix.api.set.RemoveRequest, SetId, SessionCommandHeader> REMOVE_DESCRIPTOR =
+  private static final RequestExecutor.RequestDescriptor<io.atomix.api.set.RemoveRequest, SessionCommandHeader> REMOVE_DESCRIPTOR =
       new RequestExecutor.SessionCommandDescriptor<>(io.atomix.api.set.RemoveRequest::getId, io.atomix.api.set.RemoveRequest::getHeadersList);
 
-  private static final RequestExecutor.RequestDescriptor<io.atomix.api.set.ContainsRequest, SetId, SessionQueryHeader> CONTAINS_DESCRIPTOR =
+  private static final RequestExecutor.RequestDescriptor<io.atomix.api.set.ContainsRequest, SessionQueryHeader> CONTAINS_DESCRIPTOR =
       new RequestExecutor.SessionQueryDescriptor<>(io.atomix.api.set.ContainsRequest::getId, io.atomix.api.set.ContainsRequest::getHeadersList);
 
-  private static final RequestExecutor.RequestDescriptor<io.atomix.api.set.SizeRequest, SetId, SessionQueryHeader> SIZE_DESCRIPTOR =
+  private static final RequestExecutor.RequestDescriptor<io.atomix.api.set.SizeRequest, SessionQueryHeader> SIZE_DESCRIPTOR =
       new RequestExecutor.SessionQueryDescriptor<>(io.atomix.api.set.SizeRequest::getId, io.atomix.api.set.SizeRequest::getHeadersList);
 
-  private static final RequestExecutor.RequestDescriptor<io.atomix.api.set.ClearRequest, SetId, SessionCommandHeader> CLEAR_DESCRIPTOR =
+  private static final RequestExecutor.RequestDescriptor<io.atomix.api.set.ClearRequest, SessionCommandHeader> CLEAR_DESCRIPTOR =
       new RequestExecutor.SessionCommandDescriptor<>(io.atomix.api.set.ClearRequest::getId, io.atomix.api.set.ClearRequest::getHeadersList);
 
-  private static final RequestExecutor.RequestDescriptor<io.atomix.api.set.EventRequest, SetId, SessionCommandHeader> EVENT_DESCRIPTOR =
+  private static final RequestExecutor.RequestDescriptor<io.atomix.api.set.EventRequest, SessionCommandHeader> EVENT_DESCRIPTOR =
       new RequestExecutor.SessionCommandDescriptor<>(io.atomix.api.set.EventRequest::getId, io.atomix.api.set.EventRequest::getHeadersList);
 
-  private static final RequestExecutor.RequestDescriptor<io.atomix.api.set.IterateRequest, SetId, SessionQueryHeader> ITERATE_DESCRIPTOR =
+  private static final RequestExecutor.RequestDescriptor<io.atomix.api.set.IterateRequest, SessionQueryHeader> ITERATE_DESCRIPTOR =
       new RequestExecutor.SessionQueryDescriptor<>(io.atomix.api.set.IterateRequest::getId, io.atomix.api.set.IterateRequest::getHeadersList);
 }

@@ -68,6 +68,7 @@ public class PartitionManager implements PartitionService, Managed {
   private SystemPartitionService systemPartitionService;
 
   private final Map<String, ManagedPartitionGroup> groups = Maps.newConcurrentMap();
+  private final Map<String, ManagedPartitionGroup> qualifiedGroups = Maps.newConcurrentMap();
   private final PartitionGroupMembershipEventListener groupMembershipEventListener = this::handleMembershipChange;
 
   @Override
@@ -83,8 +84,16 @@ public class PartitionManager implements PartitionService, Managed {
     if (group != null) {
       return group;
     }
+    group = qualifiedGroups.get(name);
+    if (group != null) {
+      return group;
+    }
+
     PartitionGroup systemGroup = systemPartitionService.getSystemPartitionGroup();
     if (systemGroup != null && systemGroup.name().equals(name)) {
+      return systemGroup;
+    }
+    if (systemGroup != null && systemGroup.type().getProtocolDescriptor().getFullName().equals(name)) {
       return systemGroup;
     }
     return null;
@@ -109,6 +118,7 @@ public class PartitionManager implements PartitionService, Managed {
           group = ((PartitionGroup.Type) event.membership().config().getType())
               .newPartitionGroup(event.membership().config());
           groups.put(event.membership().group(), group);
+          qualifiedGroups.put(group.type().getProtocolDescriptor().getFullName(), group);
           if (event.membership().members().contains(MemberId.from(clusterMembershipService.getLocalMember()))) {
             group.join(partitionManagementService);
           } else {
@@ -132,6 +142,7 @@ public class PartitionManager implements PartitionService, Managed {
               group = ((PartitionGroup.Type) membership.config().getType())
                   .newPartitionGroup(membership.config());
               groups.put(group.name(), group);
+              qualifiedGroups.put(group.type().getProtocolDescriptor().getFullName(), group);
             }
           }
           if (membership.members().contains(MemberId.from(clusterMembershipService.getLocalMember()))) {

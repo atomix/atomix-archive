@@ -9,57 +9,58 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutionException;
+import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
+import com.google.common.hash.Hashing;
 import com.google.common.util.concurrent.ListenableFuture;
-import com.google.protobuf.Message;
 import io.atomix.api.headers.RequestHeader;
 import io.atomix.api.headers.ResponseHeader;
 import io.atomix.api.headers.SessionCommandHeader;
 import io.atomix.api.headers.SessionHeader;
 import io.atomix.api.headers.SessionQueryHeader;
 import io.atomix.api.headers.SessionResponseHeader;
+import io.atomix.api.primitive.PrimitiveId;
 import io.atomix.client.AsyncPrimitive;
 import io.atomix.client.ManagedAsyncPrimitive;
 import io.atomix.client.PrimitiveManagementService;
-import io.atomix.primitive.partition.PartitionId;
-import io.atomix.primitive.partition.Partitioner;
 import io.atomix.utils.concurrent.ThreadContext;
 import io.grpc.stub.StreamObserver;
 
 /**
  * Primitive session.
  */
-public abstract class AbstractAsyncPrimitive<I extends Message, P extends AsyncPrimitive> implements ManagedAsyncPrimitive<P> {
-  private final I id;
-  private final PrimitiveIdDescriptor<I> descriptor;
-  private final String name;
-  private final String group;
-  private final ThreadContext context;
-  private final Partitioner<String> partitioner;
-  protected final Duration timeout;
-  private final Map<PartitionId, PrimitivePartition> partitions = new ConcurrentHashMap<>();
-  private final List<PartitionId> partitionIds = new CopyOnWriteArrayList<>();
+public abstract class AbstractAsyncPrimitive<P extends AsyncPrimitive> implements ManagedAsyncPrimitive<P> {
+  private static final BiFunction<String, List<Integer>, Integer> DEFAULT_PARTITIONER = (key, partitions) -> {
+    int hash = Math.abs(Hashing.murmur3_32().hashUnencodedChars(key).asInt());
+    return partitions.get(Hashing.consistentHash(hash, partitions.size()));
+  };
 
-  public AbstractAsyncPrimitive(I id, PrimitiveIdDescriptor<I> descriptor, PrimitiveManagementService managementService, Partitioner<String> partitioner, Duration timeout) {
+  private final PrimitiveId id;
+  private final ThreadContext context;
+  private final BiFunction<String, List<Integer>, Integer> partitioner;
+  protected final Duration timeout;
+  private final Map<Integer, PrimitivePartition> partitions = new ConcurrentHashMap<>();
+  private final List<Integer> partitionIds = new CopyOnWriteArrayList<>();
+
+  protected AbstractAsyncPrimitive(
+      PrimitiveId id,
+      PrimitiveManagementService managementService,
+      Duration timeout) {
+    this(id, managementService, DEFAULT_PARTITIONER, timeout);
+  }
+
+  protected AbstractAsyncPrimitive(
+      PrimitiveId id,
+      PrimitiveManagementService managementService,
+      BiFunction<String, List<Integer>, Integer> partitioner,
+      Duration timeout) {
     this.id = id;
-    this.descriptor = descriptor;
-    this.name = descriptor.getName(id);
     this.context = managementService.getThreadFactory().createContext();
     this.partitioner = partitioner;
     this.timeout = timeout;
-
-    if (descriptor.hasMultiRaftProtocol(id)) {
-      group = descriptor.getMultiRaftProtocol(id).getGroup();
-    } else if (descriptor.hasMultiPrimaryProtocol(id)) {
-      group = descriptor.getMultiPrimaryProtocol(id).getGroup();
-    } else if (descriptor.hasDistributedLogProtocol(id)) {
-      group = descriptor.getDistributedLogProtocol(id).getGroup();
-    } else {
-      group = null;
-    }
   }
 
   /**
@@ -67,7 +68,7 @@ public abstract class AbstractAsyncPrimitive<I extends Message, P extends AsyncP
    *
    * @return the primitive ID
    */
-  protected I id() {
+  protected PrimitiveId id() {
     return id;
   }
 
@@ -82,20 +83,7 @@ public abstract class AbstractAsyncPrimitive<I extends Message, P extends AsyncP
 
   @Override
   public String name() {
-    return name;
-  }
-
-  /**
-   * Returns the {@link PartitionId} for the given partition.
-   *
-   * @param partitionId the partition number
-   * @return the partition ID
-   */
-  protected PartitionId getPartitionId(int partitionId) {
-    return PartitionId.newBuilder()
-        .setPartition(partitionId)
-        .setGroup(group)
-        .build();
+    return id.getName();
   }
 
   /**
@@ -114,16 +102,6 @@ public abstract class AbstractAsyncPrimitive<I extends Message, P extends AsyncP
    * @return the partition
    */
   protected PrimitivePartition getPartition(int partitionId) {
-    return getPartition(getPartitionId(partitionId));
-  }
-
-  /**
-   * Gets a partition by ID.
-   *
-   * @param partitionId the partition ID
-   * @return the partition
-   */
-  protected PrimitivePartition getPartition(PartitionId partitionId) {
     return partitions.get(partitionId);
   }
 
@@ -134,8 +112,7 @@ public abstract class AbstractAsyncPrimitive<I extends Message, P extends AsyncP
    * @return the partition
    */
   protected PrimitivePartition getPartition(String key) {
-    PartitionId partitionId = partitioner.partition(key, partitionIds);
-    return getPartition(partitionId);
+    return getPartition(partitioner.apply(key, partitionIds));
   }
 
   /**
@@ -145,16 +122,6 @@ public abstract class AbstractAsyncPrimitive<I extends Message, P extends AsyncP
    * @return the partition
    */
   protected PrimitivePartition getOrCreatePartition(int partitionId) {
-    return getOrCreatePartition(getPartitionId(partitionId));
-  }
-
-  /**
-   * Gets or creates a partition by ID.
-   *
-   * @param partitionId the partition ID
-   * @return the partition
-   */
-  protected PrimitivePartition getOrCreatePartition(PartitionId partitionId) {
     PrimitivePartition partition = partitions.get(partitionId);
     if (partition == null) {
       partition = partitions.computeIfAbsent(partitionId, PrimitivePartition::new);
@@ -222,7 +189,7 @@ public abstract class AbstractAsyncPrimitive<I extends Message, P extends AsyncP
    */
   private void updateResponseHeaders(Collection<ResponseHeader> headers) {
     for (ResponseHeader header : headers) {
-      getOrCreatePartition(getPartitionId(header.getPartitionId())).update(header);
+      getOrCreatePartition(header.getPartitionId()).update(header);
     }
   }
 
@@ -233,7 +200,7 @@ public abstract class AbstractAsyncPrimitive<I extends Message, P extends AsyncP
    */
   private void updateSessionHeaders(Collection<SessionResponseHeader> headers) {
     for (SessionResponseHeader header : headers) {
-      PrimitivePartition partition = getPartition(getPartitionId(header.getPartitionId()));
+      PrimitivePartition partition = getPartition(header.getPartitionId());
       if (partition != null) {
         partition.update(header);
       }
@@ -268,7 +235,7 @@ public abstract class AbstractAsyncPrimitive<I extends Message, P extends AsyncP
    * @param headers the session headers
    */
   protected void startKeepAlive(Collection<SessionHeader> headers) {
-    headers.forEach(header -> getOrCreatePartition(getPartitionId(header.getPartitionId())).update(header));
+    headers.forEach(header -> getOrCreatePartition(header.getPartitionId()).update(header));
     context.schedule(timeout.dividedBy(2), () -> keepAlive());
   }
 

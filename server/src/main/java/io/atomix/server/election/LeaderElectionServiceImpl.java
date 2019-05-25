@@ -4,16 +4,12 @@ import java.time.Duration;
 import java.util.Collections;
 import java.util.stream.Collectors;
 
-import io.atomix.api.election.ElectionId;
 import io.atomix.api.election.LeaderElectionServiceGrpc;
 import io.atomix.api.headers.SessionCommandHeader;
 import io.atomix.api.headers.SessionHeader;
 import io.atomix.api.headers.SessionQueryHeader;
 import io.atomix.api.headers.SessionResponseHeader;
 import io.atomix.api.headers.SessionStreamHeader;
-import io.atomix.api.protocol.DistributedLogProtocol;
-import io.atomix.api.protocol.MultiPrimaryProtocol;
-import io.atomix.api.protocol.MultiRaftProtocol;
 import io.atomix.primitive.partition.PartitionService;
 import io.atomix.primitive.session.impl.CloseSessionRequest;
 import io.atomix.primitive.session.impl.DefaultSessionClient;
@@ -23,7 +19,6 @@ import io.atomix.primitive.session.impl.SessionCommandContext;
 import io.atomix.primitive.session.impl.SessionQueryContext;
 import io.atomix.primitive.session.impl.SessionStreamContext;
 import io.atomix.server.impl.PrimitiveFactory;
-import io.atomix.server.impl.PrimitiveIdDescriptor;
 import io.atomix.server.impl.RequestExecutor;
 import io.grpc.stub.StreamObserver;
 import org.apache.commons.lang3.tuple.Pair;
@@ -32,24 +27,23 @@ import org.apache.commons.lang3.tuple.Pair;
  * gRPC leader election service implementation.
  */
 public class LeaderElectionServiceImpl extends LeaderElectionServiceGrpc.LeaderElectionServiceImplBase {
-  private final PrimitiveFactory<LeaderElectionProxy, ElectionId> primitiveFactory;
-  private final RequestExecutor<LeaderElectionProxy, ElectionId, SessionHeader, io.atomix.api.election.CreateRequest, io.atomix.api.election.CreateResponse> create;
-  private final RequestExecutor<LeaderElectionProxy, ElectionId, SessionHeader, io.atomix.api.election.KeepAliveRequest, io.atomix.api.election.KeepAliveResponse> keepAlive;
-  private final RequestExecutor<LeaderElectionProxy, ElectionId, SessionHeader, io.atomix.api.election.CloseRequest, io.atomix.api.election.CloseResponse> close;
-  private final RequestExecutor<LeaderElectionProxy, ElectionId, SessionCommandHeader, io.atomix.api.election.EnterRequest, io.atomix.api.election.EnterResponse> enter;
-  private final RequestExecutor<LeaderElectionProxy, ElectionId, SessionCommandHeader, io.atomix.api.election.WithdrawRequest, io.atomix.api.election.WithdrawResponse> withdraw;
-  private final RequestExecutor<LeaderElectionProxy, ElectionId, SessionCommandHeader, io.atomix.api.election.AnointRequest, io.atomix.api.election.AnointResponse> anoint;
-  private final RequestExecutor<LeaderElectionProxy, ElectionId, SessionCommandHeader, io.atomix.api.election.PromoteRequest, io.atomix.api.election.PromoteResponse> promote;
-  private final RequestExecutor<LeaderElectionProxy, ElectionId, SessionCommandHeader, io.atomix.api.election.EvictRequest, io.atomix.api.election.EvictResponse> evict;
-  private final RequestExecutor<LeaderElectionProxy, ElectionId, SessionQueryHeader, io.atomix.api.election.GetLeadershipRequest, io.atomix.api.election.GetLeadershipResponse> getLeadership;
-  private final RequestExecutor<LeaderElectionProxy, ElectionId, SessionCommandHeader, io.atomix.api.election.EventRequest, io.atomix.api.election.EventResponse> events;
+  private final PrimitiveFactory<LeaderElectionProxy> primitiveFactory;
+  private final RequestExecutor<LeaderElectionProxy, SessionHeader, io.atomix.api.election.CreateRequest, io.atomix.api.election.CreateResponse> create;
+  private final RequestExecutor<LeaderElectionProxy, SessionHeader, io.atomix.api.election.KeepAliveRequest, io.atomix.api.election.KeepAliveResponse> keepAlive;
+  private final RequestExecutor<LeaderElectionProxy, SessionHeader, io.atomix.api.election.CloseRequest, io.atomix.api.election.CloseResponse> close;
+  private final RequestExecutor<LeaderElectionProxy, SessionCommandHeader, io.atomix.api.election.EnterRequest, io.atomix.api.election.EnterResponse> enter;
+  private final RequestExecutor<LeaderElectionProxy, SessionCommandHeader, io.atomix.api.election.WithdrawRequest, io.atomix.api.election.WithdrawResponse> withdraw;
+  private final RequestExecutor<LeaderElectionProxy, SessionCommandHeader, io.atomix.api.election.AnointRequest, io.atomix.api.election.AnointResponse> anoint;
+  private final RequestExecutor<LeaderElectionProxy, SessionCommandHeader, io.atomix.api.election.PromoteRequest, io.atomix.api.election.PromoteResponse> promote;
+  private final RequestExecutor<LeaderElectionProxy, SessionCommandHeader, io.atomix.api.election.EvictRequest, io.atomix.api.election.EvictResponse> evict;
+  private final RequestExecutor<LeaderElectionProxy, SessionQueryHeader, io.atomix.api.election.GetLeadershipRequest, io.atomix.api.election.GetLeadershipResponse> getLeadership;
+  private final RequestExecutor<LeaderElectionProxy, SessionCommandHeader, io.atomix.api.election.EventRequest, io.atomix.api.election.EventResponse> events;
 
   public LeaderElectionServiceImpl(PartitionService partitionService) {
     this.primitiveFactory = new PrimitiveFactory<>(
         partitionService,
         LeaderElectionService.TYPE,
-        (id, client) -> new LeaderElectionProxy(new DefaultSessionClient(id, client)),
-        ELECTION_ID_DESCRIPTOR);
+        (id, client) -> new LeaderElectionProxy(new DefaultSessionClient(id, client)));
     this.create = new RequestExecutor<>(primitiveFactory, CREATE_DESCRIPTOR, io.atomix.api.election.CreateResponse::getDefaultInstance);
     this.keepAlive = new RequestExecutor<>(primitiveFactory, KEEP_ALIVE_DESCRIPTOR, io.atomix.api.election.KeepAliveResponse::getDefaultInstance);
     this.close = new RequestExecutor<>(primitiveFactory, CLOSE_DESCRIPTOR, io.atomix.api.election.CloseResponse::getDefaultInstance);
@@ -308,70 +302,33 @@ public class LeaderElectionServiceImpl extends LeaderElectionServiceGrpc.LeaderE
             .build());
   }
 
-  private static final PrimitiveIdDescriptor<ElectionId> ELECTION_ID_DESCRIPTOR = new PrimitiveIdDescriptor<ElectionId>() {
-    @Override
-    public String getName(ElectionId id) {
-      return id.getName();
-    }
-
-    @Override
-    public boolean hasMultiRaftProtocol(ElectionId id) {
-      return id.hasRaft();
-    }
-
-    @Override
-    public MultiRaftProtocol getMultiRaftProtocol(ElectionId id) {
-      return id.getRaft();
-    }
-
-    @Override
-    public boolean hasMultiPrimaryProtocol(ElectionId id) {
-      return id.hasMultiPrimary();
-    }
-
-    @Override
-    public MultiPrimaryProtocol getMultiPrimaryProtocol(ElectionId id) {
-      return id.getMultiPrimary();
-    }
-
-    @Override
-    public boolean hasDistributedLogProtocol(ElectionId id) {
-      return id.hasLog();
-    }
-
-    @Override
-    public DistributedLogProtocol getDistributedLogProtocol(ElectionId id) {
-      return id.getLog();
-    }
-  };
-
-  private static final RequestExecutor.RequestDescriptor<io.atomix.api.election.CreateRequest, ElectionId, SessionHeader> CREATE_DESCRIPTOR =
+  private static final RequestExecutor.RequestDescriptor<io.atomix.api.election.CreateRequest, SessionHeader> CREATE_DESCRIPTOR =
       new RequestExecutor.SessionDescriptor<>(io.atomix.api.election.CreateRequest::getId, r -> Collections.emptyList());
 
-  private static final RequestExecutor.RequestDescriptor<io.atomix.api.election.KeepAliveRequest, ElectionId, SessionHeader> KEEP_ALIVE_DESCRIPTOR =
+  private static final RequestExecutor.RequestDescriptor<io.atomix.api.election.KeepAliveRequest, SessionHeader> KEEP_ALIVE_DESCRIPTOR =
       new RequestExecutor.SessionDescriptor<>(io.atomix.api.election.KeepAliveRequest::getId, request -> Collections.singletonList(request.getHeader()));
 
-  private static final RequestExecutor.RequestDescriptor<io.atomix.api.election.CloseRequest, ElectionId, SessionHeader> CLOSE_DESCRIPTOR =
+  private static final RequestExecutor.RequestDescriptor<io.atomix.api.election.CloseRequest, SessionHeader> CLOSE_DESCRIPTOR =
       new RequestExecutor.SessionDescriptor<>(io.atomix.api.election.CloseRequest::getId, request -> Collections.singletonList(request.getHeader()));
 
-  private static final RequestExecutor.RequestDescriptor<io.atomix.api.election.EnterRequest, ElectionId, SessionCommandHeader> ENTER_DESCRIPTOR =
+  private static final RequestExecutor.RequestDescriptor<io.atomix.api.election.EnterRequest, SessionCommandHeader> ENTER_DESCRIPTOR =
       new RequestExecutor.SessionCommandDescriptor<>(io.atomix.api.election.EnterRequest::getId, request -> Collections.singletonList(request.getHeader()));
 
-  private static final RequestExecutor.RequestDescriptor<io.atomix.api.election.WithdrawRequest, ElectionId, SessionCommandHeader> WITHDRAW_DESCRIPTOR =
+  private static final RequestExecutor.RequestDescriptor<io.atomix.api.election.WithdrawRequest, SessionCommandHeader> WITHDRAW_DESCRIPTOR =
       new RequestExecutor.SessionCommandDescriptor<>(io.atomix.api.election.WithdrawRequest::getId, request -> Collections.singletonList(request.getHeader()));
 
-  private static final RequestExecutor.RequestDescriptor<io.atomix.api.election.AnointRequest, ElectionId, SessionCommandHeader> ANOINT_DESCRIPTOR =
+  private static final RequestExecutor.RequestDescriptor<io.atomix.api.election.AnointRequest, SessionCommandHeader> ANOINT_DESCRIPTOR =
       new RequestExecutor.SessionCommandDescriptor<>(io.atomix.api.election.AnointRequest::getId, request -> Collections.singletonList(request.getHeader()));
 
-  private static final RequestExecutor.RequestDescriptor<io.atomix.api.election.PromoteRequest, ElectionId, SessionCommandHeader> PROMOTE_DESCRIPTOR =
+  private static final RequestExecutor.RequestDescriptor<io.atomix.api.election.PromoteRequest, SessionCommandHeader> PROMOTE_DESCRIPTOR =
       new RequestExecutor.SessionCommandDescriptor<>(io.atomix.api.election.PromoteRequest::getId, request -> Collections.singletonList(request.getHeader()));
 
-  private static final RequestExecutor.RequestDescriptor<io.atomix.api.election.EvictRequest, ElectionId, SessionCommandHeader> EVICT_DESCRIPTOR =
+  private static final RequestExecutor.RequestDescriptor<io.atomix.api.election.EvictRequest, SessionCommandHeader> EVICT_DESCRIPTOR =
       new RequestExecutor.SessionCommandDescriptor<>(io.atomix.api.election.EvictRequest::getId, request -> Collections.singletonList(request.getHeader()));
 
-  private static final RequestExecutor.RequestDescriptor<io.atomix.api.election.GetLeadershipRequest, ElectionId, SessionQueryHeader> GET_LEADERSHIP_DESCRIPTOR =
+  private static final RequestExecutor.RequestDescriptor<io.atomix.api.election.GetLeadershipRequest, SessionQueryHeader> GET_LEADERSHIP_DESCRIPTOR =
       new RequestExecutor.SessionQueryDescriptor<>(io.atomix.api.election.GetLeadershipRequest::getId, request -> Collections.singletonList(request.getHeader()));
 
-  private static final RequestExecutor.RequestDescriptor<io.atomix.api.election.EventRequest, ElectionId, SessionCommandHeader> EVENTS_DESCRIPTOR =
+  private static final RequestExecutor.RequestDescriptor<io.atomix.api.election.EventRequest, SessionCommandHeader> EVENTS_DESCRIPTOR =
       new RequestExecutor.SessionCommandDescriptor<>(io.atomix.api.election.EventRequest::getId, request -> Collections.singletonList(request.getHeader()));
 }

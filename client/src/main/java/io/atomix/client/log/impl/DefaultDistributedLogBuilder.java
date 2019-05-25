@@ -18,10 +18,10 @@ package io.atomix.client.log.impl;
 import java.util.concurrent.CompletableFuture;
 
 import io.atomix.client.PrimitiveManagementService;
+import io.atomix.client.log.AsyncDistributedLog;
 import io.atomix.client.log.DistributedLog;
 import io.atomix.client.log.DistributedLogBuilder;
 import io.atomix.client.log.DistributedLogConfig;
-import io.atomix.primitive.protocol.LogProtocol;
 
 /**
  * Default distributed log builder.
@@ -33,8 +33,8 @@ public class DefaultDistributedLogBuilder<E> extends DistributedLogBuilder<E> {
 
   @Override
   public CompletableFuture<DistributedLog<E>> buildAsync() {
-    LogProtocol protocol = (LogProtocol) protocol();
-    return protocol.createTopic(name, managementService.getPartitionService())
-        .thenApply(client -> new DefaultAsyncDistributedLog<E>(name, client, serializer()).sync());
+    return new DefaultAsyncDistributedLog<E>(getPrimitiveId(), managementService, serializer())
+        .connect()
+        .thenApply(AsyncDistributedLog::sync);
   }
 }

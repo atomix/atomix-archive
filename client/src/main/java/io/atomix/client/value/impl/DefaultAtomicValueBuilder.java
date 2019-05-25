@@ -18,15 +18,11 @@ package io.atomix.client.value.impl;
 import java.util.concurrent.CompletableFuture;
 
 import com.google.common.io.BaseEncoding;
-import io.atomix.api.protocol.DistributedLogProtocol;
-import io.atomix.api.protocol.MultiRaftProtocol;
-import io.atomix.api.value.ValueId;
 import io.atomix.client.PrimitiveManagementService;
 import io.atomix.client.value.AsyncAtomicValue;
 import io.atomix.client.value.AtomicValue;
 import io.atomix.client.value.AtomicValueBuilder;
 import io.atomix.client.value.AtomicValueConfig;
-import io.atomix.primitive.partition.Partitioner;
 import io.atomix.utils.serializer.Serializer;
 
 /**
@@ -39,27 +35,10 @@ public class DefaultAtomicValueBuilder<V> extends AtomicValueBuilder<V> {
     super(name, config, managementService);
   }
 
-  private ValueId createValueId() {
-    ValueId.Builder builder = ValueId.newBuilder().setName(name);
-    protocol = protocol();
-    if (protocol instanceof io.atomix.protocols.raft.MultiRaftProtocol) {
-      builder.setRaft(MultiRaftProtocol.newBuilder()
-          .setGroup(((io.atomix.protocols.raft.MultiRaftProtocol) protocol).group())
-          .build());
-    } else if (protocol instanceof io.atomix.protocols.log.DistributedLogProtocol) {
-      builder.setLog(DistributedLogProtocol.newBuilder()
-          .setGroup(((io.atomix.protocols.log.DistributedLogProtocol) protocol).group())
-          .setPartitions(((io.atomix.protocols.log.DistributedLogProtocol) protocol).config().getPartitions())
-          .setReplicationFactor(((io.atomix.protocols.log.DistributedLogProtocol) protocol).config().getReplicationFactor())
-          .build());
-    }
-    return builder.build();
-  }
-
   @Override
   @SuppressWarnings("unchecked")
   public CompletableFuture<AtomicValue<V>> buildAsync() {
-    return new DefaultAsyncAtomicValue(createValueId(), managementService.getChannelFactory(), managementService, Partitioner.MURMUR3, config.getSessionTimeout())
+    return new DefaultAsyncAtomicValue(getPrimitiveId(), managementService, config.getSessionTimeout())
         .connect()
         .thenApply(rawValue -> {
           Serializer serializer = serializer();

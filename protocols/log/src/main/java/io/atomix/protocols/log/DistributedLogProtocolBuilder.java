@@ -15,7 +15,6 @@
  */
 package io.atomix.protocols.log;
 
-import io.atomix.log.protocol.Replication;
 import io.atomix.primitive.partition.Partitioner;
 import io.atomix.primitive.protocol.PrimitiveProtocolBuilder;
 
@@ -55,7 +54,7 @@ public class DistributedLogProtocolBuilder extends PrimitiveProtocolBuilder<Dist
    * @param replicationStrategy the replication strategy
    * @return the log protocol builder
    */
-  public DistributedLogProtocolBuilder withReplicationStrategy(Replication replicationStrategy) {
+  public DistributedLogProtocolBuilder withReplicationStrategy(ReplicationStrategy replicationStrategy) {
     config.setReplicationStrategy(replicationStrategy);
     return this;
   }
