@@ -5,50 +5,36 @@ package atomix.headers;
 option java_package = "io.atomix.api.headers";
 option java_multiple_files = true;
 
-message RequestHeaders {
-    repeated RequestHeader headers = 1;
-}
-
 message RequestHeader {
-    uint32 partition_id = 1;
-    uint64 index = 2;
-}
-
-message ResponseHeaders {
-    repeated ResponseHeader headers = 1;
+    uint64 index = 1;
 }
 
 message ResponseHeader {
-    uint32 partition_id = 1;
-    uint64 index = 2;
+    uint64 index = 1;
 }
 
 message SessionHeader {
-    uint32 partition_id = 1;
-    uint64 session_id = 2;
-    uint64 last_sequence_number = 3;
-    repeated SessionStreamHeader streams = 4;
+    uint64 session_id = 1;
+    uint64 last_sequence_number = 2;
+    repeated SessionStreamHeader streams = 3;
 }
 
 message SessionCommandHeader {
-    uint32 partition_id = 1;
-    uint64 session_id = 2;
-    uint64 sequence_number = 3;
+    uint64 session_id = 1;
+    uint64 sequence_number = 2;
 }
 
 message SessionQueryHeader {
-    uint32 partition_id = 1;
-    uint64 session_id = 2;
-    uint64 last_index = 3;
-    uint64 last_sequence_number = 4;
+    uint64 session_id = 1;
+    uint64 last_index = 2;
+    uint64 last_sequence_number = 3;
 }
 
 message SessionResponseHeader {
-    uint32 partition_id = 1;
-    uint64 session_id = 2;
-    uint64 index = 3;
-    uint64 sequence_number = 4;
-    repeated SessionStreamHeader streams = 5;
+    uint64 session_id = 1;
+    uint64 index = 2;
+    uint64 sequence_number = 3;
+    repeated SessionStreamHeader streams = 4;
 }
 
 message SessionStreamHeader {

@@ -10,26 +10,26 @@ option java_package = "io.atomix.api.set";
 option java_multiple_files = true;
 
 message CreateRequest {
-    atomix.primitive.PrimitiveId id = 1;
+    atomix.primitive.PrimitiveId set_id = 1;
     google.protobuf.Duration timeout = 2;
 }
 
 message CreateResponse {
-    repeated atomix.headers.SessionHeader headers = 1;
+    atomix.headers.SessionHeader header = 1;
 }
 
 message KeepAliveRequest {
-    atomix.primitive.PrimitiveId id = 1;
-    repeated atomix.headers.SessionHeader headers = 2;
+    atomix.primitive.PrimitiveId set_id = 1;
+    atomix.headers.SessionHeader header = 2;
 }
 
 message KeepAliveResponse {
-    repeated atomix.headers.SessionHeader headers = 1;
+    atomix.headers.SessionHeader header = 1;
 }
 
 message CloseRequest {
-    atomix.primitive.PrimitiveId id = 1;
-    repeated atomix.headers.SessionHeader headers = 2;
+    atomix.primitive.PrimitiveId set_id = 1;
+    atomix.headers.SessionHeader header = 2;
     bool delete = 3;
 }
 
@@ -38,62 +38,62 @@ message CloseResponse {
 }
 
 message SizeRequest {
-    atomix.primitive.PrimitiveId id = 1;
-    repeated atomix.headers.SessionQueryHeader headers = 2;
+    atomix.primitive.PrimitiveId set_id = 1;
+    atomix.headers.SessionQueryHeader header = 2;
 }
 
 message SizeResponse {
-    repeated atomix.headers.SessionResponseHeader headers = 1;
+    atomix.headers.SessionResponseHeader header = 1;
     int32 size = 2;
 }
 
 message ContainsRequest {
-    atomix.primitive.PrimitiveId id = 1;
-    repeated atomix.headers.SessionQueryHeader headers = 2;
+    atomix.primitive.PrimitiveId set_id = 1;
+    atomix.headers.SessionQueryHeader header = 2;
     repeated string values = 3;
 }
 
 message ContainsResponse {
-    repeated atomix.headers.SessionResponseHeader headers = 1;
+    atomix.headers.SessionResponseHeader header = 1;
     bool contains = 2;
 }
 
 message AddRequest {
-    atomix.primitive.PrimitiveId id = 1;
-    repeated atomix.headers.SessionCommandHeader headers = 2;
+    atomix.primitive.PrimitiveId set_id = 1;
+    atomix.headers.SessionCommandHeader header = 2;
     repeated string values = 3;
 }
 
 message AddResponse {
-    repeated atomix.headers.SessionResponseHeader headers = 1;
+    atomix.headers.SessionResponseHeader header = 1;
     ResponseStatus status = 2;
     bool added = 3;
 }
 
 message RemoveRequest {
-    atomix.primitive.PrimitiveId id = 1;
-    repeated atomix.headers.SessionCommandHeader headers = 2;
+    atomix.primitive.PrimitiveId set_id = 1;
+    atomix.headers.SessionCommandHeader header = 2;
     repeated string values = 3;
 }
 
 message RemoveResponse {
-    repeated atomix.headers.SessionResponseHeader headers = 1;
+    atomix.headers.SessionResponseHeader header = 1;
     ResponseStatus status = 2;
     bool removed = 3;
 }
 
 message ClearRequest {
-    atomix.primitive.PrimitiveId id = 1;
-    repeated atomix.headers.SessionCommandHeader headers = 2;
+    atomix.primitive.PrimitiveId set_id = 1;
+    atomix.headers.SessionCommandHeader header = 2;
 }
 
 message ClearResponse {
-    repeated atomix.headers.SessionResponseHeader headers = 1;
+    atomix.headers.SessionResponseHeader header = 1;
 }
 
 message EventRequest {
-    atomix.primitive.PrimitiveId id = 1;
-    repeated atomix.headers.SessionCommandHeader headers = 2;
+    atomix.primitive.PrimitiveId set_id = 1;
+    atomix.headers.SessionCommandHeader header = 2;
 }
 
 message EventResponse {
@@ -108,8 +108,8 @@ message EventResponse {
 }
 
 message IterateRequest {
-    atomix.primitive.PrimitiveId id = 1;
-    repeated atomix.headers.SessionQueryHeader headers = 2;
+    atomix.primitive.PrimitiveId set_id = 1;
+    atomix.headers.SessionQueryHeader header = 2;
 }
 
 message IterateResponse {
@@ -126,23 +126,43 @@ enum ResponseStatus {
 // Set service
 service SetService {
 
-    rpc Create(CreateRequest) returns (CreateResponse) {}
+    rpc Create(CreateRequest) returns (CreateResponse) {
 
-    rpc KeepAlive(KeepAliveRequest) returns (KeepAliveResponse) {}
+    }
 
-    rpc Close(CloseRequest) returns (CloseResponse) {}
+    rpc KeepAlive(KeepAliveRequest) returns (KeepAliveResponse) {
 
-    rpc Size(SizeRequest) returns (SizeResponse) {}
+    }
 
-    rpc Contains(ContainsRequest) returns (ContainsResponse) {}
+    rpc Close(CloseRequest) returns (CloseResponse) {
 
-    rpc Add(AddRequest) returns (AddResponse) {}
+    }
 
-    rpc Remove(RemoveRequest) returns (RemoveResponse) {}
+    rpc Size(SizeRequest) returns (SizeResponse) {
 
-    rpc Clear(ClearRequest) returns (ClearResponse) {}
+    }
 
-    rpc Listen(EventRequest) returns (stream EventResponse) {}
+    rpc Contains(ContainsRequest) returns (ContainsResponse) {
 
-    rpc Iterate(IterateRequest) returns (stream IterateResponse) {}
+    }
+
+    rpc Add(AddRequest) returns (AddResponse) {
+
+    }
+
+    rpc Remove(RemoveRequest) returns (RemoveResponse) {
+
+    }
+
+    rpc Clear(ClearRequest) returns (ClearResponse) {
+
+    }
+
+    rpc Listen(EventRequest) returns (stream EventResponse) {
+
+    }
+
+    rpc Iterate(IterateRequest) returns (stream IterateResponse) {
+
+    }
 }

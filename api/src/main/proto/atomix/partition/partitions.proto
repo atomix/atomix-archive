@@ -1,0 +1,60 @@
+syntax = "proto3";
+
+package atomix.partition;
+
+import "google/protobuf/any.proto";
+
+option java_package = "io.atomix.api.partition";
+option java_multiple_files = true;
+
+// Gets a list of partition groups
+message GetPartitionGroupsRequest {
+}
+
+// Returns a list of partition groups
+message GetPartitionGroupsResponse {
+    repeated PartitionGroup groups = 1;
+}
+
+// Creates a new partition group
+message CreatePartitionGroupRequest {
+    PartitionGroup group = 1;
+}
+
+// Returns the status of a partition group
+message CreatePartitionGroupResponse {
+
+}
+
+// Deletes a partition group
+message DeletePartitionGroupRequest {
+    string name = 1;
+}
+
+// Returns the result of deleting a partition group
+message DeletePartitionGroupResponse {
+
+}
+
+// Partition group
+message PartitionGroup {
+    string name = 1;
+    google.protobuf.Any group = 2;
+}
+
+// Partition service
+service PartitionService {
+
+    rpc CreatePartitionGroup(CreatePartitionGroupRequest) returns (CreatePartitionGroupResponse) {
+
+    }
+
+    rpc DeletePartitionGroup(DeletePartitionGroupRequest) returns (DeletePartitionGroupResponse) {
+
+    }
+
+    rpc GetPartitionGroups(GetPartitionGroupsRequest) returns (GetPartitionGroupsResponse) {
+
+    }
+
+}

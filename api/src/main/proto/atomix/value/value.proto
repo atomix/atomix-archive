@@ -10,7 +10,7 @@ option java_package = "io.atomix.api.value";
 option java_multiple_files = true;
 
 message CreateRequest {
-    atomix.primitive.PrimitiveId id = 1;
+    atomix.primitive.PrimitiveId value_id = 1;
     google.protobuf.Duration timeout = 2;
 }
 
@@ -19,7 +19,7 @@ message CreateResponse {
 }
 
 message KeepAliveRequest {
-    atomix.primitive.PrimitiveId id = 1;
+    atomix.primitive.PrimitiveId value_id = 1;
     atomix.headers.SessionHeader header = 2;
 }
 
@@ -28,7 +28,7 @@ message KeepAliveResponse {
 }
 
 message CloseRequest {
-    atomix.primitive.PrimitiveId id = 1;
+    atomix.primitive.PrimitiveId value_id = 1;
     atomix.headers.SessionHeader header = 2;
     bool delete = 3;
 }
@@ -38,7 +38,7 @@ message CloseResponse {
 }
 
 message GetRequest {
-    atomix.primitive.PrimitiveId id = 1;
+    atomix.primitive.PrimitiveId value_id = 1;
     atomix.headers.SessionQueryHeader header = 2;
 }
 
@@ -49,7 +49,7 @@ message GetResponse {
 }
 
 message SetRequest {
-    atomix.primitive.PrimitiveId id = 1;
+    atomix.primitive.PrimitiveId value_id = 1;
     atomix.headers.SessionCommandHeader header = 2;
     bytes value = 3;
 }
@@ -62,7 +62,7 @@ message SetResponse {
 }
 
 message CheckAndSetRequest {
-    atomix.primitive.PrimitiveId id = 1;
+    atomix.primitive.PrimitiveId value_id = 1;
     atomix.headers.SessionCommandHeader header = 2;
     bytes check = 3;
     bytes update = 4;
@@ -76,7 +76,7 @@ message CheckAndSetResponse {
 }
 
 message EventRequest {
-    atomix.primitive.PrimitiveId id = 1;
+    atomix.primitive.PrimitiveId value_id = 1;
     atomix.headers.SessionCommandHeader header = 2;
 }
 
@@ -96,18 +96,32 @@ message EventResponse {
 // Value service
 service ValueService {
 
-    rpc Create(CreateRequest) returns (CreateResponse) {}
+    rpc Create(CreateRequest) returns (CreateResponse) {
 
-    rpc KeepAlive(KeepAliveRequest) returns (KeepAliveResponse) {}
+    }
 
-    rpc Close(CloseRequest) returns (CloseResponse) {}
+    rpc KeepAlive(KeepAliveRequest) returns (KeepAliveResponse) {
 
-    rpc Set(SetRequest) returns (SetResponse) {}
+    }
 
-    rpc Get(GetRequest) returns (GetResponse) {}
+    rpc Close(CloseRequest) returns (CloseResponse) {
 
-    rpc CheckAndSet(CheckAndSetRequest) returns (CheckAndSetResponse) {}
+    }
 
-    rpc Event(EventRequest) returns (stream EventResponse) {}
+    rpc Set(SetRequest) returns (SetResponse) {
+
+    }
+
+    rpc Get(GetRequest) returns (GetResponse) {
+
+    }
+
+    rpc CheckAndSet(CheckAndSetRequest) returns (CheckAndSetResponse) {
+
+    }
+
+    rpc Event(EventRequest) returns (stream EventResponse) {
+
+    }
 
 }

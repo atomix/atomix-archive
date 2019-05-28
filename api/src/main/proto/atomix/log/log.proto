@@ -8,7 +8,7 @@ option java_package = "io.atomix.api.log";
 option java_multiple_files = true;
 
 message CreateTopicRequest {
-    atomix.primitive.PrimitiveId id = 1;
+    atomix.primitive.PrimitiveId topic_id = 1;
 }
 
 message CreateTopicResponse {
@@ -16,7 +16,7 @@ message CreateTopicResponse {
 }
 
 message DeleteTopicRequest {
-    atomix.primitive.PrimitiveId id = 1;
+    atomix.primitive.PrimitiveId topic_id = 1;
 }
 
 message DeleteTopicResponse {
@@ -24,7 +24,7 @@ message DeleteTopicResponse {
 }
 
 message ProduceRequest {
-    atomix.primitive.PrimitiveId id = 1;
+    atomix.primitive.PrimitiveId topic_id = 1;
     int32 partition = 2;
     bytes value = 3;
 }
@@ -33,7 +33,7 @@ message ProduceResponse {
 }
 
 message ConsumeRequest {
-    atomix.primitive.PrimitiveId id = 1;
+    atomix.primitive.PrimitiveId topic_id = 1;
     int32 partition = 2;
     uint64 offset = 3;
 }

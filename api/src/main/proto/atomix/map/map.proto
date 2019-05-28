@@ -10,26 +10,26 @@ option java_package = "io.atomix.api.map";
 option java_multiple_files = true;
 
 message CreateRequest {
-    atomix.primitive.PrimitiveId id = 1;
+    atomix.primitive.PrimitiveId map_id = 1;
     google.protobuf.Duration timeout = 2;
 }
 
 message CreateResponse {
-    repeated atomix.headers.SessionHeader headers = 1;
+    atomix.headers.SessionHeader header = 1;
 }
 
 message KeepAliveRequest {
-    atomix.primitive.PrimitiveId id = 1;
-    repeated atomix.headers.SessionHeader headers = 2;
+    atomix.primitive.PrimitiveId map_id = 1;
+    atomix.headers.SessionHeader header = 2;
 }
 
 message KeepAliveResponse {
-    repeated atomix.headers.SessionHeader headers = 1;
+    atomix.headers.SessionHeader header = 1;
 }
 
 message CloseRequest {
-    atomix.primitive.PrimitiveId id = 1;
-    repeated atomix.headers.SessionHeader headers = 2;
+    atomix.primitive.PrimitiveId map_id = 1;
+    atomix.headers.SessionHeader header = 2;
     bool delete = 3;
 }
 
@@ -38,7 +38,7 @@ message CloseResponse {
 }
 
 message ExistsRequest {
-    atomix.primitive.PrimitiveId id = 1;
+    atomix.primitive.PrimitiveId map_id = 1;
     atomix.headers.SessionQueryHeader header = 2;
     string key = 3;
 }
@@ -49,17 +49,17 @@ message ExistsResponse {
 }
 
 message SizeRequest {
-    atomix.primitive.PrimitiveId id = 1;
-    repeated atomix.headers.SessionQueryHeader headers = 2;
+    atomix.primitive.PrimitiveId map_id = 1;
+    atomix.headers.SessionQueryHeader header = 2;
 }
 
 message SizeResponse {
-    repeated atomix.headers.SessionResponseHeader headers = 1;
+    atomix.headers.SessionResponseHeader header = 1;
     int32 size = 2;
 }
 
 message PutRequest {
-    atomix.primitive.PrimitiveId id = 1;
+    atomix.primitive.PrimitiveId map_id = 1;
     atomix.headers.SessionCommandHeader header = 2;
     string key = 3;
     bytes value = 4;
@@ -75,7 +75,7 @@ message PutResponse {
 }
 
 message ReplaceRequest {
-    atomix.primitive.PrimitiveId id = 1;
+    atomix.primitive.PrimitiveId map_id = 1;
     atomix.headers.SessionCommandHeader header = 2;
     string key = 3;
     bytes previous_value = 4;
@@ -92,7 +92,7 @@ message ReplaceResponse {
 }
 
 message GetRequest {
-    atomix.primitive.PrimitiveId id = 1;
+    atomix.primitive.PrimitiveId map_id = 1;
     atomix.headers.SessionQueryHeader header = 2;
     string key = 3;
 }
@@ -104,7 +104,7 @@ message GetResponse {
 }
 
 message RemoveRequest {
-    atomix.primitive.PrimitiveId id = 1;
+    atomix.primitive.PrimitiveId map_id = 1;
     atomix.headers.SessionCommandHeader header = 2;
     string key = 3;
     bytes value = 4;
@@ -119,17 +119,17 @@ message RemoveResponse {
 }
 
 message ClearRequest {
-    atomix.primitive.PrimitiveId id = 1;
-    repeated atomix.headers.SessionCommandHeader headers = 2;
+    atomix.primitive.PrimitiveId map_id = 1;
+    atomix.headers.SessionCommandHeader header = 2;
 }
 
 message ClearResponse {
-    repeated atomix.headers.SessionResponseHeader headers = 1;
+    atomix.headers.SessionResponseHeader header = 1;
 }
 
 message EntriesRequest {
-    atomix.primitive.PrimitiveId id = 1;
-    repeated atomix.headers.SessionQueryHeader headers = 2;
+    atomix.primitive.PrimitiveId map_id = 1;
+    atomix.headers.SessionQueryHeader header = 2;
 }
 
 message EntriesResponse {
@@ -140,8 +140,8 @@ message EntriesResponse {
 }
 
 message EventRequest {
-    atomix.primitive.PrimitiveId id = 1;
-    repeated atomix.headers.SessionCommandHeader headers = 2;
+    atomix.primitive.PrimitiveId map_id = 1;
+    atomix.headers.SessionCommandHeader header = 2;
 }
 
 message EventResponse {

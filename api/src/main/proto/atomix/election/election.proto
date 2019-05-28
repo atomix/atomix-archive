@@ -10,7 +10,7 @@ option java_package = "io.atomix.api.election";
 option java_multiple_files = true;
 
 message CreateRequest {
-    atomix.primitive.PrimitiveId id = 1;
+    atomix.primitive.PrimitiveId election_id = 1;
     google.protobuf.Duration timeout = 2;
 }
 
@@ -19,7 +19,7 @@ message CreateResponse {
 }
 
 message KeepAliveRequest {
-    atomix.primitive.PrimitiveId id = 1;
+    atomix.primitive.PrimitiveId election_id = 1;
     atomix.headers.SessionHeader header = 2;
 }
 
@@ -28,7 +28,7 @@ message KeepAliveResponse {
 }
 
 message CloseRequest {
-    atomix.primitive.PrimitiveId id = 1;
+    atomix.primitive.PrimitiveId election_id = 1;
     atomix.headers.SessionHeader header = 2;
     bool delete = 3;
 }
@@ -38,7 +38,7 @@ message CloseResponse {
 }
 
 message EnterRequest {
-    atomix.primitive.PrimitiveId id = 1;
+    atomix.primitive.PrimitiveId election_id = 1;
     atomix.headers.SessionCommandHeader header = 2;
     string candidate_id = 3;
 }
@@ -52,7 +52,7 @@ message EnterResponse {
 }
 
 message WithdrawRequest {
-    atomix.primitive.PrimitiveId id = 1;
+    atomix.primitive.PrimitiveId election_id = 1;
     atomix.headers.SessionCommandHeader header = 2;
     string candidate_id = 3;
 }
@@ -63,7 +63,7 @@ message WithdrawResponse {
 }
 
 message AnointRequest {
-    atomix.primitive.PrimitiveId id = 1;
+    atomix.primitive.PrimitiveId election_id = 1;
     atomix.headers.SessionCommandHeader header = 2;
     string candidate_id = 3;
 }
@@ -74,7 +74,7 @@ message AnointResponse {
 }
 
 message PromoteRequest {
-    atomix.primitive.PrimitiveId id = 1;
+    atomix.primitive.PrimitiveId election_id = 1;
     atomix.headers.SessionCommandHeader header = 2;
     string candidate_id = 3;
 }
@@ -85,7 +85,7 @@ message PromoteResponse {
 }
 
 message EvictRequest {
-    atomix.primitive.PrimitiveId id = 1;
+    atomix.primitive.PrimitiveId election_id = 1;
     atomix.headers.SessionCommandHeader header = 2;
     string candidate_id = 3;
 }
@@ -96,7 +96,7 @@ message EvictResponse {
 }
 
 message GetLeadershipRequest {
-    atomix.primitive.PrimitiveId id = 1;
+    atomix.primitive.PrimitiveId election_id = 1;
     atomix.headers.SessionQueryHeader header = 2;
 }
 
@@ -109,7 +109,7 @@ message GetLeadershipResponse {
 }
 
 message EventRequest {
-    atomix.primitive.PrimitiveId id = 1;
+    atomix.primitive.PrimitiveId election_id = 1;
     atomix.headers.SessionCommandHeader header = 2;
 }
 
@@ -129,24 +129,44 @@ message EventResponse {
 // Leader election service
 service LeaderElectionService {
 
-    rpc Create(CreateRequest) returns (CreateResponse) {}
+    rpc Create(CreateRequest) returns (CreateResponse) {
 
-    rpc KeepAlive(KeepAliveRequest) returns (KeepAliveResponse) {}
+    }
 
-    rpc Close(CloseRequest) returns (CloseResponse) {}
+    rpc KeepAlive(KeepAliveRequest) returns (KeepAliveResponse) {
 
-    rpc Enter(EnterRequest) returns (EnterResponse) {}
+    }
 
-    rpc Withdraw(WithdrawRequest) returns (WithdrawResponse) {}
+    rpc Close(CloseRequest) returns (CloseResponse) {
 
-    rpc Anoint(AnointRequest) returns (AnointResponse) {}
+    }
 
-    rpc Promote(PromoteRequest) returns (PromoteResponse) {}
+    rpc Enter(EnterRequest) returns (EnterResponse) {
 
-    rpc Evict(EvictRequest) returns (EvictResponse) {}
+    }
 
-    rpc GetLeadership(GetLeadershipRequest) returns (GetLeadershipResponse) {}
+    rpc Withdraw(WithdrawRequest) returns (WithdrawResponse) {
 
-    rpc Events(EventRequest) returns (stream EventResponse) {}
+    }
+
+    rpc Anoint(AnointRequest) returns (AnointResponse) {
+
+    }
+
+    rpc Promote(PromoteRequest) returns (PromoteResponse) {
+
+    }
+
+    rpc Evict(EvictRequest) returns (EvictResponse) {
+
+    }
+
+    rpc GetLeadership(GetLeadershipRequest) returns (GetLeadershipResponse) {
+
+    }
+
+    rpc Events(EventRequest) returns (stream EventResponse) {
+
+    }
 
 }
