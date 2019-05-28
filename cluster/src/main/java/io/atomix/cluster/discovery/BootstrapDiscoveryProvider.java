@@ -19,11 +19,8 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
-import java.util.stream.Collectors;
 
 import com.google.common.collect.ImmutableSet;
-import io.atomix.cluster.NodeConfig;
-import io.atomix.cluster.NodeId;
 import io.atomix.utils.component.Component;
 import io.atomix.utils.component.Managed;
 import io.atomix.utils.event.AbstractListenable;
@@ -35,10 +32,9 @@ import static com.google.common.base.Preconditions.checkNotNull;
 /**
  * Cluster membership provider that bootstraps membership from a pre-defined set of peers.
  * <p>
- * The bootstrap member provider takes a set of peer {@link BootstrapDiscoveryConfig#setNodes(Collection) addresses} and uses them
- * to join the cluster. Using the {@link io.atomix.cluster.messaging.MessagingService}, each node sends a heartbeat to
- * its configured bootstrap peers. Peers respond to each heartbeat message with a list of all known peers, thus
- * propagating membership information using a gossip style protocol.
+ * The bootstrap member provider takes a set of peer nodes and uses them to join the cluster. Using gRPC, each node
+ * sends a heartbeat to its configured bootstrap peers. Peers respond to each heartbeat message with a list of all
+ * known peers, thus propagating membership information using a gossip style protocol.
  * <p>
  * A phi accrual failure detector is used to detect failures and remove peers from the configuration. In order to avoid
  * flapping of membership following a {@link io.atomix.cluster.MemberEvent.Type#ADDED} event, the implementation attempts
@@ -47,18 +43,9 @@ import static com.google.common.base.Preconditions.checkNotNull;
 @Component(BootstrapDiscoveryConfig.class)
 public class BootstrapDiscoveryProvider
     extends AbstractListenable<DiscoveryEvent>
-    implements NodeDiscoveryProvider, Managed<BootstrapDiscoveryConfig> {
+    implements NodeDiscoveryProvider<BootstrapDiscoveryConfig>, Managed<BootstrapDiscoveryConfig> {
 
   public static final Type TYPE = new Type();
-
-  /**
-   * Creates a new bootstrap provider builder.
-   *
-   * @return a new bootstrap provider builder
-   */
-  public static BootstrapDiscoveryBuilder builder() {
-    return new BootstrapDiscoveryBuilder();
-  }
 
   /**
    * Bootstrap member location provider type.
@@ -73,7 +60,7 @@ public class BootstrapDiscoveryProvider
 
     @Override
     public BootstrapDiscoveryConfig newConfig() {
-      return new BootstrapDiscoveryConfig();
+      return BootstrapDiscoveryConfig.newBuilder().build();
     }
 
     @Override
@@ -95,12 +82,9 @@ public class BootstrapDiscoveryProvider
   }
 
   public BootstrapDiscoveryProvider(Collection<Node> bootstrapNodes) {
-    this(new BootstrapDiscoveryConfig().setNodes(bootstrapNodes.stream()
-        .map(node -> new NodeConfig()
-            .setId(NodeId.from(node.getId(), node.getNamespace()))
-            .setHost(node.getHost())
-            .setPort(node.getPort()))
-        .collect(Collectors.toList())));
+    this(BootstrapDiscoveryConfig.newBuilder()
+        .addAllNodes(bootstrapNodes)
+        .build());
   }
 
   BootstrapDiscoveryProvider(BootstrapDiscoveryConfig config) {
@@ -121,14 +105,7 @@ public class BootstrapDiscoveryProvider
   public CompletableFuture<Void> start(BootstrapDiscoveryConfig config) {
     LOGGER.info("Joined");
     this.config = config;
-    this.bootstrapNodes = ImmutableSet.copyOf(config.getNodes().stream()
-        .map(c -> Node.newBuilder()
-            .setId(c.getId().id())
-            .setNamespace(c.getId().namespace())
-            .setHost(c.getHost())
-            .setPort(c.getPort())
-            .build())
-        .collect(Collectors.toList()));
+    this.bootstrapNodes = ImmutableSet.copyOf(config.getNodesList());
     return CompletableFuture.completedFuture(null);
   }
 

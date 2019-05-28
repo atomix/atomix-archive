@@ -15,17 +15,16 @@
  */
 package io.atomix.primitive.partition;
 
+import java.nio.charset.StandardCharsets;
+import java.util.Collection;
+import java.util.List;
+
 import com.google.common.hash.Hashing;
 import com.google.protobuf.Descriptors;
 import io.atomix.primitive.protocol.PrimitiveProtocol;
 import io.atomix.primitive.protocol.ServiceProtocol;
 import io.atomix.utils.ConfiguredType;
 import io.atomix.utils.config.Configured;
-import io.atomix.utils.serializer.Namespace;
-
-import java.nio.charset.StandardCharsets;
-import java.util.Collection;
-import java.util.List;
 
 /**
  * Primitive partition group.
@@ -35,7 +34,21 @@ public interface PartitionGroup extends Configured<PartitionGroupConfig> {
   /**
    * Partition group type.
    */
-  interface Type<C extends PartitionGroupConfig<C>> extends ConfiguredType<C> {
+  interface Type extends ConfiguredType<PartitionGroupConfig> {
+
+    /**
+     * Returns the partition group configuration type.
+     *
+     * @return the partition group configuration type
+     */
+    Class<?> getConfigType();
+
+    /**
+     * Returns the partition group configuration descriptor.
+     *
+     * @return the partition group configuration descriptor
+     */
+    Descriptors.Descriptor getConfigDescriptor();
 
     /**
      * Returns the protocol type.
@@ -52,19 +65,12 @@ public interface PartitionGroup extends Configured<PartitionGroupConfig> {
     Descriptors.Descriptor getProtocolDescriptor();
 
     /**
-     * Returns the partition group namespace.
-     *
-     * @return the partition group namespace
-     */
-    Namespace namespace();
-
-    /**
      * Creates a new partition group instance.
      *
      * @param config the partition group configuration
      * @return the partition group
      */
-    ManagedPartitionGroup newPartitionGroup(C config);
+    ManagedPartitionGroup newPartitionGroup(PartitionGroupConfig config);
   }
 
   /**
@@ -128,15 +134,4 @@ public interface PartitionGroup extends Configured<PartitionGroupConfig> {
    * @return a sorted list of partition IDs
    */
   List<PartitionId> getPartitionIds();
-
-  /**
-   * Partition group builder.
-   */
-  abstract class Builder<C extends PartitionGroupConfig<C>> implements io.atomix.utils.Builder<ManagedPartitionGroup> {
-    protected final C config;
-
-    protected Builder(C config) {
-      this.config = config;
-    }
-  }
 }

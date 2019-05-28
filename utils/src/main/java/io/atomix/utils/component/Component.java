@@ -5,7 +5,7 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
-import io.atomix.utils.config.Config;
+import com.google.protobuf.Message;
 
 /**
  * Component annotation.
@@ -17,7 +17,7 @@ public @interface Component {
   /**
    * The component configuration class.
    */
-  Class<? extends Config> value() default ConfigNone.class;
+  Class<? extends Message> value() default ConfigNone.class;
 
   /**
    * The component scope.
@@ -27,7 +27,7 @@ public @interface Component {
   /**
    * Default configuration class.
    */
-  class ConfigNone implements Config {
+  abstract class ConfigNone implements Message {
   }
 
   /**

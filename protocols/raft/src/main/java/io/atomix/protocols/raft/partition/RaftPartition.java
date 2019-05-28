@@ -24,13 +24,14 @@ import java.util.stream.Collectors;
 import io.atomix.cluster.MemberId;
 import io.atomix.primitive.partition.Partition;
 import io.atomix.primitive.partition.PartitionClient;
+import io.atomix.primitive.partition.PartitionGroupConfig;
 import io.atomix.primitive.partition.PartitionId;
 import io.atomix.primitive.partition.PartitionManagementService;
 import io.atomix.primitive.partition.PartitionMetadata;
 import io.atomix.primitive.service.impl.ServiceManagerStateMachine;
-import io.atomix.protocols.raft.partition.impl.RaftClientCommunicator;
 import io.atomix.protocols.raft.partition.impl.RaftPartitionClient;
 import io.atomix.protocols.raft.partition.impl.RaftPartitionServer;
+import io.atomix.protocols.raft.partition.impl.RaftProtocolManager;
 import io.atomix.utils.concurrent.ThreadContextFactory;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
@@ -40,7 +41,8 @@ import static com.google.common.base.MoreObjects.toStringHelper;
  */
 public class RaftPartition implements Partition {
   private final PartitionId partitionId;
-  private final RaftPartitionGroupConfig config;
+  private final PartitionGroupConfig config;
+  private final RaftProtocolManager raftProtocolManager;
   private final File dataDirectory;
   private final ThreadContextFactory threadContextFactory;
   private PartitionMetadata partition;
@@ -49,11 +51,13 @@ public class RaftPartition implements Partition {
 
   public RaftPartition(
       PartitionId partitionId,
-      RaftPartitionGroupConfig config,
+      PartitionGroupConfig config,
+      RaftProtocolManager raftProtocolManager,
       File dataDirectory,
       ThreadContextFactory threadContextFactory) {
     this.partitionId = partitionId;
     this.config = config;
+    this.raftProtocolManager = raftProtocolManager;
     this.dataDirectory = dataDirectory;
     this.threadContextFactory = threadContextFactory;
   }
@@ -130,7 +134,7 @@ public class RaftPartition implements Partition {
    */
   CompletableFuture<Partition> open(PartitionMetadata metadata, PartitionManagementService managementService) {
     this.partition = metadata;
-    this.client = createClient(managementService);
+    this.client = createClient();
     if (partition.members().contains(managementService.getMembershipService().getLocalMemberId())) {
       server = createServer(managementService);
       return server.start(new ServiceManagerStateMachine(metadata.id(), managementService))
@@ -173,21 +177,17 @@ public class RaftPartition implements Partition {
         this,
         config,
         managementService.getMembershipService().getLocalMemberId(),
-        managementService.getMessagingService(),
-        managementService.getStreamingService(),
+        raftProtocolManager,
         threadContextFactory);
   }
 
   /**
    * Creates a Raft client.
    */
-  private RaftPartitionClient createClient(PartitionManagementService managementService) {
+  private RaftPartitionClient createClient() {
     return new RaftPartitionClient(
         this,
-        new RaftClientCommunicator(
-            name(),
-            managementService.getMessagingService(),
-            managementService.getStreamingService()),
+        raftProtocolManager,
         threadContextFactory);
   }
 

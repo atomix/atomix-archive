@@ -26,19 +26,15 @@ import java.util.stream.IntStream;
 
 import io.atomix.cluster.ClusterConfig;
 import io.atomix.cluster.Member;
-import io.atomix.cluster.MemberConfig;
 import io.atomix.cluster.MemberEvent;
 import io.atomix.cluster.MemberId;
 import io.atomix.cluster.MemberService;
 import io.atomix.cluster.MembershipConfig;
-import io.atomix.cluster.NodeConfig;
-import io.atomix.cluster.NodeId;
 import io.atomix.cluster.discovery.BootstrapDiscoveryConfig;
 import io.atomix.cluster.discovery.BootstrapDiscoveryProvider;
 import io.atomix.cluster.discovery.Node;
 import io.atomix.cluster.grpc.impl.ChannelServiceImpl;
 import io.atomix.cluster.grpc.impl.ServiceRegistryImpl;
-import io.atomix.cluster.messaging.impl.TestMessagingServiceFactory;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
@@ -49,8 +45,6 @@ import static org.junit.Assert.assertTrue;
  * Default cluster service test.
  */
 public class ClusterMembershipManagerTest {
-  private TestMessagingServiceFactory messagingServiceFactory = new TestMessagingServiceFactory();
-
   private Member buildMember(int memberId, String version) {
     return Member.newBuilder()
         .setId(String.valueOf(memberId))
@@ -77,20 +71,18 @@ public class ClusterMembershipManagerTest {
     NodeDiscoveryManager discoveryService = new NodeDiscoveryManager(discoveryProvider);
     ServiceRegistryImpl serviceRegistry = new ServiceRegistryImpl();
     ChannelServiceImpl channelService = new ChannelServiceImpl();
-    ClusterConfig config = new ClusterConfig()
-        .setNodeConfig(new MemberConfig()
+    ClusterConfig config = ClusterConfig.newBuilder()
+        .setNode(Member.newBuilder()
             .setId(String.valueOf(memberId))
             .setHost("localhost")
-            .setPort(5000 + memberId));
+            .setPort(5000 + memberId)
+            .build())
+        .build();
     return serviceRegistry.start(config)
         .thenCompose(v -> channelService.start(config))
-        .thenCompose(v -> discoveryProvider.start(new BootstrapDiscoveryConfig()
-            .setNodes(bootstrapLocations.stream()
-                .map(node -> new NodeConfig()
-                    .setId(NodeId.from(node.getId(), node.getNamespace()))
-                    .setHost(node.getHost())
-                    .setPort(node.getPort()))
-                .collect(Collectors.toList()))))
+        .thenCompose(v -> discoveryProvider.start(BootstrapDiscoveryConfig.newBuilder()
+            .addAllNodes(bootstrapLocations)
+            .build()))
         .thenCompose(v -> discoveryService.start())
         .thenCompose(v -> {
           ClusterMembershipManager membershipManager = new ClusterMembershipManager(
@@ -98,7 +90,7 @@ public class ClusterMembershipManagerTest {
               channelService,
               memberService,
               discoveryService);
-          return membershipManager.start(new MembershipConfig()).thenApply(v2 -> membershipManager);
+          return membershipManager.start(MembershipConfig.newBuilder().build()).thenApply(v2 -> membershipManager);
         });
   }
 

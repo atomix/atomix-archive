@@ -26,7 +26,7 @@ public interface PrimitiveProtocol<T extends Message> {
   /**
    * Distributed primitive protocol type.
    */
-  interface Type<C extends PrimitiveProtocolConfig<C>> extends ConfiguredType<C>, Comparable<Type<C>> {
+  interface Type<C extends Message> extends ConfiguredType<C>, Comparable<Type<C>> {
 
     /**
      * Creates a new protocol instance.

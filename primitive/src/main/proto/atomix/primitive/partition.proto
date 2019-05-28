@@ -2,6 +2,10 @@ syntax = "proto3";
 
 package atomix.primitive.partition;
 
+import "google/protobuf/any.proto";
+import "google/protobuf/duration.proto";
+import "atomix/utils/memory.proto";
+
 option java_package = "io.atomix.primitive.partition";
 option java_outer_classname = "PartitionProto";
 option java_multiple_files = true;
@@ -25,4 +29,87 @@ message PrimaryTerm {
 message PrimaryElectionEvent {
     PartitionId partition_id = 1;
     PrimaryTerm term = 2;
+}
+
+message PartitionGroupInfo {
+    string member_id = 1;
+    PartitionGroupMembership system_group = 2;
+    repeated PartitionGroupMembership groups = 3;
+}
+
+message PartitionGroupMembership {
+    PartitionGroupConfig config = 1;
+    repeated string members = 2;
+    bool system = 3;
+}
+
+service PartitionGroupMembershipService {
+    rpc Bootstrap(PartitionGroupInfo) returns (PartitionGroupInfo) {}
+}
+
+message PartitionGroupsConfig {
+    PartitionGroupConfig system = 1;
+    repeated PartitionGroupConfig groups = 2;
+}
+
+message PartitionGroupConfig {
+    string name = 1;
+    oneof group {
+        RaftPartitionGroupConfig raft = 2;
+        PrimaryBackupPartitionGroupConfig primary_backup = 3;
+        LogPartitionGroupConfig log = 4;
+    }
+}
+
+// TODO: Move Raft configuration to Raft module
+message RaftPartitionGroupConfig {
+    int32 partitions = 1;
+    repeated string members = 2;
+    int32 partition_size = 3;
+    RaftStorageConfig storage = 4;
+    RaftCompactionConfig compaction = 5;
+}
+
+message RaftStorageConfig {
+    string directory = 1;
+    StorageLevel level = 2;
+    atomix.utils.MemorySize max_entry_size = 3;
+    atomix.utils.MemorySize segment_size = 4;
+    bool flush_on_commit = 5;
+}
+
+enum StorageLevel {
+    DISK = 0;
+    MAPPED = 1;
+}
+
+message RaftCompactionConfig {
+    bool dynamic = 1;
+    float free_disk_buffer = 2;
+    float free_memory_buffer = 3;
+}
+
+// TODO: Move primary-backup configuration to primary-backup module
+message PrimaryBackupPartitionGroupConfig {
+    int32 partitions = 1;
+}
+
+// TODO: Move log configuration to log module
+message LogPartitionGroupConfig {
+    string member_group_strategy = 1;
+    LogStorageConfig storage = 2;
+    LogCompactionConfig compaction = 3;
+}
+
+message LogStorageConfig {
+    string directory = 1;
+    StorageLevel level = 2;
+    uint32 max_entry_size = 3;
+    uint32 segment_size = 4;
+    bool flush_on_commit = 5;
+}
+
+message LogCompactionConfig {
+    atomix.utils.MemorySize size = 1;
+    google.protobuf.Duration age = 2;
 }

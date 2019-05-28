@@ -1,0 +1,15 @@
+syntax = "proto3";
+
+package atomix.server;
+
+option java_package = "io.atomix.server.impl";
+option java_outer_classname = "CrdtCounterProto";
+option java_multiple_files = true;
+
+message BroadcastMessage {
+    map<string, uint64> counters = 1;
+}
+
+service CrdtCounterService {
+    rpc Broadcast(BroadcastMessage) returns (BroadcastMessage) {}
+}

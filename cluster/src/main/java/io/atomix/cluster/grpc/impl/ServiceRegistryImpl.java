@@ -44,15 +44,15 @@ public class ServiceRegistryImpl implements ServiceRegistry, Managed<ClusterConf
   @Override
   public CompletableFuture<Void> start(ClusterConfig config) {
     initEventLoopGroup();
-    if (config.getMessagingConfig().getTlsConfig().isEnabled()) {
-      server = NettyServerBuilder.forPort(config.getNodeConfig().getPort())
+    if (config.getMessaging().getTls().getEnabled()) {
+      server = NettyServerBuilder.forPort(config.getNode().getPort())
           .useTransportSecurity(
-              new File(config.getMessagingConfig().getTlsConfig().getCertPath()),
-              new File(config.getMessagingConfig().getTlsConfig().getKeyPath()))
+              new File(config.getMessaging().getTls().getCertPath()),
+              new File(config.getMessaging().getTls().getKeyPath()))
           .fallbackHandlerRegistry(registry)
           .build();
     } else {
-      server = NettyServerBuilder.forPort(config.getNodeConfig().getPort())
+      server = NettyServerBuilder.forPort(config.getNode().getPort())
           .fallbackHandlerRegistry(registry)
           .channelType(serverChannelClass)
           .bossEventLoopGroup(bossGroup)

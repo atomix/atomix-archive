@@ -21,49 +21,14 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Stream;
 
 import io.atomix.cluster.impl.ClusterManager;
-import io.atomix.cluster.messaging.ClusterCommunicationService;
-import io.atomix.cluster.messaging.ClusterEventService;
-import io.atomix.cluster.messaging.ClusterStreamingService;
-import io.atomix.cluster.messaging.MessagingService;
 import io.atomix.utils.component.Component;
 import io.atomix.utils.component.ComponentManager;
 import io.atomix.utils.config.ConfigMapper;
-import io.atomix.utils.net.Address;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
 
 /**
  * Atomix cluster manager.
- * <p>
- * The cluster manager is the basis for all cluster management and communication in an Atomix cluster. This class is
- * responsible for bootstrapping new clusters or joining existing ones, establishing communication between nodes,
- * and detecting failures.
- * <p>
- * The Atomix cluster can be run as a standalone instance for cluster management and communication. To build a cluster
- * instance, use {@link #builder()} to create a new builder.
- * <pre>
- *   {@code
- *   AtomixCluster cluster = AtomixCluster.builder()
- *     .withClusterName("my-cluster")
- *     .withMemberId("member-1")
- *     .withAddress("localhost:1234")
- *     .withMulticastEnabled()
- *     .build();
- *   }
- * </pre>
- * The instance can be configured with a unique identifier via {@link AtomixClusterBuilder#withMemberId(String)}. The member ID
- * can be used to lookup the member in the {@link ClusterMembershipService} or send messages to this node from other
- * member nodes. The {@link AtomixClusterBuilder#withAddress(Address) address} is the host and port to which the node will bind
- * for intra-cluster communication over TCP.
- * <p>
- * Once an instance has been configured, the {@link #start()} method must be called to bootstrap the instance. The
- * {@code start()} method returns a {@link CompletableFuture} which will be completed once all the services have been
- * bootstrapped.
- * <pre>
- *   {@code
- *   cluster.start().join();
- *   }
- * </pre>
  */
 public class AtomixCluster implements ClusterService {
   private static final String[] DEFAULT_RESOURCES = new String[]{"cluster"};
@@ -80,57 +45,7 @@ public class AtomixCluster implements ClusterService {
    * @return a new Atomix configuration from the given resource
    */
   private static ClusterConfig config(String[] resources, ClassLoader classLoader) {
-    return new ConfigMapper(classLoader).loadResources(ClusterConfig.class, resources);
-  }
-
-  /**
-   * Returns a new Atomix builder.
-   *
-   * @return a new Atomix builder
-   */
-  public static AtomixClusterBuilder builder() {
-    return builder(Thread.currentThread().getContextClassLoader());
-  }
-
-  /**
-   * Returns a new Atomix builder.
-   *
-   * @param classLoader the class loader
-   * @return a new Atomix builder
-   */
-  public static AtomixClusterBuilder builder(ClassLoader classLoader) {
-    return builder(config(DEFAULT_RESOURCES, classLoader));
-  }
-
-  /**
-   * Returns a new Atomix builder.
-   *
-   * @param config the Atomix configuration
-   * @return a new Atomix builder
-   */
-  public static AtomixClusterBuilder builder(String config) {
-    return builder(config, Thread.currentThread().getContextClassLoader());
-  }
-
-  /**
-   * Returns a new Atomix builder.
-   *
-   * @param config      the Atomix configuration
-   * @param classLoader the class loader
-   * @return a new Atomix builder
-   */
-  public static AtomixClusterBuilder builder(String config, ClassLoader classLoader) {
-    return new AtomixClusterBuilder(config(withDefaultResources(config), classLoader));
-  }
-
-  /**
-   * Returns a new Atomix builder.
-   *
-   * @param config the Atomix configuration
-   * @return a new Atomix builder
-   */
-  public static AtomixClusterBuilder builder(ClusterConfig config) {
-    return new AtomixClusterBuilder(config);
+    return new ConfigMapper(classLoader).loadResources(ClusterConfig.getDescriptor(), resources);
   }
 
   private final ClusterConfig config;
@@ -141,17 +56,21 @@ public class AtomixCluster implements ClusterService {
 
   private final AtomicBoolean started = new AtomicBoolean();
 
-  protected AtomixCluster(String configFile) {
+  public AtomixCluster(String configFile) {
     this(loadConfig(
         new File(System.getProperty("atomix.root", System.getProperty("user.dir")), configFile),
         Thread.currentThread().getContextClassLoader()), Thread.currentThread().getContextClassLoader(),
         Component.Scope.RUNTIME);
   }
 
-  protected AtomixCluster(File configFile) {
+  public AtomixCluster(File configFile) {
     this(loadConfig(configFile, Thread.currentThread().getContextClassLoader()),
         Thread.currentThread().getContextClassLoader(),
         Component.Scope.RUNTIME);
+  }
+
+  public AtomixCluster(ClusterConfig config) {
+    this(config, Thread.currentThread().getContextClassLoader(), Component.Scope.RUNTIME);
   }
 
   protected AtomixCluster(ClusterConfig config, ClassLoader classLoader, Component.Scope scope) {
@@ -161,28 +80,8 @@ public class AtomixCluster implements ClusterService {
   }
 
   @Override
-  public MessagingService getMessagingService() {
-    return clusterService.getMessagingService();
-  }
-
-  @Override
   public ClusterMembershipService getMembershipService() {
     return clusterService.getMembershipService();
-  }
-
-  @Override
-  public ClusterCommunicationService getCommunicationService() {
-    return clusterService.getCommunicationService();
-  }
-
-  @Override
-  public ClusterStreamingService getStreamingService() {
-    return clusterService.getStreamingService();
-  }
-
-  @Override
-  public ClusterEventService getEventService() {
-    return clusterService.getEventService();
   }
 
   /**
@@ -228,6 +127,6 @@ public class AtomixCluster implements ClusterService {
    * Loads a configuration from the given file.
    */
   private static ClusterConfig loadConfig(File config, ClassLoader classLoader) {
-    return new ConfigMapper(classLoader).loadResources(ClusterConfig.class, config.getAbsolutePath());
+    return new ConfigMapper(classLoader).loadResources(ClusterConfig.getDescriptor(), config.getAbsolutePath());
   }
 }

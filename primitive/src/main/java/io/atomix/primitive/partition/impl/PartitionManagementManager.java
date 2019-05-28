@@ -16,8 +16,6 @@
 package io.atomix.primitive.partition.impl;
 
 import io.atomix.cluster.ClusterMembershipService;
-import io.atomix.cluster.messaging.ClusterCommunicationService;
-import io.atomix.cluster.messaging.ClusterStreamingService;
 import io.atomix.primitive.partition.PartitionGroupMembershipService;
 import io.atomix.primitive.partition.PartitionManagementService;
 import io.atomix.primitive.partition.PartitionMetadataService;
@@ -34,10 +32,6 @@ public class PartitionManagementManager implements PartitionManagementService {
   @Dependency
   private ClusterMembershipService membershipService;
   @Dependency
-  private ClusterCommunicationService communicationService;
-  @Dependency
-  private ClusterStreamingService streamingService;
-  @Dependency
   private ServiceTypeRegistry serviceTypes;
   @Dependency
   private PartitionMetadataService metadataService;
@@ -49,16 +43,6 @@ public class PartitionManagementManager implements PartitionManagementService {
   @Override
   public ClusterMembershipService getMembershipService() {
     return membershipService;
-  }
-
-  @Override
-  public ClusterCommunicationService getMessagingService() {
-    return communicationService;
-  }
-
-  @Override
-  public ClusterStreamingService getStreamingService() {
-    return streamingService;
   }
 
   @Override

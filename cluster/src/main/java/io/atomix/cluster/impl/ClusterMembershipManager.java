@@ -1,5 +1,6 @@
 package io.atomix.cluster.impl;
 
+import java.time.Duration;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
@@ -221,7 +222,7 @@ public class ClusterMembershipManager extends MembershipServiceGrpc.MembershipSe
         else if (member.getState() == Member.State.SUSPECT && swimMember.getState() != Member.State.SUSPECT) {
           swimMember = copy(swimMember, builder -> builder.setState(Member.State.SUSPECT));
           LOGGER.debug("{} - Member unreachable {}", getLocalMemberId(), swimMember);
-          if (config.isNotifySuspect()) {
+          if (config.getNotifySuspect()) {
             gossip(swimMember, Lists.newArrayList(copy(swimMember)));
           }
         }
@@ -255,7 +256,7 @@ public class ClusterMembershipManager extends MembershipServiceGrpc.MembershipSe
       // If the updated state is SUSPECT, post a REACHABILITY_CHANGED event and record an update.
       if (member.getState() == Member.State.SUSPECT) {
         LOGGER.debug("{} - Member unreachable {}", getLocalMemberId(), swimMember);
-        if (config.isNotifySuspect()) {
+        if (config.getNotifySuspect()) {
           gossip(swimMember, Lists.newArrayList(copy(swimMember)));
         }
       }
@@ -291,7 +292,9 @@ public class ClusterMembershipManager extends MembershipServiceGrpc.MembershipSe
    */
   private void checkFailures() {
     for (Member member : members.values()) {
-      if (member.getState() == Member.State.SUSPECT && System.currentTimeMillis() - member.getTimestamp() > config.getFailureTimeout().toMillis()) {
+      Duration timeout = Duration.ofSeconds(config.getFailureTimeout().getSeconds())
+          .plusNanos(config.getFailureTimeout().getNanos());
+      if (member.getState() == Member.State.SUSPECT && System.currentTimeMillis() - member.getTimestamp() > timeout.toMillis()) {
         member = copy(member, builder -> builder.setState(Member.State.DEAD));
         members.remove(getMemberId(member));
         randomMembers.remove(member);
@@ -427,14 +430,14 @@ public class ClusterMembershipManager extends MembershipServiceGrpc.MembershipSe
       this.localMember = Member.newBuilder(this.localMember)
           .setIncarnationNumber(localMember.getIncarnationNumber())
           .build();
-      if (config.isBroadcastDisputes()) {
+      if (config.getBroadcastDisputes()) {
         broadcast(Member.newBuilder(this.localMember).build());
       }
     }
     // If the probe indicates this member is suspect, increment the local term and respond.
     else if (localMember.getState() == Member.State.SUSPECT) {
       this.localMember = copy(this.localMember, builder -> builder.setIncarnationNumber(this.localMember.getIncarnationNumber() + 1));
-      if (config.isBroadcastDisputes()) {
+      if (config.getBroadcastDisputes()) {
         broadcast(copy(this.localMember));
       }
     }
@@ -478,7 +481,7 @@ public class ClusterMembershipManager extends MembershipServiceGrpc.MembershipSe
     swimMember = Member.newBuilder(suspect)
         .setState(Member.State.SUSPECT)
         .build();
-    if (updateState(swimMember) && config.isBroadcastUpdates()) {
+    if (updateState(swimMember) && config.getBroadcastUpdates()) {
       broadcast(copy(swimMember));
     }
   }
@@ -667,10 +670,15 @@ public class ClusterMembershipManager extends MembershipServiceGrpc.MembershipSe
         .setMember(copy(localMember))
         .build());
 
+    Duration gossipInterval = Duration.ofSeconds(config.getGossipInterval().getSeconds())
+        .plusNanos(config.getGossipInterval().getNanos());
     gossipFuture = scheduler.scheduleAtFixedRate(
-        this::gossip, 0, config.getGossipInterval().toMillis(), TimeUnit.MILLISECONDS);
+        this::gossip, 0, gossipInterval.toMillis(), TimeUnit.MILLISECONDS);
+
+    Duration probeInterval = Duration.ofSeconds(config.getProbeInterval().getSeconds())
+        .plusNanos(config.getProbeInterval().getNanos());
     probeFuture = scheduler.scheduleAtFixedRate(
-        this::probe, 0, config.getProbeInterval().toMillis(), TimeUnit.MILLISECONDS);
+        this::probe, 0, probeInterval.toMillis(), TimeUnit.MILLISECONDS);
     scheduler.execute(this::sync);
     LOGGER.info("Started");
     return CompletableFuture.completedFuture(null);

@@ -1,0 +1,20 @@
+syntax = "proto3";
+
+package atomix.component.test;
+
+option java_package = "io.atomix.utils.component";
+option java_outer_classname = "TestComponentConfigProto";
+option java_multiple_files = true;
+
+message TestComponentConfig {
+    TestComponent1Config test_component_1_config = 1;
+    TestComponent2Config test_component_2_config = 2;
+}
+
+message TestComponent1Config {
+    string value = 1;
+}
+
+message TestComponent2Config {
+    string value = 1;
+}

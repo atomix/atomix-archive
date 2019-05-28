@@ -25,11 +25,10 @@ import io.atomix.primitive.partition.PartitionClient;
 import io.atomix.protocols.raft.partition.RaftPartition;
 import io.atomix.raft.RaftClient;
 import io.atomix.raft.RaftException;
-import io.atomix.raft.protocol.RaftClientProtocol;
 import io.atomix.utils.Managed;
 import io.atomix.utils.concurrent.Futures;
-import io.atomix.utils.stream.StreamHandler;
 import io.atomix.utils.concurrent.ThreadContextFactory;
+import io.atomix.utils.stream.StreamHandler;
 import org.slf4j.Logger;
 
 import static org.slf4j.LoggerFactory.getLogger;
@@ -42,16 +41,16 @@ public class RaftPartitionClient implements PartitionClient, Managed<RaftPartiti
   private final Logger log = getLogger(getClass());
 
   private final RaftPartition partition;
-  private final RaftClientProtocol protocol;
+  private final RaftProtocolManager raftProtocolManager;
   private final ThreadContextFactory threadContextFactory;
   private RaftClient client;
 
   public RaftPartitionClient(
       RaftPartition partition,
-      RaftClientProtocol protocol,
+      RaftProtocolManager raftProtocolManager,
       ThreadContextFactory threadContextFactory) {
     this.partition = partition;
-    this.protocol = protocol;
+    this.raftProtocolManager = raftProtocolManager;
     this.threadContextFactory = threadContextFactory;
   }
 
@@ -115,7 +114,7 @@ public class RaftPartitionClient implements PartitionClient, Managed<RaftPartiti
   @Override
   public CompletableFuture<RaftPartitionClient> start() {
     synchronized (RaftPartitionClient.this) {
-      client = newRaftClient(protocol);
+      client = newRaftClient();
     }
     return client.connect(partition.members()
         .stream()
@@ -140,10 +139,10 @@ public class RaftPartitionClient implements PartitionClient, Managed<RaftPartiti
     return client != null;
   }
 
-  private RaftClient newRaftClient(RaftClientProtocol protocol) {
+  private RaftClient newRaftClient() {
     return RaftClient.builder()
         .withClientId(partition.name())
-        .withProtocol(protocol)
+        .withProtocol(raftProtocolManager.getClientProtocol(partition.id()))
         .withThreadContextFactory(threadContextFactory)
         .build();
   }

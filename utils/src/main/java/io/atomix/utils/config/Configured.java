@@ -15,10 +15,12 @@
  */
 package io.atomix.utils.config;
 
+import com.google.protobuf.Message;
+
 /**
  * Interface for objects configured via a configuration object.
  */
-public interface Configured<T extends Config> {
+public interface Configured<T extends Message> {
 
   /**
    * Returns the object configuration.

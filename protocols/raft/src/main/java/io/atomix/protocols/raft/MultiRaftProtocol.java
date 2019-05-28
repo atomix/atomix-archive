@@ -28,38 +28,10 @@ public class MultiRaftProtocol implements ServiceProtocol<MultiRaft> {
   public static final Type TYPE = new Type();
 
   /**
-   * Returns an instance of the multi-Raft protocol with the default configuration.
-   *
-   * @return an instance of the multi-Raft protocol with the default configuration
-   */
-  public static MultiRaftProtocol instance() {
-    return new MultiRaftProtocol(new MultiRaftProtocolConfig());
-  }
-
-  /**
-   * Returns a new multi-Raft protocol builder.
-   *
-   * @return a new multi-Raft protocol builder
-   */
-  public static MultiRaftProtocolBuilder builder() {
-    return new MultiRaftProtocolBuilder(new MultiRaftProtocolConfig());
-  }
-
-  /**
-   * Returns a new multi-Raft protocol builder.
-   *
-   * @param group the partition group
-   * @return the multi-Raft protocol builder
-   */
-  public static MultiRaftProtocolBuilder builder(String group) {
-    return new MultiRaftProtocolBuilder(new MultiRaftProtocolConfig().setGroup(group));
-  }
-
-  /**
    * Multi-Raft protocol type.
    */
   @Component
-  public static final class Type implements PrimitiveProtocol.Type<MultiRaftProtocolConfig> {
+  public static final class Type implements PrimitiveProtocol.Type<MultiRaft> {
     private static final String NAME = "multi-raft";
 
     @Override
@@ -68,19 +40,19 @@ public class MultiRaftProtocol implements ServiceProtocol<MultiRaft> {
     }
 
     @Override
-    public MultiRaftProtocolConfig newConfig() {
-      return new MultiRaftProtocolConfig();
+    public MultiRaft newConfig() {
+      return MultiRaft.newBuilder().build();
     }
 
     @Override
-    public PrimitiveProtocol newProtocol(MultiRaftProtocolConfig config) {
+    public PrimitiveProtocol newProtocol(MultiRaft config) {
       return new MultiRaftProtocol(config);
     }
   }
 
-  private final MultiRaftProtocolConfig config;
+  private final MultiRaft config;
 
-  protected MultiRaftProtocol(MultiRaftProtocolConfig config) {
+  public MultiRaftProtocol(MultiRaft config) {
     this.config = checkNotNull(config, "config cannot be null");
   }
 

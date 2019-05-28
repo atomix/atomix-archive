@@ -28,38 +28,10 @@ public class DistributedLogProtocol implements LogProtocol<DistributedLog> {
   public static final Type TYPE = new Type();
 
   /**
-   * Returns an instance of the log protocol with the default configuration.
-   *
-   * @return an instance of the log protocol with the default configuration
-   */
-  public static DistributedLogProtocol instance() {
-    return new DistributedLogProtocol(new DistributedLogProtocolConfig());
-  }
-
-  /**
-   * Returns a new log protocol builder.
-   *
-   * @return a new log protocol builder
-   */
-  public static DistributedLogProtocolBuilder builder() {
-    return new DistributedLogProtocolBuilder(new DistributedLogProtocolConfig());
-  }
-
-  /**
-   * Returns a new log protocol builder.
-   *
-   * @param group the partition group
-   * @return the log protocol builder
-   */
-  public static DistributedLogProtocolBuilder builder(String group) {
-    return new DistributedLogProtocolBuilder(new DistributedLogProtocolConfig().setGroup(group));
-  }
-
-  /**
    * Log protocol type.
    */
   @Component
-  public static final class Type implements PrimitiveProtocol.Type<DistributedLogProtocolConfig> {
+  public static final class Type implements PrimitiveProtocol.Type<DistributedLog> {
     private static final String NAME = "multi-log";
 
     @Override
@@ -68,19 +40,19 @@ public class DistributedLogProtocol implements LogProtocol<DistributedLog> {
     }
 
     @Override
-    public DistributedLogProtocolConfig newConfig() {
-      return new DistributedLogProtocolConfig();
+    public DistributedLog newConfig() {
+      return DistributedLog.newBuilder().build();
     }
 
     @Override
-    public PrimitiveProtocol newProtocol(DistributedLogProtocolConfig config) {
+    public PrimitiveProtocol newProtocol(DistributedLog config) {
       return new DistributedLogProtocol(config);
     }
   }
 
-  private final DistributedLogProtocolConfig config;
+  private final DistributedLog config;
 
-  protected DistributedLogProtocol(DistributedLogProtocolConfig config) {
+  protected DistributedLogProtocol(DistributedLog config) {
     this.config = checkNotNull(config, "config cannot be null");
   }
 
@@ -99,7 +71,7 @@ public class DistributedLogProtocol implements LogProtocol<DistributedLog> {
    *
    * @return the protocol configuration
    */
-  public DistributedLogProtocolConfig config() {
+  public DistributedLog config() {
     return config;
   }
 

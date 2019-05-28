@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package atomix.server;
+
+import "atomix/cluster/cluster.proto";
+import "atomix/primitive/partition.proto";
+
+option java_package = "io.atomix.server";
+option java_outer_classname = "AtomixConfigProto";
+option java_multiple_files = true;
+
+// Atomix server configuration
+message ServerConfig {
+    atomix.cluster.ClusterConfig cluster = 1;
+    atomix.primitive.partition.PartitionGroupsConfig partition_groups = 2;
+    bool enable_shutdown_hook = 3;
+}

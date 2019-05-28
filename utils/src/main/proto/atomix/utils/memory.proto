@@ -1,0 +1,11 @@
+syntax = "proto3";
+
+package atomix.utils;
+
+option java_package = "io.atomix.utils";
+option java_outer_classname = "AtomixUtilsProto";
+option java_multiple_files = true;
+
+message MemorySize {
+    uint64 size = 1;
+}

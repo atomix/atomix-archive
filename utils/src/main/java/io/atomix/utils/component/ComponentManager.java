@@ -22,10 +22,10 @@ import com.google.common.graph.GraphBuilder;
 import com.google.common.graph.Graphs;
 import com.google.common.graph.ImmutableGraph;
 import com.google.common.graph.MutableGraph;
+import com.google.protobuf.Message;
 import io.atomix.utils.concurrent.Futures;
 import io.atomix.utils.concurrent.SingleThreadContext;
 import io.atomix.utils.concurrent.ThreadContext;
-import io.atomix.utils.config.Config;
 import io.github.classgraph.ClassGraph;
 import io.github.classgraph.ClassInfo;
 import io.github.classgraph.ScanResult;
@@ -35,7 +35,7 @@ import org.slf4j.LoggerFactory;
 /**
  * Component manager.
  */
-public class ComponentManager<C extends Config, M> {
+public class ComponentManager<C extends Message, M> {
   private static final Logger LOGGER = LoggerFactory.getLogger(ComponentManager.class);
   private final Class<M> rootClass;
   private final ClassLoader classLoader;
@@ -111,7 +111,7 @@ public class ComponentManager<C extends Config, M> {
       for (ClassInfo classInfo : result.getClassesWithAnnotation(Component.class.getName())) {
         Class<?> componentClass = classInfo.loadClass();
         Component componentAnnotation = componentClass.getAnnotation(Component.class);
-        Config componentConfig = componentAnnotation.value() != Component.ConfigNone.class
+        Message componentConfig = componentAnnotation.value() != Component.ConfigNone.class
             ? configMap.getConfig(componentAnnotation.value())
             : null;
 
@@ -333,16 +333,16 @@ public class ComponentManager<C extends Config, M> {
   private static class ComponentInstance<T> {
     private final Class<T> type;
     private final Component component;
-    private final Config config;
+    private final Message config;
     private final boolean root;
     private volatile T instance;
     private volatile boolean started;
 
-    ComponentInstance(Class<T> type, Component component, Config config) {
+    ComponentInstance(Class<T> type, Component component, Message config) {
       this(type, component, config, false);
     }
 
-    ComponentInstance(Class<T> type, Component component, Config config, boolean root) {
+    ComponentInstance(Class<T> type, Component component, Message config, boolean root) {
       this.type = type;
       this.component = component;
       this.config = config;
@@ -418,7 +418,7 @@ public class ComponentManager<C extends Config, M> {
      *
      * @return the component configuration
      */
-    public Config config() {
+    public Message config() {
       return config;
     }
 
@@ -443,9 +443,9 @@ public class ComponentManager<C extends Config, M> {
   }
 
   private static class ConfigMap {
-    private final Map<Class, Config> configs = new HashMap<>();
+    private final Map<Class, Message> configs = new HashMap<>();
 
-    ConfigMap(Config config) throws Exception {
+    ConfigMap(Message config) throws Exception {
       mapConfigs(config);
     }
 
@@ -457,11 +457,11 @@ public class ComponentManager<C extends Config, M> {
      * @return the configuration object
      */
     @SuppressWarnings("unchecked")
-    public <T extends Config> T getConfig(Class<T> type) {
+    public <T extends Message> T getConfig(Class<T> type) {
       return (T) configs.get(type);
     }
 
-    private void mapConfigs(Config config) throws Exception {
+    private void mapConfigs(Message config) throws Exception {
       if (config != null) {
         Class<?> configClass = config.getClass();
         while (configClass != Object.class) {
@@ -472,7 +472,7 @@ public class ComponentManager<C extends Config, M> {
       }
     }
 
-    private void mapConfigs(Class<?> configClass, Config config) throws Exception {
+    private void mapConfigs(Class<?> configClass, Message config) throws Exception {
       // Iterate through methods first to find getters for configuration classes.
       for (Method method : configClass.getDeclaredMethods()) {
         if (Modifier.isStatic(method.getModifiers())) {
@@ -482,8 +482,8 @@ public class ComponentManager<C extends Config, M> {
         // If this is a getter method, get the configuration and map it.
         if (method.getName().startsWith("get")
             && method.getParameterCount() == 0
-            && Config.class.isAssignableFrom(method.getReturnType())) {
-          mapConfigs((Config) method.invoke(config));
+            && Message.class.isAssignableFrom(method.getReturnType())) {
+          mapConfigs((Message) method.invoke(config));
         }
       }
 
@@ -492,12 +492,12 @@ public class ComponentManager<C extends Config, M> {
           continue;
         }
 
-        if (Config.class.isAssignableFrom(field.getType())) {
+        if (Message.class.isAssignableFrom(field.getType())) {
           try {
             configClass.getMethod(getterName(field));
           } catch (NoSuchMethodException e) {
             field.setAccessible(true);
-            mapConfigs((Config) field.get(config));
+            mapConfigs((Message) field.get(config));
           }
         }
       }

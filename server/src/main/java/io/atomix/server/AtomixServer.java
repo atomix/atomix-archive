@@ -58,7 +58,7 @@ public class AtomixServer {
    *
    * @return a new Atomix configuration
    */
-  public static AtomixConfig config() {
+  public static ServerConfig config() {
     return config(Thread.currentThread().getContextClassLoader());
   }
 
@@ -71,7 +71,7 @@ public class AtomixServer {
    * @param classLoader the class loader
    * @return a new Atomix configuration
    */
-  public static AtomixConfig config(ClassLoader classLoader) {
+  public static ServerConfig config(ClassLoader classLoader) {
     return config(classLoader, null, AtomixRegistry.registry(classLoader));
   }
 
@@ -84,7 +84,7 @@ public class AtomixServer {
    * @param registry the Atomix registry
    * @return a new Atomix configuration
    */
-  public static AtomixConfig config(AtomixRegistry registry) {
+  public static ServerConfig config(AtomixRegistry registry) {
     return config(Thread.currentThread().getContextClassLoader(), null, registry);
   }
 
@@ -97,7 +97,7 @@ public class AtomixServer {
    * @param files the file from which to return a new Atomix configuration
    * @return a new Atomix configuration from the given file
    */
-  public static AtomixConfig config(String... files) {
+  public static ServerConfig config(String... files) {
     return config(Thread.currentThread().getContextClassLoader(), Stream.of(files).map(File::new).collect(Collectors.toList()));
   }
 
@@ -111,7 +111,7 @@ public class AtomixServer {
    * @param files       the file from which to return a new Atomix configuration
    * @return a new Atomix configuration from the given file
    */
-  public static AtomixConfig config(ClassLoader classLoader, String... files) {
+  public static ServerConfig config(ClassLoader classLoader, String... files) {
     return config(classLoader, Stream.of(files).map(File::new).collect(Collectors.toList()), AtomixRegistry.registry(classLoader));
   }
 
@@ -125,7 +125,7 @@ public class AtomixServer {
    * @param files    the file from which to return a new Atomix configuration
    * @return a new Atomix configuration from the given file
    */
-  public static AtomixConfig config(AtomixRegistry registry, String... files) {
+  public static ServerConfig config(AtomixRegistry registry, String... files) {
     return config(Thread.currentThread().getContextClassLoader(), Stream.of(files).map(File::new).collect(Collectors.toList()), registry);
   }
 
@@ -138,7 +138,7 @@ public class AtomixServer {
    * @param configFiles the Atomix configuration files
    * @return a new Atomix configuration
    */
-  public static AtomixConfig config(File... configFiles) {
+  public static ServerConfig config(File... configFiles) {
     return config(Thread.currentThread().getContextClassLoader(), Arrays.asList(configFiles), AtomixRegistry.registry());
   }
 
@@ -151,7 +151,7 @@ public class AtomixServer {
    * @param files the file from which to return a new Atomix configuration
    * @return a new Atomix configuration from the given file
    */
-  public static AtomixConfig config(List<File> files) {
+  public static ServerConfig config(List<File> files) {
     return config(Thread.currentThread().getContextClassLoader(), files);
   }
 
@@ -165,7 +165,7 @@ public class AtomixServer {
    * @param files       the file from which to return a new Atomix configuration
    * @return a new Atomix configuration from the given file
    */
-  public static AtomixConfig config(ClassLoader classLoader, List<File> files) {
+  public static ServerConfig config(ClassLoader classLoader, List<File> files) {
     return config(classLoader, files, AtomixRegistry.registry(classLoader));
   }
 
@@ -179,7 +179,7 @@ public class AtomixServer {
    * @param files    the file from which to return a new Atomix configuration
    * @return a new Atomix configuration from the given file
    */
-  public static AtomixConfig config(AtomixRegistry registry, List<File> files) {
+  public static ServerConfig config(AtomixRegistry registry, List<File> files) {
     return config(Thread.currentThread().getContextClassLoader(), files, registry);
   }
 
@@ -191,14 +191,14 @@ public class AtomixServer {
    * @param registry    the Atomix registry from which to map types
    * @return a new Atomix configuration from the given resource
    */
-  private static AtomixConfig config(ClassLoader classLoader, List<File> files, AtomixRegistry registry) {
+  private static ServerConfig config(ClassLoader classLoader, List<File> files, AtomixRegistry registry) {
     ConfigMapper mapper = new PolymorphicConfigMapper(
         classLoader,
         registry,
         new PolymorphicTypeMapper("type", PartitionGroupConfig.class, PartitionGroup.Type.class),
         new PolymorphicTypeMapper("type", PrimitiveProtocolConfig.class, PrimitiveProtocol.Type.class),
         new PolymorphicTypeMapper("type", NodeDiscoveryConfig.class, NodeDiscoveryProvider.Type.class));
-    return mapper.loadFiles(AtomixConfig.class, files, Lists.newArrayList(RESOURCES));
+    return mapper.loadFiles(ServerConfig.getDescriptor(), files, Lists.newArrayList(RESOURCES));
   }
 
   /**
@@ -301,7 +301,7 @@ public class AtomixServer {
    * @param config the Atomix configuration
    * @return the Atomix builder
    */
-  public static AtomixServerBuilder builder(AtomixConfig config) {
+  public static AtomixServerBuilder builder(ServerConfig config) {
     return builder(config, Thread.currentThread().getContextClassLoader());
   }
 
@@ -314,16 +314,16 @@ public class AtomixServer {
    * @param classLoader the class loader with which to load the Atomix registry
    * @return the Atomix builder
    */
-  public static AtomixServerBuilder builder(AtomixConfig config, ClassLoader classLoader) {
+  public static AtomixServerBuilder builder(ServerConfig config, ClassLoader classLoader) {
     return new AtomixServerBuilder(config, classLoader);
   }
 
   private static final Logger LOGGER = LoggerFactory.getLogger(AtomixServer.class);
 
-  private final AtomixConfig config;
+  private final ServerConfig config;
   private final ClassLoader classLoader;
   private final Component.Scope scope;
-  private volatile ComponentManager<AtomixConfig, AtomixServerManager> manager;
+  private volatile ComponentManager<ServerConfig, AtomixServerManager> manager;
   private volatile AtomixService atomixService;
   private final boolean enableShutdownHook;
   private final AtomicBoolean started = new AtomicBoolean();
@@ -349,15 +349,15 @@ public class AtomixServer {
     this(config(classLoader, configFiles, AtomixRegistry.registry(classLoader)));
   }
 
-  protected AtomixServer(AtomixConfig config) {
+  protected AtomixServer(ServerConfig config) {
     this(config, Thread.currentThread().getContextClassLoader(), Component.Scope.RUNTIME);
   }
 
-  protected AtomixServer(AtomixConfig config, Component.Scope scope) {
+  protected AtomixServer(ServerConfig config, Component.Scope scope) {
     this(config, Thread.currentThread().getContextClassLoader(), scope);
   }
 
-  protected AtomixServer(AtomixConfig config, ClassLoader classLoader, Component.Scope scope) {
+  protected AtomixServer(ServerConfig config, ClassLoader classLoader, Component.Scope scope) {
     this.config = config;
     this.classLoader = classLoader;
     this.scope = scope;

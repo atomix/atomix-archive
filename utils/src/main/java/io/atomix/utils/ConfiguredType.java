@@ -15,12 +15,12 @@
  */
 package io.atomix.utils;
 
-import io.atomix.utils.config.TypedConfig;
+import com.google.protobuf.Message;
 
 /**
  * Configured type.
  */
-public interface ConfiguredType<C extends TypedConfig> extends NamedType {
+public interface ConfiguredType<C extends Message> extends NamedType {
 
   /**
    * Returns a new configuration.

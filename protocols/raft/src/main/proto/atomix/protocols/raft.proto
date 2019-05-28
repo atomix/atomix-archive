@@ -2,6 +2,9 @@ syntax = "proto3";
 
 package atomix.protocols;
 
+import "atomix/raft/protocol.proto";
+import "atomix/primitive/partition.proto";
+
 option java_package = "io.atomix.protocols.raft";
 option java_multiple_files = true;
 
@@ -16,4 +19,75 @@ message RaftPartitionGroupMetadata {
 
 message RaftPrimitiveMetadata {
     string name = 1;
+}
+
+message RaftPartitionJoin {
+    atomix.primitive.partition.PartitionId id = 1;
+    atomix.raft.protocol.JoinRequest join = 2;
+}
+
+message RaftPartitionLeave {
+    atomix.primitive.partition.PartitionId id = 1;
+    atomix.raft.protocol.LeaveRequest leave = 2;
+}
+
+message RaftPartitionConfigure {
+    atomix.primitive.partition.PartitionId id = 1;
+    atomix.raft.protocol.ConfigureRequest configure = 2;
+}
+
+message RaftPartitionReconfigure {
+    atomix.primitive.partition.PartitionId id = 1;
+    atomix.raft.protocol.ReconfigureRequest reconfigure = 2;
+}
+
+message RaftPartitionPoll {
+    atomix.primitive.partition.PartitionId id = 1;
+    atomix.raft.protocol.PollRequest poll = 2;
+}
+
+message RaftPartitionVote {
+    atomix.primitive.partition.PartitionId id = 1;
+    atomix.raft.protocol.VoteRequest vote = 2;
+}
+
+message RaftPartitionTransfer {
+    atomix.primitive.partition.PartitionId id = 1;
+    atomix.raft.protocol.TransferRequest transfer = 2;
+}
+
+message RaftPartitionAppend {
+    atomix.primitive.partition.PartitionId id = 1;
+    atomix.raft.protocol.AppendRequest append = 2;
+}
+
+message RaftPartitionInstall {
+    atomix.primitive.partition.PartitionId id = 1;
+    atomix.raft.protocol.InstallRequest install = 2;
+}
+
+message RaftPartitionCommand {
+    atomix.primitive.partition.PartitionId id = 1;
+    atomix.raft.protocol.CommandRequest command = 2;
+}
+
+message RaftPartitionQuery {
+    atomix.primitive.partition.PartitionId id = 1;
+    atomix.raft.protocol.QueryRequest query = 2;
+}
+
+service RaftPartitionService {
+    rpc Join(RaftPartitionJoin) returns (atomix.raft.protocol.JoinResponse) {}
+    rpc Leave(RaftPartitionLeave) returns (atomix.raft.protocol.LeaveResponse) {}
+    rpc Configure(RaftPartitionConfigure) returns (atomix.raft.protocol.ConfigureResponse) {}
+    rpc Reconfigure(RaftPartitionReconfigure) returns (atomix.raft.protocol.ReconfigureResponse) {}
+    rpc Poll(RaftPartitionPoll) returns (atomix.raft.protocol.PollResponse) {}
+    rpc Vote(RaftPartitionVote) returns (atomix.raft.protocol.VoteResponse) {}
+    rpc Transfer(RaftPartitionTransfer) returns (atomix.raft.protocol.TransferResponse) {}
+    rpc Append(RaftPartitionAppend) returns (atomix.raft.protocol.AppendResponse) {}
+    rpc Install(RaftPartitionInstall) returns (atomix.raft.protocol.InstallResponse) {}
+    rpc Command(RaftPartitionCommand) returns (atomix.raft.protocol.CommandResponse) {}
+    rpc CommandStream(RaftPartitionCommand) returns (stream atomix.raft.protocol.CommandResponse) {}
+    rpc Query(RaftPartitionQuery) returns (atomix.raft.protocol.QueryResponse) {}
+    rpc QueryStream(RaftPartitionQuery) returns (stream atomix.raft.protocol.QueryResponse) {}
 }

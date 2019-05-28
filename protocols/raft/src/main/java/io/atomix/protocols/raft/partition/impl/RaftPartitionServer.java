@@ -26,16 +26,13 @@ import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
 import io.atomix.cluster.MemberId;
-import io.atomix.cluster.messaging.ClusterCommunicationService;
-import io.atomix.cluster.messaging.ClusterStreamingService;
 import io.atomix.primitive.partition.Partition;
+import io.atomix.primitive.partition.PartitionGroupConfig;
 import io.atomix.primitive.service.StateMachine;
 import io.atomix.protocols.raft.partition.RaftPartition;
-import io.atomix.protocols.raft.partition.RaftPartitionGroupConfig;
 import io.atomix.raft.RaftServer;
 import io.atomix.raft.storage.RaftStorage;
-import io.atomix.storage.StorageException;
-import io.atomix.utils.concurrent.Futures;
+import io.atomix.storage.StorageLevel;
 import io.atomix.utils.concurrent.ThreadContextFactory;
 import org.slf4j.Logger;
 
@@ -53,24 +50,21 @@ public class RaftPartitionServer {
 
   private final MemberId localMemberId;
   private final RaftPartition partition;
-  private final RaftPartitionGroupConfig config;
-  private final ClusterCommunicationService clusterCommunicator;
-  private final ClusterStreamingService streamingService;
+  private final PartitionGroupConfig config;
+  private final RaftProtocolManager raftProtocolManager;
   private final ThreadContextFactory threadContextFactory;
   private RaftServer server;
 
   public RaftPartitionServer(
       RaftPartition partition,
-      RaftPartitionGroupConfig config,
+      PartitionGroupConfig config,
       MemberId localMemberId,
-      ClusterCommunicationService clusterCommunicator,
-      ClusterStreamingService streamingService,
+      RaftProtocolManager raftProtocolManager,
       ThreadContextFactory threadContextFactory) {
     this.partition = partition;
     this.config = config;
     this.localMemberId = localMemberId;
-    this.clusterCommunicator = clusterCommunicator;
-    this.streamingService = streamingService;
+    this.raftProtocolManager = raftProtocolManager;
     this.threadContextFactory = threadContextFactory;
   }
 
@@ -88,11 +82,7 @@ public class RaftPartitionServer {
         return CompletableFuture.completedFuture(null);
       }
       synchronized (this) {
-        try {
-          server = buildServer(stateMachine);
-        } catch (StorageException e) {
-          return Futures.exceptionalFuture(e);
-        }
+        server = buildServer(stateMachine);
       }
       serverOpenFuture = server.bootstrap(partition.members()
           .stream()
@@ -163,23 +153,20 @@ public class RaftPartitionServer {
   private RaftServer buildServer(StateMachine stateMachine) {
     return RaftServer.builder(localMemberId.toString())
         .withName(partition.name())
-        .withProtocol(new RaftServerCommunicator(
-            partition.name(),
-            clusterCommunicator,
-            streamingService))
+        .withProtocol(raftProtocolManager.getServerProtocol(partition.id()))
         .withStateMachine(new RaftPartitionStateMachine(stateMachine))
         .withElectionTimeout(Duration.ofMillis(ELECTION_TIMEOUT_MILLIS))
         .withHeartbeatInterval(Duration.ofMillis(HEARTBEAT_INTERVAL_MILLIS))
         .withStorage(RaftStorage.builder()
             .withPrefix(partition.name())
             .withDirectory(partition.dataDirectory())
-            .withStorageLevel(config.getStorageConfig().getLevel())
-            .withMaxSegmentSize((int) config.getStorageConfig().getSegmentSize().bytes())
-            .withMaxEntrySize((int) config.getStorageConfig().getMaxEntrySize().bytes())
-            .withFlushOnCommit(config.getStorageConfig().isFlushOnCommit())
-            .withDynamicCompaction(config.getCompactionConfig().isDynamic())
-            .withFreeDiskBuffer(config.getCompactionConfig().getFreeDiskBuffer())
-            .withFreeMemoryBuffer(config.getCompactionConfig().getFreeMemoryBuffer())
+            .withStorageLevel(StorageLevel.valueOf(config.getRaft().getStorage().getLevel().name()))
+            .withMaxSegmentSize((int) config.getRaft().getStorage().getSegmentSize().getSize())
+            .withMaxEntrySize((int) config.getRaft().getStorage().getMaxEntrySize().getSize())
+            .withFlushOnCommit(config.getRaft().getStorage().getFlushOnCommit())
+            .withDynamicCompaction(config.getRaft().getCompaction().getDynamic())
+            .withFreeDiskBuffer(config.getRaft().getCompaction().getFreeDiskBuffer())
+            .withFreeMemoryBuffer(config.getRaft().getCompaction().getFreeMemoryBuffer())
             .build())
         .withThreadContextFactory(threadContextFactory)
         .build();

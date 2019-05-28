@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+package atomix.config.test;
+
+option java_package = "io.atomix.utils.config";
+option java_outer_classname = "TestConfigProto";
+option java_multiple_files = true;
+
+message TestConfig {
+    int32 some_int = 1;
+    bool some_bool = 2;
+    string some_text = 3;
+    TestSubConfig some_sub_config = 4;
+    repeated string some_texts = 5;
+    repeated TestSubConfig some_sub_configs = 6;
+    map<string, string> some_map_texts = 7;
+    map<string, TestSubConfig> some_map_configs = 8;
+}
+
+message TestSubConfig {
+    string some_text = 1;
+}

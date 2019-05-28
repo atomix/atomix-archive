@@ -47,18 +47,9 @@ import static io.atomix.utils.concurrent.Threads.namedThreads;
  */
 @Component(DnsDiscoveryConfig.class)
 public class DnsDiscoveryProvider extends AbstractListenable<DiscoveryEvent>
-    implements NodeDiscoveryProvider, Managed<DnsDiscoveryConfig> {
+    implements NodeDiscoveryProvider<DnsDiscoveryConfig>, Managed<DnsDiscoveryConfig> {
 
   public static final Type TYPE = new Type();
-
-  /**
-   * Creates a new DNS provider builder.
-   *
-   * @return a new DNS provider builder
-   */
-  public static DnsDiscoveryBuilder builder() {
-    return new DnsDiscoveryBuilder();
-  }
 
   /**
    * DNS node discovery provider type.
@@ -73,7 +64,7 @@ public class DnsDiscoveryProvider extends AbstractListenable<DiscoveryEvent>
 
     @Override
     public DnsDiscoveryConfig newConfig() {
-      return new DnsDiscoveryConfig();
+      return DnsDiscoveryConfig.newBuilder().build();
     }
 
     @Override
@@ -99,13 +90,16 @@ public class DnsDiscoveryProvider extends AbstractListenable<DiscoveryEvent>
   }
 
   public DnsDiscoveryProvider(String service) {
-    this(new DnsDiscoveryConfig().setService(service));
+    this(DnsDiscoveryConfig.newBuilder().setService(service).build());
   }
 
   DnsDiscoveryProvider(DnsDiscoveryConfig config) {
     this.config = checkNotNull(config, "config cannot be null");
     this.service = checkNotNull(config.getService(), "service cannot be null");
-    this.resolutionInterval = checkNotNull(config.getResolutionInterval(), "resolutionInterval cannot be null");
+    this.resolutionInterval = config.hasResolutionInterval()
+        ? Duration.ofSeconds(config.getResolutionInterval().getSeconds())
+        .plusNanos(config.getResolutionInterval().getNanos())
+        : Duration.ofSeconds(15);
   }
 
   @Override
@@ -175,7 +169,10 @@ public class DnsDiscoveryProvider extends AbstractListenable<DiscoveryEvent>
     LOGGER.info("Joined");
     this.config = checkNotNull(config, "config cannot be null");
     this.service = checkNotNull(config.getService(), "service cannot be null");
-    this.resolutionInterval = checkNotNull(config.getResolutionInterval(), "resolutionInterval cannot be null");
+    this.resolutionInterval = config.hasResolutionInterval()
+        ? Duration.ofSeconds(config.getResolutionInterval().getSeconds())
+        .plusNanos(config.getResolutionInterval().getNanos())
+        : Duration.ofSeconds(15);
     resolverScheduler.scheduleAtFixedRate(
         this::resolveNodes, 0, resolutionInterval.toMillis(), TimeUnit.MILLISECONDS);
     return CompletableFuture.completedFuture(null);

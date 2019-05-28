@@ -22,7 +22,8 @@ import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import io.atomix.cluster.discovery.BootstrapDiscoveryProvider;
+import io.atomix.cluster.discovery.BootstrapDiscoveryConfig;
+import io.atomix.cluster.discovery.DiscoveryConfig;
 import io.atomix.cluster.discovery.Node;
 import org.junit.Test;
 
@@ -40,38 +41,50 @@ public class AtomixClusterTest {
         Node.newBuilder().setId("bar").setHost("localhost").setPort(5001).build(),
         Node.newBuilder().setId("baz").setHost("localhost").setPort(5002).build());
 
-    AtomixCluster cluster1 = AtomixCluster.builder()
-        .withMemberId("foo")
-        .withHost("localhost")
-        .withPort(5000)
-        .withMembershipProvider(BootstrapDiscoveryProvider.builder()
-            .withNodes(bootstrapLocations)
+    AtomixCluster cluster1 = new AtomixCluster(ClusterConfig.newBuilder()
+        .setNode(Member.newBuilder()
+            .setId("foo")
+            .setHost("localhost")
+            .setPort(5000)
             .build())
-        .build();
+        .setDiscovery(DiscoveryConfig.newBuilder()
+            .setBootstrap(BootstrapDiscoveryConfig.newBuilder()
+                .addAllNodes(bootstrapLocations)
+                .build())
+            .build())
+        .build());
     cluster1.start().join();
 
     assertEquals("foo", cluster1.getMembershipService().getLocalMember().getId());
 
-    AtomixCluster cluster2 = AtomixCluster.builder()
-        .withMemberId("bar")
-        .withHost("localhost")
-        .withPort(5001)
-        .withMembershipProvider(BootstrapDiscoveryProvider.builder()
-            .withNodes(bootstrapLocations)
+    AtomixCluster cluster2 = new AtomixCluster(ClusterConfig.newBuilder()
+        .setNode(Member.newBuilder()
+            .setId("bar")
+            .setHost("localhost")
+            .setPort(5001)
             .build())
-        .build();
+        .setDiscovery(DiscoveryConfig.newBuilder()
+            .setBootstrap(BootstrapDiscoveryConfig.newBuilder()
+                .addAllNodes(bootstrapLocations)
+                .build())
+            .build())
+        .build());
     cluster2.start().join();
 
     assertEquals("bar", cluster2.getMembershipService().getLocalMember().getId());
 
-    AtomixCluster cluster3 = AtomixCluster.builder()
-        .withMemberId("baz")
-        .withHost("localhost")
-        .withPort(5002)
-        .withMembershipProvider(BootstrapDiscoveryProvider.builder()
-            .withNodes(bootstrapLocations)
+    AtomixCluster cluster3 = new AtomixCluster(ClusterConfig.newBuilder()
+        .setNode(Member.newBuilder()
+            .setId("baz")
+            .setHost("localhost")
+            .setPort(5002)
             .build())
-        .build();
+        .setDiscovery(DiscoveryConfig.newBuilder()
+            .setBootstrap(BootstrapDiscoveryConfig.newBuilder()
+                .addAllNodes(bootstrapLocations)
+                .build())
+            .build())
+        .build());
     cluster3.start().join();
 
     assertEquals("baz", cluster3.getMembershipService().getLocalMember().getId());

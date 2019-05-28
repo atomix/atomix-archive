@@ -2,12 +2,10 @@ package io.atomix.utils.component;
 
 import java.util.concurrent.CompletableFuture;
 
-import io.atomix.utils.config.Config;
-
 /**
  * Managed component.
  */
-public interface Managed<C extends Config> {
+public interface Managed<C> {
 
   /**
    * Starts the managed component.

@@ -32,7 +32,7 @@ public class ChannelServiceImpl implements ChannelService, Managed<ClusterConfig
   @Override
   public Channel getChannel(String target) {
     NettyChannelBuilder builder;
-    if (config.getMessagingConfig().getTlsConfig().isEnabled()) {
+    if (config.getMessaging().getTls().getEnabled()) {
       builder = NettyChannelBuilder.forTarget(target)
           .nameResolverFactory(new DnsNameResolverProvider())
           .channelType(clientChannelClass)
@@ -51,7 +51,7 @@ public class ChannelServiceImpl implements ChannelService, Managed<ClusterConfig
   @Override
   public Channel getChannel(String host, int port) {
     NettyChannelBuilder builder;
-    if (config.getMessagingConfig().getTlsConfig().isEnabled()) {
+    if (config.getMessaging().getTls().getEnabled()) {
       builder = NettyChannelBuilder.forAddress(host, port)
           .channelType(clientChannelClass)
           .eventLoopGroup(clientGroup)

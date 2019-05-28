@@ -16,8 +16,6 @@
 package io.atomix.primitive.partition;
 
 import io.atomix.cluster.ClusterMembershipService;
-import io.atomix.cluster.messaging.ClusterCommunicationService;
-import io.atomix.cluster.messaging.ClusterStreamingService;
 import io.atomix.primitive.service.ServiceTypeRegistry;
 
 /**
@@ -31,20 +29,6 @@ public interface PartitionManagementService {
    * @return the cluster service
    */
   ClusterMembershipService getMembershipService();
-
-  /**
-   * Returns the cluster messaging service.
-   *
-   * @return the cluster messaging service
-   */
-  ClusterCommunicationService getMessagingService();
-
-  /**
-   * Returns the cluster streaming service.
-   *
-   * @return the cluster streaming service
-   */
-  ClusterStreamingService getStreamingService();
 
   /**
    * Returns the service type registry.

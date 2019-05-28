@@ -17,6 +17,7 @@ package io.atomix.cluster.discovery;
 
 import java.util.Set;
 
+import com.google.protobuf.Message;
 import io.atomix.utils.ConfiguredType;
 import io.atomix.utils.config.Configured;
 import io.atomix.utils.event.Listenable;
@@ -31,12 +32,12 @@ import io.atomix.utils.event.Listenable;
  *
  * @see BootstrapDiscoveryProvider
  */
-public interface NodeDiscoveryProvider extends Listenable<DiscoveryEvent>, Configured<NodeDiscoveryConfig> {
+public interface NodeDiscoveryProvider<T extends Message> extends Listenable<DiscoveryEvent>, Configured<T> {
 
   /**
    * Membership provider type.
    */
-  interface Type<C extends NodeDiscoveryConfig> extends ConfiguredType<C> {
+  interface Type<C extends Message> extends ConfiguredType<C> {
 
     /**
      * Creates a new instance of the provider.

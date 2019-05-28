@@ -9,7 +9,7 @@ public class ComponentManagerTest {
   @Test
   public void testComponentManager() throws Exception {
     ComponentManager<TestComponentConfig, TestComponent> manager = new ComponentManager<>(TestComponent.class);
-    manager.start(new TestComponentConfig()).join();
+    manager.start(TestComponentConfig.newBuilder().build()).join();
     manager.stop().join();
   }
 }

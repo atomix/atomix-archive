@@ -22,13 +22,13 @@ import java.util.concurrent.CompletableFuture;
 import com.google.common.collect.Maps;
 import io.atomix.cluster.ClusterMembershipService;
 import io.atomix.cluster.MemberId;
-import io.atomix.cluster.messaging.ClusterCommunicationService;
-import io.atomix.cluster.messaging.ClusterStreamingService;
 import io.atomix.primitive.partition.ManagedPartitionGroup;
 import io.atomix.primitive.partition.PartitionGroup;
+import io.atomix.primitive.partition.PartitionGroupConfig;
 import io.atomix.primitive.partition.PartitionGroupMembershipEvent;
 import io.atomix.primitive.partition.PartitionGroupMembershipEventListener;
 import io.atomix.primitive.partition.PartitionGroupMembershipService;
+import io.atomix.primitive.partition.PartitionGroupTypeRegistry;
 import io.atomix.primitive.partition.PartitionManagementService;
 import io.atomix.primitive.partition.PartitionService;
 import io.atomix.primitive.partition.SystemPartitionService;
@@ -36,6 +36,7 @@ import io.atomix.primitive.service.ServiceTypeRegistry;
 import io.atomix.utils.component.Component;
 import io.atomix.utils.component.Dependency;
 import io.atomix.utils.component.Managed;
+import io.atomix.utils.concurrent.Futures;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -48,27 +49,20 @@ public class PartitionManager implements PartitionService, Managed {
 
   @Dependency
   private ClusterMembershipService clusterMembershipService;
-
-  @Dependency
-  private ClusterCommunicationService communicationService;
-
-  @Dependency
-  private ClusterStreamingService streamingService;
-
   @Dependency
   private ServiceTypeRegistry serviceTypeRegistry;
-
   @Dependency
   private PartitionGroupMembershipService groupMembershipService;
-
+  @Dependency
+  private PartitionGroupTypeRegistry groupTypeRegistry;
   @Dependency
   private PartitionManagementService partitionManagementService;
-
   @Dependency
   private SystemPartitionService systemPartitionService;
 
   private final Map<String, ManagedPartitionGroup> groups = Maps.newConcurrentMap();
-  private final Map<String, ManagedPartitionGroup> qualifiedGroups = Maps.newConcurrentMap();
+  private final Map<String, ManagedPartitionGroup> configGroups = Maps.newConcurrentMap();
+  private final Map<String, ManagedPartitionGroup> protocolGroups = Maps.newConcurrentMap();
   private final PartitionGroupMembershipEventListener groupMembershipEventListener = this::handleMembershipChange;
 
   @Override
@@ -84,16 +78,20 @@ public class PartitionManager implements PartitionService, Managed {
     if (group != null) {
       return group;
     }
-    group = qualifiedGroups.get(name);
+    group = configGroups.get(name);
+    if (group != null) {
+      return group;
+    }
+    group = protocolGroups.get(name);
     if (group != null) {
       return group;
     }
 
     PartitionGroup systemGroup = systemPartitionService.getSystemPartitionGroup();
-    if (systemGroup != null && systemGroup.name().equals(name)) {
-      return systemGroup;
-    }
-    if (systemGroup != null && systemGroup.type().getProtocolDescriptor().getFullName().equals(name)) {
+    if (systemGroup != null
+        && (systemGroup.name().equals(name)
+        || systemGroup.type().getConfigDescriptor().getFullName().equals(name)
+        || systemGroup.type().getProtocolDescriptor().getFullName().equals(name))) {
       return systemGroup;
     }
     return null;
@@ -105,24 +103,41 @@ public class PartitionManager implements PartitionService, Managed {
     return (Collection) groups.values();
   }
 
+  private String getType(PartitionGroupConfig config) {
+    if (config.hasRaft()) {
+      return "raft";
+    }
+    if (config.hasPrimaryBackup()) {
+      return "primary-backup";
+    }
+    if (config.hasLog()) {
+      return "log";
+    }
+    return null;
+  }
+
   @SuppressWarnings("unchecked")
   private void handleMembershipChange(PartitionGroupMembershipEvent event) {
     if (partitionManagementService == null) {
       return;
     }
 
-    if (!event.membership().system()) {
+    if (!event.membership().getSystem()) {
       synchronized (groups) {
-        ManagedPartitionGroup group = groups.get(event.membership().group());
+        ManagedPartitionGroup group = groups.get(event.membership().getConfig().getName());
         if (group == null) {
-          group = ((PartitionGroup.Type) event.membership().config().getType())
-              .newPartitionGroup(event.membership().config());
-          groups.put(event.membership().group(), group);
-          qualifiedGroups.put(group.type().getProtocolDescriptor().getFullName(), group);
-          if (event.membership().members().contains(MemberId.from(clusterMembershipService.getLocalMember()))) {
-            group.join(partitionManagementService);
+          PartitionGroup.Type type = groupTypeRegistry.getGroupType(getType(event.membership().getConfig()));
+          if (type != null) {
+            group = type.newPartitionGroup(event.membership().getConfig());
+            groups.put(group.name(), group);
+            protocolGroups.put(group.type().getProtocolDescriptor().getFullName(), group);
+            if (event.membership().getMembersList().contains(MemberId.from(clusterMembershipService.getLocalMember()).toString())) {
+              group.join(partitionManagementService);
+            } else {
+              group.connect(partitionManagementService);
+            }
           } else {
-            group.connect(partitionManagementService);
+            LOGGER.error("Unknown partition group type " + getType(event.membership().getConfig()));
           }
         }
       }
@@ -137,15 +152,19 @@ public class PartitionManager implements PartitionService, Managed {
         .map(membership -> {
           ManagedPartitionGroup group;
           synchronized (groups) {
-            group = groups.get(membership.group());
+            group = groups.get(membership.getConfig().getName());
             if (group == null) {
-              group = ((PartitionGroup.Type) membership.config().getType())
-                  .newPartitionGroup(membership.config());
-              groups.put(group.name(), group);
-              qualifiedGroups.put(group.type().getProtocolDescriptor().getFullName(), group);
+              PartitionGroup.Type type = groupTypeRegistry.getGroupType(getType(membership.getConfig()));
+              if (type != null) {
+                group = type.newPartitionGroup(membership.getConfig());
+                groups.put(group.name(), group);
+                protocolGroups.put(group.type().getProtocolDescriptor().getFullName(), group);
+              } else {
+                return Futures.exceptionalFuture(new IllegalStateException("Unknown partition group type " + getType(membership.getConfig())));
+              }
             }
           }
-          if (membership.members().contains(MemberId.from(clusterMembershipService.getLocalMember()))) {
+          if (membership.getMembersList().contains(MemberId.from(clusterMembershipService.getLocalMember()).toString())) {
             return group.join(partitionManagementService);
           } else {
             return group.connect(partitionManagementService);
