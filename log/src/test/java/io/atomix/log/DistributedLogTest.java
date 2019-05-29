@@ -32,11 +32,11 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
-import io.atomix.log.impl.DefaultDistributedLogServer;
-import io.atomix.log.protocol.TestLogProtocolFactory;
+import io.atomix.protocols.log.DistributedLogClient;
+import io.atomix.protocols.log.DistributedLogServer;
+import io.atomix.protocols.log.impl.DefaultDistributedLogServer;
+import io.atomix.protocols.log.protocol.TestLogProtocolFactory;
 import io.atomix.utils.concurrent.Futures;
-import io.atomix.utils.serializer.Serializer;
-import io.atomix.utils.serializer.serializers.DefaultSerializers;
 import net.jodah.concurrentunit.ConcurrentTestCase;
 import org.junit.After;
 import org.junit.Before;
@@ -46,7 +46,6 @@ import org.junit.Test;
  * Raft test.
  */
 public class DistributedLogTest extends ConcurrentTestCase {
-  private static final Serializer SERIALIZER = DefaultSerializers.BASIC;
   private volatile int memberId;
   private volatile int sessionId;
   private TestTermProviderFactory termProviderFactory;

@@ -19,7 +19,7 @@ import java.util.Optional;
 
 import io.atomix.client.PrimitiveType;
 import io.atomix.client.SyncPrimitive;
-import io.atomix.utils.time.Versioned;
+import io.atomix.client.Versioned;
 
 /**
  * Distributed version of java.util.concurrent.atomic.AtomicReference.

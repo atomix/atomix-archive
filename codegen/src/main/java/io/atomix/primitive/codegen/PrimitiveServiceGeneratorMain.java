@@ -10,7 +10,7 @@ import com.google.common.io.ByteStreams;
 import com.google.protobuf.Descriptors;
 import com.google.protobuf.ExtensionRegistryLite;
 import com.google.protobuf.compiler.PluginProtos;
-import io.atomix.primitive.service.impl.PrimitiveServiceProto;
+import io.atomix.service.ServiceDescriptorProto;
 
 /**
  * Primitive service generator main.
@@ -30,7 +30,7 @@ public class PrimitiveServiceGeneratorMain {
     }
 
     ExtensionRegistryLite registryLite = ExtensionRegistryLite.newInstance();
-    PrimitiveServiceProto.registerAllExtensions(registryLite);
+    ServiceDescriptorProto.registerAllExtensions(registryLite);
 
     PrimitiveServiceGenerator compiler = new PrimitiveServiceGenerator();
     PluginProtos.CodeGeneratorRequest request = PluginProtos.CodeGeneratorRequest.parseFrom(is, registryLite);

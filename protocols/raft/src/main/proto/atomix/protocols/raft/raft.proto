@@ -1,0 +1,63 @@
+syntax = "proto3";
+
+package atomix.protocols.raft;
+
+import "google/protobuf/duration.proto";
+import "atomix/utils/memory.proto";
+
+option java_package = "io.atomix.protocols.raft.protocol";
+option java_outer_classname = "RaftProto";
+option java_multiple_files = true;
+
+message RaftMember {
+    string member_id = 1;
+    Type type = 2;
+    int64 updated = 3;
+
+    enum Type {
+        INACTIVE = 0;
+        PASSIVE = 1;
+        PROMOTABLE = 2;
+        ACTIVE = 3;
+    }
+}
+
+message SessionMetadata {
+    int64 session_id = 1;
+    string service_name = 2;
+    string service_type = 3;
+}
+
+enum ReadConsistency {
+    SEQUENTIAL = 0;
+    LINEARIZABLE_LEASE = 1;
+    LINEARIZABLE = 2;
+}
+
+message RaftProtocolConfig {
+    string member_id = 1;
+    repeated string members = 2;
+    google.protobuf.Duration election_timeout = 3;
+    google.protobuf.Duration heartbeat_interval = 4;
+    RaftStorageConfig storage = 5;
+    RaftCompactionConfig compaction = 6;
+}
+
+message RaftStorageConfig {
+    string directory = 1;
+    StorageLevel level = 2;
+    atomix.utils.MemorySize max_entry_size = 3;
+    atomix.utils.MemorySize segment_size = 4;
+    bool flush_on_commit = 5;
+}
+
+enum StorageLevel {
+    DISK = 0;
+    MAPPED = 1;
+}
+
+message RaftCompactionConfig {
+    bool dynamic = 1;
+    float free_disk_buffer = 2;
+    float free_memory_buffer = 3;
+}

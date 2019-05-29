@@ -20,8 +20,8 @@ import java.util.concurrent.CompletionException;
 
 import com.google.protobuf.Any;
 import io.atomix.api.primitive.PrimitiveId;
-import io.atomix.primitive.protocol.PrimitiveProtocol;
-import io.atomix.primitive.protocol.PrimitiveProtocolConfig;
+import io.atomix.service.protocol.PrimitiveProtocol;
+import io.atomix.service.protocol.PrimitiveProtocolConfig;
 import io.atomix.utils.Builder;
 import io.atomix.utils.config.ConfigurationException;
 import io.atomix.utils.serializer.Namespace;

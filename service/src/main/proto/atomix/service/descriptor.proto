@@ -1,0 +1,30 @@
+syntax = "proto3";
+
+package atomix.service;
+
+import "google/protobuf/descriptor.proto";
+import "atomix/service/operation.proto";
+
+option java_package = "io.atomix.service";
+option java_outer_classname = "ServiceDescriptorProto";
+option java_multiple_files = true;
+
+extend google.protobuf.ServiceOptions {
+    string name = 50001;
+    ServiceTypeInfo type = 50002;
+}
+
+enum ServiceTypeInfo {
+    SIMPLE = 0;
+    SESSION = 1;
+}
+
+message ServiceOperationInfo {
+    string name = 1;
+    atomix.service.OperationTypeInfo type = 2;
+    bool async = 3;
+}
+
+extend google.protobuf.MethodOptions {
+    ServiceOperationInfo operation = 50003;
+}

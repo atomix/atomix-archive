@@ -15,6 +15,7 @@
  */
 package io.atomix.utils;
 
+import com.google.protobuf.Descriptors;
 import com.google.protobuf.Message;
 
 /**
@@ -23,10 +24,17 @@ import com.google.protobuf.Message;
 public interface ConfiguredType<C extends Message> extends NamedType {
 
   /**
-   * Returns a new configuration.
+   * Returns the configuration class.
    *
-   * @return a new configuration
+   * @return the configuration class
    */
-  C newConfig();
+  Class<C> getConfigClass();
+
+  /**
+   * Returns the descriptor for the type's configuration.
+   *
+   * @return the descriptor for the type's configuration
+   */
+  Descriptors.Descriptor getConfigDescriptor();
 
 }

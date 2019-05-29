@@ -28,8 +28,23 @@
   <dependencies>
     <dependency>
       <groupId>io.atomix</groupId>
-      <artifactId>atomix-agent</artifactId>
+      <artifactId>atomix-server</artifactId>
       <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>io.atomix</groupId>
+      <artifactId>atomix-protocols-raft</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>io.atomix</groupId>
+      <artifactId>atomix-protocols-log</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>net.sourceforge.argparse4j</groupId>
+      <artifactId>argparse4j</artifactId>
+      <version>${argparse4j.version}</version>
     </dependency>
     <dependency>
       <groupId>ch.qos.logback</groupId>

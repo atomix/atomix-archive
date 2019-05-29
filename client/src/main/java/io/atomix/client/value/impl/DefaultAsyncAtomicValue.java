@@ -29,7 +29,7 @@ import io.atomix.client.value.AtomicValue;
 import io.atomix.client.value.AtomicValueEvent;
 import io.atomix.client.value.AtomicValueEventListener;
 import io.atomix.utils.concurrent.Futures;
-import io.atomix.utils.time.Versioned;
+import io.atomix.client.Versioned;
 import io.grpc.stub.StreamObserver;
 
 /**

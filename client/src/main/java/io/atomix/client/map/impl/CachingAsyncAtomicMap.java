@@ -32,7 +32,7 @@ import io.atomix.client.PrimitiveState;
 import io.atomix.client.cache.CacheConfig;
 import io.atomix.client.map.AsyncAtomicMap;
 import io.atomix.client.map.AtomicMapEventListener;
-import io.atomix.utils.time.Versioned;
+import io.atomix.client.Versioned;
 import org.slf4j.Logger;
 
 import static org.slf4j.LoggerFactory.getLogger;

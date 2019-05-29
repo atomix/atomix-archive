@@ -22,6 +22,7 @@ import java.lang.reflect.Method;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -38,6 +39,7 @@ import com.google.common.base.CaseFormat;
 import com.google.common.base.Strings;
 import com.google.common.io.BaseEncoding;
 import com.google.common.primitives.Primitives;
+import com.google.protobuf.Any;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.Descriptors;
 import com.google.protobuf.Message;
@@ -50,9 +52,15 @@ import org.slf4j.LoggerFactory;
 public class ConfigMapper {
   private static final Logger LOGGER = LoggerFactory.getLogger(ConfigMapper.class);
   private final ClassLoader classLoader;
+  private final Map<String, PolymorphicTypeMapper> types = new HashMap<>();
 
-  public ConfigMapper(ClassLoader classLoader) {
+  public ConfigMapper(ClassLoader classLoader, PolymorphicTypeMapper... types) {
+    this(classLoader, types != null ? Arrays.asList(types) : Collections.emptyList());
+  }
+
+  public ConfigMapper(ClassLoader classLoader, Collection<PolymorphicTypeMapper> types) {
     this.classLoader = classLoader;
+    types.forEach(type -> this.types.put(type.getContainerDescriptor().getFullName(), type));
   }
 
   /**
@@ -64,6 +72,7 @@ public class ConfigMapper {
    * @param <T>        the resulting type
    * @return the loaded configuration
    */
+  @SuppressWarnings("unchecked")
   public <T> T loadFiles(Descriptors.Descriptor descriptor, List<File> files, List<String> resources) {
     if (files == null) {
       return loadResources(descriptor, resources);
@@ -71,9 +80,17 @@ public class ConfigMapper {
 
     ObjectMapper mapper = new ObjectMapper(new YAMLFactory());
     ObjectNode config = parseFiles(mapper, files, resources);
-    return map(config, descriptor);
+    return (T) map(config, descriptor);
   }
 
+  /**
+   * Parses the given files and resources and merges the results together.
+   *
+   * @param mapper    the object mapper
+   * @param files     the files to parse
+   * @param resources the resources to parse
+   * @return the resulting merged configuration
+   */
   private ObjectNode parseFiles(ObjectMapper mapper, List<File> files, List<String> resources) {
     ObjectNode node = null;
     for (File file : files) {
@@ -104,8 +121,14 @@ public class ConfigMapper {
     return node;
   }
 
-  private void mergeNodes(ObjectNode node, ObjectNode parent) {
-    Iterator<Map.Entry<String, JsonNode>> iterator = parent.fields();
+  /**
+   * Recursively merges the given nodes together.
+   *
+   * @param node     the node into which to merge the parent
+   * @param fallback the fallback to merge into the given node
+   */
+  private void mergeNodes(ObjectNode node, ObjectNode fallback) {
+    Iterator<Map.Entry<String, JsonNode>> iterator = fallback.fields();
     while (iterator.hasNext()) {
       Map.Entry<String, JsonNode> entry = iterator.next();
       JsonNode field = node.get(entry.getKey());
@@ -151,7 +174,7 @@ public class ConfigMapper {
    * @param config     the configuration to apply
    * @param descriptor the descriptor to which to apply the configuration
    */
-  protected <T> T map(ObjectNode config, Descriptors.Descriptor descriptor) {
+  protected Message map(ObjectNode config, Descriptors.Descriptor descriptor) {
     return map(config, null, null, descriptor);
   }
 
@@ -178,10 +201,31 @@ public class ConfigMapper {
    * @param descriptor the class to which to apply the configuration
    */
   @SuppressWarnings("unchecked")
-  protected <T> T map(ObjectNode config, String path, String name, Descriptors.Descriptor descriptor) {
-    Message.Builder builder = newBuilder(descriptor);
-    mapFields(builder, descriptor, path, name, config);
-    return (T) builder.build();
+  protected Message map(ObjectNode config, String path, String name, Descriptors.Descriptor descriptor) {
+    PolymorphicTypeMapper type = types.get(descriptor.getFullName());
+    if (type != null) {
+      if (config.getNodeType() != JsonNodeType.OBJECT) {
+        throw new ConfigurationException("Invalid polymorphic type value " + config.getNodeType());
+      }
+
+      String typeName = config.get(type.getNameField().getJsonName()).asText();
+      Descriptors.Descriptor typeDescriptor = descriptor = type.getConfigDescriptor(typeName);
+      if (descriptor == null) {
+        throw new ConfigurationException("Unknown polymorphic type " + typeName);
+      }
+
+      Message.Builder typeBuilder = newBuilder(typeDescriptor);
+      mapFields(typeBuilder, typeDescriptor, path, name, config);
+
+      Message.Builder builder = newBuilder(descriptor);
+      setValue(builder, type.getNameField(), getSetterName(type.getNameField()), String.class, typeName);
+      setValue(builder, type.getAnyField(), getSetterName(type.getAnyField()), Any.class, Any.pack(typeBuilder.build()));
+      return builder.build();
+    } else {
+      Message.Builder builder = newBuilder(descriptor);
+      mapFields(builder, descriptor, path, name, config);
+      return builder.build();
+    }
   }
 
   private void mapFields(Message.Builder builder, Descriptors.Descriptor descriptor, String path, String name, ObjectNode config) {

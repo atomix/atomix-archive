@@ -40,7 +40,7 @@ import io.atomix.client.set.DistributedSet;
 import io.atomix.client.set.impl.BlockingDistributedSet;
 import io.atomix.primitive.PrimitiveException;
 import io.atomix.utils.concurrent.Retries;
-import io.atomix.utils.time.Versioned;
+import io.atomix.client.Versioned;
 
 /**
  * Default implementation of {@code ConsistentMap}.

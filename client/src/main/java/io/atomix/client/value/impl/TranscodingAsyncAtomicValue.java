@@ -27,7 +27,7 @@ import io.atomix.client.value.AsyncAtomicValue;
 import io.atomix.client.value.AtomicValue;
 import io.atomix.client.value.AtomicValueEvent;
 import io.atomix.client.value.AtomicValueEventListener;
-import io.atomix.utils.time.Versioned;
+import io.atomix.client.Versioned;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
 

@@ -15,7 +15,7 @@
  */
 package io.atomix.client;
 
-import io.atomix.primitive.protocol.PrimitiveProtocolConfig;
+import io.atomix.service.protocol.PrimitiveProtocolConfig;
 import io.atomix.utils.config.NamedConfig;
 import io.atomix.utils.config.TypedConfig;
 import io.atomix.utils.serializer.NamespaceConfig;

@@ -1,445 +1,104 @@
 package io.atomix.server.impl;
 
-import java.util.Collection;
-import java.util.List;
-import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.Supplier;
-import java.util.stream.Collectors;
 
 import com.google.common.base.Strings;
 import com.google.protobuf.Message;
-import io.atomix.api.headers.RequestHeader;
-import io.atomix.api.headers.SessionCommandHeader;
-import io.atomix.api.headers.SessionHeader;
-import io.atomix.api.headers.SessionQueryHeader;
 import io.atomix.api.primitive.PrimitiveId;
-import io.atomix.primitive.partition.PartitionId;
-import io.atomix.primitive.proxy.PrimitiveProxy;
-import io.atomix.primitive.session.impl.SessionResponseContext;
-import io.atomix.utils.QuadFunction;
-import io.atomix.utils.TriFunction;
-import io.atomix.utils.concurrent.Futures;
+import io.atomix.service.proxy.ServiceProxy;
 import io.atomix.utils.stream.StreamHandler;
 import io.grpc.Metadata;
 import io.grpc.Status;
 import io.grpc.protobuf.ProtoUtils;
 import io.grpc.stub.StreamObserver;
-import org.apache.commons.lang3.tuple.Pair;
 
 /**
  * Primitive factory.
  */
-public class RequestExecutor<P extends PrimitiveProxy, H extends Message, T extends Message, R extends Message> {
+public class RequestExecutor<P extends ServiceProxy> {
   private final PrimitiveFactory<P> primitiveFactory;
-  private final RequestDescriptor<T, H> requestDescriptor;
-  private final Supplier<R> responseSupplier;
 
-  public RequestExecutor(
-      PrimitiveFactory<P> primitiveFactory,
-      RequestDescriptor<T, H> requestDescriptor,
-      Supplier<R> responseSupplier) {
+  public RequestExecutor(PrimitiveFactory<P> primitiveFactory) {
     this.primitiveFactory = primitiveFactory;
-    this.requestDescriptor = requestDescriptor;
-    this.responseSupplier = responseSupplier;
-  }
-
-  /**
-   * Returns the primitive ID for the given request.
-   *
-   * @param request the request for which to return the primitive ID
-   * @return the primitive ID for the given request
-   */
-  private PrimitiveId getId(T request) {
-    return requestDescriptor.getId(request);
-  }
-
-  /**
-   * Returns the default header for the given partition.
-   *
-   * @param partitionId the partition ID
-   * @return the default header for the given partition
-   */
-  private H getDefaultHeader(int partitionId) {
-    return requestDescriptor.getDefaultHeader(partitionId);
-  }
-
-  /**
-   * Returns the headers for the given request.
-   *
-   * @param request the request for which to return headers
-   * @return the headers for the given request
-   */
-  private Collection<H> getHeaders(T request) {
-    return requestDescriptor.getHeaders(request);
-  }
-
-  /**
-   * Returns the partition ID for the given header.
-   *
-   * @param header the header for which to return the partition ID
-   * @return the partition ID for the given header
-   */
-  private int getPartitionId(H header) {
-    return requestDescriptor.getPartitionId(header);
   }
 
   /**
    * Executes the given function on the primitive.
    *
-   * @param request          the request
+   * @param id               the primitive ID
    * @param responseObserver the response observer
    * @param function         the function to execute
    */
-  public void execute(
-      T request,
+  public <R extends Message> void execute(
+      PrimitiveId id,
+      Supplier<R> defaultResponseSupplier,
       StreamObserver<R> responseObserver,
       Function<P, CompletableFuture<R>> function) {
-    PrimitiveId id = getId(request);
-    if (isValidId(id, responseObserver)) {
-      primitiveFactory.getPrimitive(id).whenComplete((primitive, primitiveError) -> {
-        if (primitiveError == null) {
-          function.apply(primitive.getRight()).whenComplete((result, funcError) -> {
-            if (funcError == null) {
-              responseObserver.onNext(result);
-              responseObserver.onCompleted();
-            } else {
-              responseObserver.onError(funcError);
-            }
-          });
+    if (isValidId(id, defaultResponseSupplier, responseObserver)) {
+      function.apply(primitiveFactory.getPrimitive(id)).whenComplete((result, funcError) -> {
+        if (funcError == null) {
+          responseObserver.onNext(result);
+          responseObserver.onCompleted();
         } else {
-          responseObserver.onError(primitiveError);
+          responseObserver.onError(funcError);
         }
       });
     }
   }
 
   /**
-   * Creates a new session ID and applies it to the given function.
+   * Executes the given function on the primitive.
    *
-   * @param request          the request
-   * @param key              the request key
+   * @param id               the primitive ID
    * @param responseObserver the response observer
-   * @param function         the function to which to apply the session ID
+   * @param function         the function to execute
    */
-  public void createBy(
-      T request,
-      String key,
+  public <T, R extends Message> void execute(
+      PrimitiveId id,
+      Supplier<R> defaultResponseSupplier,
       StreamObserver<R> responseObserver,
-      BiFunction<PartitionId, P, CompletableFuture<R>> function) {
-    PrimitiveId id = getId(request);
-    if (isValidId(id, responseObserver)) {
-      primitiveFactory.getPrimitive(id, key).whenComplete((primitive, primitiveError) -> {
-        if (primitiveError == null) {
-          function.apply(primitive.getLeft(), primitive.getRight()).whenComplete((result, funcError) -> {
-            if (funcError == null) {
-              responseObserver.onNext(result);
-              responseObserver.onCompleted();
-            } else {
-              responseObserver.onError(funcError);
-            }
-          });
-        } else {
-          responseObserver.onError(primitiveError);
+      BiFunction<P, StreamHandler<T>, CompletableFuture<?>> function,
+      Function<T, R> converter) {
+    if (isValidId(id, defaultResponseSupplier, responseObserver)) {
+      StreamHandler<T> handler = new StreamHandler<T>() {
+        @Override
+        public void next(T response) {
+          responseObserver.onNext(converter.apply(response));
+        }
+
+        @Override
+        public void complete() {
+          responseObserver.onCompleted();
+        }
+
+        @Override
+        public void error(Throwable error) {
+          responseObserver.onError(error);
+        }
+      };
+
+      function.apply(primitiveFactory.getPrimitive(id), handler).whenComplete((result, funcError) -> {
+        if (funcError != null) {
+          responseObserver.onError(funcError);
         }
       });
-    }
-  }
-
-  /**
-   * Creates a new session ID and applies it to the given function.
-   *
-   * @param request          the request
-   * @param responseObserver the response observer
-   * @param function         the function to which to apply the session ID
-   * @param responseFunction the response function
-   */
-  public <V> void createAll(
-      T request,
-      StreamObserver<R> responseObserver,
-      BiFunction<PartitionId, P, CompletableFuture<V>> function,
-      Function<List<V>, R> responseFunction) {
-    PrimitiveId id = getId(request);
-    if (isValidId(id, responseObserver)) {
-      primitiveFactory.getPrimitives(id)
-          .thenCompose(partitions -> Futures.allOf(partitions.entrySet().stream()
-              .map(e -> function.apply(e.getKey(), e.getValue()))))
-          .thenApply(results -> results.collect(Collectors.toList()))
-          .thenApply(results -> responseFunction.apply(results))
-          .whenComplete((result, funcError) -> {
-            if (funcError == null) {
-              responseObserver.onNext(result);
-              responseObserver.onCompleted();
-            } else {
-              responseObserver.onError(funcError);
-            }
-          });
-    }
-  }
-
-  /**
-   * Executes the given function on all partitions and aggregates the responses.
-   *
-   * @param request          the request
-   * @param responseObserver the response observer
-   * @param function         the function to execute
-   * @param aggregator       a function with which to aggregate responses
-   */
-  public <V> void executeAll(
-      T request,
-      StreamObserver<R> responseObserver,
-      TriFunction<PartitionId, H, P, CompletableFuture<V>> function,
-      Function<List<V>, R> aggregator) {
-    PrimitiveId id = getId(request);
-    if (isValidId(id, responseObserver)) {
-      final String group = primitiveFactory.getPartitionGroup(id);
-      Map<PartitionId, H> headerMap = getHeaders(request).stream()
-          .map(header -> Pair.of(PartitionId.newBuilder()
-              .setGroup(group)
-              .setPartition(getPartitionId(header))
-              .build(), header))
-          .collect(Collectors.toMap(Pair::getKey, Pair::getValue));
-      primitiveFactory.getPrimitives(id)
-          .thenCompose(partitions -> Futures.allOf(partitions.entrySet().stream()
-              .map(e -> {
-                H header = headerMap.computeIfAbsent(e.getKey(), i -> getDefaultHeader(i.getPartition()));
-                return function.apply(e.getKey(), header, e.getValue());
-              })))
-          .thenApply(responses -> responses.collect(Collectors.toList()))
-          .thenApply(aggregator)
-          .whenComplete((result, funcError) -> {
-            if (funcError == null) {
-              responseObserver.onNext(result);
-              responseObserver.onCompleted();
-            } else {
-              responseObserver.onError(funcError);
-            }
-          });
-    }
-  }
-
-  /**
-   * Executes the given streaming function on all partitions.
-   *
-   * @param request          the request
-   * @param responseObserver the response observer
-   * @param function         the function to execute
-   * @param converter        the converter to apply to stream events
-   */
-  public <V> void executeAll(
-      T request,
-      StreamObserver<R> responseObserver,
-      TriFunction<H, StreamHandler<V>, P, CompletableFuture<SessionResponseContext>> function,
-      BiFunction<H, V, R> converter) {
-    PrimitiveId id = getId(request);
-    if (isValidId(id, responseObserver)) {
-      final String group = primitiveFactory.getPartitionGroup(id);
-      Map<PartitionId, H> headerMap = getHeaders(request).stream()
-          .map(header -> Pair.of(PartitionId.newBuilder()
-              .setGroup(group)
-              .setPartition(getPartitionId(header))
-              .build(), header))
-          .collect(Collectors.toMap(Pair::getKey, Pair::getValue));
-      primitiveFactory.getPrimitives(id)
-          .thenCompose(partitions -> Futures.allOf(partitions.entrySet().stream()
-              .map(e -> {
-                H header = headerMap.computeIfAbsent(e.getKey(), i -> getDefaultHeader(i.getPartition()));
-                return function.apply(header, new StreamHandler<V>() {
-                  @Override
-                  public void next(V value) {
-                    responseObserver.onNext(converter.apply(header, value));
-                  }
-
-                  @Override
-                  public void complete() {
-                    responseObserver.onCompleted();
-                  }
-
-                  @Override
-                  public void error(Throwable error) {
-                    responseObserver.onError(error);
-                  }
-                }, e.getValue());
-              })))
-          .whenComplete((result, funcError) -> {
-            if (funcError != null) {
-              responseObserver.onError(funcError);
-            }
-          });
-    }
-  }
-
-  /**
-   * Executes the given streaming function on all partitions.
-   *
-   * @param request          the request
-   * @param responseObserver the response observer
-   * @param function         the function to execute
-   */
-  public void executeAll(
-      T request,
-      StreamObserver<R> responseObserver,
-      TriFunction<PartitionId, H, P, CompletableFuture<R>> function) {
-    PrimitiveId id = getId(request);
-    if (isValidId(id, responseObserver)) {
-      final String group = primitiveFactory.getPartitionGroup(id);
-      Map<PartitionId, H> headerMap = getHeaders(request).stream()
-          .map(header -> Pair.of(PartitionId.newBuilder()
-              .setGroup(group)
-              .setPartition(getPartitionId(header))
-              .build(), header))
-          .collect(Collectors.toMap(Pair::getKey, Pair::getValue));
-      primitiveFactory.getPrimitives(id)
-          .thenCompose(partitions -> Futures.allOf(partitions.entrySet().stream()
-              .map(e -> {
-                H header = headerMap.computeIfAbsent(e.getKey(), i -> getDefaultHeader(i.getPartition()));
-                return function.apply(e.getKey(), header, e.getValue());
-              })))
-          .whenComplete((result, funcError) -> {
-            if (funcError != null) {
-              responseObserver.onError(funcError);
-            }
-          });
-    }
-  }
-
-  /**
-   * Executes the given function on the partition owning the given key.
-   *
-   * @param request          the request
-   * @param header           the header with which to partition the request
-   * @param responseObserver the response observer
-   * @param function         the function to execute
-   */
-  public void executeBy(
-      T request,
-      H header,
-      StreamObserver<R> responseObserver,
-      TriFunction<PartitionId, H, P, CompletableFuture<R>> function) {
-    PrimitiveId id = getId(request);
-    if (isValidId(id, responseObserver)) {
-      primitiveFactory.getPrimitive(id, getPartitionId(header)).whenComplete((primitive, primitiveError) -> {
-        if (primitiveError == null) {
-          function.apply(primitive.getLeft(), header, primitive.getRight()).whenComplete((result, funcError) -> {
-            if (funcError == null) {
-              responseObserver.onNext(result);
-              responseObserver.onCompleted();
-            } else {
-              responseObserver.onError(funcError);
-            }
-          });
-        } else {
-          responseObserver.onError(primitiveError);
-        }
-      });
-    }
-  }
-
-  /**
-   * Executes the given function on the partition owning the given key.
-   *
-   * @param request          the request
-   * @param header           the header with which to partition the request
-   * @param responseObserver the response observer
-   * @param function         the function to execute
-   */
-  public <V> void executeBy(
-      T request,
-      H header,
-      StreamObserver<R> responseObserver,
-      QuadFunction<PartitionId, H, StreamHandler<V>, P, CompletableFuture<SessionResponseContext>> function,
-      TriFunction<PartitionId, H, V, R> converter) {
-    PrimitiveId id = getId(request);
-    if (isValidId(id, responseObserver)) {
-      primitiveFactory.getPrimitive(id, getPartitionId(header)).whenComplete((primitive, primitiveError) -> {
-        if (primitiveError == null) {
-          StreamHandler<V> handler = new StreamHandler<V>() {
-            @Override
-            public void next(V value) {
-              responseObserver.onNext(converter.apply(primitive.getLeft(), header, value));
-            }
-
-            @Override
-            public void complete() {
-              responseObserver.onCompleted();
-            }
-
-            @Override
-            public void error(Throwable error) {
-              responseObserver.onError(error);
-            }
-          };
-          function.apply(primitive.getLeft(), header, handler, primitive.getRight()).whenComplete((result, funcError) -> {
-            if (funcError != null) {
-              responseObserver.onError(funcError);
-            }
-          });
-        } else {
-          responseObserver.onError(primitiveError);
-        }
-      });
-    }
-  }
-
-  /**
-   * Executes the given function on the partitions owning the given keys and aggregates the responses.
-   *
-   * @param request          the request
-   * @param keys             the keys with which to partition the request
-   * @param responseObserver the response observer
-   * @param function         the function to execute
-   * @param aggregator       a function with which to aggregate responses
-   */
-  public <V> void executeBy(
-      T request,
-      Collection<String> keys,
-      StreamObserver<R> responseObserver,
-      QuadFunction<PartitionId, H, Collection<String>, P, CompletableFuture<V>> function,
-      Function<List<V>, R> aggregator) {
-    PrimitiveId id = getId(request);
-    if (isValidId(id, responseObserver)) {
-      final String group = primitiveFactory.getPartitionGroup(id);
-      Map<PartitionId, H> headerMap = getHeaders(request).stream()
-          .map(header -> Pair.of(PartitionId.newBuilder()
-              .setGroup(group)
-              .setPartition(getPartitionId(header))
-              .build(), header))
-          .collect(Collectors.toMap(Pair::getKey, Pair::getValue));
-      primitiveFactory.getPrimitives(id, keys)
-          .thenCompose(partitions -> Futures.allOf(partitions.entrySet().stream()
-              .map(e -> {
-                H header = headerMap.computeIfAbsent(e.getKey(), i -> getDefaultHeader(i.getPartition()));
-                return function.apply(e.getKey(), header, e.getValue().getLeft(), e.getValue().getRight());
-              })))
-          .thenApply(responses -> responses.collect(Collectors.toList()))
-          .thenApply(aggregator)
-          .whenComplete((result, funcError) -> {
-            if (funcError == null) {
-              responseObserver.onNext(result);
-              responseObserver.onCompleted();
-            } else {
-              responseObserver.onError(funcError);
-            }
-          });
     }
   }
 
   /**
    * Validates the given ID.
    *
-   * @param id               the primitive ID
-   * @param responseObserver the response observer
+   * @param id                      the primitive ID
+   * @param defaultResponseSupplier the default response supplier
+   * @param responseObserver        the response observer
    * @return indicates whether the ID is valid
    */
-  private boolean isValidId(PrimitiveId id, StreamObserver<R> responseObserver) {
+  private <R extends Message> boolean isValidId(PrimitiveId id, Supplier<R> defaultResponseSupplier, StreamObserver<R> responseObserver) {
     if (Strings.isNullOrEmpty(id.getName())) {
-      fail(Status.INVALID_ARGUMENT, "Primitive name not specified", responseObserver);
-      return false;
-    }
-    if (!id.hasProtocol()) {
-      fail(Status.INVALID_ARGUMENT, "Primitive protocol not specified", responseObserver);
+      fail(Status.INVALID_ARGUMENT, "Primitive name not specified", defaultResponseSupplier, responseObserver);
       return false;
     }
     return true;
@@ -448,182 +107,17 @@ public class RequestExecutor<P extends PrimitiveProxy, H extends Message, T exte
   /**
    * Sends a failure response to the given observer.
    *
-   * @param status           the response status
-   * @param message          the failure message
-   * @param responseObserver the response observer on which to send the error
+   * @param status                  the response status
+   * @param message                 the failure message
+   * @param defaultResponseSupplier the default response supplier
+   * @param responseObserver        the response observer on which to send the error
    */
-  private void fail(Status status, String message, StreamObserver<R> responseObserver) {
-    R response = responseSupplier.get();
+  private <R extends Message> void fail(Status status, String message, Supplier<R> defaultResponseSupplier, StreamObserver<R> responseObserver) {
+    R response = defaultResponseSupplier.get();
     Metadata.Key<R> key = ProtoUtils.keyForProto(response);
     Metadata metadata = new Metadata();
     metadata.put(key, response);
     responseObserver.onError(status.withDescription(message)
         .asRuntimeException(metadata));
-  }
-
-  /**
-   * Request descriptor.
-   */
-  public interface RequestDescriptor<T extends Message, H extends Message> {
-
-    /**
-     * Returns the request ID for the given request.
-     *
-     * @param request the request for which to return the ID
-     * @return the ID for the given request
-     */
-    PrimitiveId getId(T request);
-
-    /**
-     * Returns the headers for the given request.
-     *
-     * @param request the request for which to return the headers
-     * @return the headers for the given request
-     */
-    Collection<H> getHeaders(T request);
-
-    /**
-     * Returns the partition ID for the given header.
-     *
-     * @param header the header for which to return the partition ID
-     * @return the partition ID for the given header
-     */
-    int getPartitionId(H header);
-
-    /**
-     * Returns the default header for the given partition.
-     *
-     * @param partitionId the partition ID
-     * @return the default header for the given partition
-     */
-    H getDefaultHeader(int partitionId);
-  }
-
-  public static class BasicDescriptor<T extends Message> implements RequestExecutor.RequestDescriptor<T, RequestHeader> {
-    private final Function<T, PrimitiveId> idGetter;
-    private final Function<T, Collection<RequestHeader>> headerGetter;
-
-    public BasicDescriptor(Function<T, PrimitiveId> idGetter, Function<T, Collection<RequestHeader>> headerGetter) {
-      this.idGetter = idGetter;
-      this.headerGetter = headerGetter;
-    }
-
-    @Override
-    public PrimitiveId getId(T request) {
-      return idGetter.apply(request);
-    }
-
-    @Override
-    public Collection<RequestHeader> getHeaders(T request) {
-      return headerGetter.apply(request);
-    }
-
-    @Override
-    public int getPartitionId(RequestHeader header) {
-      return header.getPartitionId();
-    }
-
-    @Override
-    public RequestHeader getDefaultHeader(int partitionId) {
-      return RequestHeader.newBuilder()
-          .setPartitionId(partitionId)
-          .build();
-    }
-  }
-
-  public static class SessionDescriptor<T extends Message> implements RequestExecutor.RequestDescriptor<T, SessionHeader> {
-    private final Function<T, PrimitiveId> idGetter;
-    private final Function<T, Collection<SessionHeader>> headerGetter;
-
-    public SessionDescriptor(Function<T, PrimitiveId> idGetter, Function<T, Collection<SessionHeader>> headerGetter) {
-      this.idGetter = idGetter;
-      this.headerGetter = headerGetter;
-    }
-
-    @Override
-    public PrimitiveId getId(T request) {
-      return idGetter.apply(request);
-    }
-
-    @Override
-    public Collection<SessionHeader> getHeaders(T request) {
-      return headerGetter.apply(request);
-    }
-
-    @Override
-    public int getPartitionId(SessionHeader header) {
-      return header.getPartitionId();
-    }
-
-    @Override
-    public SessionHeader getDefaultHeader(int partitionId) {
-      return SessionHeader.newBuilder()
-          .setPartitionId(partitionId)
-          .build();
-    }
-  }
-
-  public static class SessionCommandDescriptor<T extends Message> implements RequestExecutor.RequestDescriptor<T, SessionCommandHeader> {
-    private final Function<T, PrimitiveId> idGetter;
-    private final Function<T, Collection<SessionCommandHeader>> headerGetter;
-
-    public SessionCommandDescriptor(Function<T, PrimitiveId> idGetter, Function<T, Collection<SessionCommandHeader>> headerGetter) {
-      this.idGetter = idGetter;
-      this.headerGetter = headerGetter;
-    }
-
-    @Override
-    public PrimitiveId getId(T request) {
-      return idGetter.apply(request);
-    }
-
-    @Override
-    public Collection<SessionCommandHeader> getHeaders(T request) {
-      return headerGetter.apply(request);
-    }
-
-    @Override
-    public int getPartitionId(SessionCommandHeader header) {
-      return header.getPartitionId();
-    }
-
-    @Override
-    public SessionCommandHeader getDefaultHeader(int partitionId) {
-      return SessionCommandHeader.newBuilder()
-          .setPartitionId(partitionId)
-          .build();
-    }
-  }
-
-  public static class SessionQueryDescriptor<T extends Message> implements RequestExecutor.RequestDescriptor<T, SessionQueryHeader> {
-    private final Function<T, PrimitiveId> idGetter;
-    private final Function<T, Collection<SessionQueryHeader>> headerGetter;
-
-    public SessionQueryDescriptor(Function<T, PrimitiveId> idGetter, Function<T, Collection<SessionQueryHeader>> headerGetter) {
-      this.idGetter = idGetter;
-      this.headerGetter = headerGetter;
-    }
-
-    @Override
-    public PrimitiveId getId(T request) {
-      return idGetter.apply(request);
-    }
-
-    @Override
-    public Collection<SessionQueryHeader> getHeaders(T request) {
-      return headerGetter.apply(request);
-    }
-
-    @Override
-    public int getPartitionId(SessionQueryHeader header) {
-      return header.getPartitionId();
-    }
-
-    @Override
-    public SessionQueryHeader getDefaultHeader(int partitionId) {
-      return SessionQueryHeader.newBuilder()
-          .setPartitionId(partitionId)
-          .build();
-    }
   }
 }

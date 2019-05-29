@@ -17,9 +17,9 @@ package io.atomix.client.log;
 
 import io.atomix.client.PrimitiveBuilder;
 import io.atomix.client.PrimitiveManagementService;
-import io.atomix.primitive.protocol.LogCompatibleBuilder;
-import io.atomix.primitive.protocol.LogProtocol;
-import io.atomix.primitive.protocol.PrimitiveProtocol;
+import io.atomix.service.protocol.LogCompatibleBuilder;
+import io.atomix.service.protocol.LogProtocol;
+import io.atomix.service.protocol.PrimitiveProtocol;
 
 /**
  * Builder for DistributedLog.

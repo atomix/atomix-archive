@@ -15,13 +15,15 @@
  */
 package io.atomix.storage.journal;
 
+import java.io.IOException;
+
 import io.atomix.storage.StorageLevel;
 
 /**
  * Memory mapped journal test.
  */
 public class MappedJournalTest extends PersistentJournalTest {
-  public MappedJournalTest(int maxSegmentSize, int cacheSize) {
+  public MappedJournalTest(int maxSegmentSize, int cacheSize) throws IOException {
     super(maxSegmentSize, cacheSize);
   }
 

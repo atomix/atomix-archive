@@ -15,15 +15,14 @@
  */
 package ${proxyClass.packageName};
 
-import io.atomix.primitive.service.ServiceClient;
-import io.atomix.primitive.service.impl.ServiceId;
-import io.atomix.primitive.service.impl.RequestContext;
-import io.atomix.primitive.service.impl.ResponseContext;
-import io.atomix.primitive.partition.PartitionId;
-import io.atomix.primitive.proxy.SimplePrimitiveProxy;
+import io.atomix.service.client.ServiceClient;
+import io.atomix.service.protocol.ServiceId;
+import io.atomix.service.protocol.RequestContext;
+import io.atomix.service.protocol.ResponseContext;
+import io.atomix.service.proxy.SimpleServiceProxy;
 <#if hasStreams>
 import io.atomix.utils.stream.StreamHandler;
-import io.atomix.primitive.service.impl.StreamContext;
+import io.atomix.service.protocol.StreamContext;
 </#if>
 import io.atomix.utils.concurrent.ThreadContext;
 
@@ -44,7 +43,7 @@ import ${operation.responseClass.packageName}.${operation.responseClass.classNam
 /**
  * Atomix generated proxy ${proxyClass.className}.
  */
-public class ${proxyClass.className} extends SimplePrimitiveProxy {
+public class ${proxyClass.className} extends SimpleServiceProxy {
     public ${proxyClass.className}(ServiceClient client) {
         super(client);
     }

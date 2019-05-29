@@ -15,15 +15,11 @@
  */
 package io.atomix.storage.journal;
 
-import io.atomix.storage.StorageLevel;
-import io.atomix.utils.serializer.Namespace;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
-
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.nio.ByteBuffer;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
@@ -34,6 +30,13 @@ import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+
+import io.atomix.storage.StorageLevel;
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -48,20 +51,28 @@ import static org.junit.Assert.assertTrue;
  */
 @RunWith(Parameterized.class)
 public abstract class AbstractJournalTest {
-  private static final Namespace NAMESPACE = Namespace.builder()
-      .register(TestEntry.class)
-      .register(byte[].class)
-      .build();
-
   private static final JournalCodec<TestEntry> CODEC = new JournalCodec<TestEntry>() {
     @Override
-    public void encode(TestEntry entry, ByteBuffer buffer) {
-      NAMESPACE.serialize(entry, buffer);
+    public void encode(TestEntry entry, ByteBuffer buffer) throws IOException {
+      ByteArrayOutputStream bos = new ByteArrayOutputStream();
+      ObjectOutputStream oos = new ObjectOutputStream(bos);
+      oos.writeObject(entry);
+      byte[] bytes = bos.toByteArray();
+      buffer.putInt(bytes.length);
+      buffer.put(bytes);
     }
 
     @Override
-    public TestEntry decode(ByteBuffer buffer) {
-      return NAMESPACE.deserialize(buffer);
+    public TestEntry decode(ByteBuffer buffer) throws IOException {
+      try {
+        byte[] bytes = new byte[buffer.getInt()];
+        buffer.get(bytes);
+        ByteArrayInputStream bis = new ByteArrayInputStream(bytes);
+        ObjectInputStream ois = new ObjectInputStream(bis);
+        return (TestEntry) ois.readObject();
+      } catch (ClassNotFoundException e) {
+        throw new IOException(e);
+      }
     }
   };
 
@@ -72,21 +83,29 @@ public abstract class AbstractJournalTest {
   private final int cacheSize;
   protected final int entriesPerSegment;
 
-  protected AbstractJournalTest(int maxSegmentSize, int cacheSize) {
+  protected AbstractJournalTest(int maxSegmentSize, int cacheSize) throws IOException {
     this.maxSegmentSize = maxSegmentSize;
     this.cacheSize = cacheSize;
-    int entryLength = (NAMESPACE.serialize(ENTRY).length + 8);
+    ByteBuffer buffer = ByteBuffer.allocate(1024);
+    CODEC.encode(ENTRY, buffer);
+    buffer.flip();
+    int entryLength = (buffer.remaining() + 8);
     this.entriesPerSegment = (maxSegmentSize - 64) / entryLength;
   }
 
   protected abstract StorageLevel storageLevel();
 
   @Parameterized.Parameters
-  public static Collection primeNumbers() {
+  public static Collection primeNumbers() throws IOException {
+    ByteBuffer buffer = ByteBuffer.allocate(1024);
+    CODEC.encode(ENTRY, buffer);
+    buffer.flip();
+    int entryLength = (buffer.remaining() + 8);
+
     List<Object[]> runs = new ArrayList<>();
     for (int i = 1; i <= 10; i++) {
       for (int j = 1; j <= 10; j++) {
-        runs.add(new Object[]{64 + (i * (NAMESPACE.serialize(ENTRY).length + 8) + j), j});
+        runs.add(new Object[]{64 + (i * (entryLength + 8) + j), j});
       }
     }
     return runs;

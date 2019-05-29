@@ -1,0 +1,23 @@
+syntax = "proto3";
+
+package atomix.protocols.raft;
+
+import "atomix/protocols/raft/raft.proto";
+
+option java_package = "io.atomix.protocols.raft.storage.system";
+option java_outer_classname = "RaftSystemProto";
+option java_multiple_files = true;
+
+// Raft system metadata
+message RaftMetadata {
+    int64 term = 1;
+    string vote = 2;
+}
+
+// Raft system configuration
+message RaftConfiguration {
+    int64 index = 1;
+    int64 term = 2;
+    int64 timestamp = 3;
+    repeated RaftMember members = 4;
+}

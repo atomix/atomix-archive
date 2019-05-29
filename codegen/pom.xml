@@ -29,7 +29,7 @@
     <dependencies>
         <dependency>
             <groupId>io.atomix</groupId>
-            <artifactId>atomix-primitive</artifactId>
+            <artifactId>atomix-service</artifactId>
             <version>${project.version}</version>
         </dependency>
         <dependency>

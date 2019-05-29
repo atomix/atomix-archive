@@ -22,7 +22,7 @@ import java.util.concurrent.CompletableFuture;
 import io.atomix.client.AsyncPrimitive;
 import io.atomix.client.DistributedPrimitive;
 import io.atomix.client.PrimitiveType;
-import io.atomix.utils.time.Versioned;
+import io.atomix.client.Versioned;
 
 /**
  * Distributed version of java.util.concurrent.atomic.AtomicReference.

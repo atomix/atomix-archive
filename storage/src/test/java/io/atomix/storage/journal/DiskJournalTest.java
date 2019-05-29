@@ -15,13 +15,15 @@
  */
 package io.atomix.storage.journal;
 
+import java.io.IOException;
+
 import io.atomix.storage.StorageLevel;
 
 /**
  * Disk journal test.
  */
 public class DiskJournalTest extends PersistentJournalTest {
-  public DiskJournalTest(int maxSegmentSize, int cacheSize) {
+  public DiskJournalTest(int maxSegmentSize, int cacheSize) throws IOException {
     super(maxSegmentSize, cacheSize);
   }
 

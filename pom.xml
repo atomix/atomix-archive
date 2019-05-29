@@ -181,16 +181,12 @@
   </issueManagement>
 
   <modules>
-    <module>agent</module>
     <module>api</module>
     <module>client</module>
-    <module>cluster</module>
     <module>codegen</module>
     <module>dist</module>
-    <module>log</module>
-    <module>primitive</module>
     <module>protocols</module>
-    <module>raft</module>
+    <module>service</module>
     <module>server</module>
     <module>storage</module>
     <module>utils</module>
@@ -375,11 +371,11 @@
             </group>
             <group>
               <title>Primitive API</title>
-              <packages>io.atomix.primitive:io.atomix.primitive.config:io.atomix.primitive.event:io.atomix.primitive.operation:io.atomix.primitive.partition:io.atomix.primitive.proxy:io.atomix.primitive.resource:io.atomix.primitive.service:io.atomix.primitive.session</packages>
+              <packages>io.atomix.primitive:io.atomix.primitive.config:io.atomix.primitive.event:io.atomix.service.operation:io.atomix.primitive.partition:io.atomix.service.proxy:io.atomix.primitive.resource:io.atomix.service.service:io.atomix.service.session</packages>
             </group>
             <group>
               <title>Protocol API</title>
-              <packages>io.atomix.primitive.protocol*</packages>
+              <packages>io.atomix.service.protocol*</packages>
             </group>
             <group>
               <title>Raft Protocol</title>

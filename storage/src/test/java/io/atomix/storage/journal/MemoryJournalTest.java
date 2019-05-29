@@ -15,13 +15,15 @@
  */
 package io.atomix.storage.journal;
 
+import java.io.IOException;
+
 import io.atomix.storage.StorageLevel;
 
 /**
  * Memory journal test.
  */
 public class MemoryJournalTest extends AbstractJournalTest {
-  public MemoryJournalTest(int maxSegmentSize, int cacheSize) {
+  public MemoryJournalTest(int maxSegmentSize, int cacheSize) throws IOException {
     super(maxSegmentSize, cacheSize);
   }
 

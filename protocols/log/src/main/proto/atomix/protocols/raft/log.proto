@@ -1,0 +1,48 @@
+syntax = "proto3";
+
+package atomix.protocols.log;
+
+import "google/protobuf/duration.proto";
+import "atomix/utils/memory.proto";
+
+option java_package = "io.atomix.protocols.log";
+option java_multiple_files = true;
+
+// Log entry
+message LogEntry {
+    int64 term = 1;
+    int64 timestamp = 2;
+    bytes value = 3;
+}
+
+// Distributed log replication strategy
+enum ReplicationStrategy {
+    SYNCHRONOUS = 0;
+    ASYNCHRONOUS = 1;
+}
+
+message LogProtocolConfig {
+    string member = 1;
+    string group = 2;
+    string member_group_strategy = 3;
+    LogStorageConfig storage = 4;
+    LogCompactionConfig compaction = 5;
+}
+
+message LogStorageConfig {
+    string directory = 1;
+    StorageLevel level = 2;
+    atomix.utils.MemorySize max_entry_size = 3;
+    atomix.utils.MemorySize segment_size = 4;
+    bool flush_on_commit = 5;
+}
+
+enum StorageLevel {
+    DISK = 0;
+    MAPPED = 1;
+}
+
+message LogCompactionConfig {
+    atomix.utils.MemorySize size = 1;
+    google.protobuf.Duration age = 2;
+}

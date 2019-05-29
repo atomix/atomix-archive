@@ -27,7 +27,7 @@ import io.atomix.client.value.AtomicValueEventListener;
 import io.atomix.client.value.DistributedValue;
 import io.atomix.client.value.ValueEvent;
 import io.atomix.client.value.ValueEventListener;
-import io.atomix.utils.time.Versioned;
+import io.atomix.client.Versioned;
 
 /**
  * Delegating distributed value.

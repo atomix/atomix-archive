@@ -7,35 +7,15 @@ package atomix.log;
 option java_package = "io.atomix.api.log";
 option java_multiple_files = true;
 
-message CreateTopicRequest {
-    atomix.primitive.PrimitiveId topic_id = 1;
-}
-
-message CreateTopicResponse {
-    int32 partitions = 1;
-}
-
-message DeleteTopicRequest {
-    atomix.primitive.PrimitiveId topic_id = 1;
-}
-
-message DeleteTopicResponse {
-
-}
-
 message ProduceRequest {
-    atomix.primitive.PrimitiveId topic_id = 1;
-    int32 partition = 2;
-    bytes value = 3;
+    bytes value = 1;
 }
 
 message ProduceResponse {
 }
 
 message ConsumeRequest {
-    atomix.primitive.PrimitiveId topic_id = 1;
-    int32 partition = 2;
-    uint64 offset = 3;
+    uint64 offset = 1;
 }
 
 message LogRecord {
@@ -46,10 +26,6 @@ message LogRecord {
 
 // Distributed log service
 service LogService {
-
-    rpc CreateTopic(CreateTopicRequest) returns (CreateTopicResponse) {}
-
-    rpc DeleteTopic(DeleteTopicRequest) returns (DeleteTopicResponse) {}
 
     rpc Produce(stream ProduceRequest) returns (ProduceResponse) {}
 

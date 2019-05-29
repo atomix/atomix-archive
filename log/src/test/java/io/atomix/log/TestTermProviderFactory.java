@@ -1,5 +1,7 @@
 package io.atomix.log;
 
+import io.atomix.protocols.log.TermProvider;
+
 /**
  * Test term provider factory.
  */

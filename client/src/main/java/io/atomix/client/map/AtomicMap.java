@@ -28,7 +28,7 @@ import io.atomix.client.PrimitiveType;
 import io.atomix.client.SyncPrimitive;
 import io.atomix.client.collection.DistributedCollection;
 import io.atomix.client.set.DistributedSet;
-import io.atomix.utils.time.Versioned;
+import io.atomix.client.Versioned;
 
 /**
  * {@code ConsistentMap} provides the same functionality as {@link AsyncAtomicMap} with

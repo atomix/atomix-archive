@@ -1,0 +1,97 @@
+syntax = "proto3";
+
+package atomix.partition;
+
+import "google/protobuf/any.proto";
+
+option java_package = "io.atomix.api.partition";
+option java_multiple_files = true;
+
+// Gets a list of partition groups
+message GetPartitionGroupsRequest {
+}
+
+// Returns a list of partition groups
+message GetPartitionGroupsResponse {
+    repeated PartitionGroup groups = 1;
+}
+
+// Creates a new partition group
+message CreatePartitionGroupRequest {
+    PartitionGroup group = 1;
+}
+
+// Returns the status of a partition group
+message CreatePartitionGroupResponse {
+
+}
+
+// Deletes a partition group
+message DeletePartitionGroupRequest {
+    string name = 1;
+}
+
+// Returns the result of deleting a partition group
+message DeletePartitionGroupResponse {
+
+}
+
+// Partition group
+message PartitionGroup {
+    string name = 1;
+    google.protobuf.Any group = 2;
+}
+
+// Partition service
+service PartitionService {
+
+    // Creates a partition group
+    rpc CreatePartitionGroup(CreatePartitionGroupRequest) returns (CreatePartitionGroupResponse) {}
+
+    // Deletes a partition group
+    rpc DeletePartitionGroup(DeletePartitionGroupRequest) returns (DeletePartitionGroupResponse) {}
+
+    // Gets a list of active partition groups
+    rpc GetPartitionGroups(GetPartitionGroupsRequest) returns (GetPartitionGroupsResponse) {}
+
+}
+
+// Partition identifier
+message PartitionId {
+    int32 partition = 1;
+    string group = 2;
+}
+
+// Enters a primary election
+message EnterRequest {
+    PartitionId partition_id = 1;
+    GroupMember member = 2;
+}
+
+// Enter response
+message EnterResponse {
+    PrimaryTerm term = 1;
+}
+
+// Primary election group member
+message GroupMember {
+    string member = 1;
+    string group = 2;
+}
+
+// Primary term
+message PrimaryTerm {
+    int64 term = 1;
+    GroupMember primary = 2;
+    repeated GroupMember candidates = 3;
+}
+
+// Partition primary election service
+service PrimaryElectionService {
+
+    // Enters the primary election
+    // Election updates are streamed back to the client as changes occur
+    // in the controller.
+    rpc Enter(EnterRequest) returns (stream EnterResponse) {}
+
+}

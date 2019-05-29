@@ -17,7 +17,7 @@ package io.atomix.client.value;
 
 import com.google.common.base.MoreObjects;
 import io.atomix.utils.event.AbstractEvent;
-import io.atomix.utils.time.Versioned;
+import io.atomix.client.Versioned;
 
 import java.util.Objects;
 

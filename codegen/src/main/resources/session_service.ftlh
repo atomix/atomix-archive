@@ -15,9 +15,9 @@
  */
 package ${serviceClass.packageName};
 
-import io.atomix.primitive.session.SessionId;
-import io.atomix.primitive.service.SessionManagedPrimitiveService;
-import io.atomix.primitive.service.ServiceOperationRegistry;
+import io.atomix.service.session.SessionId;
+import io.atomix.service.SessionManagedPrimitiveService;
+import io.atomix.service.ServiceOperationRegistry;
 <#if hasStreams>
 import io.atomix.utils.stream.StreamHandler;
 </#if>

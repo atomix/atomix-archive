@@ -17,9 +17,9 @@ package io.atomix.client.set;
 
 import io.atomix.client.PrimitiveManagementService;
 import io.atomix.client.collection.DistributedCollectionBuilder;
-import io.atomix.primitive.protocol.PrimitiveProtocol;
-import io.atomix.primitive.protocol.ProxyCompatibleBuilder;
-import io.atomix.primitive.protocol.ServiceProtocol;
+import io.atomix.service.protocol.PrimitiveProtocol;
+import io.atomix.service.protocol.ProxyCompatibleBuilder;
+import io.atomix.service.protocol.ServiceProtocol;
 
 /**
  * Builder for distributed set.

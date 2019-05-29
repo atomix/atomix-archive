@@ -36,7 +36,7 @@ import io.atomix.client.map.AtomicMapEventListener;
 import io.atomix.client.set.AsyncDistributedSet;
 import io.atomix.client.set.impl.TranscodingAsyncDistributedSet;
 import io.atomix.utils.concurrent.Futures;
-import io.atomix.utils.time.Versioned;
+import io.atomix.client.Versioned;
 
 /**
  * An {@code AsyncConsistentMap} that maps its operations to operations on a

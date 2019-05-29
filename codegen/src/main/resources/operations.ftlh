@@ -15,10 +15,10 @@
  */
 package ${operationsClass.packageName};
 
-import io.atomix.primitive.operation.CommandId;
-import io.atomix.primitive.operation.QueryId;
+import io.atomix.service.operation.CommandId;
+import io.atomix.service.operation.QueryId;
 <#if hasAsyncs || hasStreams>
-import io.atomix.primitive.operation.StreamType;
+import io.atomix.service.operation.StreamType;
 </#if>
 
 <#list operations as operation>

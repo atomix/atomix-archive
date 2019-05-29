@@ -15,6 +15,8 @@
  */
 package io.atomix.storage.journal;
 
+import java.io.Serializable;
+
 import io.atomix.utils.misc.ArraySizeHashPrinter;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
@@ -24,7 +26,7 @@ import static com.google.common.base.MoreObjects.toStringHelper;
  *
  * @author <a href="http://github.com/kuujo">Jordan Halterman</a>
  */
-public class TestEntry {
+public class TestEntry implements Serializable {
   private final byte[] bytes;
 
   public TestEntry(int size) {

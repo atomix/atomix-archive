@@ -55,7 +55,7 @@ import io.atomix.client.set.AsyncDistributedSet;
 import io.atomix.client.set.impl.UnsupportedAsyncDistributedSet;
 import io.atomix.primitive.PrimitiveException;
 import io.atomix.utils.concurrent.Futures;
-import io.atomix.utils.time.Versioned;
+import io.atomix.client.Versioned;
 import io.grpc.stub.StreamObserver;
 
 /**

@@ -16,7 +16,7 @@
 package io.atomix.client.value;
 
 import io.atomix.client.AbstractPrimitiveTest;
-import io.atomix.utils.time.Versioned;
+import io.atomix.client.Versioned;
 import org.junit.Test;
 
 import java.util.concurrent.BlockingQueue;

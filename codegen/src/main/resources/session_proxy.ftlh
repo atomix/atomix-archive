@@ -15,19 +15,18 @@
  */
 package ${proxyClass.packageName};
 
-import io.atomix.primitive.partition.PartitionId;
-import io.atomix.primitive.proxy.SessionEnabledPrimitiveProxy;
-import io.atomix.primitive.service.impl.ServiceId;
-import io.atomix.primitive.session.SessionClient;
-import io.atomix.primitive.session.impl.SessionResponseContext;
+import io.atomix.service.proxy.SessionEnabledServiceProxy;
+import io.atomix.service.protocol.ServiceId;
+import io.atomix.service.client.SessionClient;
+import io.atomix.service.protocol.SessionResponseContext;
 <#if hasCommands>
-import io.atomix.primitive.session.impl.SessionCommandContext;
+import io.atomix.service.protocol.SessionCommandContext;
 </#if>
 <#if hasQueries>
-import io.atomix.primitive.session.impl.SessionQueryContext;
+import io.atomix.service.protocol.SessionQueryContext;
 </#if>
 <#if hasStreams>
-import io.atomix.primitive.session.impl.SessionStreamContext;
+import io.atomix.service.protocol.SessionStreamContext;
 import io.atomix.utils.stream.StreamHandler;
 </#if>
 import io.atomix.utils.concurrent.ThreadContext;
@@ -49,7 +48,7 @@ import ${operation.responseClass.packageName}.${operation.responseClass.classNam
 /**
  * Atomix generated proxy ${proxyClass.className}.
  */
-public class ${proxyClass.className} extends SessionEnabledPrimitiveProxy {
+public class ${proxyClass.className} extends SessionEnabledServiceProxy {
     public ${proxyClass.className}(SessionClient client) {
         super(client);
     }

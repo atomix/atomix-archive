@@ -22,6 +22,8 @@ import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 
 import com.google.common.collect.Sets;
+import io.atomix.protocols.log.Term;
+import io.atomix.protocols.log.TermProvider;
 
 /**
  * Test primary election.

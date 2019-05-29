@@ -26,7 +26,7 @@ import java.util.stream.Collectors;
 
 import com.google.common.collect.Maps;
 import io.atomix.client.AbstractPrimitiveTest;
-import io.atomix.utils.time.Versioned;
+import io.atomix.client.Versioned;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;

@@ -15,6 +15,8 @@
  */
 package io.atomix.storage.journal;
 
+import java.io.IOException;
+
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
@@ -24,7 +26,7 @@ import static org.junit.Assert.assertTrue;
  * Persistent journal test base.
  */
 public abstract class PersistentJournalTest extends AbstractJournalTest {
-  protected PersistentJournalTest(int maxSegmentSize, int cacheSize) {
+  protected PersistentJournalTest(int maxSegmentSize, int cacheSize) throws IOException {
     super(maxSegmentSize, cacheSize);
   }
 

@@ -21,7 +21,7 @@ import io.atomix.client.value.AsyncAtomicValue;
 import io.atomix.client.value.AtomicValue;
 import io.atomix.client.value.AtomicValueEventListener;
 import io.atomix.primitive.PrimitiveException;
-import io.atomix.utils.time.Versioned;
+import io.atomix.client.Versioned;
 
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;

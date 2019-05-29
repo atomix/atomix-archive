@@ -31,9 +31,9 @@ import com.google.protobuf.compiler.PluginProtos;
 import freemarker.template.Configuration;
 import freemarker.template.Template;
 import freemarker.template.TemplateException;
-import io.atomix.primitive.operation.OperationType;
-import io.atomix.primitive.service.impl.PrimitiveServiceProto;
-import io.atomix.primitive.service.impl.ServiceTypeInfo;
+import io.atomix.service.ServiceDescriptorProto;
+import io.atomix.service.ServiceTypeInfo;
+import io.atomix.service.operation.OperationType;
 import org.apache.commons.lang3.tuple.Pair;
 
 /**
@@ -287,8 +287,8 @@ public class PrimitiveServiceGenerator {
    * @return indicates whether the given service is a session enabled service
    */
   private boolean isSessionService(DescriptorProtos.ServiceDescriptorProto serviceDescriptor) {
-    return serviceDescriptor.getOptions().hasExtension(PrimitiveServiceProto.type)
-        && serviceDescriptor.getOptions().getExtension(PrimitiveServiceProto.type) == ServiceTypeInfo.SESSION;
+    return serviceDescriptor.getOptions().hasExtension(ServiceDescriptorProto.type)
+        && serviceDescriptor.getOptions().getExtension(ServiceDescriptorProto.type) == ServiceTypeInfo.SESSION;
   }
 
   /**
@@ -298,7 +298,7 @@ public class PrimitiveServiceGenerator {
    * @return indicates whether the given descriptor is a primitive operation
    */
   private boolean isOperationMethod(DescriptorProtos.MethodDescriptorProto methodDescriptor) {
-    return methodDescriptor.getOptions().hasExtension(PrimitiveServiceProto.operation);
+    return methodDescriptor.getOptions().hasExtension(ServiceDescriptorProto.operation);
   }
 
   /**
@@ -308,7 +308,7 @@ public class PrimitiveServiceGenerator {
    * @return indicates whether the given method is an asynchronous method
    */
   private boolean isAsyncMethod(DescriptorProtos.MethodDescriptorProto methodDescriptor) {
-    return methodDescriptor.getOptions().getExtension(PrimitiveServiceProto.operation).getAsync();
+    return methodDescriptor.getOptions().getExtension(ServiceDescriptorProto.operation).getAsync();
   }
 
   /**
@@ -368,8 +368,8 @@ public class PrimitiveServiceGenerator {
    * @return the service name
    */
   private static String getServiceName(DescriptorProtos.ServiceDescriptorProto serviceDescriptor) {
-    if (serviceDescriptor.getOptions().hasExtension(PrimitiveServiceProto.name)) {
-      return serviceDescriptor.getOptions().getExtension(PrimitiveServiceProto.name);
+    if (serviceDescriptor.getOptions().hasExtension(ServiceDescriptorProto.name)) {
+      return serviceDescriptor.getOptions().getExtension(ServiceDescriptorProto.name);
     }
     return getBaseName(serviceDescriptor);
   }
@@ -479,7 +479,7 @@ public class PrimitiveServiceGenerator {
    * @return the operation name
    */
   private static String getOperationName(DescriptorProtos.MethodDescriptorProto methodDescriptor) {
-    String name = methodDescriptor.getOptions().getExtension(PrimitiveServiceProto.operation).getName();
+    String name = methodDescriptor.getOptions().getExtension(ServiceDescriptorProto.operation).getName();
     return Strings.isNullOrEmpty(name)
         ? getMethodName(methodDescriptor)
         : name;
@@ -502,7 +502,7 @@ public class PrimitiveServiceGenerator {
    * @return the operation type name
    */
   private static String getOperationType(DescriptorProtos.MethodDescriptorProto methodDescriptor) {
-    return methodDescriptor.getOptions().getExtension(PrimitiveServiceProto.operation).getType().name();
+    return methodDescriptor.getOptions().getExtension(ServiceDescriptorProto.operation).getType().name();
   }
 
   /**

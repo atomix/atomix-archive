@@ -1,0 +1,132 @@
+syntax = "proto3";
+
+package atomix.service.protocol;
+
+option java_package = "io.atomix.service.protocol";
+option java_outer_classname = "SessionProto";
+option java_multiple_files = true;
+
+// Session managed service snapshot
+message SessionManagedServiceSnapshot {
+    repeated SessionSnapshot sessions = 1;
+    bytes snapshot = 2;
+}
+
+// Service session
+message SessionSnapshot {
+    int64 session_id = 1;
+    int64 timeout = 2;
+    int64 timestamp = 3;
+    int64 command_sequence = 4;
+    int64 last_applied = 5;
+    repeated SessionStreamSnapshot streams = 6;
+}
+
+// Service session stream
+message SessionStreamSnapshot {
+    uint64 stream_id = 1;
+    string type = 2;
+    uint64 sequence_number = 3;
+    uint64 last_completed = 4;
+}
+
+message SessionRequest {
+    oneof request {
+        OpenSessionRequest open_session = 1;
+        KeepAliveRequest keep_alive = 2;
+        CloseSessionRequest close_session = 3;
+        SessionCommandRequest command = 4;
+        SessionQueryRequest query = 5;
+    }
+}
+
+message SessionResponse {
+    oneof response {
+        OpenSessionResponse open_session = 1;
+        KeepAliveResponse keep_alive = 2;
+        CloseSessionResponse close_session = 3;
+        SessionCommandResponse command = 4;
+        SessionQueryResponse query = 5;
+        SessionStreamResponse stream = 6;
+    }
+}
+
+message OpenSessionRequest {
+    int64 timeout = 1;
+}
+
+message OpenSessionResponse {
+    uint64 session_id = 1;
+}
+
+message KeepAliveRequest {
+    uint64 session_id = 1;
+    uint64 command_sequence = 2;
+    map<int64, int64> streams = 3;
+}
+
+message KeepAliveResponse {
+}
+
+message CloseSessionRequest {
+    uint64 session_id = 1;
+}
+
+message CloseSessionResponse {
+
+}
+
+message SessionCommandRequest {
+    SessionCommandContext context = 1;
+    string name = 2;
+    bytes input = 3;
+}
+
+message SessionCommandResponse {
+    SessionResponseContext context = 1;
+    bytes output = 2;
+}
+
+message SessionQueryRequest {
+    SessionQueryContext context = 1;
+    string name = 2;
+    bytes input = 3;
+}
+
+message SessionQueryResponse {
+    SessionResponseContext context = 1;
+    bytes output = 2;
+}
+
+message SessionCommandContext {
+    uint64 session_id = 1;
+    uint64 sequence_number = 2;
+}
+
+message SessionQueryContext {
+    uint64 session_id = 1;
+    uint64 last_sequence_number = 2;
+    uint64 last_index = 3;
+}
+
+message SessionResponseContext {
+    uint64 index = 1;
+    uint64 sequence = 2;
+    repeated SessionStreamContext streams = 3;
+}
+
+message SessionStreamContext {
+    uint64 stream_id = 1;
+    uint64 index = 2;
+    uint64 sequence = 3;
+}
+
+message SessionStreamResponse {
+    SessionStreamContext context = 1;
+    bytes value = 2;
+}
+
+message PrimitiveEvent {
+    string type = 1;
+    bytes value = 2;
+}

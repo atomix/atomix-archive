@@ -15,6 +15,6 @@
  */
 
 /**
- * Provides a {@link io.atomix.primitive.protocol.PrimitiveProtocol} implementation for distributed log based primitives.
+ * Provides a {@link io.atomix.service.protocol.PrimitiveProtocol} implementation for distributed log based primitives.
  */
 package io.atomix.protocols.log;

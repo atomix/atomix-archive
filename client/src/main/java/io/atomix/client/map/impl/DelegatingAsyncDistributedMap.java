@@ -49,7 +49,7 @@ import io.atomix.client.set.DistributedSet;
 import io.atomix.client.set.DistributedSetType;
 import io.atomix.client.set.impl.BlockingDistributedSet;
 import io.atomix.utils.concurrent.Futures;
-import io.atomix.utils.time.Versioned;
+import io.atomix.client.Versioned;
 
 /**
  * Distributed map implementation that delegates to an atomic map.

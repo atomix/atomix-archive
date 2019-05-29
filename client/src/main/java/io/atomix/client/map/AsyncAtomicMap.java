@@ -31,7 +31,7 @@ import io.atomix.client.DistributedPrimitive;
 import io.atomix.client.PrimitiveType;
 import io.atomix.client.collection.AsyncDistributedCollection;
 import io.atomix.client.set.AsyncDistributedSet;
-import io.atomix.utils.time.Versioned;
+import io.atomix.client.Versioned;
 
 /**
  * A distributed, strongly consistent map whose methods are all executed asynchronously.

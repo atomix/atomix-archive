@@ -29,7 +29,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
-import io.atomix.primitive.protocol.ServiceProtocol;
+import io.atomix.server.protocol.ServiceProtocol;
 import io.atomix.protocols.log.partition.LogPartitionGroup;
 import io.atomix.protocols.raft.MultiRaftProtocol;
 import io.atomix.protocols.raft.partition.RaftPartitionGroup;
