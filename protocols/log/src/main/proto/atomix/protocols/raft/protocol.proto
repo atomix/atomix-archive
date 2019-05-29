@@ -49,6 +49,9 @@ message ResetRequest {
     int64 index = 3;
 }
 
+message ResetResponse {
+}
+
 message BackupOperation {
     int64 index = 1;
     int64 term = 2;
@@ -63,13 +66,12 @@ enum ResponseStatus {
 
 service DistributedLogService {
 
-    rpc Append (AppendRequest) returns (AppendResponse) {
-    }
+    rpc Append (AppendRequest) returns (AppendResponse) {}
 
-    rpc Consume (ConsumeRequest) returns (ConsumeResponse) {
-    }
+    rpc Consume (ConsumeRequest) returns (ConsumeResponse) {}
 
-    rpc Backup (BackupRequest) returns (BackupResponse) {
-    }
+    rpc Backup (BackupRequest) returns (BackupResponse) {}
+
+    rpc Reset(ResetRequest) returns (ResetResponse) {}
 
 }

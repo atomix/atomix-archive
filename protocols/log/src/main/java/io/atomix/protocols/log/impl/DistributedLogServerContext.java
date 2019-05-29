@@ -24,7 +24,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
-import com.google.protobuf.Message;
 import io.atomix.protocols.log.DistributedLogServer;
 import io.atomix.protocols.log.LogEntry;
 import io.atomix.protocols.log.ReplicationStrategy;
@@ -383,7 +382,7 @@ public class DistributedLogServerContext implements Managed<Void> {
   /**
    * Handles a read request.
    */
-  private CompletableFuture<ConsumeResponse> consume(ConsumeRequest request, StreamHandler<ConsumeResponse> handler) {
+  private CompletableFuture<Void> consume(ConsumeRequest request, StreamHandler<ConsumeResponse> handler) {
     return runOnContext(() -> role.consume(request, handler));
   }
 
@@ -394,7 +393,7 @@ public class DistributedLogServerContext implements Managed<Void> {
     role.reset(request);
   }
 
-  private <R extends Message> CompletableFuture<R> runOnContext(Supplier<CompletableFuture<R>> function) {
+  private <R> CompletableFuture<R> runOnContext(Supplier<CompletableFuture<R>> function) {
     CompletableFuture<R> future = new CompletableFuture<>();
     threadContext.execute(() -> {
       function.get().whenComplete((response, error) -> {

@@ -29,12 +29,12 @@ import io.atomix.protocols.log.protocol.BackupOperation;
 import io.atomix.protocols.log.protocol.ConsumeRequest;
 import io.atomix.protocols.log.protocol.ConsumeResponse;
 import io.atomix.protocols.log.protocol.LogRecord;
-import io.atomix.protocols.log.protocol.RecordsRequest;
 import io.atomix.protocols.log.protocol.ResetRequest;
 import io.atomix.protocols.log.protocol.ResponseStatus;
 import io.atomix.storage.StorageException;
 import io.atomix.storage.journal.Indexed;
 import io.atomix.storage.journal.JournalReader;
+import io.atomix.utils.stream.StreamHandler;
 
 /**
  * Primary role.
@@ -87,15 +87,13 @@ public class LeaderRole extends LogServerRole {
   }
 
   @Override
-  public CompletableFuture<ConsumeResponse> consume(ConsumeRequest request) {
+  public CompletableFuture<Void> consume(ConsumeRequest request, StreamHandler<ConsumeResponse> handler) {
     logRequest(request);
     JournalReader<LogEntry> reader = context.journal().openReader(request.getIndex(), JournalReader.Mode.COMMITS);
-    ConsumerSender consumer = new ConsumerSender(request.getMemberId(), request.getConsumerId(), reader);
+    ConsumerSender consumer = new ConsumerSender(request.getMemberId(), request.getConsumerId(), reader, handler);
     consumers.put(new ConsumerKey(request.getMemberId(), request.getConsumerId()), consumer);
     consumer.next();
-    return CompletableFuture.completedFuture(logResponse(ConsumeResponse.newBuilder()
-        .setStatus(ResponseStatus.OK)
-        .build()));
+    return CompletableFuture.completedFuture(null);
   }
 
   @Override
@@ -120,12 +118,14 @@ public class LeaderRole extends LogServerRole {
     private final String memberId;
     private final long consumerId;
     private final JournalReader<LogEntry> reader;
+    private final StreamHandler<ConsumeResponse> handler;
     private boolean open = true;
 
-    ConsumerSender(String memberId, long consumerId, JournalReader<LogEntry> reader) {
+    ConsumerSender(String memberId, long consumerId, JournalReader<LogEntry> reader, StreamHandler<ConsumeResponse> handler) {
       this.memberId = memberId;
       this.consumerId = consumerId;
       this.reader = reader;
+      this.handler = handler;
     }
 
     /**
@@ -154,12 +154,12 @@ public class LeaderRole extends LogServerRole {
               .setValue(entry.entry().getValue())
               .build();
           boolean reset = reader.getFirstIndex() == entry.index();
-          RecordsRequest request = RecordsRequest.newBuilder()
+          ConsumeResponse response = ConsumeResponse.newBuilder()
               .setRecord(record)
               .setReset(reset)
               .build();
-          log.trace("Sending {} to {} at {}", request, memberId, consumerId);
-          context.protocol().produce(memberId, consumerId, request);
+          log.trace("Sending {} to {} at {}", response, memberId, consumerId);
+          handler.next(response);
           next();
         }
       });
@@ -170,6 +170,7 @@ public class LeaderRole extends LogServerRole {
      */
     void close() {
       reader.close();
+      handler.complete();
       open = false;
     }
   }
