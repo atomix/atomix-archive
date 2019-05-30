@@ -15,8 +15,11 @@
  */
 package io.atomix.client.map.impl;
 
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.stream.Collectors;
 
+import com.google.common.collect.Maps;
 import com.google.common.io.BaseEncoding;
 import io.atomix.api.primitive.PrimitiveId;
 import io.atomix.client.PrimitiveManagementService;
@@ -37,8 +40,13 @@ public class DefaultDistributedMapBuilder<K, V> extends DistributedMapBuilder<K,
   @Override
   @SuppressWarnings("unchecked")
   public CompletableFuture<DistributedMap<K, V>> buildAsync() {
-    return new DefaultAsyncAtomicMap(getPrimitiveId(), managementService, sessionTimeout)
-        .connect()
+    return managementService.getPartitionService().getPartitionGroup(group)
+        .thenCompose(group -> {
+          Map<Integer, AsyncAtomicMap<String, byte[]>> partitions = group.getPartitions().stream()
+              .map(partition -> Maps.immutableEntry(partition.id(), new DefaultAsyncAtomicMap(getPrimitiveId(), partition, managementService.getThreadFactory().createContext(), sessionTimeout)))
+              .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+          return new PartitionedAsyncAtomicMap(id, partitions, partitioner).connect();
+        })
         .thenApply(rawMap -> {
           Serializer serializer = serializer();
           return new TranscodingAsyncAtomicMap<K, V, String, byte[]>(

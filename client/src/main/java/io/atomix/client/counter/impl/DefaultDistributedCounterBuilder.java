@@ -33,9 +33,13 @@ public class DefaultDistributedCounterBuilder extends DistributedCounterBuilder 
 
   @Override
   public CompletableFuture<DistributedCounter> buildAsync() {
-    return new DefaultAsyncAtomicCounter(getPrimitiveId(), managementService)
-        .connect()
-        .thenApply(DelegatingDistributedCounter::new)
-        .thenApply(AsyncDistributedCounter::sync);
+    return managementService.getPartitionService().getPartitionGroup(group)
+        .thenCompose(group -> new DefaultAsyncAtomicCounter(
+            getPrimitiveId(),
+            group.getPartition(partitioner.partition(getPrimitiveId().getName(), group.getPartitionIds())),
+            managementService.getThreadFactory().createContext())
+            .connect()
+            .thenApply(DelegatingDistributedCounter::new)
+            .thenApply(AsyncDistributedCounter::sync));
   }
 }

@@ -30,16 +30,17 @@ import io.atomix.api.set.RemoveResponse;
 import io.atomix.api.set.SetServiceGrpc;
 import io.atomix.api.set.SizeRequest;
 import io.atomix.api.set.SizeResponse;
-import io.atomix.client.PrimitiveManagementService;
 import io.atomix.client.collection.CollectionEvent;
 import io.atomix.client.collection.CollectionEventListener;
 import io.atomix.client.impl.AbstractManagedPrimitive;
 import io.atomix.client.impl.TranscodingStreamObserver;
 import io.atomix.client.iterator.AsyncIterator;
 import io.atomix.client.iterator.impl.StreamObserverIterator;
+import io.atomix.client.partition.Partition;
 import io.atomix.client.set.AsyncDistributedSet;
 import io.atomix.client.set.DistributedSet;
 import io.atomix.client.utils.concurrent.Futures;
+import io.atomix.client.utils.concurrent.ThreadContext;
 import io.grpc.stub.StreamObserver;
 
 /**
@@ -51,8 +52,8 @@ public class DefaultAsyncDistributedSet
   private volatile CompletableFuture<Long> listenFuture;
   private final Map<CollectionEventListener<String>, Executor> eventListeners = new ConcurrentHashMap<>();
 
-  public DefaultAsyncDistributedSet(PrimitiveId id, PrimitiveManagementService managementService, Duration timeout) {
-    super(id, SetServiceGrpc.newStub(managementService.getChannelFactory().getChannel()), managementService, timeout);
+  public DefaultAsyncDistributedSet(PrimitiveId id, Partition partition, ThreadContext context, Duration timeout) {
+    super(id, SetServiceGrpc.newStub(partition.getChannelFactory().getChannel()), context, timeout);
   }
 
   @Override

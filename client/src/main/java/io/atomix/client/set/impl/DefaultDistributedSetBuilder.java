@@ -15,8 +15,11 @@
  */
 package io.atomix.client.set.impl;
 
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.stream.Collectors;
 
+import com.google.common.collect.Maps;
 import com.google.common.io.BaseEncoding;
 import io.atomix.api.primitive.PrimitiveId;
 import io.atomix.client.PrimitiveManagementService;
@@ -38,8 +41,14 @@ public class DefaultDistributedSetBuilder<E> extends DistributedSetBuilder<E> {
   @Override
   @SuppressWarnings("unchecked")
   public CompletableFuture<DistributedSet<E>> buildAsync() {
-    return new DefaultAsyncDistributedSet(getPrimitiveId(), managementService, sessionTimeout)
-        .connect()
+    return managementService.getPartitionService().getPartitionGroup(group)
+        .thenCompose(group -> {
+          Map<Integer, AsyncDistributedSet<String>> partitions = group.getPartitions().stream()
+              .map(partition -> Maps.immutableEntry(partition.id(), new DefaultAsyncDistributedSet(
+                  getPrimitiveId(), partition, managementService.getThreadFactory().createContext(), sessionTimeout)))
+              .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+          return new PartitionedAsyncDistributedSet(id, partitions, partitioner).connect();
+        })
         .thenApply(rawSet -> {
           Serializer serializer = serializer();
           return new TranscodingAsyncDistributedSet<E, String>(

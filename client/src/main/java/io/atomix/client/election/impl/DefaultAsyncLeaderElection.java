@@ -43,7 +43,6 @@ import io.atomix.api.election.PromoteResponse;
 import io.atomix.api.election.WithdrawRequest;
 import io.atomix.api.election.WithdrawResponse;
 import io.atomix.api.primitive.PrimitiveId;
-import io.atomix.client.PrimitiveManagementService;
 import io.atomix.client.election.AsyncLeaderElection;
 import io.atomix.client.election.Leader;
 import io.atomix.client.election.LeaderElection;
@@ -51,6 +50,8 @@ import io.atomix.client.election.Leadership;
 import io.atomix.client.election.LeadershipEvent;
 import io.atomix.client.election.LeadershipEventListener;
 import io.atomix.client.impl.AbstractManagedPrimitive;
+import io.atomix.client.partition.Partition;
+import io.atomix.client.utils.concurrent.ThreadContext;
 import io.grpc.stub.StreamObserver;
 
 /**
@@ -62,8 +63,8 @@ public class DefaultAsyncLeaderElection
   private volatile CompletableFuture<Long> listenFuture;
   private final Set<LeadershipEventListener<String>> eventListeners = new CopyOnWriteArraySet<>();
 
-  public DefaultAsyncLeaderElection(PrimitiveId id, PrimitiveManagementService managementService, Duration timeout) {
-    super(id, LeaderElectionServiceGrpc.newStub(managementService.getChannelFactory().getChannel()), managementService, timeout);
+  public DefaultAsyncLeaderElection(PrimitiveId id, Partition partition, ThreadContext context, Duration timeout) {
+    super(id, LeaderElectionServiceGrpc.newStub(partition.getChannelFactory().getChannel()), context, timeout);
   }
 
   @Override

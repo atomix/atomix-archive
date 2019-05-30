@@ -23,9 +23,10 @@ import io.atomix.api.value.KeepAliveResponse;
 import io.atomix.api.value.SetRequest;
 import io.atomix.api.value.SetResponse;
 import io.atomix.api.value.ValueServiceGrpc;
-import io.atomix.client.PrimitiveManagementService;
 import io.atomix.client.Versioned;
 import io.atomix.client.impl.AbstractManagedPrimitive;
+import io.atomix.client.partition.Partition;
+import io.atomix.client.utils.concurrent.ThreadContext;
 import io.atomix.client.value.AsyncAtomicValue;
 import io.atomix.client.value.AtomicValue;
 import io.atomix.client.value.AtomicValueEvent;
@@ -41,11 +42,8 @@ public class DefaultAsyncAtomicValue
   private volatile CompletableFuture<Long> listenFuture;
   private final Set<AtomicValueEventListener<String>> eventListeners = new CopyOnWriteArraySet<>();
 
-  public DefaultAsyncAtomicValue(
-      PrimitiveId id,
-      PrimitiveManagementService managementService,
-      Duration timeout) {
-    super(id, ValueServiceGrpc.newStub(managementService.getChannelFactory().getChannel()), managementService, timeout);
+  public DefaultAsyncAtomicValue(PrimitiveId id, Partition partition, ThreadContext context, Duration timeout) {
+    super(id, ValueServiceGrpc.newStub(partition.getChannelFactory().getChannel()), context, timeout);
   }
 
   @Override

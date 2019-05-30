@@ -34,8 +34,12 @@ public class DefaultAtomicCounterBuilder extends AtomicCounterBuilder {
   @Override
   @SuppressWarnings("unchecked")
   public CompletableFuture<AtomicCounter> buildAsync() {
-    return new DefaultAsyncAtomicCounter(getPrimitiveId(), managementService)
-        .connect()
-        .thenApply(AsyncAtomicCounter::sync);
+    return managementService.getPartitionService().getPartitionGroup(group)
+        .thenCompose(group -> new DefaultAsyncAtomicCounter(
+            getPrimitiveId(),
+            group.getPartition(partitioner.partition(getPrimitiveId().getName(), group.getPartitionIds())),
+            managementService.getThreadFactory().createContext())
+            .connect()
+            .thenApply(AsyncAtomicCounter::sync));
   }
 }

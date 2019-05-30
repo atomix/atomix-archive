@@ -13,10 +13,10 @@ import io.atomix.api.headers.SessionStreamHeader;
 import io.atomix.api.primitive.PrimitiveId;
 import io.atomix.client.AsyncPrimitive;
 import io.atomix.client.ManagedAsyncPrimitive;
-import io.atomix.client.PrimitiveManagementService;
 import io.atomix.client.PrimitiveState;
 import io.atomix.client.utils.concurrent.Futures;
 import io.atomix.client.utils.concurrent.Scheduled;
+import io.atomix.client.utils.concurrent.ThreadContext;
 import io.grpc.stub.StreamObserver;
 
 /**
@@ -36,9 +36,9 @@ public abstract class AbstractManagedPrimitive<S, P extends AsyncPrimitive> exte
   protected AbstractManagedPrimitive(
       PrimitiveId id,
       S service,
-      PrimitiveManagementService managementService,
+      ThreadContext context,
       Duration timeout) {
-    super(id, service, managementService);
+    super(id, service, context);
     this.timeout = timeout;
   }
 

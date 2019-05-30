@@ -34,9 +34,13 @@ public class DelegatingAtomicIdGeneratorBuilder extends AtomicIdGeneratorBuilder
 
   @Override
   public CompletableFuture<AtomicIdGenerator> buildAsync() {
-    return new DefaultAsyncAtomicCounter(getPrimitiveId(), managementService)
-        .connect()
-        .thenApply(DelegatingAtomicIdGenerator::new)
-        .thenApply(AsyncAtomicIdGenerator::sync);
+    return managementService.getPartitionService().getPartitionGroup(group)
+        .thenCompose(group -> new DefaultAsyncAtomicCounter(
+            getPrimitiveId(),
+            group.getPartition(partitioner.partition(getPrimitiveId().getName(), group.getPartitionIds())),
+            managementService.getThreadFactory().createContext())
+            .connect()
+            .thenApply(DelegatingAtomicIdGenerator::new)
+            .thenApply(AsyncAtomicIdGenerator::sync));
   }
 }

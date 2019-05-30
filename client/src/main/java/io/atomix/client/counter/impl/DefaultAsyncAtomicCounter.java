@@ -35,10 +35,11 @@ import io.atomix.api.counter.SetRequest;
 import io.atomix.api.counter.SetResponse;
 import io.atomix.api.headers.ResponseHeader;
 import io.atomix.api.primitive.PrimitiveId;
-import io.atomix.client.PrimitiveManagementService;
 import io.atomix.client.counter.AsyncAtomicCounter;
 import io.atomix.client.counter.AtomicCounter;
 import io.atomix.client.impl.AbstractAsyncPrimitive;
+import io.atomix.client.partition.Partition;
+import io.atomix.client.utils.concurrent.ThreadContext;
 
 /**
  * Atomix counter implementation.
@@ -46,10 +47,8 @@ import io.atomix.client.impl.AbstractAsyncPrimitive;
 public class DefaultAsyncAtomicCounter
     extends AbstractAsyncPrimitive<CounterServiceGrpc.CounterServiceStub, AsyncAtomicCounter>
     implements AsyncAtomicCounter {
-  public DefaultAsyncAtomicCounter(
-      PrimitiveId id,
-      PrimitiveManagementService managementService) {
-    super(id, CounterServiceGrpc.newStub(managementService.getChannelFactory().getChannel()), managementService);
+  public DefaultAsyncAtomicCounter(PrimitiveId id, Partition partition, ThreadContext context) {
+    super(id, CounterServiceGrpc.newStub(partition.getChannelFactory().getChannel()), context);
   }
 
   @Override

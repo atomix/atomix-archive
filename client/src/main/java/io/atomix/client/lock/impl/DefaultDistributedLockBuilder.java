@@ -34,9 +34,14 @@ public class DefaultDistributedLockBuilder extends DistributedLockBuilder {
   @Override
   @SuppressWarnings("unchecked")
   public CompletableFuture<DistributedLock> buildAsync() {
-    return new DefaultAsyncAtomicLock(getPrimitiveId(), managementService, sessionTimeout)
-        .connect()
-        .thenApply(DelegatingAsyncDistributedLock::new)
-        .thenApply(AsyncDistributedLock::sync);
+    return managementService.getPartitionService().getPartitionGroup(group)
+        .thenCompose(group -> new DefaultAsyncAtomicLock(
+            getPrimitiveId(),
+            group.getPartition(partitioner.partition(getPrimitiveId().getName(), group.getPartitionIds())),
+            managementService.getThreadFactory().createContext(),
+            sessionTimeout)
+            .connect()
+            .thenApply(DelegatingAsyncDistributedLock::new)
+            .thenApply(AsyncDistributedLock::sync));
   }
 }

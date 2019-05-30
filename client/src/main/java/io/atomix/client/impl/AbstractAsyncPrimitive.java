@@ -9,7 +9,6 @@ import io.atomix.api.headers.ResponseHeader;
 import io.atomix.api.primitive.PrimitiveId;
 import io.atomix.client.AsyncPrimitive;
 import io.atomix.client.ManagedAsyncPrimitive;
-import io.atomix.client.PrimitiveManagementService;
 import io.atomix.client.utils.concurrent.ThreadContext;
 import io.grpc.stub.StreamObserver;
 
@@ -24,10 +23,10 @@ public abstract class AbstractAsyncPrimitive<S, P extends AsyncPrimitive> implem
   private final ThreadContext context;
   private final AtomicLong index = new AtomicLong();
 
-  public AbstractAsyncPrimitive(PrimitiveId id, S service, PrimitiveManagementService managementService) {
+  public AbstractAsyncPrimitive(PrimitiveId id, S service, ThreadContext context) {
     this.id = checkNotNull(id);
     this.service = checkNotNull(service);
-    this.context = managementService.getThreadFactory().createContext();
+    this.context = context;
   }
 
   @Override

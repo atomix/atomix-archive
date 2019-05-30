@@ -17,24 +17,29 @@ package io.atomix.client.impl;
 
 import io.atomix.client.PrimitiveCache;
 import io.atomix.client.PrimitiveManagementService;
-import io.atomix.client.channel.ChannelFactory;
+import io.atomix.client.partition.PartitionService;
 import io.atomix.client.utils.concurrent.ThreadContextFactory;
 
 /**
  * Default primitive management service.
  */
 public class DefaultPrimitiveManagementService implements PrimitiveManagementService {
+  private final PartitionService partitionService;
   private final PrimitiveCache primitiveCache;
-  private final ChannelFactory channelFactory;
   private final ThreadContextFactory threadContextFactory;
 
   public DefaultPrimitiveManagementService(
+      PartitionService partitionService,
       PrimitiveCache primitiveCache,
-      ChannelFactory channelFactory,
       ThreadContextFactory threadContextFactory) {
+    this.partitionService = partitionService;
     this.primitiveCache = primitiveCache;
-    this.channelFactory = channelFactory;
     this.threadContextFactory = threadContextFactory;
+  }
+
+  @Override
+  public PartitionService getPartitionService() {
+    return partitionService;
   }
 
   @Override
@@ -45,10 +50,5 @@ public class DefaultPrimitiveManagementService implements PrimitiveManagementSer
   @Override
   public ThreadContextFactory getThreadFactory() {
     return threadContextFactory;
-  }
-
-  @Override
-  public ChannelFactory getChannelFactory() {
-    return channelFactory;
   }
 }

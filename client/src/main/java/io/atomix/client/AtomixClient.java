@@ -22,6 +22,7 @@ import io.atomix.api.primitive.PrimitiveId;
 import io.atomix.client.channel.ChannelProvider;
 import io.atomix.client.impl.DefaultPrimitiveManagementService;
 import io.atomix.client.impl.PrimitiveCacheImpl;
+import io.atomix.client.partition.impl.PartitionServiceImpl;
 import io.atomix.client.utils.concurrent.BlockingAwareThreadPoolContextFactory;
 import io.atomix.client.utils.concurrent.ThreadContextFactory;
 import org.slf4j.Logger;
@@ -146,8 +147,8 @@ public class AtomixClient implements AtomixClientService {
         Runtime.getRuntime().availableProcessors(),
         LOGGER);
     this.managementService = new DefaultPrimitiveManagementService(
+        new PartitionServiceImpl(channelProvider.getFactory()),
         primitiveCache,
-        channelProvider.getFactory(),
         threadContextFactory);
     started.set(true);
     LOGGER.info("Started");

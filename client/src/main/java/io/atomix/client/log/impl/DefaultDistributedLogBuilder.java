@@ -15,7 +15,6 @@
  */
 package io.atomix.client.log.impl;
 
-import java.util.Collections;
 import java.util.concurrent.CompletableFuture;
 
 import io.atomix.api.primitive.PrimitiveId;
@@ -33,13 +32,12 @@ public class DefaultDistributedLogBuilder<E> extends DistributedLogBuilder<E> {
 
   @Override
   public CompletableFuture<DistributedLog<E>> buildAsync() {
-    return CompletableFuture.completedFuture(
-        new DefaultAsyncDistributedLog<E>(
+    return managementService.getPartitionService().getPartitionGroup(group)
+        .thenApply(group -> new DefaultAsyncDistributedLog<E>(
             getPrimitiveId(),
-            managementService,
-            Collections.emptyList(), // TODO: Pass partitions into log
+            group,
             partitioner,
-            serializer())
+            serializer)
             .sync());
   }
 }

@@ -36,15 +36,20 @@ public class DefaultLeaderElectionBuilder<T> extends LeaderElectionBuilder<T> {
   @Override
   @SuppressWarnings("unchecked")
   public CompletableFuture<LeaderElection<T>> buildAsync() {
-    return new DefaultAsyncLeaderElection(getPrimitiveId(), managementService, sessionTimeout)
-        .connect()
-        .thenApply(election -> {
-          Serializer serializer = serializer();
-          return new TranscodingAsyncLeaderElection<T, String>(
-              election,
-              id -> BaseEncoding.base16().encode(serializer.encode(id)),
-              string -> serializer.decode(BaseEncoding.base16().decode(string)));
-        })
-        .thenApply(AsyncLeaderElection::sync);
+    return managementService.getPartitionService().getPartitionGroup(group)
+        .thenCompose(group -> new DefaultAsyncLeaderElection(
+            getPrimitiveId(),
+            group.getPartition(partitioner.partition(getPrimitiveId().getName(), group.getPartitionIds())),
+            managementService.getThreadFactory().createContext(),
+            sessionTimeout)
+            .connect()
+            .thenApply(election -> {
+              Serializer serializer = serializer();
+              return new TranscodingAsyncLeaderElection<T, String>(
+                  election,
+                  id -> BaseEncoding.base16().encode(serializer.encode(id)),
+                  string -> serializer.decode(BaseEncoding.base16().decode(string)));
+            })
+            .thenApply(AsyncLeaderElection::sync));
   }
 }

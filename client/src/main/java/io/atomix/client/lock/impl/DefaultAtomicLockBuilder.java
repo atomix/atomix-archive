@@ -34,8 +34,13 @@ public class DefaultAtomicLockBuilder extends AtomicLockBuilder {
   @Override
   @SuppressWarnings("unchecked")
   public CompletableFuture<AtomicLock> buildAsync() {
-    return new DefaultAsyncAtomicLock(getPrimitiveId(), managementService, sessionTimeout)
-        .connect()
-        .thenApply(AsyncAtomicLock::sync);
+    return managementService.getPartitionService().getPartitionGroup(group)
+        .thenCompose(group -> new DefaultAsyncAtomicLock(
+            getPrimitiveId(),
+            group.getPartition(partitioner.partition(getPrimitiveId().getName(), group.getPartitionIds())),
+            managementService.getThreadFactory().createContext(),
+            sessionTimeout)
+            .connect()
+            .thenApply(AsyncAtomicLock::sync));
   }
 }

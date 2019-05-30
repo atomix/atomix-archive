@@ -15,7 +15,7 @@
  */
 package io.atomix.client;
 
-import io.atomix.client.channel.ChannelFactory;
+import io.atomix.client.partition.PartitionService;
 import io.atomix.client.utils.concurrent.ThreadContextFactory;
 
 /**
@@ -24,11 +24,11 @@ import io.atomix.client.utils.concurrent.ThreadContextFactory;
 public interface PrimitiveManagementService {
 
   /**
-   * Returns the channel factory.
+   * Returns the partition service.
    *
-   * @return the channel factory
+   * @return the partition service
    */
-  ChannelFactory getChannelFactory();
+  PartitionService getPartitionService();
 
   /**
    * Returns the local primitive cache.

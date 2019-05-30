@@ -19,6 +19,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 
 import io.atomix.api.primitive.PrimitiveId;
+import io.atomix.client.partition.Partitioner;
 import io.atomix.client.utils.serializer.Serializer;
 
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -32,6 +33,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
 public abstract class PrimitiveBuilder<B extends PrimitiveBuilder<B, P>, P extends SyncPrimitive> {
   protected final PrimitiveId id;
   protected String group;
+  protected Partitioner<String> partitioner = Partitioner.MURMUR3;
   protected boolean readOnly;
   protected Serializer serializer;
   protected final PrimitiveManagementService managementService;
@@ -59,6 +61,18 @@ public abstract class PrimitiveBuilder<B extends PrimitiveBuilder<B, P>, P exten
   @SuppressWarnings("unchecked")
   public B withGroup(String group) {
     this.group = checkNotNull(group);
+    return (B) this;
+  }
+
+  /**
+   * Sets the primitive partitioner.
+   *
+   * @param partitioner the primitive partitioner
+   * @return the primitive builder
+   */
+  @SuppressWarnings("unchecked")
+  public B withPartitioner(Partitioner<String> partitioner) {
+    this.partitioner = checkNotNull(partitioner);
     return (B) this;
   }
 

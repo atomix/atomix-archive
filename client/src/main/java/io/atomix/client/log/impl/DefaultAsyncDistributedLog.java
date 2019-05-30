@@ -16,7 +16,6 @@
 package io.atomix.client.log.impl;
 
 import java.time.Duration;
-import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -27,14 +26,14 @@ import java.util.function.Consumer;
 import com.google.common.io.BaseEncoding;
 import io.atomix.api.log.LogServiceGrpc;
 import io.atomix.api.primitive.PrimitiveId;
-import io.atomix.client.Partitioner;
-import io.atomix.client.PrimitiveManagementService;
 import io.atomix.client.PrimitiveType;
 import io.atomix.client.log.AsyncDistributedLog;
 import io.atomix.client.log.AsyncDistributedLogPartition;
 import io.atomix.client.log.DistributedLog;
 import io.atomix.client.log.DistributedLogType;
 import io.atomix.client.log.Record;
+import io.atomix.client.partition.PartitionGroup;
+import io.atomix.client.partition.Partitioner;
 import io.atomix.client.utils.concurrent.Futures;
 import io.atomix.client.utils.serializer.Serializer;
 
@@ -45,7 +44,6 @@ import static com.google.common.base.Preconditions.checkNotNull;
  */
 public class DefaultAsyncDistributedLog<E> implements AsyncDistributedLog<E> {
   private final PrimitiveId id;
-  private final LogServiceGrpc.LogServiceStub log;
   private final Partitioner<String> partitioner;
   private final Map<Integer, DefaultAsyncDistributedLogPartition<E>> partitions = new ConcurrentHashMap<>();
   private final List<AsyncDistributedLogPartition<E>> sortedPartitions = new CopyOnWriteArrayList<>();
@@ -54,23 +52,26 @@ public class DefaultAsyncDistributedLog<E> implements AsyncDistributedLog<E> {
 
   public DefaultAsyncDistributedLog(
       PrimitiveId id,
-      PrimitiveManagementService managementService,
-      Collection<DefaultAsyncDistributedLogPartition<E>> partitions,
+      PartitionGroup partitionGroup,
       Serializer serializer) {
-    this(id, managementService, partitions, Partitioner.MURMUR3, serializer);
+    this(id, partitionGroup, Partitioner.MURMUR3, serializer);
   }
 
   public DefaultAsyncDistributedLog(
       PrimitiveId id,
-      PrimitiveManagementService managementService,
-      Collection<DefaultAsyncDistributedLogPartition<E>> partitions,
+      PartitionGroup partitionGroup,
       Partitioner<String> partitioner,
       Serializer serializer) {
     this.id = checkNotNull(id);
-    this.log = LogServiceGrpc.newStub(managementService.getChannelFactory().getChannel());
     this.partitioner = checkNotNull(partitioner);
     this.serializer = checkNotNull(serializer);
-    partitions.forEach(partition -> this.partitions.put(partition.id(), partition));
+    partitionGroup.getPartitions().forEach(partition -> this.partitions.put(
+        partition.id(),
+        new DefaultAsyncDistributedLogPartition<>(
+            id,
+            partition.id(),
+            LogServiceGrpc.newStub(partition.getChannelFactory().getChannel()),
+            serializer)));
   }
 
   @Override

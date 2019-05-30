@@ -39,7 +39,6 @@ import io.atomix.api.map.SizeRequest;
 import io.atomix.api.map.SizeResponse;
 import io.atomix.api.primitive.PrimitiveId;
 import io.atomix.client.PrimitiveException;
-import io.atomix.client.PrimitiveManagementService;
 import io.atomix.client.Versioned;
 import io.atomix.client.collection.AsyncDistributedCollection;
 import io.atomix.client.collection.CollectionEvent;
@@ -53,9 +52,11 @@ import io.atomix.client.map.AsyncAtomicMap;
 import io.atomix.client.map.AtomicMap;
 import io.atomix.client.map.AtomicMapEvent;
 import io.atomix.client.map.AtomicMapEventListener;
+import io.atomix.client.partition.Partition;
 import io.atomix.client.set.AsyncDistributedSet;
 import io.atomix.client.set.impl.UnsupportedAsyncDistributedSet;
 import io.atomix.client.utils.concurrent.Futures;
+import io.atomix.client.utils.concurrent.ThreadContext;
 import io.grpc.stub.StreamObserver;
 
 /**
@@ -65,8 +66,8 @@ public class DefaultAsyncAtomicMap extends AbstractManagedPrimitive<MapServiceGr
   private volatile CompletableFuture<Long> listenFuture;
   private final Map<AtomicMapEventListener<String, byte[]>, Executor> eventListeners = new ConcurrentHashMap<>();
 
-  public DefaultAsyncAtomicMap(PrimitiveId id, PrimitiveManagementService managementService, Duration timeout) {
-    super(id, MapServiceGrpc.newStub(managementService.getChannelFactory().getChannel()), managementService, timeout);
+  public DefaultAsyncAtomicMap(PrimitiveId id, Partition partition, ThreadContext context, Duration timeout) {
+    super(id, MapServiceGrpc.newStub(partition.getChannelFactory().getChannel()), context, timeout);
   }
 
   @Override

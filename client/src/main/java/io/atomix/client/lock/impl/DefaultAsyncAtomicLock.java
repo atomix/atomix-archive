@@ -34,11 +34,12 @@ import io.atomix.api.lock.LockServiceGrpc;
 import io.atomix.api.lock.UnlockRequest;
 import io.atomix.api.lock.UnlockResponse;
 import io.atomix.api.primitive.PrimitiveId;
-import io.atomix.client.PrimitiveManagementService;
 import io.atomix.client.impl.AbstractManagedPrimitive;
 import io.atomix.client.lock.AsyncAtomicLock;
 import io.atomix.client.lock.AtomicLock;
+import io.atomix.client.partition.Partition;
 import io.atomix.client.utils.concurrent.Scheduled;
+import io.atomix.client.utils.concurrent.ThreadContext;
 
 /**
  * Raft lock.
@@ -46,11 +47,8 @@ import io.atomix.client.utils.concurrent.Scheduled;
 public class DefaultAsyncAtomicLock extends AbstractManagedPrimitive<LockServiceGrpc.LockServiceStub, AsyncAtomicLock> implements AsyncAtomicLock {
   private final AtomicLong lockId = new AtomicLong();
 
-  public DefaultAsyncAtomicLock(
-      PrimitiveId id,
-      PrimitiveManagementService managementService,
-      Duration timeout) {
-    super(id, LockServiceGrpc.newStub(managementService.getChannelFactory().getChannel()), managementService, timeout);
+  public DefaultAsyncAtomicLock(PrimitiveId id, Partition partition, ThreadContext context, Duration timeout) {
+    super(id, LockServiceGrpc.newStub(partition.getChannelFactory().getChannel()), context, timeout);
   }
 
   @Override

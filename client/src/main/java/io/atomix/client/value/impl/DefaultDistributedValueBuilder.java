@@ -38,16 +38,21 @@ public class DefaultDistributedValueBuilder<V> extends DistributedValueBuilder<V
   @Override
   @SuppressWarnings("unchecked")
   public CompletableFuture<DistributedValue<V>> buildAsync() {
-    return new DefaultAsyncAtomicValue(getPrimitiveId(), managementService, sessionTimeout)
-        .connect()
-        .thenApply(rawValue -> {
-          Serializer serializer = serializer();
-          return new TranscodingAsyncAtomicValue<V, String>(
-              rawValue,
-              value -> BaseEncoding.base16().encode(serializer.encode(value)),
-              string -> serializer.decode(BaseEncoding.base16().decode(string)));
-        })
-        .thenApply(DelegatingAsyncDistributedValue::new)
-        .thenApply(AsyncDistributedValue::sync);
+    return managementService.getPartitionService().getPartitionGroup(group)
+        .thenCompose(group -> new DefaultAsyncAtomicValue(
+            getPrimitiveId(),
+            group.getPartition(partitioner.partition(getPrimitiveId().getName(), group.getPartitionIds())),
+            managementService.getThreadFactory().createContext(),
+            sessionTimeout)
+            .connect()
+            .thenApply(rawValue -> {
+              Serializer serializer = serializer();
+              return new TranscodingAsyncAtomicValue<V, String>(
+                  rawValue,
+                  value -> BaseEncoding.base16().encode(serializer.encode(value)),
+                  string -> serializer.decode(BaseEncoding.base16().decode(string)));
+            })
+            .thenApply(DelegatingAsyncDistributedValue::new)
+            .thenApply(AsyncDistributedValue::sync));
   }
 }
