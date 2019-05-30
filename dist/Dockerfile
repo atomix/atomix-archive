@@ -2,7 +2,7 @@
 
 FROM java:8
 
-RUN apt-get update -y && apt-get install -y iptables stress
+RUN apt-get update -y && apt-get install -y iptables
 
 ARG VERSION
 RUN mkdir -p /opt/atomix
@@ -14,4 +14,4 @@ WORKDIR /opt/atomix
 EXPOSE 5678
 EXPOSE 5679
 
-ENTRYPOINT ["./bin/atomix-agent"]
+ENTRYPOINT ["./bin/atomix-server"]
