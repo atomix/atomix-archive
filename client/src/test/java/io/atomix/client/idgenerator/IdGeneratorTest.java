@@ -34,12 +34,8 @@ public class IdGeneratorTest extends AbstractPrimitiveTest {
    */
   @Test
   public void testNextId() throws Throwable {
-    AtomicIdGenerator idGenerator1 = client().atomicIdGeneratorBuilder("testNextId")
-        .withProtocol(protocol())
-        .build();
-    AtomicIdGenerator idGenerator2 = client().atomicIdGeneratorBuilder("testNextId")
-        .withProtocol(protocol())
-        .build();
+    AtomicIdGenerator idGenerator1 = client().atomicIdGeneratorBuilder("testNextId").build();
+    AtomicIdGenerator idGenerator2 = client().atomicIdGeneratorBuilder("testNextId").build();
 
     assertEquals(1, idGenerator1.nextId());
     assertEquals(2, idGenerator1.nextId());
@@ -63,14 +59,10 @@ public class IdGeneratorTest extends AbstractPrimitiveTest {
   @Test
   public void testNextIdBatchRollover() throws Throwable {
     DelegatingAtomicIdGenerator idGenerator1 = new DelegatingAtomicIdGenerator(
-        client().atomicCounterBuilder("testNextIdBatchRollover")
-            .withProtocol(protocol())
-            .build()
+        client().atomicCounterBuilder("testNextIdBatchRollover").build()
             .async(), 2);
     DelegatingAtomicIdGenerator idGenerator2 = new DelegatingAtomicIdGenerator(
-        client().atomicCounterBuilder("testNextIdBatchRollover")
-            .withProtocol(protocol())
-            .build()
+        client().atomicCounterBuilder("testNextIdBatchRollover").build()
             .async(), 2);
 
     CompletableFuture<Long> future11 = idGenerator1.nextId();

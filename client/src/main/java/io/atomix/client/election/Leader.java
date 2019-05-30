@@ -15,11 +15,10 @@
  */
 package io.atomix.client.election;
 
+import java.util.function.Function;
+
 import com.google.common.base.MoreObjects;
 import com.google.common.base.Objects;
-import io.atomix.cluster.MemberId;
-
-import java.util.function.Function;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -27,7 +26,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
 /**
  * Topic leader.
  * <p>
- * Identified by the {@link MemberId node identifier} and a monotonically increasing term number.
+ * Identified by the candidate identifier and a monotonically increasing term number.
  * The term number is incremented by one every time a new node is elected as leader.
  * Also available is the system clock time at the instant when this node was elected as leader.
  * Keep in mind though that as with any system clock based time stamps this particular information

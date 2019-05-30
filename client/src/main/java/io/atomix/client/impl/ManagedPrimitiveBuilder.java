@@ -2,18 +2,21 @@ package io.atomix.client.impl;
 
 import java.time.Duration;
 
+import io.atomix.api.primitive.PrimitiveId;
 import io.atomix.client.PrimitiveBuilder;
 import io.atomix.client.PrimitiveManagementService;
 import io.atomix.client.SyncPrimitive;
-import io.atomix.client.PrimitiveType;
-import io.atomix.client.ManagedPrimitiveConfig;
+
+import static com.google.common.base.Preconditions.checkNotNull;
 
 /**
  * Primitive builder for managed primitives.
  */
-public abstract class ManagedPrimitiveBuilder<B extends PrimitiveBuilder<B, C, P>, C extends ManagedPrimitiveConfig, P extends SyncPrimitive> extends PrimitiveBuilder<B, C, P> {
-  public ManagedPrimitiveBuilder(PrimitiveType type, String name, C config, PrimitiveManagementService managementService) {
-    super(type, name, config, managementService);
+public abstract class ManagedPrimitiveBuilder<B extends PrimitiveBuilder<B, P>, P extends SyncPrimitive> extends PrimitiveBuilder<B, P> {
+  protected Duration sessionTimeout = Duration.ofSeconds(30);
+
+  protected ManagedPrimitiveBuilder(PrimitiveId id, PrimitiveManagementService managementService) {
+    super(id, managementService);
   }
 
   /**
@@ -24,7 +27,7 @@ public abstract class ManagedPrimitiveBuilder<B extends PrimitiveBuilder<B, C, P
    */
   @SuppressWarnings("unchecked")
   public B withSessionTimeout(Duration timeout) {
-    config.setSessionTimeout(timeout);
+    this.sessionTimeout = checkNotNull(timeout, "timeout cannot be null");
     return (B) this;
   }
 }

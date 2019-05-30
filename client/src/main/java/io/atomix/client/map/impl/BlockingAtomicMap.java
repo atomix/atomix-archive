@@ -29,8 +29,10 @@ import java.util.function.Function;
 import java.util.function.Predicate;
 
 import com.google.common.base.Throwables;
+import io.atomix.client.PrimitiveException;
 import io.atomix.client.PrimitiveState;
 import io.atomix.client.Synchronous;
+import io.atomix.client.Versioned;
 import io.atomix.client.collection.DistributedCollection;
 import io.atomix.client.collection.impl.BlockingDistributedCollection;
 import io.atomix.client.map.AsyncAtomicMap;
@@ -38,9 +40,6 @@ import io.atomix.client.map.AtomicMap;
 import io.atomix.client.map.AtomicMapEventListener;
 import io.atomix.client.set.DistributedSet;
 import io.atomix.client.set.impl.BlockingDistributedSet;
-import io.atomix.primitive.PrimitiveException;
-import io.atomix.utils.concurrent.Retries;
-import io.atomix.client.Versioned;
 
 /**
  * Default implementation of {@code ConsistentMap}.
@@ -92,30 +91,27 @@ public class BlockingAtomicMap<K, V> extends Synchronous<AsyncAtomicMap<K, V>> i
 
   @Override
   public Versioned<V> computeIfAbsent(K key,
-                                      Function<? super K, ? extends V> mappingFunction) {
+      Function<? super K, ? extends V> mappingFunction) {
     return computeIf(key, Objects::isNull, (k, v) -> mappingFunction.apply(k));
   }
 
   @Override
   public Versioned<V> computeIfPresent(K key,
-                                       BiFunction<? super K, ? super V, ? extends V> remappingFunction) {
+      BiFunction<? super K, ? super V, ? extends V> remappingFunction) {
     return computeIf(key, Objects::nonNull, remappingFunction);
   }
 
   @Override
   public Versioned<V> compute(K key,
-                              BiFunction<? super K, ? super V, ? extends V> remappingFunction) {
+      BiFunction<? super K, ? super V, ? extends V> remappingFunction) {
     return computeIf(key, v -> true, remappingFunction);
   }
 
   @Override
   public Versioned<V> computeIf(K key,
-                                Predicate<? super V> condition,
-                                BiFunction<? super K, ? super V, ? extends V> remappingFunction) {
-    return Retries.retryable(() -> complete(asyncMap.computeIf(key, condition, remappingFunction)),
-        PrimitiveException.ConcurrentModification.class,
-        Integer.MAX_VALUE,
-        MAX_DELAY_BETWEEN_RETRY_MILLS).get();
+      Predicate<? super V> condition,
+      BiFunction<? super K, ? super V, ? extends V> remappingFunction) {
+    return complete(asyncMap.computeIf(key, condition, remappingFunction));
   }
 
   @Override

@@ -16,12 +16,10 @@
 
 package io.atomix.client;
 
+import java.util.function.Function;
+
 import com.google.common.base.MoreObjects;
 import com.google.common.base.Objects;
-import io.atomix.utils.misc.ArraySizeHashPrinter;
-import io.atomix.utils.misc.TimestampPrinter;
-
-import java.util.function.Function;
 
 /**
  * Versioned value.
@@ -145,9 +143,8 @@ public class Versioned<V> {
   @Override
   public String toString() {
     return MoreObjects.toStringHelper(this)
-        .add("value", value instanceof byte[] ? ArraySizeHashPrinter.of((byte[]) value) : value)
+        .add("value", value)
         .add("version", version)
-        .add("creationTime", new TimestampPrinter(creationTime))
         .toString();
   }
 }

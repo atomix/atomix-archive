@@ -15,25 +15,16 @@
  */
 package io.atomix.client.election;
 
-import io.atomix.client.PrimitiveBuilder;
+import io.atomix.api.primitive.PrimitiveId;
 import io.atomix.client.PrimitiveManagementService;
-import io.atomix.service.protocol.PrimitiveProtocol;
-import io.atomix.service.protocol.ProxyCompatibleBuilder;
-import io.atomix.service.protocol.ServiceProtocol;
+import io.atomix.client.impl.ManagedPrimitiveBuilder;
 
 /**
  * Builder for constructing new {@link AsyncLeaderElection} instances.
  */
 public abstract class LeaderElectionBuilder<T>
-    extends PrimitiveBuilder<LeaderElectionBuilder<T>, LeaderElectionConfig, LeaderElection<T>>
-    implements ProxyCompatibleBuilder<LeaderElectionBuilder<T>> {
-
-  protected LeaderElectionBuilder(String name, LeaderElectionConfig config, PrimitiveManagementService managementService) {
-    super(LeaderElectionType.instance(), name, config, managementService);
-  }
-
-  @Override
-  public LeaderElectionBuilder<T> withProtocol(ServiceProtocol protocol) {
-    return withProtocol((PrimitiveProtocol) protocol);
+    extends ManagedPrimitiveBuilder<LeaderElectionBuilder<T>, LeaderElection<T>> {
+  protected LeaderElectionBuilder(PrimitiveId id, PrimitiveManagementService managementService) {
+    super(id, managementService);
   }
 }

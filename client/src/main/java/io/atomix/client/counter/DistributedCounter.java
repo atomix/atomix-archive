@@ -15,8 +15,8 @@
  */
 package io.atomix.client.counter;
 
-import io.atomix.client.SyncPrimitive;
 import io.atomix.client.PrimitiveType;
+import io.atomix.client.SyncPrimitive;
 
 /**
  * Distributed version of java.util.concurrent.atomic.AtomicLong.

@@ -15,25 +15,16 @@
  */
 package io.atomix.client.idgenerator;
 
+import io.atomix.api.primitive.PrimitiveId;
 import io.atomix.client.PrimitiveBuilder;
 import io.atomix.client.PrimitiveManagementService;
-import io.atomix.service.protocol.PrimitiveProtocol;
-import io.atomix.service.protocol.ProxyCompatibleBuilder;
-import io.atomix.service.protocol.ServiceProtocol;
 
 /**
  * Builder for AtomicIdGenerator.
  */
 public abstract class AtomicIdGeneratorBuilder
-    extends PrimitiveBuilder<AtomicIdGeneratorBuilder, AtomicIdGeneratorConfig, AtomicIdGenerator>
-    implements ProxyCompatibleBuilder<AtomicIdGeneratorBuilder> {
-
-  protected AtomicIdGeneratorBuilder(String name, AtomicIdGeneratorConfig config, PrimitiveManagementService managementService) {
-    super(AtomicIdGeneratorType.instance(), name, config, managementService);
-  }
-
-  @Override
-  public AtomicIdGeneratorBuilder withProtocol(ServiceProtocol protocol) {
-    return withProtocol((PrimitiveProtocol) protocol);
+    extends PrimitiveBuilder<AtomicIdGeneratorBuilder, AtomicIdGenerator> {
+  protected AtomicIdGeneratorBuilder(PrimitiveId id, PrimitiveManagementService managementService) {
+    super(id, managementService);
   }
 }

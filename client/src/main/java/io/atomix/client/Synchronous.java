@@ -19,8 +19,6 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
-import io.atomix.utils.AtomixRuntimeException;
-
 /**
  * DistributedPrimitive that is a synchronous (blocking) version of
  * another.
@@ -44,8 +42,14 @@ public abstract class Synchronous<T extends AsyncPrimitive> implements SyncPrimi
   public void delete() {
     try {
       primitive.delete().get(DEFAULT_OPERATION_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS);
-    } catch (InterruptedException | ExecutionException | TimeoutException e) {
-      throw new AtomixRuntimeException(e);
+    } catch (InterruptedException | TimeoutException e) {
+      throw new PrimitiveException(e);
+    } catch (ExecutionException e) {
+      if (e.getCause() instanceof PrimitiveException) {
+        throw (PrimitiveException) e.getCause();
+      } else {
+        throw new PrimitiveException(e.getCause());
+      }
     }
   }
 
@@ -53,8 +57,14 @@ public abstract class Synchronous<T extends AsyncPrimitive> implements SyncPrimi
   public void close() {
     try {
       primitive.close().get(DEFAULT_OPERATION_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS);
-    } catch (InterruptedException | ExecutionException | TimeoutException e) {
-      throw new AtomixRuntimeException(e);
+    } catch (InterruptedException | TimeoutException e) {
+      throw new PrimitiveException(e);
+    } catch (ExecutionException e) {
+      if (e.getCause() instanceof PrimitiveException) {
+        throw (PrimitiveException) e.getCause();
+      } else {
+        throw new PrimitiveException(e.getCause());
+      }
     }
   }
 }

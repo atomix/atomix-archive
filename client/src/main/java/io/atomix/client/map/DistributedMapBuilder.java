@@ -15,10 +15,8 @@
  */
 package io.atomix.client.map;
 
+import io.atomix.api.primitive.PrimitiveId;
 import io.atomix.client.PrimitiveManagementService;
-import io.atomix.service.protocol.PrimitiveProtocol;
-import io.atomix.service.protocol.ProxyCompatibleBuilder;
-import io.atomix.service.protocol.ServiceProtocol;
 
 /**
  * Builder for {@link DistributedMap} instances.
@@ -27,15 +25,8 @@ import io.atomix.service.protocol.ServiceProtocol;
  * @param <V> type for map value
  */
 public abstract class DistributedMapBuilder<K, V>
-    extends MapBuilder<DistributedMapBuilder<K, V>, DistributedMapConfig, DistributedMap<K, V>, K, V>
-    implements ProxyCompatibleBuilder<DistributedMapBuilder<K, V>> {
-
-  protected DistributedMapBuilder(String name, DistributedMapConfig config, PrimitiveManagementService managementService) {
-    super(DistributedMapType.instance(), name, config, managementService);
-  }
-
-  @Override
-  public DistributedMapBuilder<K, V> withProtocol(ServiceProtocol protocol) {
-    return withProtocol((PrimitiveProtocol) protocol);
+    extends MapBuilder<DistributedMapBuilder<K, V>, DistributedMap<K, V>, K, V> {
+  protected DistributedMapBuilder(PrimitiveId id, PrimitiveManagementService managementService) {
+    super(id, managementService);
   }
 }

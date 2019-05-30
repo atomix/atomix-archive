@@ -18,12 +18,12 @@ package io.atomix.client.set.impl;
 import java.util.concurrent.CompletableFuture;
 
 import com.google.common.io.BaseEncoding;
+import io.atomix.api.primitive.PrimitiveId;
 import io.atomix.client.PrimitiveManagementService;
 import io.atomix.client.set.AsyncDistributedSet;
 import io.atomix.client.set.DistributedSet;
 import io.atomix.client.set.DistributedSetBuilder;
-import io.atomix.client.set.DistributedSetConfig;
-import io.atomix.utils.serializer.Serializer;
+import io.atomix.client.utils.serializer.Serializer;
 
 /**
  * Default distributed set builder.
@@ -31,14 +31,14 @@ import io.atomix.utils.serializer.Serializer;
  * @param <E> type for set elements
  */
 public class DefaultDistributedSetBuilder<E> extends DistributedSetBuilder<E> {
-  public DefaultDistributedSetBuilder(String name, DistributedSetConfig config, PrimitiveManagementService managementService) {
-    super(name, config, managementService);
+  public DefaultDistributedSetBuilder(PrimitiveId id, PrimitiveManagementService managementService) {
+    super(id, managementService);
   }
 
   @Override
   @SuppressWarnings("unchecked")
   public CompletableFuture<DistributedSet<E>> buildAsync() {
-    return new DefaultAsyncDistributedSet(getPrimitiveId(), managementService, config.getSessionTimeout())
+    return new DefaultAsyncDistributedSet(getPrimitiveId(), managementService, sessionTimeout)
         .connect()
         .thenApply(rawSet -> {
           Serializer serializer = serializer();
@@ -48,13 +48,13 @@ public class DefaultDistributedSetBuilder<E> extends DistributedSetBuilder<E> {
               string -> serializer.decode(BaseEncoding.base16().decode(string)));
         })
         .<AsyncDistributedSet<E>>thenApply(set -> {
-          if (config.getCacheConfig().isEnabled()) {
-            return new CachingAsyncDistributedSet<>(set, config.getCacheConfig());
+          if (cacheEnabled) {
+            return new CachingAsyncDistributedSet<>(set, cacheSize);
           }
           return set;
         })
         .thenApply(set -> {
-          if (config.isReadOnly()) {
+          if (readOnly) {
             return new UnmodifiableAsyncDistributedSet<>(set);
           }
           return set;

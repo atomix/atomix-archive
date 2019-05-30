@@ -15,29 +15,20 @@
  */
 package io.atomix.client;
 
-import io.atomix.utils.ConfiguredType;
+import io.atomix.api.primitive.PrimitiveId;
 
 /**
  * Primitive type.
  */
-public interface PrimitiveType<B extends PrimitiveBuilder, C extends PrimitiveConfig, P extends SyncPrimitive> extends ConfiguredType<C> {
-
-  /**
-   * Returns a new instance of the primitive configuration.
-   *
-   * @return a new instance of the primitive configuration
-   */
-  @Override
-  C newConfig();
+public interface PrimitiveType<B extends PrimitiveBuilder, P extends SyncPrimitive> {
 
   /**
    * Returns a new primitive builder.
    *
-   * @param primitiveName     the primitive name
-   * @param config            the primitive configuration
+   * @param id the primitive ID
    * @param managementService the primitive management service
    * @return a new primitive builder
    */
-  B newBuilder(String primitiveName, C config, PrimitiveManagementService managementService);
+  B newBuilder(PrimitiveId id, PrimitiveManagementService managementService);
 
 }

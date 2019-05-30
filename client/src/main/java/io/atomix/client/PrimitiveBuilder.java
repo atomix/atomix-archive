@@ -18,16 +18,8 @@ package io.atomix.client;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 
-import com.google.protobuf.Any;
 import io.atomix.api.primitive.PrimitiveId;
-import io.atomix.service.protocol.PrimitiveProtocol;
-import io.atomix.service.protocol.PrimitiveProtocolConfig;
-import io.atomix.utils.Builder;
-import io.atomix.utils.config.ConfigurationException;
-import io.atomix.utils.serializer.Namespace;
-import io.atomix.utils.serializer.NamespaceConfig;
-import io.atomix.utils.serializer.Namespaces;
-import io.atomix.utils.serializer.Serializer;
+import io.atomix.client.utils.serializer.Serializer;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -37,18 +29,15 @@ import static com.google.common.base.Preconditions.checkNotNull;
  * @param <B> builder type
  * @param <P> primitive type
  */
-public abstract class PrimitiveBuilder<B extends PrimitiveBuilder<B, C, P>, C extends PrimitiveConfig, P extends SyncPrimitive> implements Builder<P> {
-  protected final PrimitiveType type;
-  protected final String name;
-  protected final C config;
-  protected PrimitiveProtocol protocol;
+public abstract class PrimitiveBuilder<B extends PrimitiveBuilder<B, P>, P extends SyncPrimitive> {
+  protected final PrimitiveId id;
+  protected String group;
+  protected boolean readOnly;
   protected Serializer serializer;
   protected final PrimitiveManagementService managementService;
 
-  public PrimitiveBuilder(PrimitiveType type, String name, C config, PrimitiveManagementService managementService) {
-    this.type = checkNotNull(type, "type cannot be null");
-    this.name = checkNotNull(name, "name cannot be null");
-    this.config = checkNotNull(config, "config cannot be null");
+  public PrimitiveBuilder(PrimitiveId id, PrimitiveManagementService managementService) {
+    this.id = checkNotNull(id, "id cannot be null");
     this.managementService = checkNotNull(managementService, "managementService cannot be null");
   }
 
@@ -58,21 +47,18 @@ public abstract class PrimitiveBuilder<B extends PrimitiveBuilder<B, C, P>, C ex
    * @return the primitive ID
    */
   protected PrimitiveId getPrimitiveId() {
-    return PrimitiveId.newBuilder()
-        .setName(name)
-        .setProtocol(Any.pack(protocol().toProto()))
-        .build();
+    return id;
   }
 
   /**
-   * Sets the primitive protocol.
+   * Sets the primitive partition group.
    *
-   * @param protocol the primitive protocol
+   * @param group the primitive partition group
    * @return the primitive builder
    */
   @SuppressWarnings("unchecked")
-  protected B withProtocol(PrimitiveProtocol protocol) {
-    this.protocol = protocol;
+  public B withGroup(String group) {
+    this.group = checkNotNull(group);
     return (B) this;
   }
 
@@ -95,8 +81,7 @@ public abstract class PrimitiveBuilder<B extends PrimitiveBuilder<B, C, P>, C ex
    */
   @SuppressWarnings("unchecked")
   public B withReadOnly() {
-    config.setReadOnly();
-    return (B) this;
+    return withReadOnly(true);
   }
 
   /**
@@ -107,26 +92,8 @@ public abstract class PrimitiveBuilder<B extends PrimitiveBuilder<B, C, P>, C ex
    */
   @SuppressWarnings("unchecked")
   public B withReadOnly(boolean readOnly) {
-    config.setReadOnly(readOnly);
+    this.readOnly = readOnly;
     return (B) this;
-  }
-
-  /**
-   * Returns the primitive protocol.
-   *
-   * @return the primitive protocol
-   */
-  @SuppressWarnings("unchecked")
-  protected PrimitiveProtocol protocol() {
-    PrimitiveProtocol protocol = this.protocol;
-    if (protocol == null) {
-      PrimitiveProtocolConfig<?> protocolConfig = config.getProtocolConfig();
-      if (protocolConfig == null) {
-        throw new ConfigurationException("Primitive protocol not configured");
-      }
-      protocol = protocolConfig.getType().newProtocol(protocolConfig);
-    }
-    return protocol;
   }
 
   /**
@@ -135,25 +102,6 @@ public abstract class PrimitiveBuilder<B extends PrimitiveBuilder<B, C, P>, C ex
    * @return the protocol serializer
    */
   protected Serializer serializer() {
-    Serializer serializer = this.serializer;
-    if (serializer == null) {
-      synchronized (this) {
-        serializer = this.serializer;
-        if (serializer == null) {
-          NamespaceConfig config = this.config.getNamespaceConfig();
-          if (config == null) {
-            serializer = Serializer.using(Namespaces.BASIC);
-          } else {
-            serializer = Serializer.using(Namespace.builder()
-                .register(Namespaces.BASIC)
-                .nextId(Namespaces.BEGIN_USER_CUSTOM_ID)
-                .register(new Namespace(config))
-                .build());
-          }
-          this.serializer = serializer;
-        }
-      }
-    }
     return serializer;
   }
 
@@ -165,7 +113,6 @@ public abstract class PrimitiveBuilder<B extends PrimitiveBuilder<B, C, P>, C ex
    *
    * @return a new instance of the primitive
    */
-  @Override
   public P build() {
     try {
       return buildAsync().join();
@@ -217,6 +164,6 @@ public abstract class PrimitiveBuilder<B extends PrimitiveBuilder<B, C, P>, C ex
    * @return a singleton instance of the primitive
    */
   public CompletableFuture<P> getAsync() {
-    return managementService.getPrimitiveCache().getPrimitive(name, this::buildAsync);
+    return managementService.getPrimitiveCache().getPrimitive(id, this::buildAsync);
   }
 }

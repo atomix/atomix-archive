@@ -15,10 +15,8 @@
  */
 package io.atomix.client.value;
 
+import io.atomix.api.primitive.PrimitiveId;
 import io.atomix.client.PrimitiveManagementService;
-import io.atomix.service.protocol.PrimitiveProtocol;
-import io.atomix.service.protocol.ProxyCompatibleBuilder;
-import io.atomix.service.protocol.ServiceProtocol;
 
 /**
  * Builder for constructing new AtomicValue instances.
@@ -26,15 +24,8 @@ import io.atomix.service.protocol.ServiceProtocol;
  * @param <V> atomic value type
  */
 public abstract class AtomicValueBuilder<V>
-    extends ValueBuilder<AtomicValueBuilder<V>, AtomicValueConfig, AtomicValue<V>, V>
-    implements ProxyCompatibleBuilder<AtomicValueBuilder<V>> {
-
-  protected AtomicValueBuilder(String name, AtomicValueConfig config, PrimitiveManagementService managementService) {
-    super(AtomicValueType.instance(), name, config, managementService);
-  }
-
-  @Override
-  public AtomicValueBuilder<V> withProtocol(ServiceProtocol protocol) {
-    return withProtocol((PrimitiveProtocol) protocol);
+    extends ValueBuilder<AtomicValueBuilder<V>, AtomicValue<V>, V> {
+  protected AtomicValueBuilder(PrimitiveId id, PrimitiveManagementService managementService) {
+    super(id, managementService);
   }
 }

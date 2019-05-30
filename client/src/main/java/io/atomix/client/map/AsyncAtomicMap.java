@@ -29,9 +29,9 @@ import com.google.common.util.concurrent.MoreExecutors;
 import io.atomix.client.AsyncPrimitive;
 import io.atomix.client.DistributedPrimitive;
 import io.atomix.client.PrimitiveType;
+import io.atomix.client.Versioned;
 import io.atomix.client.collection.AsyncDistributedCollection;
 import io.atomix.client.set.AsyncDistributedSet;
-import io.atomix.client.Versioned;
 
 /**
  * A distributed, strongly consistent map whose methods are all executed asynchronously.

@@ -15,18 +15,25 @@
  */
 package io.atomix.client.cache;
 
+import io.atomix.api.primitive.PrimitiveId;
 import io.atomix.client.PrimitiveManagementService;
-import io.atomix.client.PrimitiveType;
 import io.atomix.client.SyncPrimitive;
 import io.atomix.client.impl.ManagedPrimitiveBuilder;
+
+import static com.google.common.base.Preconditions.checkArgument;
 
 /**
  * Cached distributed primitive builder.
  */
-public abstract class CachedPrimitiveBuilder<B extends CachedPrimitiveBuilder<B, C, P>, C extends CachedPrimitiveConfig<C>, P extends SyncPrimitive>
-    extends ManagedPrimitiveBuilder<B, C, P> {
-  protected CachedPrimitiveBuilder(PrimitiveType type, String name, C config, PrimitiveManagementService managementService) {
-    super(type, name, config, managementService);
+public abstract class CachedPrimitiveBuilder<B extends CachedPrimitiveBuilder<B, P>, P extends SyncPrimitive>
+    extends ManagedPrimitiveBuilder<B, P> {
+  private static final int DEFAULT_CACHE_SIZE = 1000;
+
+  protected boolean cacheEnabled = false;
+  protected int cacheSize = DEFAULT_CACHE_SIZE;
+
+  protected CachedPrimitiveBuilder(PrimitiveId id, PrimitiveManagementService managementService) {
+    super(id, managementService);
   }
 
   /**
@@ -36,8 +43,7 @@ public abstract class CachedPrimitiveBuilder<B extends CachedPrimitiveBuilder<B,
    */
   @SuppressWarnings("unchecked")
   public B withCacheEnabled() {
-    config.getCacheConfig().setCacheEnabled();
-    return (B) this;
+    return withCacheEnabled(true);
   }
 
   /**
@@ -48,7 +54,7 @@ public abstract class CachedPrimitiveBuilder<B extends CachedPrimitiveBuilder<B,
    */
   @SuppressWarnings("unchecked")
   public B withCacheEnabled(boolean cacheEnabled) {
-    config.getCacheConfig().setEnabled(cacheEnabled);
+    this.cacheEnabled = cacheEnabled;
     return (B) this;
   }
 
@@ -60,7 +66,8 @@ public abstract class CachedPrimitiveBuilder<B extends CachedPrimitiveBuilder<B,
    */
   @SuppressWarnings("unchecked")
   public B withCacheSize(int cacheSize) {
-    config.getCacheConfig().setSize(cacheSize);
+    checkArgument(cacheSize > 0, "cacheSize must be positive");
+    this.cacheSize = cacheSize;
     return (B) this;
   }
 }

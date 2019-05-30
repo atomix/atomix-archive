@@ -17,7 +17,6 @@ package io.atomix.client.set.impl;
 
 import java.time.Duration;
 
-import io.atomix.client.cache.CacheConfig;
 import io.atomix.client.collection.impl.CachingAsyncDistributedCollection;
 import io.atomix.client.set.AsyncDistributedSet;
 import io.atomix.client.set.DistributedSet;
@@ -28,8 +27,8 @@ import io.atomix.client.set.DistributedSet;
 public class CachingAsyncDistributedSet<E> extends CachingAsyncDistributedCollection<E> implements AsyncDistributedSet<E> {
   private final AsyncDistributedSet<E> backingSet;
 
-  public CachingAsyncDistributedSet(AsyncDistributedSet<E> backingCollection, CacheConfig cacheConfig) {
-    super(backingCollection, cacheConfig);
+  public CachingAsyncDistributedSet(AsyncDistributedSet<E> backingCollection, int cacheSize) {
+    super(backingCollection, cacheSize);
     this.backingSet = backingCollection;
   }
 

@@ -1,7 +1,7 @@
 package io.atomix.client.channel;
 
 import io.grpc.internal.DnsNameResolverProvider;
-import io.grpc.netty.NettyChannelBuilder;
+import io.grpc.netty.shaded.io.grpc.netty.NettyChannelBuilder;
 
 /**
  * Service-based channel factory.

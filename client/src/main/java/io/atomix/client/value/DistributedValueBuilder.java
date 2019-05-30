@@ -15,10 +15,8 @@
  */
 package io.atomix.client.value;
 
+import io.atomix.api.primitive.PrimitiveId;
 import io.atomix.client.PrimitiveManagementService;
-import io.atomix.service.protocol.PrimitiveProtocol;
-import io.atomix.service.protocol.ProxyCompatibleBuilder;
-import io.atomix.service.protocol.ServiceProtocol;
 
 /**
  * Builder for constructing new DistributedValue instances.
@@ -26,15 +24,8 @@ import io.atomix.service.protocol.ServiceProtocol;
  * @param <V> atomic value type
  */
 public abstract class DistributedValueBuilder<V>
-    extends ValueBuilder<DistributedValueBuilder<V>, DistributedValueConfig, DistributedValue<V>, V>
-    implements ProxyCompatibleBuilder<DistributedValueBuilder<V>> {
-
-  protected DistributedValueBuilder(String name, DistributedValueConfig config, PrimitiveManagementService managementService) {
-    super(DistributedValueType.instance(), name, config, managementService);
-  }
-
-  @Override
-  public DistributedValueBuilder<V> withProtocol(ServiceProtocol protocol) {
-    return withProtocol((PrimitiveProtocol) protocol);
+    extends ValueBuilder<DistributedValueBuilder<V>, DistributedValue<V>, V> {
+  protected DistributedValueBuilder(PrimitiveId id, PrimitiveManagementService managementService) {
+    super(id, managementService);
   }
 }

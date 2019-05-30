@@ -15,19 +15,17 @@
  */
 package io.atomix.client.value;
 
+import io.atomix.api.primitive.PrimitiveId;
 import io.atomix.client.PrimitiveManagementService;
 import io.atomix.client.PrimitiveType;
 import io.atomix.client.value.impl.DefaultAtomicValueBuilder;
-import io.atomix.utils.component.Component;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
 
 /**
  * Atomic value primitive type.
  */
-@Component
-public class AtomicValueType<V> implements PrimitiveType<AtomicValueBuilder<V>, AtomicValueConfig, AtomicValue<V>> {
-  private static final String NAME = "atomic-value";
+public class AtomicValueType<V> implements PrimitiveType<AtomicValueBuilder<V>, AtomicValue<V>> {
   private static final AtomicValueType INSTANCE = new AtomicValueType();
 
   /**
@@ -42,24 +40,12 @@ public class AtomicValueType<V> implements PrimitiveType<AtomicValueBuilder<V>, 
   }
 
   @Override
-  public String name() {
-    return NAME;
-  }
-
-  @Override
-  public AtomicValueConfig newConfig() {
-    return new AtomicValueConfig();
-  }
-
-  @Override
-  public AtomicValueBuilder<V> newBuilder(String name, AtomicValueConfig config, PrimitiveManagementService managementService) {
-    return new DefaultAtomicValueBuilder<>(name, config, managementService);
+  public AtomicValueBuilder<V> newBuilder(PrimitiveId id, PrimitiveManagementService managementService) {
+    return new DefaultAtomicValueBuilder<>(id, managementService);
   }
 
   @Override
   public String toString() {
-    return toStringHelper(this)
-        .add("name", name())
-        .toString();
+    return toStringHelper(this).toString();
   }
 }

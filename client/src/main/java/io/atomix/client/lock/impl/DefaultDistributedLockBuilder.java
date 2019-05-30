@@ -17,24 +17,24 @@ package io.atomix.client.lock.impl;
 
 import java.util.concurrent.CompletableFuture;
 
+import io.atomix.api.primitive.PrimitiveId;
 import io.atomix.client.PrimitiveManagementService;
 import io.atomix.client.lock.AsyncDistributedLock;
 import io.atomix.client.lock.DistributedLock;
 import io.atomix.client.lock.DistributedLockBuilder;
-import io.atomix.client.lock.DistributedLockConfig;
 
 /**
  * Default distributed lock builder implementation.
  */
 public class DefaultDistributedLockBuilder extends DistributedLockBuilder {
-  public DefaultDistributedLockBuilder(String name, DistributedLockConfig config, PrimitiveManagementService managementService) {
-    super(name, config, managementService);
+  public DefaultDistributedLockBuilder(PrimitiveId id, PrimitiveManagementService managementService) {
+    super(id, managementService);
   }
 
   @Override
   @SuppressWarnings("unchecked")
   public CompletableFuture<DistributedLock> buildAsync() {
-    return new DefaultAsyncAtomicLock(getPrimitiveId(), managementService, config.getSessionTimeout())
+    return new DefaultAsyncAtomicLock(getPrimitiveId(), managementService, sessionTimeout)
         .connect()
         .thenApply(DelegatingAsyncDistributedLock::new)
         .thenApply(AsyncDistributedLock::sync);

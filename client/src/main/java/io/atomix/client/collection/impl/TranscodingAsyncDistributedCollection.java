@@ -16,6 +16,14 @@
 
 package io.atomix.client.collection.impl;
 
+import java.time.Duration;
+import java.util.Collection;
+import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+
 import com.google.common.collect.Maps;
 import io.atomix.client.collection.AsyncDistributedCollection;
 import io.atomix.client.collection.CollectionEvent;
@@ -24,14 +32,6 @@ import io.atomix.client.collection.DistributedCollection;
 import io.atomix.client.impl.DelegatingAsyncPrimitive;
 import io.atomix.client.iterator.AsyncIterator;
 import io.atomix.client.iterator.impl.TranscodingIterator;
-
-import java.time.Duration;
-import java.util.Collection;
-import java.util.Map;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Executor;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 
 /**
  * An {@code AsyncDistributedCollection} that maps its operations to operations on a

@@ -20,9 +20,9 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
+import io.atomix.client.PrimitiveException;
 import io.atomix.client.iterator.AsyncIterator;
 import io.atomix.client.iterator.SyncIterator;
-import io.atomix.primitive.PrimitiveException;
 
 /**
  * Blocking iterator.

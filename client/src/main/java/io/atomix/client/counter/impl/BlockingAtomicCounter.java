@@ -15,16 +15,16 @@
  */
 package io.atomix.client.counter.impl;
 
-import com.google.common.base.Throwables;
-import io.atomix.client.Synchronous;
-import io.atomix.client.counter.AsyncAtomicCounter;
-import io.atomix.client.counter.AtomicCounter;
-import io.atomix.primitive.PrimitiveException;
-
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+
+import com.google.common.base.Throwables;
+import io.atomix.client.PrimitiveException;
+import io.atomix.client.Synchronous;
+import io.atomix.client.counter.AsyncAtomicCounter;
+import io.atomix.client.counter.AtomicCounter;
 
 /**
  * Default implementation for a {@code AtomicCounter} backed by a {@link AsyncAtomicCounter}.
@@ -97,7 +97,7 @@ public class BlockingAtomicCounter extends Synchronous<AsyncAtomicCounter> imple
       Thread.currentThread().interrupt();
       throw new PrimitiveException.Interrupted();
     } catch (TimeoutException e) {
-      throw new PrimitiveException.Timeout();
+      throw new PrimitiveException.ConcurrentModification();
     } catch (ExecutionException e) {
       Throwable cause = Throwables.getRootCause(e);
       if (cause instanceof PrimitiveException) {

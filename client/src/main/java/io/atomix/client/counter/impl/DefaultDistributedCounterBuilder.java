@@ -17,18 +17,18 @@ package io.atomix.client.counter.impl;
 
 import java.util.concurrent.CompletableFuture;
 
+import io.atomix.api.primitive.PrimitiveId;
 import io.atomix.client.PrimitiveManagementService;
 import io.atomix.client.counter.AsyncDistributedCounter;
 import io.atomix.client.counter.DistributedCounter;
 import io.atomix.client.counter.DistributedCounterBuilder;
-import io.atomix.client.counter.DistributedCounterConfig;
 
 /**
  * Default distributed counter builder.
  */
 public class DefaultDistributedCounterBuilder extends DistributedCounterBuilder {
-  public DefaultDistributedCounterBuilder(String name, DistributedCounterConfig config, PrimitiveManagementService managementService) {
-    super(name, config, managementService);
+  public DefaultDistributedCounterBuilder(PrimitiveId id, PrimitiveManagementService managementService) {
+    super(id, managementService);
   }
 
   @Override

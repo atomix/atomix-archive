@@ -15,20 +15,20 @@
  */
 package io.atomix.client.election.impl;
 
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.function.Consumer;
+
 import com.google.common.base.Throwables;
+import io.atomix.client.PrimitiveException;
 import io.atomix.client.PrimitiveState;
 import io.atomix.client.Synchronous;
 import io.atomix.client.election.AsyncLeaderElection;
 import io.atomix.client.election.LeaderElection;
 import io.atomix.client.election.Leadership;
 import io.atomix.client.election.LeadershipEventListener;
-import io.atomix.primitive.PrimitiveException;
-
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
-import java.util.function.Consumer;
 
 /**
  * Default implementation for a {@code LeaderElector} backed by a {@link AsyncLeaderElection}.
@@ -106,7 +106,7 @@ public class BlockingLeaderElection<T> extends Synchronous<AsyncLeaderElection<T
       Thread.currentThread().interrupt();
       throw new PrimitiveException.Interrupted();
     } catch (TimeoutException e) {
-      throw new PrimitiveException.Timeout();
+      throw new PrimitiveException.ConcurrentModification();
     } catch (ExecutionException e) {
       Throwable cause = Throwables.getRootCause(e);
       if (cause instanceof PrimitiveException) {

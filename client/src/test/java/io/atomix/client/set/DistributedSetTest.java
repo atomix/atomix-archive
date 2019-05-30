@@ -35,9 +35,7 @@ import static org.junit.Assert.assertTrue;
 public class DistributedSetTest extends AbstractPrimitiveTest {
   @Test
   public void testSetOperations() throws Exception {
-    DistributedSet<String> set = client().<String>setBuilder("test-set")
-        .withProtocol(protocol())
-        .build();
+    DistributedSet<String> set = client().<String>setBuilder("test-set").build();
 
     assertEquals(0, set.size());
     assertTrue(set.isEmpty());
@@ -65,9 +63,7 @@ public class DistributedSetTest extends AbstractPrimitiveTest {
 
   @Test
   public void testEventListeners() throws Exception {
-    DistributedSet<String> set = client().<String>setBuilder("test-set-listeners")
-        .withProtocol(protocol())
-        .build();
+    DistributedSet<String> set = client().<String>setBuilder("test-set-listeners").build();
 
     TestSetEventListener listener = new TestSetEventListener();
     CollectionEvent<String> event;

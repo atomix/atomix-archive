@@ -15,8 +15,8 @@
  */
 package io.atomix.client.idgenerator;
 
-import io.atomix.client.SyncPrimitive;
 import io.atomix.client.PrimitiveType;
+import io.atomix.client.SyncPrimitive;
 
 /**
  * Generator for globally unique numeric identifiers.

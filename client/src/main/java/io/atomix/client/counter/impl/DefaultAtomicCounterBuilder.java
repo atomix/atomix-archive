@@ -17,18 +17,18 @@ package io.atomix.client.counter.impl;
 
 import java.util.concurrent.CompletableFuture;
 
+import io.atomix.api.primitive.PrimitiveId;
 import io.atomix.client.PrimitiveManagementService;
 import io.atomix.client.counter.AsyncAtomicCounter;
 import io.atomix.client.counter.AtomicCounter;
 import io.atomix.client.counter.AtomicCounterBuilder;
-import io.atomix.client.counter.AtomicCounterConfig;
 
 /**
  * Atomic counter proxy builder.
  */
 public class DefaultAtomicCounterBuilder extends AtomicCounterBuilder {
-  public DefaultAtomicCounterBuilder(String name, AtomicCounterConfig config, PrimitiveManagementService managementService) {
-    super(name, config, managementService);
+  public DefaultAtomicCounterBuilder(PrimitiveId id, PrimitiveManagementService managementService) {
+    super(id, managementService);
   }
 
   @Override

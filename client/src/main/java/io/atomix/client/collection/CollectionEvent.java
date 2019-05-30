@@ -15,7 +15,7 @@
  */
 package io.atomix.client.collection;
 
-import io.atomix.utils.event.AbstractEvent;
+import io.atomix.client.event.AbstractEvent;
 
 /**
  * Representation of a DistributedCollection update notification.

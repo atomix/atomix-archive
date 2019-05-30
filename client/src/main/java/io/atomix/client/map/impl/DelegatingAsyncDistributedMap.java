@@ -27,6 +27,7 @@ import java.util.stream.Collectors;
 
 import com.google.common.collect.Maps;
 import io.atomix.client.PrimitiveType;
+import io.atomix.client.Versioned;
 import io.atomix.client.collection.AsyncDistributedCollection;
 import io.atomix.client.collection.CollectionEvent;
 import io.atomix.client.collection.CollectionEventListener;
@@ -48,8 +49,7 @@ import io.atomix.client.set.AsyncDistributedSet;
 import io.atomix.client.set.DistributedSet;
 import io.atomix.client.set.DistributedSetType;
 import io.atomix.client.set.impl.BlockingDistributedSet;
-import io.atomix.utils.concurrent.Futures;
-import io.atomix.client.Versioned;
+import io.atomix.client.utils.concurrent.Futures;
 
 /**
  * Distributed map implementation that delegates to an atomic map.

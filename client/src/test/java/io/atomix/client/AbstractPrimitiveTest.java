@@ -15,7 +15,6 @@
  */
 package io.atomix.client;
 
-import java.io.File;
 import java.io.IOException;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
@@ -23,17 +22,28 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
-import io.atomix.server.protocol.ServiceProtocol;
-import io.atomix.protocols.log.partition.LogPartitionGroup;
-import io.atomix.protocols.raft.MultiRaftProtocol;
-import io.atomix.protocols.raft.partition.RaftPartitionGroup;
+import com.google.protobuf.Any;
+import io.atomix.api.partition.Partition;
+import io.atomix.api.partition.PartitionEndpoint;
+import io.atomix.api.partition.PartitionGroup;
+import io.atomix.api.partition.PartitionGroupSpec;
+import io.atomix.api.partition.PartitionId;
+import io.atomix.client.test.TestController;
+import io.atomix.client.utils.concurrent.Futures;
+import io.atomix.protocols.raft.RaftProtocol;
+import io.atomix.protocols.raft.protocol.RaftProtocolConfig;
+import io.atomix.protocols.raft.protocol.RaftStorageConfig;
 import io.atomix.server.AtomixServer;
+import io.atomix.server.NodeConfig;
+import io.atomix.server.ProtocolConfig;
+import io.atomix.server.ServerConfig;
 import org.junit.After;
 import org.junit.Before;
 
@@ -41,17 +51,9 @@ import org.junit.Before;
  * Base Atomix test.
  */
 public abstract class AbstractPrimitiveTest {
-  private AtomixServer server;
+  private TestController controller;
+  private List<AtomixServer> servers;
   private List<AtomixClient> clients;
-
-  /**
-   * Returns the primitive protocol with which to test.
-   *
-   * @return the protocol with which to test
-   */
-  protected ServiceProtocol protocol() {
-    return MultiRaftProtocol.builder("raft").build();
-  }
 
   /**
    * Returns a new Atomix instance.
@@ -66,31 +68,69 @@ public abstract class AbstractPrimitiveTest {
     return client;
   }
 
+  private AtomixServer createServer(int partitionId, String host, int port) {
+    String memberId = String.format("test-%d", partitionId);
+    return new AtomixServer(ServerConfig.newBuilder()
+        .setPartition(PartitionId.newBuilder()
+            .setPartition(partitionId)
+            .setGroup("test")
+            .build())
+        .setNode(NodeConfig.newBuilder()
+            .setId(memberId)
+            .setHost(host)
+            .setPort(port)
+            .build())
+        .setProtocol(ProtocolConfig.newBuilder()
+            .setType(RaftProtocol.TYPE.name())
+            .setConfig(Any.pack(RaftProtocolConfig.newBuilder()
+                .setMemberId(memberId)
+                .addMembers(memberId)
+                .setStorage(RaftStorageConfig.newBuilder()
+                    .setDirectory("target/test-data/test/" + memberId)
+                    .build())
+                .build()))
+            .build())
+        .build());
+  }
+
   @Before
   public void setupTest() throws Exception {
     deleteData();
     clients = new CopyOnWriteArrayList<>();
-    server = AtomixServer.builder()
-        .withMemberId("test")
-        .withHost("localhost")
-        .withPort(5000)
-        .withManagementGroup(RaftPartitionGroup.builder("system")
-            .withMembers("test")
-            .withNumPartitions(1)
-            .withPartitionSize(1)
-            .withDataDirectory(new File("target/test-data/system"))
+    PartitionGroup partitionGroup = PartitionGroup.newBuilder()
+        .setName("test")
+        .setSpec(PartitionGroupSpec.newBuilder()
+            .setName("test")
             .build())
-        .addPartitionGroup(RaftPartitionGroup.builder("raft")
-            .withMembers("test")
-            .withNumPartitions(3)
-            .withPartitionSize(1)
-            .withDataDirectory(new File("target/test-data/raft"))
+        .addPartitions(Partition.newBuilder()
+            .setPartitionId(1)
+            .addEndpoints(PartitionEndpoint.newBuilder()
+                .setHost("localhost")
+                .setPort(5001)
+                .build())
             .build())
-        .addPartitionGroup(LogPartitionGroup.builder("log")
-            .withDataDirectory(new File("target/test-data/log"))
+        .addPartitions(Partition.newBuilder()
+            .setPartitionId(2)
+            .addEndpoints(PartitionEndpoint.newBuilder()
+                .setHost("localhost")
+                .setPort(5002)
+                .build())
+            .build())
+        .addPartitions(Partition.newBuilder()
+            .setPartitionId(3)
+            .addEndpoints(PartitionEndpoint.newBuilder()
+                .setHost("localhost")
+                .setPort(5003)
+                .build())
             .build())
         .build();
-    server.start().get(30, TimeUnit.SECONDS);
+    controller = new TestController(6000, Collections.singletonList(partitionGroup));
+    controller.start().get(30, TimeUnit.SECONDS);
+
+    servers.add(createServer(1, "localhost", 5001));
+    servers.add(createServer(2, "localhost", 5002));
+    servers.add(createServer(3, "localhost", 5003));
+    Futures.allOf(servers.stream().map(AtomixServer::start)).get(30, TimeUnit.SECONDS);
   }
 
   @After
@@ -101,7 +141,7 @@ public abstract class AbstractPrimitiveTest {
     } catch (Exception e) {
       // Do nothing
     }
-    server.stop().get(30, TimeUnit.SECONDS);
+    Futures.allOf(servers.stream().map(AtomixServer::stop)).get(30, TimeUnit.SECONDS);
     deleteData();
   }
 

@@ -26,12 +26,12 @@ import java.util.concurrent.TimeoutException;
 import java.util.function.Consumer;
 
 import com.google.common.base.Throwables;
+import io.atomix.client.PrimitiveException;
 import io.atomix.client.Synchronous;
 import io.atomix.client.log.AsyncDistributedLog;
 import io.atomix.client.log.DistributedLog;
 import io.atomix.client.log.DistributedLogPartition;
 import io.atomix.client.log.Record;
-import io.atomix.primitive.PrimitiveException;
 
 /**
  * Default distributed log.
@@ -90,7 +90,7 @@ public class BlockingDistributedLog<E> extends Synchronous<AsyncDistributedLog<E
       Thread.currentThread().interrupt();
       throw new PrimitiveException.Interrupted();
     } catch (TimeoutException e) {
-      throw new PrimitiveException.Timeout();
+      throw new PrimitiveException.ConcurrentModification();
     } catch (ExecutionException e) {
       Throwable cause = Throwables.getRootCause(e);
       if (cause instanceof PrimitiveException) {

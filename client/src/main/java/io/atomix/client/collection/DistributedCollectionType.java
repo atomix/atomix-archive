@@ -15,6 +15,7 @@
  */
 package io.atomix.client.collection;
 
+import io.atomix.api.primitive.PrimitiveId;
 import io.atomix.client.PrimitiveManagementService;
 import io.atomix.client.PrimitiveType;
 
@@ -23,8 +24,7 @@ import static com.google.common.base.MoreObjects.toStringHelper;
 /**
  * Distributed collection primitive type.
  */
-public class DistributedCollectionType<E> implements PrimitiveType<DistributedCollectionBuilder, DistributedCollectionConfig, DistributedCollection<E>> {
-  private static final String NAME = "collection";
+public class DistributedCollectionType<E> implements PrimitiveType<DistributedCollectionBuilder, DistributedCollection<E>> {
   private static final DistributedCollectionType INSTANCE = new DistributedCollectionType();
 
   /**
@@ -39,24 +39,12 @@ public class DistributedCollectionType<E> implements PrimitiveType<DistributedCo
   }
 
   @Override
-  public String name() {
-    return NAME;
-  }
-
-  @Override
-  public DistributedCollectionConfig newConfig() {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public DistributedCollectionBuilder newBuilder(String primitiveName, DistributedCollectionConfig config, PrimitiveManagementService managementService) {
+  public DistributedCollectionBuilder newBuilder(PrimitiveId id, PrimitiveManagementService managementService) {
     throw new UnsupportedOperationException();
   }
 
   @Override
   public String toString() {
-    return toStringHelper(this)
-        .add("name", name())
-        .toString();
+    return toStringHelper(this).toString();
   }
 }

@@ -35,9 +35,7 @@ public class DistributedLockTest extends AbstractPrimitiveTest {
    */
   @Test
   public void testLockUnlock() throws Throwable {
-    DistributedLock lock = client().lockBuilder("test-lock-unlock")
-        .withProtocol(protocol())
-        .build();
+    DistributedLock lock = client().lockBuilder("test-lock-unlock").build();
     lock.lock();
     assertTrue(lock.isLocked());
     lock.unlock();
@@ -49,12 +47,8 @@ public class DistributedLockTest extends AbstractPrimitiveTest {
    */
   @Test
   public void testReleaseOnClose() throws Throwable {
-    DistributedLock lock1 = client().lockBuilder("test-lock-on-close")
-        .withProtocol(protocol())
-        .build();
-    DistributedLock lock2 = client().lockBuilder("test-lock-on-close")
-        .withProtocol(protocol())
-        .build();
+    DistributedLock lock1 = client().lockBuilder("test-lock-on-close").build();
+    DistributedLock lock2 = client().lockBuilder("test-lock-on-close").build();
     lock1.lock();
     CompletableFuture<Void> future = lock2.async().lock();
     lock1.close();
@@ -66,12 +60,8 @@ public class DistributedLockTest extends AbstractPrimitiveTest {
    */
   @Test
   public void testTryLockFail() throws Throwable {
-    DistributedLock lock1 = client().lockBuilder("test-try-lock-fail")
-        .withProtocol(protocol())
-        .build();
-    DistributedLock lock2 = client().lockBuilder("test-try-lock-fail")
-        .withProtocol(protocol())
-        .build();
+    DistributedLock lock1 = client().lockBuilder("test-try-lock-fail").build();
+    DistributedLock lock2 = client().lockBuilder("test-try-lock-fail").build();
 
     lock1.lock();
 
@@ -83,9 +73,7 @@ public class DistributedLockTest extends AbstractPrimitiveTest {
    */
   @Test
   public void testTryLockSucceed() throws Throwable {
-    DistributedLock lock = client().lockBuilder("test-try-lock-succeed")
-        .withProtocol(protocol())
-        .build();
+    DistributedLock lock = client().lockBuilder("test-try-lock-succeed").build();
     assertTrue(lock.tryLock());
   }
 
@@ -94,12 +82,8 @@ public class DistributedLockTest extends AbstractPrimitiveTest {
    */
   @Test
   public void testTryLockFailWithTimeout() throws Throwable {
-    DistributedLock lock1 = client().lockBuilder("test-try-lock-fail-with-timeout")
-        .withProtocol(protocol())
-        .build();
-    DistributedLock lock2 = client().lockBuilder("test-try-lock-fail-with-timeout")
-        .withProtocol(protocol())
-        .build();
+    DistributedLock lock1 = client().lockBuilder("test-try-lock-fail-with-timeout").build();
+    DistributedLock lock2 = client().lockBuilder("test-try-lock-fail-with-timeout").build();
 
     lock1.lock();
 
@@ -111,12 +95,8 @@ public class DistributedLockTest extends AbstractPrimitiveTest {
    */
   @Test
   public void testTryLockSucceedWithTimeout() throws Throwable {
-    DistributedLock lock1 = client().lockBuilder("test-try-lock-succeed-with-timeout")
-        .withProtocol(protocol())
-        .build();
-    DistributedLock lock2 = client().lockBuilder("test-try-lock-succeed-with-timeout")
-        .withProtocol(protocol())
-        .build();
+    DistributedLock lock1 = client().lockBuilder("test-try-lock-succeed-with-timeout").build();
+    DistributedLock lock2 = client().lockBuilder("test-try-lock-succeed-with-timeout").build();
 
     lock1.lock();
 
@@ -130,12 +110,8 @@ public class DistributedLockTest extends AbstractPrimitiveTest {
    */
   @Test
   public void testBlockingUnlock() throws Throwable {
-    DistributedLock lock1 = client().lockBuilder("test-blocking-unlock")
-        .withProtocol(protocol())
-        .build();
-    DistributedLock lock2 = client().lockBuilder("test-blocking-unlock")
-        .withProtocol(protocol())
-        .build();
+    DistributedLock lock1 = client().lockBuilder("test-blocking-unlock").build();
+    DistributedLock lock2 = client().lockBuilder("test-blocking-unlock").build();
 
     lock1.async().lock().thenRun(() -> lock1.unlock());
 

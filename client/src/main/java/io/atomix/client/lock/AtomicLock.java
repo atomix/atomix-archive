@@ -16,11 +16,10 @@
 package io.atomix.client.lock;
 
 import java.time.Duration;
-import java.util.Optional;
+import java.util.OptionalLong;
 
 import io.atomix.client.PrimitiveType;
 import io.atomix.client.SyncPrimitive;
-import io.atomix.utils.time.Version;
 
 /**
  * Asynchronous lock primitive.
@@ -36,14 +35,14 @@ public interface AtomicLock extends SyncPrimitive {
    *
    * @return the acquired lock version
    */
-  Version lock();
+  long lock();
 
   /**
    * Attempts to acquire the lock.
    *
    * @return indicates whether the lock was acquired
    */
-  Optional<Version> tryLock();
+  OptionalLong tryLock();
 
   /**
    * Attempts to acquire the lock for a specified amount of time.
@@ -51,7 +50,7 @@ public interface AtomicLock extends SyncPrimitive {
    * @param timeout the timeout after which to give up attempting to acquire the lock
    * @return indicates whether the lock was acquired
    */
-  Optional<Version> tryLock(Duration timeout);
+  OptionalLong tryLock(Duration timeout);
 
   /**
    * Returns a boolean indicating whether the lock is locked.
@@ -66,7 +65,7 @@ public interface AtomicLock extends SyncPrimitive {
    * @param version the lock version
    * @return indicates whether the lock is locked
    */
-  boolean isLocked(Version version);
+  boolean isLocked(long version);
 
   /**
    * Unlocks the lock.
@@ -79,7 +78,7 @@ public interface AtomicLock extends SyncPrimitive {
    * @param version the lock version
    * @return indicates whether the lock was successfully unlocked
    */
-  boolean unlock(Version version);
+  boolean unlock(long version);
 
   @Override
   AsyncAtomicLock async();

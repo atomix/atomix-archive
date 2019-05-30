@@ -46,9 +46,7 @@ public class DistributedMapTest extends AbstractPrimitiveTest {
     final String fooValue = "Hello foo!";
     final String barValue = "Hello bar!";
 
-    DistributedMap<String, String> map = client().<String, String>mapBuilder("testBasicMapOperationMap")
-        .withProtocol(protocol())
-        .build();
+    DistributedMap<String, String> map = client().<String, String>mapBuilder("testBasicMapOperationMap").build();
 
     assertTrue(map.isEmpty());
     assertNull(map.put("foo", fooValue));
@@ -94,9 +92,7 @@ public class DistributedMapTest extends AbstractPrimitiveTest {
     final String value2 = "value2";
     final String value3 = "value3";
 
-    DistributedMap<String, String> map = client().<String, String>mapBuilder("testMapComputeOperationsMap")
-        .withProtocol(protocol())
-        .build();
+    DistributedMap<String, String> map = client().<String, String>mapBuilder("testMapComputeOperationsMap").build();
     assertEquals(value1, map.computeIfAbsent("foo", k -> value1));
     assertEquals(value1, map.computeIfAbsent("foo", k -> value2));
     assertNull(map.computeIfPresent("bar", (k, v) -> value2));
@@ -111,9 +107,7 @@ public class DistributedMapTest extends AbstractPrimitiveTest {
     final String value2 = "value2";
     final String value3 = "value3";
 
-    DistributedMap<String, String> map = client().<String, String>mapBuilder("testMapListenerMap")
-        .withProtocol(protocol())
-        .build();
+    DistributedMap<String, String> map = client().<String, String>mapBuilder("testMapListenerMap").build();
     TestMapEventListener listener = new TestMapEventListener();
 
     // add listener; insert new value into map and verify an INSERT event is received.
@@ -173,9 +167,7 @@ public class DistributedMapTest extends AbstractPrimitiveTest {
 
   @Test
   public void testMapViews() throws Exception {
-    DistributedMap<String, String> map = client().<String, String>mapBuilder("testMapViews")
-        .withProtocol(protocol())
-        .build();
+    DistributedMap<String, String> map = client().<String, String>mapBuilder("testMapViews").build();
 
     assertTrue(map.isEmpty());
     assertTrue(map.keySet().isEmpty());
@@ -250,9 +242,7 @@ public class DistributedMapTest extends AbstractPrimitiveTest {
   @Test
   public void testComplexTypes() throws Throwable {
     DistributedMap<Key, Pair<String, Integer>> map = client()
-        .<Key, Pair<String, Integer>>mapBuilder("testComplexTypes")
-        .withProtocol(protocol())
-        .build();
+        .<Key, Pair<String, Integer>>mapBuilder("testComplexTypes").build();
 
     map.put(new Key("foo"), Pair.of("foo", 1));
     assertEquals("foo", map.get(new Key("foo")).getLeft());

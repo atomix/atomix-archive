@@ -20,11 +20,11 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
+import io.atomix.client.PrimitiveException;
 import io.atomix.client.Synchronous;
 import io.atomix.client.value.AsyncDistributedValue;
 import io.atomix.client.value.DistributedValue;
 import io.atomix.client.value.ValueEventListener;
-import io.atomix.primitive.PrimitiveException;
 
 /**
  * Default implementation for a {@code DistributedValue} backed by a {@link AsyncDistributedValue}.

@@ -4,6 +4,7 @@ import java.time.Duration;
 import java.util.Collection;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
 import java.util.function.BiFunction;
 import java.util.function.Predicate;
@@ -37,13 +38,14 @@ import io.atomix.api.map.ResponseStatus;
 import io.atomix.api.map.SizeRequest;
 import io.atomix.api.map.SizeResponse;
 import io.atomix.api.primitive.PrimitiveId;
+import io.atomix.client.PrimitiveException;
 import io.atomix.client.PrimitiveManagementService;
+import io.atomix.client.Versioned;
 import io.atomix.client.collection.AsyncDistributedCollection;
 import io.atomix.client.collection.CollectionEvent;
 import io.atomix.client.collection.CollectionEventListener;
 import io.atomix.client.collection.impl.UnsupportedAsyncDistributedCollection;
-import io.atomix.client.impl.AbstractAsyncPrimitive;
-import io.atomix.client.impl.PrimitivePartition;
+import io.atomix.client.impl.AbstractManagedPrimitive;
 import io.atomix.client.impl.TranscodingStreamObserver;
 import io.atomix.client.iterator.AsyncIterator;
 import io.atomix.client.iterator.impl.StreamObserverIterator;
@@ -53,43 +55,40 @@ import io.atomix.client.map.AtomicMapEvent;
 import io.atomix.client.map.AtomicMapEventListener;
 import io.atomix.client.set.AsyncDistributedSet;
 import io.atomix.client.set.impl.UnsupportedAsyncDistributedSet;
-import io.atomix.primitive.PrimitiveException;
-import io.atomix.utils.concurrent.Futures;
-import io.atomix.client.Versioned;
+import io.atomix.client.utils.concurrent.Futures;
 import io.grpc.stub.StreamObserver;
 
 /**
  * Default asynchronous atomic map primitive.
  */
-public class DefaultAsyncAtomicMap extends AbstractAsyncPrimitive<AsyncAtomicMap<String, byte[]>> implements AsyncAtomicMap<String, byte[]> {
-  private final MapServiceGrpc.MapServiceStub map;
+public class DefaultAsyncAtomicMap extends AbstractManagedPrimitive<MapServiceGrpc.MapServiceStub, AsyncAtomicMap<String, byte[]>> implements AsyncAtomicMap<String, byte[]> {
+  private volatile CompletableFuture<Long> listenFuture;
+  private final Map<AtomicMapEventListener<String, byte[]>, Executor> eventListeners = new ConcurrentHashMap<>();
 
-  public DefaultAsyncAtomicMap(
-      PrimitiveId mapId,
-      PrimitiveManagementService managementService,
-      Duration timeout) {
-    super(mapId, managementService, timeout);
-    this.map = MapServiceGrpc.newStub(managementService.getChannelFactory().getChannel());
+  public DefaultAsyncAtomicMap(PrimitiveId id, PrimitiveManagementService managementService, Duration timeout) {
+    super(id, MapServiceGrpc.newStub(managementService.getChannelFactory().getChannel()), managementService, timeout);
   }
 
   @Override
   public CompletableFuture<Integer> size() {
-    return this.<SizeResponse>execute(stream -> map.size(SizeRequest.newBuilder()
-        .setId(id())
-        .addAllHeaders(getQueryHeaders())
-        .build(), stream))
-        .thenCompose(response -> order(response.getSize(), response.getHeadersList()));
+    return query(
+        (map, header, observer) -> map.size(SizeRequest.newBuilder()
+            .setMapId(getPrimitiveId())
+            .setHeader(header)
+            .build(), observer),
+        SizeResponse::getHeader)
+        .thenApply(response -> response.getSize());
   }
 
   @Override
   public CompletableFuture<Boolean> containsKey(String key) {
-    PrimitivePartition partition = getPartition(key);
-    return this.<ExistsResponse>execute(stream -> map.exists(ExistsRequest.newBuilder()
-        .setId(id())
-        .setHeader(partition.getQueryHeader())
-        .setKey(key)
-        .build(), stream))
-        .thenCompose(response -> partition.order(response.getContainsKey(), response.getHeader()));
+    return query(
+        (map, header, observer) -> map.exists(ExistsRequest.newBuilder()
+            .setMapId(getPrimitiveId())
+            .setHeader(header)
+            .build(), observer),
+        ExistsResponse::getHeader)
+        .thenApply(response -> response.getContainsKey());
   }
 
   @Override
@@ -99,30 +98,30 @@ public class DefaultAsyncAtomicMap extends AbstractAsyncPrimitive<AsyncAtomicMap
 
   @Override
   public CompletableFuture<Versioned<byte[]>> get(String key) {
-    PrimitivePartition partition = getPartition(key);
-    return this.<GetResponse>execute(stream -> map.get(GetRequest.newBuilder()
-        .setId(id())
-        .setHeader(partition.getQueryHeader())
-        .setKey(key)
-        .build(), stream))
-        .thenCompose(response -> partition.order(
-            response.getVersion() != 0
-                ? new Versioned<>(response.getValue().toByteArray(), response.getVersion())
-                : null, response.getHeader()));
+    return query(
+        (map, header, observer) -> map.get(GetRequest.newBuilder()
+            .setMapId(getPrimitiveId())
+            .setHeader(header)
+            .setKey(key)
+            .build(), observer),
+        GetResponse::getHeader)
+        .thenApply(response -> response.getVersion() != 0
+            ? new Versioned<>(response.getValue().toByteArray(), response.getVersion())
+            : null);
   }
 
   @Override
   public CompletableFuture<Versioned<byte[]>> getOrDefault(String key, byte[] defaultValue) {
-    PrimitivePartition partition = getPartition(key);
-    return this.<GetResponse>execute(stream -> map.get(GetRequest.newBuilder()
-        .setId(id())
-        .setHeader(partition.getQueryHeader())
-        .setKey(key)
-        .build(), stream))
-        .thenCompose(response -> partition.order(
-            response.getVersion() != 0
-                ? new Versioned<>(response.getValue().toByteArray(), response.getVersion())
-                : new Versioned<>(defaultValue, 0), response.getHeader()));
+    return query(
+        (map, header, observer) -> map.get(GetRequest.newBuilder()
+            .setMapId(getPrimitiveId())
+            .setHeader(header)
+            .setKey(key)
+            .build(), observer),
+        GetResponse::getHeader)
+        .thenApply(response -> response.getVersion() != 0
+            ? new Versioned<>(response.getValue().toByteArray(), response.getVersion())
+            : new Versioned<>(defaultValue, 0));
   }
 
   @Override
@@ -130,12 +129,13 @@ public class DefaultAsyncAtomicMap extends AbstractAsyncPrimitive<AsyncAtomicMap
       String key,
       Predicate<? super byte[]> condition,
       BiFunction<? super String, ? super byte[], ? extends byte[]> remappingFunction) {
-    PrimitivePartition partition = getPartition(key);
-    return this.<GetResponse>execute(stream -> map.get(GetRequest.newBuilder()
-        .setId(id())
-        .setHeader(partition.getQueryHeader())
-        .setKey(key)
-        .build(), stream))
+    return query(
+        (map, header, observer) -> map.get(GetRequest.newBuilder()
+            .setMapId(getPrimitiveId())
+            .setHeader(header)
+            .setKey(key)
+            .build(), observer),
+        GetResponse::getHeader)
         .thenCompose(response -> {
           byte[] currentValue = response.getVersion() > 0 ? response.getValue().toByteArray() : null;
           if (!condition.test(currentValue)) {
@@ -160,13 +160,15 @@ public class DefaultAsyncAtomicMap extends AbstractAsyncPrimitive<AsyncAtomicMap
 
           // If the response was empty, add the value only if the key is empty.
           if (response.getVersion() == 0) {
-            return this.<PutResponse>execute(stream -> map.put(PutRequest.newBuilder()
-                .setId(id())
-                .setHeader(partition.getCommandHeader())
-                .setKey(key)
-                .setValue(ByteString.copyFrom(computedValue))
-                .setVersion(-1)
-                .build(), stream))
+            return command(
+                (map, header, observer) -> map.put(PutRequest.newBuilder()
+                    .setMapId(getPrimitiveId())
+                    .setHeader(header)
+                    .setKey(key)
+                    .setValue(ByteString.copyFrom(computedValue))
+                    .setVersion(-1)
+                    .build(), observer),
+                PutResponse::getHeader)
                 .thenCompose(result -> {
                   if (result.getStatus() == ResponseStatus.WRITE_LOCK
                       || result.getStatus() == ResponseStatus.PRECONDITION_FAILED) {
@@ -188,13 +190,15 @@ public class DefaultAsyncAtomicMap extends AbstractAsyncPrimitive<AsyncAtomicMap
           // If both the current value and the computed value are non-empty, update the value
           // if the key has not changed.
           else {
-            return this.<ReplaceResponse>execute(stream -> map.replace(ReplaceRequest.newBuilder()
-                .setId(id())
-                .setHeader(partition.getCommandHeader())
-                .setKey(key)
-                .setPreviousVersion(response.getVersion())
-                .setNewValue(ByteString.copyFrom(computedValue))
-                .build(), stream))
+            return command(
+                (map, header, observer) -> map.replace(ReplaceRequest.newBuilder()
+                    .setMapId(getPrimitiveId())
+                    .setHeader(header)
+                    .setKey(key)
+                    .setPreviousVersion(response.getVersion())
+                    .setNewValue(ByteString.copyFrom(computedValue))
+                    .build(), observer),
+                ReplaceResponse::getHeader)
                 .thenCompose(result -> {
                   if (result.getStatus() == ResponseStatus.WRITE_LOCK
                       || result.getStatus() == ResponseStatus.PRECONDITION_FAILED) {
@@ -208,73 +212,78 @@ public class DefaultAsyncAtomicMap extends AbstractAsyncPrimitive<AsyncAtomicMap
 
   @Override
   public CompletableFuture<Versioned<byte[]>> put(String key, byte[] value, Duration ttl) {
-    PrimitivePartition partition = getPartition(key);
-    return this.<PutResponse>execute(stream -> map.put(PutRequest.newBuilder()
-        .setId(id())
-        .setHeader(partition.getCommandHeader())
-        .setKey(key)
-        .setValue(ByteString.copyFrom(value))
-        .setTtl(ttl.toMillis())
-        .build(), stream))
+    return command(
+        (map, header, observer) -> map.put(PutRequest.newBuilder()
+            .setMapId(getPrimitiveId())
+            .setHeader(header)
+            .setKey(key)
+            .setValue(ByteString.copyFrom(value))
+            .setTtl(ttl.toMillis())
+            .build(), observer),
+        PutResponse::getHeader)
         .thenCompose(response -> {
           if (response.getStatus() == ResponseStatus.WRITE_LOCK) {
             return Futures.exceptionalFuture(new PrimitiveException.ConcurrentModification());
           }
           if (!response.getPreviousValue().isEmpty()) {
-            return partition.order(new Versioned<>(response.getPreviousValue().toByteArray(), response.getPreviousVersion()), response.getHeader());
+            return CompletableFuture.completedFuture(new Versioned<>(response.getPreviousValue().toByteArray(), response.getPreviousVersion()));
           }
-          return partition.order(null, response.getHeader());
+          return CompletableFuture.completedFuture(null);
         });
   }
 
   @Override
   public CompletableFuture<Versioned<byte[]>> putIfAbsent(String key, byte[] value, Duration ttl) {
-    PrimitivePartition partition = getPartition(key);
-    return this.<PutResponse>execute(stream -> map.put(PutRequest.newBuilder()
-        .setId(id())
-        .setHeader(partition.getCommandHeader())
-        .setKey(key)
-        .setValue(ByteString.copyFrom(value))
-        .setVersion(-1)
-        .setTtl(ttl.toMillis())
-        .build(), stream))
+    return command(
+        (map, header, observer) -> map.put(PutRequest.newBuilder()
+            .setMapId(getPrimitiveId())
+            .setHeader(header)
+            .setKey(key)
+            .setValue(ByteString.copyFrom(value))
+            .setVersion(-1)
+            .setTtl(ttl.toMillis())
+            .build(), observer),
+        PutResponse::getHeader)
         .thenCompose(response -> {
           if (response.getStatus() == ResponseStatus.WRITE_LOCK) {
             return Futures.exceptionalFuture(new PrimitiveException.ConcurrentModification());
           }
           if (response.getStatus() == ResponseStatus.PRECONDITION_FAILED) {
-            return partition.order(new Versioned<>(response.getPreviousValue().toByteArray(), response.getPreviousVersion()), response.getHeader());
+            return CompletableFuture.completedFuture(new Versioned<>(response.getPreviousValue().toByteArray(), response.getPreviousVersion()));
           }
-          return partition.order(null, response.getHeader());
+          return CompletableFuture.completedFuture(null);
         });
   }
 
   @Override
   public CompletableFuture<Versioned<byte[]>> remove(String key) {
-    PrimitivePartition partition = getPartition(key);
-    return this.<RemoveResponse>execute(stream -> map.remove(RemoveRequest.newBuilder()
-        .setId(id())
-        .setHeader(partition.getCommandHeader())
-        .setKey(key)
-        .build(), stream))
+    return command(
+        (map, header, observer) -> map.remove(RemoveRequest.newBuilder()
+            .setMapId(getPrimitiveId())
+            .setHeader(header)
+            .setKey(key)
+            .build(), observer),
+        RemoveResponse::getHeader)
         .thenCompose(response -> {
           if (response.getStatus() == ResponseStatus.WRITE_LOCK) {
             return Futures.exceptionalFuture(new PrimitiveException.ConcurrentModification());
           }
           if (!response.getPreviousValue().isEmpty()) {
-            return partition.order(new Versioned<>(response.getPreviousValue().toByteArray(), response.getPreviousVersion()), response.getHeader());
+            return CompletableFuture.completedFuture(new Versioned<>(response.getPreviousValue().toByteArray(), response.getPreviousVersion()));
           }
-          return partition.order(null, response.getHeader());
+          return CompletableFuture.completedFuture(null);
         });
   }
 
   @Override
   public CompletableFuture<Void> clear() {
-    return this.<ClearResponse>execute(stream -> map.clear(ClearRequest.newBuilder()
-        .setId(id())
-        .addAllHeaders(getCommandHeaders())
-        .build(), stream))
-        .thenCompose(response -> order(null, response.getHeadersList()));
+    return command(
+        (map, header, observer) -> map.clear(ClearRequest.newBuilder()
+            .setMapId(getPrimitiveId())
+            .setHeader(header)
+            .build(), observer),
+        ClearResponse::getHeader)
+        .thenApply(response -> null);
   }
 
   @Override
@@ -294,180 +303,198 @@ public class DefaultAsyncAtomicMap extends AbstractAsyncPrimitive<AsyncAtomicMap
 
   @Override
   public CompletableFuture<Boolean> remove(String key, byte[] value) {
-    PrimitivePartition partition = getPartition(key);
-    return this.<RemoveResponse>execute(stream -> map.remove(RemoveRequest.newBuilder()
-        .setId(id())
-        .setHeader(partition.getCommandHeader())
-        .setKey(key)
-        .setValue(ByteString.copyFrom(value))
-        .build(), stream))
+    return command(
+        (map, header, observer) -> map.remove(RemoveRequest.newBuilder()
+            .setMapId(getPrimitiveId())
+            .setHeader(header)
+            .setKey(key)
+            .setValue(ByteString.copyFrom(value))
+            .build(), observer),
+        RemoveResponse::getHeader)
         .thenCompose(response -> {
           if (response.getStatus() == ResponseStatus.WRITE_LOCK) {
             return Futures.exceptionalFuture(new PrimitiveException.ConcurrentModification());
           }
-          return partition.order(response.getStatus() == ResponseStatus.OK, response.getHeader());
+          return CompletableFuture.completedFuture(response.getStatus() == ResponseStatus.OK);
         });
   }
 
   @Override
   public CompletableFuture<Boolean> remove(String key, long version) {
-    PrimitivePartition partition = getPartition(key);
-    return this.<RemoveResponse>execute(stream -> map.remove(RemoveRequest.newBuilder()
-        .setId(id())
-        .setHeader(partition.getCommandHeader())
-        .setKey(key)
-        .setVersion(version)
-        .build(), stream))
+    return command(
+        (map, header, observer) -> map.remove(RemoveRequest.newBuilder()
+            .setMapId(getPrimitiveId())
+            .setHeader(header)
+            .setKey(key)
+            .setVersion(version)
+            .build(), observer),
+        RemoveResponse::getHeader)
         .thenCompose(response -> {
           if (response.getStatus() == ResponseStatus.WRITE_LOCK) {
             return Futures.exceptionalFuture(new PrimitiveException.ConcurrentModification());
           }
-          return partition.order(response.getStatus() == ResponseStatus.OK, response.getHeader());
+          return CompletableFuture.completedFuture(response.getStatus() == ResponseStatus.OK);
         });
   }
 
   @Override
   public CompletableFuture<Versioned<byte[]>> replace(String key, byte[] value) {
-    PrimitivePartition partition = getPartition(key);
-    return this.<ReplaceResponse>execute(stream -> map.replace(ReplaceRequest.newBuilder()
-        .setId(id())
-        .setHeader(partition.getCommandHeader())
-        .setKey(key)
-        .setNewValue(ByteString.copyFrom(value))
-        .build(), stream))
+    return command(
+        (map, header, observer) -> map.replace(ReplaceRequest.newBuilder()
+            .setMapId(getPrimitiveId())
+            .setHeader(header)
+            .setKey(key)
+            .setNewValue(ByteString.copyFrom(value))
+            .build(), observer),
+        ReplaceResponse::getHeader)
         .thenCompose(response -> {
           if (response.getStatus() == ResponseStatus.WRITE_LOCK) {
             return Futures.exceptionalFuture(new PrimitiveException.ConcurrentModification());
           } else if (response.getStatus() == ResponseStatus.PRECONDITION_FAILED) {
-            return partition.order(null, response.getHeader());
+            return CompletableFuture.completedFuture(null);
           } else if (response.getStatus() == ResponseStatus.OK) {
-            return partition.order(new Versioned<>(response.getPreviousValue().toByteArray(), response.getPreviousVersion()), response.getHeader());
+            return CompletableFuture.completedFuture(new Versioned<>(response.getPreviousValue().toByteArray(), response.getPreviousVersion()));
           }
-          return partition.order(null, response.getHeader());
+          return CompletableFuture.completedFuture(null);
         });
   }
 
   @Override
   public CompletableFuture<Boolean> replace(String key, byte[] oldValue, byte[] newValue) {
-    PrimitivePartition partition = getPartition(key);
-    return this.<ReplaceResponse>execute(stream -> map.replace(ReplaceRequest.newBuilder()
-        .setId(id())
-        .setHeader(partition.getCommandHeader())
-        .setKey(key)
-        .setPreviousValue(ByteString.copyFrom(oldValue))
-        .setNewValue(ByteString.copyFrom(newValue))
-        .build(), stream))
+    return command(
+        (map, header, observer) -> map.replace(ReplaceRequest.newBuilder()
+            .setMapId(getPrimitiveId())
+            .setHeader(header)
+            .setKey(key)
+            .setPreviousValue(ByteString.copyFrom(oldValue))
+            .setNewValue(ByteString.copyFrom(newValue))
+            .build(), observer),
+        ReplaceResponse::getHeader)
         .thenCompose(response -> {
           if (response.getStatus() == ResponseStatus.WRITE_LOCK) {
             return Futures.exceptionalFuture(new PrimitiveException.ConcurrentModification());
           }
-          return partition.order(response.getStatus() == ResponseStatus.OK, response.getHeader());
+          return CompletableFuture.completedFuture(response.getStatus() == ResponseStatus.OK);
         });
   }
 
   @Override
   public CompletableFuture<Boolean> replace(String key, long oldVersion, byte[] newValue) {
-    PrimitivePartition partition = getPartition(key);
-    return this.<ReplaceResponse>execute(stream -> map.replace(ReplaceRequest.newBuilder()
-        .setId(id())
-        .setHeader(partition.getCommandHeader())
-        .setKey(key)
-        .setPreviousVersion(oldVersion)
-        .setNewValue(ByteString.copyFrom(newValue))
-        .build(), stream))
+    return command(
+        (map, header, observer) -> map.replace(ReplaceRequest.newBuilder()
+            .setMapId(getPrimitiveId())
+            .setHeader(header)
+            .setKey(key)
+            .setPreviousVersion(oldVersion)
+            .setNewValue(ByteString.copyFrom(newValue))
+            .build(), observer),
+        ReplaceResponse::getHeader)
         .thenCompose(response -> {
           if (response.getStatus() == ResponseStatus.WRITE_LOCK) {
             return Futures.exceptionalFuture(new PrimitiveException.ConcurrentModification());
           }
-          return partition.order(response.getStatus() == ResponseStatus.OK, response.getHeader());
+          return CompletableFuture.completedFuture(response.getStatus() == ResponseStatus.OK);
         });
   }
 
+  private synchronized CompletableFuture<Void> listen() {
+    if (listenFuture == null && !eventListeners.isEmpty()) {
+      listenFuture = command(
+          (service, header, observer) -> service.events(EventRequest.newBuilder()
+              .setMapId(getPrimitiveId())
+              .setHeader(header)
+              .build(), observer),
+          EventResponse::getHeader,
+          new StreamObserver<EventResponse>() {
+            @Override
+            public void onNext(EventResponse response) {
+              AtomicMapEvent<String, byte[]> event = null;
+              switch (response.getType()) {
+                case INSERTED:
+                  event = new AtomicMapEvent<>(
+                      AtomicMapEvent.Type.INSERTED,
+                      response.getKey(),
+                      new Versioned<>(response.getNewValue().toByteArray(), response.getNewVersion()),
+                      null);
+                  break;
+                case UPDATED:
+                  event = new AtomicMapEvent<>(
+                      AtomicMapEvent.Type.UPDATED,
+                      response.getKey(),
+                      new Versioned<>(response.getNewValue().toByteArray(), response.getNewVersion()),
+                      new Versioned<>(response.getOldValue().toByteArray(), response.getOldVersion()));
+                  break;
+                case REMOVED:
+                  event = new AtomicMapEvent<>(
+                      AtomicMapEvent.Type.REMOVED,
+                      response.getKey(),
+                      null,
+                      new Versioned<>(response.getOldValue().toByteArray(), response.getOldVersion()));
+                  break;
+              }
+              onEvent(event);
+            }
+
+            private void onEvent(AtomicMapEvent<String, byte[]> event) {
+              eventListeners.forEach((l, e) -> e.execute(() -> l.event(event)));
+            }
+
+            @Override
+            public void onError(Throwable t) {
+              onCompleted();
+            }
+
+            @Override
+            public void onCompleted() {
+              synchronized (DefaultAsyncAtomicMap.this) {
+                listenFuture = null;
+              }
+              listen();
+            }
+          });
+    }
+    return listenFuture.thenApply(v -> null);
+  }
+
   @Override
-  public CompletableFuture<Void> addListener(AtomicMapEventListener<String, byte[]> listener, Executor executor) {
-    map.events(EventRequest.newBuilder()
-        .setId(id())
-        .addAllHeaders(getCommandHeaders())
-        .build(), new StreamObserver<EventResponse>() {
-      @Override
-      public void onNext(EventResponse response) {
-        PrimitivePartition partition = getPartition(response.getHeader().getPartitionId());
-        AtomicMapEvent<String, byte[]> event = null;
-        switch (response.getType()) {
-          case INSERTED:
-            event = new AtomicMapEvent<>(
-                AtomicMapEvent.Type.INSERTED,
-                response.getKey(),
-                new Versioned<>(response.getNewValue().toByteArray(), response.getNewVersion()),
-                null);
-            break;
-          case UPDATED:
-            event = new AtomicMapEvent<>(
-                AtomicMapEvent.Type.UPDATED,
-                response.getKey(),
-                new Versioned<>(response.getNewValue().toByteArray(), response.getNewVersion()),
-                new Versioned<>(response.getOldValue().toByteArray(), response.getOldVersion()));
-            break;
-          case REMOVED:
-            event = new AtomicMapEvent<>(
-                AtomicMapEvent.Type.REMOVED,
-                response.getKey(),
-                null,
-                new Versioned<>(response.getOldValue().toByteArray(), response.getOldVersion()));
-            break;
-        }
-        partition.order(event, response.getHeader()).thenAccept(listener::event);
-      }
+  public synchronized CompletableFuture<Void> addListener(AtomicMapEventListener<String, byte[]> listener, Executor executor) {
+    eventListeners.put(listener, executor);
+    return listen();
+  }
 
-      @Override
-      public void onError(Throwable t) {
-
-      }
-
-      @Override
-      public void onCompleted() {
-
-      }
-    });
+  @Override
+  public synchronized CompletableFuture<Void> removeListener(AtomicMapEventListener<String, byte[]> listener) {
+    eventListeners.remove(listener);
     return CompletableFuture.completedFuture(null);
   }
 
   @Override
-  public CompletableFuture<Void> removeListener(AtomicMapEventListener<String, byte[]> listener) {
-    return CompletableFuture.completedFuture(null);
-  }
-
-  @Override
-  public CompletableFuture<AsyncAtomicMap<String, byte[]>> connect() {
-    return this.<CreateResponse>execute(stream -> map.create(CreateRequest.newBuilder()
-        .setId(id())
+  protected CompletableFuture<Long> openSession(Duration timeout) {
+    return this.<CreateResponse>session((service, header, observer) -> service.create(CreateRequest.newBuilder()
+        .setMapId(getPrimitiveId())
         .setTimeout(com.google.protobuf.Duration.newBuilder()
             .setSeconds(timeout.getSeconds())
             .setNanos(timeout.getNano())
             .build())
-        .build(), stream))
-        .thenAccept(response -> {
-          startKeepAlive(response.getHeadersList());
-        })
-        .thenApply(v -> this);
+        .build(), observer))
+        .thenApply(response -> response.getHeader().getSessionId());
   }
 
   @Override
-  protected CompletableFuture<Void> keepAlive() {
-    return this.<KeepAliveResponse>execute(stream -> map.keepAlive(KeepAliveRequest.newBuilder()
-        .setId(id())
-        .addAllHeaders(getSessionHeaders())
-        .build(), stream))
-        .thenAccept(response -> completeKeepAlive(response.getHeadersList()));
+  protected CompletableFuture<Boolean> keepAlive() {
+    return this.<KeepAliveResponse>session((service, header, observer) -> service.keepAlive(KeepAliveRequest.newBuilder()
+        .setMapId(getPrimitiveId())
+        .build(), observer))
+        .thenApply(response -> true);
   }
 
   @Override
-  public CompletableFuture<Void> close() {
-    return this.<CloseResponse>execute(stream -> map.close(CloseRequest.newBuilder()
-        .setId(id())
-        .addAllHeaders(getSessionHeaders())
-        .build(), stream))
-        .thenApply(response -> null);
+  protected CompletableFuture<Void> close(boolean delete) {
+    return this.<CloseResponse>session((service, header, observer) -> service.close(CloseRequest.newBuilder()
+        .setMapId(getPrimitiveId())
+        .setDelete(delete)
+        .build(), observer))
+        .thenApply(v -> null);
   }
 
   @Override
@@ -549,10 +576,12 @@ public class DefaultAsyncAtomicMap extends AbstractAsyncPrimitive<AsyncAtomicMap
     @Override
     public AsyncIterator<Map.Entry<String, Versioned<byte[]>>> iterator() {
       StreamObserverIterator<Map.Entry<String, Versioned<byte[]>>> iterator = new StreamObserverIterator<>();
-      map.entries(EntriesRequest.newBuilder()
-              .setId(id())
-              .addAllHeaders(getQueryHeaders())
-              .build(),
+      query(
+          (map, header, observer) -> map.entries(EntriesRequest.newBuilder()
+              .setMapId(getPrimitiveId())
+              .setHeader(header)
+              .build(), observer),
+          EntriesResponse::getHeader,
           new TranscodingStreamObserver<>(
               iterator,
               response -> Maps.immutableEntry(
@@ -634,10 +663,12 @@ public class DefaultAsyncAtomicMap extends AbstractAsyncPrimitive<AsyncAtomicMap
     @Override
     public AsyncIterator<String> iterator() {
       StreamObserverIterator<String> iterator = new StreamObserverIterator<>();
-      map.entries(EntriesRequest.newBuilder()
-              .setId(id())
-              .addAllHeaders(getQueryHeaders())
-              .build(),
+      query(
+          (map, header, observer) -> map.entries(EntriesRequest.newBuilder()
+              .setMapId(getPrimitiveId())
+              .setHeader(header)
+              .build(), observer),
+          EntriesResponse::getHeader,
           new TranscodingStreamObserver<>(
               iterator,
               EntriesResponse::getKey));
@@ -699,10 +730,12 @@ public class DefaultAsyncAtomicMap extends AbstractAsyncPrimitive<AsyncAtomicMap
     @Override
     public AsyncIterator<Versioned<byte[]>> iterator() {
       StreamObserverIterator<Versioned<byte[]>> iterator = new StreamObserverIterator<>();
-      map.entries(EntriesRequest.newBuilder()
-              .setId(id())
-              .addAllHeaders(getQueryHeaders())
-              .build(),
+      query(
+          (map, header, observer) -> map.entries(EntriesRequest.newBuilder()
+              .setMapId(getPrimitiveId())
+              .setHeader(header)
+              .build(), observer),
+          EntriesResponse::getHeader,
           new TranscodingStreamObserver<>(
               iterator,
               response -> new Versioned<>(response.getValue().toByteArray(), response.getVersion())));

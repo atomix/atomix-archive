@@ -23,13 +23,13 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 import com.google.common.base.Throwables;
+import io.atomix.client.PrimitiveException;
 import io.atomix.client.Synchronous;
 import io.atomix.client.collection.AsyncDistributedCollection;
 import io.atomix.client.collection.CollectionEventListener;
 import io.atomix.client.collection.DistributedCollection;
 import io.atomix.client.iterator.SyncIterator;
 import io.atomix.client.iterator.impl.BlockingIterator;
-import io.atomix.primitive.PrimitiveException;
 
 /**
  * Implementation of {@link DistributedCollection} that merely delegates to a {@link AsyncDistributedCollection} and
@@ -143,7 +143,7 @@ public class BlockingDistributedCollection<E> extends Synchronous<AsyncDistribut
       Thread.currentThread().interrupt();
       throw new PrimitiveException.Interrupted();
     } catch (TimeoutException e) {
-      throw new PrimitiveException.Timeout();
+      throw new PrimitiveException.ConcurrentModification();
     } catch (ExecutionException e) {
       Throwable cause = Throwables.getRootCause(e);
       if (cause instanceof PrimitiveException) {

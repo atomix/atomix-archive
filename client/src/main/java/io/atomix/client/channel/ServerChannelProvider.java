@@ -1,17 +1,18 @@
 package io.atomix.client.channel;
 
-import io.atomix.utils.net.Address;
-import io.grpc.netty.NettyChannelBuilder;
+import io.grpc.netty.shaded.io.grpc.netty.NettyChannelBuilder;
 
 /**
  * Server channel provider.
  */
 public class ServerChannelProvider implements ChannelProvider {
-  private final Address address;
+  private final String host;
+  private final int port;
   private final ChannelConfig config;
 
-  public ServerChannelProvider(Address address, ChannelConfig config) {
-    this.address = address;
+  public ServerChannelProvider(String host, int port, ChannelConfig config) {
+    this.host = host;
+    this.port = port;
     this.config = config;
   }
 
@@ -19,10 +20,10 @@ public class ServerChannelProvider implements ChannelProvider {
   public ChannelFactory getFactory() {
     NettyChannelBuilder builder;
     if (config.isTlsEnabled()) {
-      builder = NettyChannelBuilder.forAddress(address.host(), address.port())
+      builder = NettyChannelBuilder.forAddress(host, port)
           .useTransportSecurity();
     } else {
-      builder = NettyChannelBuilder.forAddress(address.host(), address.port())
+      builder = NettyChannelBuilder.forAddress(host, port)
           .usePlaintext();
     }
     return builder::build;

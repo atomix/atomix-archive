@@ -15,8 +15,8 @@
  */
 package io.atomix.client.election;
 
-import io.atomix.client.SyncPrimitive;
 import io.atomix.client.PrimitiveType;
+import io.atomix.client.SyncPrimitive;
 
 /**
  * {@code LeaderElector} provides the same functionality as {@link AsyncLeaderElection} with

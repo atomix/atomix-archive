@@ -15,19 +15,17 @@
  */
 package io.atomix.client.value;
 
+import io.atomix.api.primitive.PrimitiveId;
 import io.atomix.client.PrimitiveManagementService;
 import io.atomix.client.PrimitiveType;
 import io.atomix.client.value.impl.DefaultDistributedValueBuilder;
-import io.atomix.utils.component.Component;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
 
 /**
  * Distributed value primitive type.
  */
-@Component
-public class DistributedValueType<V> implements PrimitiveType<DistributedValueBuilder<V>, DistributedValueConfig, DistributedValue<V>> {
-  private static final String NAME = "value";
+public class DistributedValueType<V> implements PrimitiveType<DistributedValueBuilder<V>, DistributedValue<V>> {
   private static final DistributedValueType INSTANCE = new DistributedValueType();
 
   /**
@@ -42,24 +40,12 @@ public class DistributedValueType<V> implements PrimitiveType<DistributedValueBu
   }
 
   @Override
-  public String name() {
-    return NAME;
-  }
-
-  @Override
-  public DistributedValueConfig newConfig() {
-    return new DistributedValueConfig();
-  }
-
-  @Override
-  public DistributedValueBuilder<V> newBuilder(String name, DistributedValueConfig config, PrimitiveManagementService managementService) {
-    return new DefaultDistributedValueBuilder<>(name, config, managementService);
+  public DistributedValueBuilder<V> newBuilder(PrimitiveId id, PrimitiveManagementService managementService) {
+    return new DefaultDistributedValueBuilder<>(id, managementService);
   }
 
   @Override
   public String toString() {
-    return toStringHelper(this)
-        .add("name", name())
-        .toString();
+    return toStringHelper(this).toString();
   }
 }

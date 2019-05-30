@@ -15,19 +15,17 @@
  */
 package io.atomix.client.lock;
 
+import io.atomix.api.primitive.PrimitiveId;
 import io.atomix.client.PrimitiveManagementService;
 import io.atomix.client.PrimitiveType;
 import io.atomix.client.lock.impl.DefaultAtomicLockBuilder;
-import io.atomix.utils.component.Component;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
 
 /**
  * Atomic lock primitive type.
  */
-@Component
-public class AtomicLockType implements PrimitiveType<AtomicLockBuilder, AtomicLockConfig, AtomicLock> {
-  private static final String NAME = "atomic-lock";
+public class AtomicLockType implements PrimitiveType<AtomicLockBuilder, AtomicLock> {
   private static final AtomicLockType INSTANCE = new AtomicLockType();
 
   /**
@@ -40,24 +38,12 @@ public class AtomicLockType implements PrimitiveType<AtomicLockBuilder, AtomicLo
   }
 
   @Override
-  public String name() {
-    return NAME;
-  }
-
-  @Override
-  public AtomicLockConfig newConfig() {
-    return new AtomicLockConfig();
-  }
-
-  @Override
-  public AtomicLockBuilder newBuilder(String name, AtomicLockConfig config, PrimitiveManagementService managementService) {
-    return new DefaultAtomicLockBuilder(name, config, managementService);
+  public AtomicLockBuilder newBuilder(PrimitiveId id, PrimitiveManagementService managementService) {
+    return new DefaultAtomicLockBuilder(id, managementService);
   }
 
   @Override
   public String toString() {
-    return toStringHelper(this)
-        .add("name", name())
-        .toString();
+    return toStringHelper(this).toString();
   }
 }

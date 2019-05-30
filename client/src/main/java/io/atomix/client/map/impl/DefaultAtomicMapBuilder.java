@@ -18,12 +18,12 @@ package io.atomix.client.map.impl;
 import java.util.concurrent.CompletableFuture;
 
 import com.google.common.io.BaseEncoding;
+import io.atomix.api.primitive.PrimitiveId;
 import io.atomix.client.PrimitiveManagementService;
 import io.atomix.client.map.AsyncAtomicMap;
 import io.atomix.client.map.AtomicMap;
 import io.atomix.client.map.AtomicMapBuilder;
-import io.atomix.client.map.AtomicMapConfig;
-import io.atomix.utils.serializer.Serializer;
+import io.atomix.client.utils.serializer.Serializer;
 
 /**
  * Default {@link AsyncAtomicMap} builder.
@@ -32,14 +32,14 @@ import io.atomix.utils.serializer.Serializer;
  * @param <V> type for map value
  */
 public class DefaultAtomicMapBuilder<K, V> extends AtomicMapBuilder<K, V> {
-  public DefaultAtomicMapBuilder(String name, AtomicMapConfig config, PrimitiveManagementService managementService) {
-    super(name, config, managementService);
+  public DefaultAtomicMapBuilder(PrimitiveId id, PrimitiveManagementService managementService) {
+    super(id, managementService);
   }
 
   @Override
   @SuppressWarnings("unchecked")
   public CompletableFuture<AtomicMap<K, V>> buildAsync() {
-    return new DefaultAsyncAtomicMap(getPrimitiveId(), managementService, config.getSessionTimeout())
+    return new DefaultAsyncAtomicMap(getPrimitiveId(), managementService, sessionTimeout)
         .connect()
         .thenApply(rawMap -> {
           Serializer serializer = serializer();
@@ -51,13 +51,13 @@ public class DefaultAtomicMapBuilder<K, V> extends AtomicMapBuilder<K, V> {
               bytes -> serializer.decode(bytes));
         })
         .<AsyncAtomicMap<K, V>>thenApply(map -> {
-          if (config.getCacheConfig().isEnabled()) {
-            return new CachingAsyncAtomicMap<>(map, config.getCacheConfig());
+          if (cacheEnabled) {
+            return new CachingAsyncAtomicMap<>(map, cacheSize);
           }
           return map;
         })
         .thenApply(map -> {
-          if (config.isReadOnly()) {
+          if (readOnly) {
             return new UnmodifiableAsyncAtomicMap<>(map);
           }
           return map;

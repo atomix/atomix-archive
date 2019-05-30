@@ -33,157 +33,137 @@ import io.atomix.api.counter.IncrementRequest;
 import io.atomix.api.counter.IncrementResponse;
 import io.atomix.api.counter.SetRequest;
 import io.atomix.api.counter.SetResponse;
+import io.atomix.api.headers.ResponseHeader;
 import io.atomix.api.primitive.PrimitiveId;
 import io.atomix.client.PrimitiveManagementService;
 import io.atomix.client.counter.AsyncAtomicCounter;
 import io.atomix.client.counter.AtomicCounter;
 import io.atomix.client.impl.AbstractAsyncPrimitive;
-import io.atomix.client.impl.PrimitivePartition;
 
 /**
  * Atomix counter implementation.
  */
 public class DefaultAsyncAtomicCounter
-    extends AbstractAsyncPrimitive<AsyncAtomicCounter>
+    extends AbstractAsyncPrimitive<CounterServiceGrpc.CounterServiceStub, AsyncAtomicCounter>
     implements AsyncAtomicCounter {
-  private final CounterServiceGrpc.CounterServiceStub counter;
-
   public DefaultAsyncAtomicCounter(
       PrimitiveId id,
       PrimitiveManagementService managementService) {
-    super(id, managementService, Duration.ZERO);
-    this.counter = CounterServiceGrpc.newStub(managementService.getChannelFactory().getChannel());
+    super(id, CounterServiceGrpc.newStub(managementService.getChannelFactory().getChannel()), managementService);
   }
 
   @Override
   public CompletableFuture<Long> get() {
-    PrimitivePartition partition = getPartition();
-    return this.<GetResponse>execute(observer -> counter.get(GetRequest.newBuilder()
-        .setId(id())
-        .setHeader(partition.getRequestHeader())
-        .build(), observer))
-        .thenCompose(response -> partition.complete(response.getValue(), response.getHeader()));
+    return execute((counter, header, observer) -> counter.get(GetRequest.newBuilder()
+        .setCounterId(getPrimitiveId())
+        .setHeader(header)
+        .build(), observer), GetResponse::getHeader)
+        .thenApply(response -> response.getValue());
   }
 
   @Override
   public CompletableFuture<Void> set(long value) {
-    PrimitivePartition partition = getPartition();
-    return this.<SetResponse>execute(observer -> counter.set(SetRequest.newBuilder()
-        .setId(id())
-        .setHeader(partition.getRequestHeader())
+    return execute((counter, header, observer) -> counter.set(SetRequest.newBuilder()
+        .setCounterId(getPrimitiveId())
+        .setHeader(header)
         .setValue(value)
-        .build(), observer))
-        .thenCompose(response -> partition.complete(null, response.getHeader()));
+        .build(), observer), SetResponse::getHeader)
+        .thenApply(response -> null);
   }
 
   @Override
   public CompletableFuture<Boolean> compareAndSet(long expectedValue, long updateValue) {
-    PrimitivePartition partition = getPartition();
-    return this.<CheckAndSetResponse>execute(observer -> counter.checkAndSet(CheckAndSetRequest.newBuilder()
-        .setId(id())
-        .setHeader(partition.getRequestHeader())
+    return execute((counter, header, observer) -> counter.checkAndSet(CheckAndSetRequest.newBuilder()
+        .setCounterId(getPrimitiveId())
+        .setHeader(header)
         .setExpect(expectedValue)
         .setUpdate(updateValue)
-        .build(), observer))
-        .thenCompose(response -> partition.complete(response.getSucceeded(), response.getHeader()));
+        .build(), observer), CheckAndSetResponse::getHeader)
+        .thenApply(response -> response.getSucceeded());
   }
 
   @Override
   public CompletableFuture<Long> addAndGet(long delta) {
-    PrimitivePartition partition = getPartition();
-    return this.<IncrementResponse>execute(observer -> counter.increment(IncrementRequest.newBuilder()
-        .setId(id())
-        .setHeader(partition.getRequestHeader())
+    return execute((counter, header, observer) -> counter.increment(IncrementRequest.newBuilder()
+        .setCounterId(getPrimitiveId())
+        .setHeader(header)
         .setDelta(delta)
-        .build(), observer))
-        .thenCompose(response -> partition.complete(response.getNextValue(), response.getHeader()));
+        .build(), observer), IncrementResponse::getHeader)
+        .thenApply(response -> response.getNextValue());
   }
 
   @Override
   public CompletableFuture<Long> getAndAdd(long delta) {
-    PrimitivePartition partition = getPartition();
-    return this.<IncrementResponse>execute(observer -> counter.increment(IncrementRequest.newBuilder()
-        .setId(id())
-        .setHeader(partition.getRequestHeader())
+    return execute((counter, header, observer) -> counter.increment(IncrementRequest.newBuilder()
+        .setCounterId(getPrimitiveId())
+        .setHeader(header)
         .setDelta(delta)
-        .build(), observer))
-        .thenCompose(response -> partition.complete(response.getPreviousValue(), response.getHeader()));
+        .build(), observer), IncrementResponse::getHeader)
+        .thenApply(response -> response.getPreviousValue());
   }
 
   @Override
   public CompletableFuture<Long> incrementAndGet() {
-    PrimitivePartition partition = getPartition();
-    return this.<IncrementResponse>execute(observer -> counter.increment(IncrementRequest.newBuilder()
-        .setId(id())
-        .setHeader(partition.getRequestHeader())
-        .build(), observer))
-        .thenCompose(response -> partition.complete(response.getNextValue(), response.getHeader()));
+    return execute((counter, header, observer) -> counter.increment(IncrementRequest.newBuilder()
+        .setCounterId(getPrimitiveId())
+        .setHeader(header)
+        .setDelta(1)
+        .build(), observer), IncrementResponse::getHeader)
+        .thenApply(response -> response.getNextValue());
   }
 
   @Override
   public CompletableFuture<Long> getAndIncrement() {
-    PrimitivePartition partition = getPartition();
-    return this.<IncrementResponse>execute(observer -> counter.increment(IncrementRequest.newBuilder()
-        .setId(id())
-        .setHeader(partition.getRequestHeader())
-        .build(), observer))
-        .thenCompose(response -> partition.complete(response.getPreviousValue(), response.getHeader()));
+    return execute((counter, header, observer) -> counter.increment(IncrementRequest.newBuilder()
+        .setCounterId(getPrimitiveId())
+        .setHeader(header)
+        .setDelta(1)
+        .build(), observer), IncrementResponse::getHeader)
+        .thenApply(response -> response.getPreviousValue());
   }
 
   @Override
   public CompletableFuture<Long> decrementAndGet() {
-    PrimitivePartition partition = getPartition();
-    return this.<DecrementResponse>execute(observer -> counter.decrement(DecrementRequest.newBuilder()
-        .setId(id())
-        .setHeader(partition.getRequestHeader())
-        .build(), observer))
-        .thenCompose(response -> partition.complete(response.getNextValue(), response.getHeader()));
+    return execute((counter, header, observer) -> counter.decrement(DecrementRequest.newBuilder()
+        .setCounterId(getPrimitiveId())
+        .setHeader(header)
+        .setDelta(1)
+        .build(), observer), DecrementResponse::getHeader)
+        .thenApply(response -> response.getNextValue());
   }
 
   @Override
   public CompletableFuture<Long> getAndDecrement() {
-    PrimitivePartition partition = getPartition();
-    return this.<DecrementResponse>execute(observer -> counter.decrement(DecrementRequest.newBuilder()
-        .setId(id())
-        .setHeader(partition.getRequestHeader())
-        .build(), observer))
-        .thenCompose(response -> partition.complete(response.getPreviousValue(), response.getHeader()));
+    return execute((counter, header, observer) -> counter.decrement(DecrementRequest.newBuilder()
+        .setCounterId(getPrimitiveId())
+        .setHeader(header)
+        .setDelta(1)
+        .build(), observer), DecrementResponse::getHeader)
+        .thenApply(response -> response.getPreviousValue());
   }
 
   @Override
   public CompletableFuture<AsyncAtomicCounter> connect() {
-    return this.<CreateResponse>execute(observer -> counter.create(CreateRequest.newBuilder()
-        .setId(id())
-        .build(), observer))
-        .thenApply(response -> {
-          getOrCreatePartition(response.getHeader().getPartitionId()).init(response.getHeader());
-          return this;
-        });
-  }
-
-  @Override
-  protected CompletableFuture<Void> keepAlive() {
-    return CompletableFuture.completedFuture(null);
+    return execute((counter, header, observer) -> counter.create(CreateRequest.newBuilder()
+        .setCounterId(getPrimitiveId())
+        .build(), observer), CreateResponse::getHeader)
+        .thenApply(v -> this);
   }
 
   @Override
   public CompletableFuture<Void> close() {
-    PrimitivePartition partition = getPartition();
-    return this.<CloseResponse>execute(observer -> counter.close(CloseRequest.newBuilder()
-        .setId(id())
-        .setHeader(partition.getRequestHeader())
-        .build(), observer))
+    return this.<CloseResponse>execute((counter, header, observer) -> counter.close(CloseRequest.newBuilder()
+        .setCounterId(getPrimitiveId())
+        .build(), observer), response -> ResponseHeader.getDefaultInstance())
         .thenApply(v -> null);
   }
 
   @Override
   public CompletableFuture<Void> delete() {
-    PrimitivePartition partition = getPartition();
-    return this.<CloseResponse>execute(observer -> counter.close(CloseRequest.newBuilder()
-        .setId(id())
-        .setHeader(partition.getRequestHeader())
+    return this.<CloseResponse>execute((counter, header, observer) -> counter.close(CloseRequest.newBuilder()
+        .setCounterId(getPrimitiveId())
         .setDelete(true)
-        .build(), observer))
+        .build(), observer), response -> ResponseHeader.getDefaultInstance())
         .thenApply(v -> null);
   }
 

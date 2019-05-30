@@ -3,7 +3,9 @@ package io.atomix.client.set.impl;
 import java.time.Duration;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
 
 import io.atomix.api.primitive.PrimitiveId;
@@ -31,30 +33,26 @@ import io.atomix.api.set.SizeResponse;
 import io.atomix.client.PrimitiveManagementService;
 import io.atomix.client.collection.CollectionEvent;
 import io.atomix.client.collection.CollectionEventListener;
-import io.atomix.client.impl.AbstractAsyncPrimitive;
-import io.atomix.client.impl.PrimitivePartition;
+import io.atomix.client.impl.AbstractManagedPrimitive;
 import io.atomix.client.impl.TranscodingStreamObserver;
 import io.atomix.client.iterator.AsyncIterator;
 import io.atomix.client.iterator.impl.StreamObserverIterator;
 import io.atomix.client.set.AsyncDistributedSet;
 import io.atomix.client.set.DistributedSet;
-import io.atomix.utils.concurrent.Futures;
+import io.atomix.client.utils.concurrent.Futures;
 import io.grpc.stub.StreamObserver;
 
 /**
  * Default distributed set primitive.
  */
 public class DefaultAsyncDistributedSet
-    extends AbstractAsyncPrimitive<AsyncDistributedSet<String>>
+    extends AbstractManagedPrimitive<SetServiceGrpc.SetServiceStub, AsyncDistributedSet<String>>
     implements AsyncDistributedSet<String> {
-  private final SetServiceGrpc.SetServiceStub set;
+  private volatile CompletableFuture<Long> listenFuture;
+  private final Map<CollectionEventListener<String>, Executor> eventListeners = new ConcurrentHashMap<>();
 
-  public DefaultAsyncDistributedSet(
-      PrimitiveId id,
-      PrimitiveManagementService managementService,
-      Duration timeout) {
-    super(id, managementService, timeout);
-    this.set = SetServiceGrpc.newStub(managementService.getChannelFactory().getChannel());
+  public DefaultAsyncDistributedSet(PrimitiveId id, PrimitiveManagementService managementService, Duration timeout) {
+    super(id, SetServiceGrpc.newStub(managementService.getChannelFactory().getChannel()), managementService, timeout);
   }
 
   @Override
@@ -69,11 +67,13 @@ public class DefaultAsyncDistributedSet
 
   @Override
   public CompletableFuture<Integer> size() {
-    return this.<SizeResponse>execute(observer -> set.size(SizeRequest.newBuilder()
-        .setId(id())
-        .addAllHeaders(getQueryHeaders())
-        .build(), observer))
-        .thenCompose(response -> order(response.getSize(), response.getHeadersList()));
+    return query(
+        (set, header, observer) -> set.size(SizeRequest.newBuilder()
+            .setSetId(getPrimitiveId())
+            .setHeader(header)
+            .build(), observer),
+        SizeResponse::getHeader)
+        .thenApply(response -> response.getSize());
   }
 
   @Override
@@ -89,22 +89,26 @@ public class DefaultAsyncDistributedSet
   @Override
   @SuppressWarnings("unchecked")
   public CompletableFuture<Boolean> addAll(Collection<? extends String> c) {
-    return this.<AddResponse>execute(observer -> set.add(AddRequest.newBuilder()
-        .setId(id())
-        .addAllHeaders(getCommandHeaders())
-        .addAllValues((Collection) c)
-        .build(), observer))
-        .thenCompose(response -> order(response.getAdded(), response.getHeadersList()));
+    return command(
+        (set, header, observer) -> set.add(AddRequest.newBuilder()
+            .setSetId(getPrimitiveId())
+            .setHeader(header)
+            .addAllValues((Collection) c)
+            .build(), observer),
+        AddResponse::getHeader)
+        .thenApply(response -> response.getAdded());
   }
 
   @Override
   public CompletableFuture<Boolean> containsAll(Collection<? extends String> c) {
-    return this.<ContainsResponse>execute(observer -> set.contains(ContainsRequest.newBuilder()
-        .setId(id())
-        .addAllHeaders(getQueryHeaders())
-        .addAllValues((Collection) c)
-        .build(), observer))
-        .thenCompose(response -> order(response.getContains(), response.getHeadersList()));
+    return query(
+        (set, header, observer) -> set.contains(ContainsRequest.newBuilder()
+            .setSetId(getPrimitiveId())
+            .setHeader(header)
+            .addAllValues((Collection) c)
+            .build(), observer),
+        ContainsResponse::getHeader)
+        .thenApply(response -> response.getContains());
   }
 
   @Override
@@ -114,73 +118,96 @@ public class DefaultAsyncDistributedSet
 
   @Override
   public CompletableFuture<Boolean> removeAll(Collection<? extends String> c) {
-    return this.<RemoveResponse>execute(observer -> set.remove(RemoveRequest.newBuilder()
-        .setId(id())
-        .addAllHeaders(getCommandHeaders())
-        .addAllValues((Collection) c)
-        .build(), observer))
-        .thenCompose(response -> order(response.getRemoved(), response.getHeadersList()));
+    return command(
+        (set, header, observer) -> set.remove(RemoveRequest.newBuilder()
+            .setSetId(getPrimitiveId())
+            .setHeader(header)
+            .addAllValues((Collection) c)
+            .build(), observer),
+        RemoveResponse::getHeader)
+        .thenApply(response -> response.getRemoved());
   }
 
   @Override
   public CompletableFuture<Void> clear() {
-    return this.<ClearResponse>execute(observer -> set.clear(ClearRequest.newBuilder()
-        .setId(id())
-        .addAllHeaders(getCommandHeaders())
-        .build(), observer))
-        .thenCompose(response -> order(null, response.getHeadersList()));
+    return command(
+        (set, header, observer) -> set.clear(ClearRequest.newBuilder()
+            .setSetId(getPrimitiveId())
+            .setHeader(header)
+            .build(), observer),
+        ClearResponse::getHeader)
+        .thenApply(response -> null);
+  }
+
+  private synchronized CompletableFuture<Void> listen() {
+    if (listenFuture == null && !eventListeners.isEmpty()) {
+      listenFuture = command(
+          (service, header, observer) -> service.listen(EventRequest.newBuilder()
+              .setSetId(getPrimitiveId())
+              .setHeader(header)
+              .build(), observer),
+          EventResponse::getHeader,
+          new StreamObserver<EventResponse>() {
+            @Override
+            public void onNext(EventResponse response) {
+              CollectionEvent<String> event = null;
+              switch (response.getType()) {
+                case ADDED:
+                  event = new CollectionEvent<>(
+                      CollectionEvent.Type.ADDED,
+                      response.getValue());
+                  break;
+                case REMOVED:
+                  event = new CollectionEvent<>(
+                      CollectionEvent.Type.REMOVED,
+                      response.getValue());
+                  break;
+              }
+              onEvent(event);
+            }
+
+            private void onEvent(CollectionEvent<String> event) {
+              eventListeners.forEach((l, e) -> e.execute(() -> l.event(event)));
+            }
+
+            @Override
+            public void onError(Throwable t) {
+              onCompleted();
+            }
+
+            @Override
+            public void onCompleted() {
+              synchronized (DefaultAsyncDistributedSet.this) {
+                listenFuture = null;
+              }
+              listen();
+            }
+          });
+    }
+    return listenFuture.thenApply(v -> null);
   }
 
   @Override
-  public CompletableFuture<Void> addListener(CollectionEventListener<String> listener, Executor executor) {
-    set.listen(EventRequest.newBuilder()
-        .setId(id())
-        .addAllHeaders(getCommandHeaders())
-        .build(), new StreamObserver<EventResponse>() {
-      @Override
-      public void onNext(EventResponse response) {
-        PrimitivePartition partition = getPartition(response.getHeader().getPartitionId());
-        CollectionEvent<String> event = null;
-        switch (response.getType()) {
-          case ADDED:
-            event = new CollectionEvent<>(
-                CollectionEvent.Type.ADDED,
-                response.getValue());
-            break;
-          case REMOVED:
-            event = new CollectionEvent<>(
-                CollectionEvent.Type.REMOVED,
-                response.getValue());
-            break;
-        }
-        partition.order(event, response.getHeader()).thenAccept(listener::event);
-      }
-
-      @Override
-      public void onError(Throwable t) {
-
-      }
-
-      @Override
-      public void onCompleted() {
-
-      }
-    });
-    return CompletableFuture.completedFuture(null);
+  public synchronized CompletableFuture<Void> addListener(CollectionEventListener<String> listener, Executor executor) {
+    eventListeners.put(listener, executor);
+    return listen();
   }
 
   @Override
-  public CompletableFuture<Void> removeListener(CollectionEventListener<String> listener) {
+  public synchronized CompletableFuture<Void> removeListener(CollectionEventListener<String> listener) {
+    eventListeners.remove(listener);
     return CompletableFuture.completedFuture(null);
   }
 
   @Override
   public AsyncIterator<String> iterator() {
     StreamObserverIterator<String> iterator = new StreamObserverIterator<>();
-    set.iterate(IterateRequest.newBuilder()
-            .setId(id())
-            .addAllHeaders(getQueryHeaders())
-            .build(),
+    query(
+        (set, header, observer) -> set.iterate(IterateRequest.newBuilder()
+            .setSetId(getPrimitiveId())
+            .setHeader(header)
+            .build(), observer),
+        IterateResponse::getHeader,
         new TranscodingStreamObserver<>(
             iterator,
             IterateResponse::getValue));
@@ -188,41 +215,32 @@ public class DefaultAsyncDistributedSet
   }
 
   @Override
-  public CompletableFuture<AsyncDistributedSet<String>> connect() {
-    return this.<CreateResponse>execute(stream -> set.create(CreateRequest.newBuilder()
-        .setId(id())
+  protected CompletableFuture<Long> openSession(Duration timeout) {
+    return this.<CreateResponse>session((service, header, observer) -> service.create(CreateRequest.newBuilder()
+        .setSetId(getPrimitiveId())
         .setTimeout(com.google.protobuf.Duration.newBuilder()
             .setSeconds(timeout.getSeconds())
             .setNanos(timeout.getNano())
             .build())
-        .build(), stream))
-        .thenAccept(response -> {
-          startKeepAlive(response.getHeadersList());
-        })
-        .thenApply(v -> this);
+        .build(), observer))
+        .thenApply(response -> response.getHeader().getSessionId());
   }
 
   @Override
-  protected CompletableFuture<Void> keepAlive() {
-    return this.<KeepAliveResponse>execute(stream -> set.keepAlive(KeepAliveRequest.newBuilder()
-        .setId(id())
-        .addAllHeaders(getSessionHeaders())
-        .build(), stream))
-        .thenAccept(response -> completeKeepAlive(response.getHeadersList()));
+  protected CompletableFuture<Boolean> keepAlive() {
+    return this.<KeepAliveResponse>session((service, header, observer) -> service.keepAlive(KeepAliveRequest.newBuilder()
+        .setSetId(getPrimitiveId())
+        .build(), observer))
+        .thenApply(response -> true);
   }
 
   @Override
-  public CompletableFuture<Void> close() {
-    return this.<CloseResponse>execute(stream -> set.close(CloseRequest.newBuilder()
-        .setId(id())
-        .addAllHeaders(getSessionHeaders())
-        .build(), stream))
-        .thenApply(response -> null);
-  }
-
-  @Override
-  public CompletableFuture<Void> delete() {
-    return Futures.exceptionalFuture(new UnsupportedOperationException());
+  protected CompletableFuture<Void> close(boolean delete) {
+    return this.<CloseResponse>session((service, header, observer) -> service.close(CloseRequest.newBuilder()
+        .setSetId(getPrimitiveId())
+        .setDelete(delete)
+        .build(), observer))
+        .thenApply(v -> null);
   }
 
   @Override

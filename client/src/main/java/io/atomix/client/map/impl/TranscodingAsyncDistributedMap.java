@@ -16,6 +16,15 @@
 
 package io.atomix.client.map.impl;
 
+import java.time.Duration;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
+import java.util.function.BiFunction;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+
 import com.google.common.collect.Maps;
 import io.atomix.client.collection.AsyncDistributedCollection;
 import io.atomix.client.collection.impl.TranscodingAsyncDistributedCollection;
@@ -26,16 +35,7 @@ import io.atomix.client.map.MapEvent;
 import io.atomix.client.map.MapEventListener;
 import io.atomix.client.set.AsyncDistributedSet;
 import io.atomix.client.set.impl.TranscodingAsyncDistributedSet;
-import io.atomix.utils.concurrent.Futures;
-
-import java.time.Duration;
-import java.util.Map;
-import java.util.Map.Entry;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Executor;
-import java.util.function.BiFunction;
-import java.util.function.Function;
-import java.util.stream.Collectors;
+import io.atomix.client.utils.concurrent.Futures;
 
 /**
  * An {@code AsyncDistributedMap} that maps its operations to operations on a

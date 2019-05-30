@@ -15,19 +15,20 @@
  */
 package io.atomix.client.lock.impl;
 
-import com.google.common.base.Throwables;
-import io.atomix.client.Synchronous;
-import io.atomix.client.lock.AsyncAtomicLock;
-import io.atomix.client.lock.AtomicLock;
-import io.atomix.primitive.PrimitiveException;
-import io.atomix.utils.time.Version;
-
 import java.time.Duration;
-import java.util.Optional;
+import java.util.OptionalLong;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+
+import com.google.common.base.Throwables;
+import io.atomix.client.PrimitiveException;
+import io.atomix.client.Synchronous;
+import io.atomix.client.lock.AsyncAtomicLock;
+import io.atomix.client.lock.AtomicLock;
+
+;
 
 /**
  * Default implementation for a {@code DistributedLock} backed by a {@link AsyncAtomicLock}.
@@ -44,17 +45,17 @@ public class BlockingAtomicLock extends Synchronous<AsyncAtomicLock> implements 
   }
 
   @Override
-  public Version lock() {
+  public long lock() {
     return asyncLock.lock().join();
   }
 
   @Override
-  public Optional<Version> tryLock() {
+  public OptionalLong tryLock() {
     return asyncLock.tryLock().join();
   }
 
   @Override
-  public Optional<Version> tryLock(Duration timeout) {
+  public OptionalLong tryLock(Duration timeout) {
     return asyncLock.tryLock(timeout).join();
   }
 
@@ -64,7 +65,7 @@ public class BlockingAtomicLock extends Synchronous<AsyncAtomicLock> implements 
   }
 
   @Override
-  public boolean isLocked(Version version) {
+  public boolean isLocked(long version) {
     return complete(asyncLock.isLocked(version));
   }
 
@@ -74,7 +75,7 @@ public class BlockingAtomicLock extends Synchronous<AsyncAtomicLock> implements 
   }
 
   @Override
-  public boolean unlock(Version version) {
+  public boolean unlock(long version) {
     return complete(asyncLock.unlock(version));
   }
 
@@ -90,7 +91,7 @@ public class BlockingAtomicLock extends Synchronous<AsyncAtomicLock> implements 
       Thread.currentThread().interrupt();
       throw new PrimitiveException.Interrupted();
     } catch (TimeoutException e) {
-      throw new PrimitiveException.Timeout();
+      throw new PrimitiveException.ConcurrentModification();
     } catch (ExecutionException e) {
       Throwable cause = Throwables.getRootCause(e);
       if (cause instanceof PrimitiveException) {

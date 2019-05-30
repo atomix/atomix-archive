@@ -15,20 +15,17 @@
  */
 package io.atomix.client.map;
 
+import io.atomix.api.primitive.PrimitiveId;
 import io.atomix.client.PrimitiveManagementService;
 import io.atomix.client.PrimitiveType;
 import io.atomix.client.map.impl.DefaultAtomicMapBuilder;
-import io.atomix.utils.component.Component;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
 
 /**
  * Consistent map primitive type.
  */
-@Component
-public class AtomicMapType<K, V> implements PrimitiveType<AtomicMapBuilder<K, V>, AtomicMapConfig, AtomicMap<K, V>> {
-  private static final String NAME = "atomic-map";
-
+public class AtomicMapType<K, V> implements PrimitiveType<AtomicMapBuilder<K, V>, AtomicMap<K, V>> {
   private static final AtomicMapType INSTANCE = new AtomicMapType();
 
   /**
@@ -44,24 +41,12 @@ public class AtomicMapType<K, V> implements PrimitiveType<AtomicMapBuilder<K, V>
   }
 
   @Override
-  public String name() {
-    return NAME;
-  }
-
-  @Override
-  public AtomicMapConfig newConfig() {
-    return new AtomicMapConfig();
-  }
-
-  @Override
-  public AtomicMapBuilder<K, V> newBuilder(String name, AtomicMapConfig config, PrimitiveManagementService managementService) {
-    return new DefaultAtomicMapBuilder<>(name, config, managementService);
+  public AtomicMapBuilder<K, V> newBuilder(PrimitiveId id, PrimitiveManagementService managementService) {
+    return new DefaultAtomicMapBuilder<>(id, managementService);
   }
 
   @Override
   public String toString() {
-    return toStringHelper(this)
-        .add("name", name())
-        .toString();
+    return toStringHelper(this).toString();
   }
 }

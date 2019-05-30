@@ -15,114 +15,18 @@
  */
 package io.atomix.client.collection;
 
-import com.google.common.collect.Lists;
+import io.atomix.api.primitive.PrimitiveId;
 import io.atomix.client.PrimitiveManagementService;
-import io.atomix.client.PrimitiveType;
-import io.atomix.client.impl.ManagedPrimitiveBuilder;
-import io.atomix.utils.serializer.Namespaces;
-import io.atomix.utils.serializer.Serializer;
+import io.atomix.client.cache.CachedPrimitiveBuilder;
 
 /**
  * Distributed collection builder.
  */
 public abstract class DistributedCollectionBuilder<
-    B extends DistributedCollectionBuilder<B, C, P, E>,
-    C extends DistributedCollectionConfig<C>,
+    B extends DistributedCollectionBuilder<B, P, E>,
     P extends DistributedCollection<E>, E>
-    extends ManagedPrimitiveBuilder<B, C, P> {
-  protected DistributedCollectionBuilder(PrimitiveType type, String name, C config, PrimitiveManagementService managementService) {
-    super(type, name, config, managementService);
-  }
-
-  /**
-   * Sets the element type.
-   *
-   * @param elementType the element type
-   * @return the collection builder
-   */
-  @SuppressWarnings("unchecked")
-  public B withElementType(Class<?> elementType) {
-    config.setElementType(elementType);
-    return (B) this;
-  }
-
-  /**
-   * Sets extra serializable types on the map.
-   *
-   * @param extraTypes the types to set
-   * @return the collection builder
-   */
-  @SuppressWarnings("unchecked")
-  public B withExtraTypes(Class<?>... extraTypes) {
-    config.setExtraTypes(Lists.newArrayList(extraTypes));
-    return (B) this;
-  }
-
-  /**
-   * Adds an extra serializable type to the map.
-   *
-   * @param extraType the type to add
-   * @return the collection builder
-   */
-  @SuppressWarnings("unchecked")
-  public B addExtraType(Class<?> extraType) {
-    config.addExtraType(extraType);
-    return (B) this;
-  }
-
-  /**
-   * Sets whether registration is required for serializable types.
-   *
-   * @return the collection configuration
-   */
-  @SuppressWarnings("unchecked")
-  public B withRegistrationRequired() {
-    return withRegistrationRequired(true);
-  }
-
-  /**
-   * Sets whether registration is required for serializable types.
-   *
-   * @param registrationRequired whether registration is required for serializable types
-   * @return the collection builder
-   */
-  @SuppressWarnings("unchecked")
-  public B withRegistrationRequired(boolean registrationRequired) {
-    config.setRegistrationRequired(registrationRequired);
-    return (B) this;
-  }
-
-  /**
-   * Sets whether compatible serialization is enabled.
-   *
-   * @return the collection builder
-   */
-  @SuppressWarnings("unchecked")
-  public B withCompatibleSerialization() {
-    return withCompatibleSerialization(true);
-  }
-
-  /**
-   * Sets whether compatible serialization is enabled.
-   *
-   * @param compatibleSerialization whether compatible serialization is enabled
-   * @return the collection builder
-   */
-  @SuppressWarnings("unchecked")
-  public B withCompatibleSerialization(boolean compatibleSerialization) {
-    config.setCompatibleSerialization(compatibleSerialization);
-    return (B) this;
-  }
-
-  /**
-   * Returns the protocol serializer.
-   *
-   * @return the protocol serializer
-   */
-  protected Serializer serializer() {
-    if (serializer == null) {
-      serializer = Serializer.using(Namespaces.BASIC);
-    }
-    return serializer;
+    extends CachedPrimitiveBuilder<B, P> {
+  protected DistributedCollectionBuilder(PrimitiveId id, PrimitiveManagementService managementService) {
+    super(id, managementService);
   }
 }

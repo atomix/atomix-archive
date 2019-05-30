@@ -26,6 +26,7 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 
 import com.google.common.base.Throwables;
+import io.atomix.client.PrimitiveException;
 import io.atomix.client.PrimitiveState;
 import io.atomix.client.Synchronous;
 import io.atomix.client.collection.DistributedCollection;
@@ -35,8 +36,6 @@ import io.atomix.client.map.DistributedMap;
 import io.atomix.client.map.MapEventListener;
 import io.atomix.client.set.DistributedSet;
 import io.atomix.client.set.impl.BlockingDistributedSet;
-import io.atomix.primitive.PrimitiveException;
-import io.atomix.utils.concurrent.Retries;
 
 /**
  * Default implementation of {@code ConsistentMap}.
@@ -98,26 +97,17 @@ public class BlockingDistributedMap<K, V> extends Synchronous<AsyncDistributedMa
 
   @Override
   public V computeIfAbsent(K key, Function<? super K, ? extends V> mappingFunction) {
-    return Retries.retryable(() -> complete(asyncMap.computeIfAbsent(key, mappingFunction)),
-        PrimitiveException.ConcurrentModification.class,
-        Integer.MAX_VALUE,
-        MAX_DELAY_BETWEEN_RETRY_MILLS).get();
+    return complete(asyncMap.computeIfAbsent(key, mappingFunction));
   }
 
   @Override
   public V computeIfPresent(K key, BiFunction<? super K, ? super V, ? extends V> remappingFunction) {
-    return Retries.retryable(() -> complete(asyncMap.computeIfPresent(key, remappingFunction)),
-        PrimitiveException.ConcurrentModification.class,
-        Integer.MAX_VALUE,
-        MAX_DELAY_BETWEEN_RETRY_MILLS).get();
+    return complete(asyncMap.computeIfPresent(key, remappingFunction));
   }
 
   @Override
   public V compute(K key, BiFunction<? super K, ? super V, ? extends V> remappingFunction) {
-    return Retries.retryable(() -> complete(asyncMap.compute(key, remappingFunction)),
-        PrimitiveException.ConcurrentModification.class,
-        Integer.MAX_VALUE,
-        MAX_DELAY_BETWEEN_RETRY_MILLS).get();
+    return complete(asyncMap.compute(key, remappingFunction));
   }
 
   @Override
@@ -192,7 +182,7 @@ public class BlockingDistributedMap<K, V> extends Synchronous<AsyncDistributedMa
       Thread.currentThread().interrupt();
       throw new PrimitiveException.Interrupted();
     } catch (TimeoutException e) {
-      throw new PrimitiveException.Timeout();
+      throw new PrimitiveException.ConcurrentModification();
     } catch (ExecutionException e) {
       Throwable cause = Throwables.getRootCause(e);
       if (cause instanceof PrimitiveException) {

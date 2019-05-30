@@ -15,11 +15,9 @@
  */
 package io.atomix.client.set;
 
+import io.atomix.api.primitive.PrimitiveId;
 import io.atomix.client.PrimitiveManagementService;
 import io.atomix.client.collection.DistributedCollectionBuilder;
-import io.atomix.service.protocol.PrimitiveProtocol;
-import io.atomix.service.protocol.ProxyCompatibleBuilder;
-import io.atomix.service.protocol.ServiceProtocol;
 
 /**
  * Builder for distributed set.
@@ -27,15 +25,8 @@ import io.atomix.service.protocol.ServiceProtocol;
  * @param <E> type set elements.
  */
 public abstract class DistributedSetBuilder<E>
-    extends DistributedCollectionBuilder<DistributedSetBuilder<E>, DistributedSetConfig, DistributedSet<E>, E>
-    implements ProxyCompatibleBuilder<DistributedSetBuilder<E>> {
-
-  protected DistributedSetBuilder(String name, DistributedSetConfig config, PrimitiveManagementService managementService) {
-    super(DistributedSetType.instance(), name, config, managementService);
-  }
-
-  @Override
-  public DistributedSetBuilder<E> withProtocol(ServiceProtocol protocol) {
-    return withProtocol((PrimitiveProtocol) protocol);
+    extends DistributedCollectionBuilder<DistributedSetBuilder<E>, DistributedSet<E>, E> {
+  protected DistributedSetBuilder(PrimitiveId id, PrimitiveManagementService managementService) {
+    super(id, managementService);
   }
 }

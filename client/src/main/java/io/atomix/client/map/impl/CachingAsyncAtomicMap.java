@@ -29,10 +29,9 @@ import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import com.google.common.util.concurrent.MoreExecutors;
 import io.atomix.client.PrimitiveState;
-import io.atomix.client.cache.CacheConfig;
+import io.atomix.client.Versioned;
 import io.atomix.client.map.AsyncAtomicMap;
 import io.atomix.client.map.AtomicMapEventListener;
-import io.atomix.client.Versioned;
 import org.slf4j.Logger;
 
 import static org.slf4j.LoggerFactory.getLogger;
@@ -62,14 +61,14 @@ public class CachingAsyncAtomicMap<K, V> extends DelegatingAsyncAtomicMap<K, V> 
   /**
    * Constructor to configure cache size.
    *
-   * @param backingMap  a distributed, strongly consistent map for backing
-   * @param cacheConfig the cache configuration
+   * @param backingMap a distributed, strongly consistent map for backing
+   * @param cacheSize  the cache size
    */
-  public CachingAsyncAtomicMap(AsyncAtomicMap<K, V> backingMap, CacheConfig cacheConfig) {
+  public CachingAsyncAtomicMap(AsyncAtomicMap<K, V> backingMap, int cacheSize) {
     super(backingMap);
     this.backingMap = backingMap;
     cache = CacheBuilder.newBuilder()
-        .maximumSize(cacheConfig.getSize())
+        .maximumSize(cacheSize)
         .build(CacheLoader.from(CachingAsyncAtomicMap.super::get));
     cacheUpdater = event -> {
       Versioned<V> newValue = event.newValue();
@@ -127,8 +126,8 @@ public class CachingAsyncAtomicMap<K, V> extends DelegatingAsyncAtomicMap<K, V> 
 
   @Override
   public CompletableFuture<Versioned<V>> computeIf(K key,
-                                                   Predicate<? super V> condition,
-                                                   BiFunction<? super K, ? super V, ? extends V> remappingFunction) {
+      Predicate<? super V> condition,
+      BiFunction<? super K, ? super V, ? extends V> remappingFunction) {
     return super.computeIf(key, condition, remappingFunction)
         .whenComplete((r, e) -> cache.invalidate(key));
   }

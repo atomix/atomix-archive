@@ -28,9 +28,7 @@ import static org.junit.Assert.assertTrue;
 public class AtomicCounterTest extends AbstractPrimitiveTest {
   @Test
   public void testBasicOperations() throws Throwable {
-    AtomicCounter along = client().atomicCounterBuilder("test-counter-basic-operations")
-        .withProtocol(protocol())
-        .build();
+    AtomicCounter along = client().atomicCounterBuilder("test-counter-basic-operations").build();
     assertEquals(0, along.get());
     assertEquals(1, along.incrementAndGet());
     along.set(100);

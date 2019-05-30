@@ -4,15 +4,29 @@ import io.atomix.client.channel.ChannelConfig;
 import io.atomix.client.channel.ChannelProvider;
 import io.atomix.client.channel.ServerChannelProvider;
 import io.atomix.client.channel.ServiceChannelProvider;
-import io.atomix.utils.Builder;
-import io.atomix.utils.net.Address;
+import io.atomix.client.utils.Builder;
+
+import static com.google.common.base.Preconditions.checkNotNull;
 
 /**
  * Atomix client builder.
  */
 public class AtomixClientBuilder implements Builder<AtomixClient> {
+  private static final String DEFAULT_NAMESPACE = "default";
+  private String namespace = DEFAULT_NAMESPACE;
   private ChannelProvider channelProvider;
   private final ChannelConfig channelConfig = new ChannelConfig();
+
+  /**
+   * Sets the client namespace.
+   *
+   * @param namespace the client namespace
+   * @return the client builder
+   */
+  public AtomixClientBuilder withNamespace(String namespace) {
+    this.namespace = checkNotNull(namespace);
+    return this;
+  }
 
   /**
    * Sets the server to which to connect.
@@ -22,17 +36,7 @@ public class AtomixClientBuilder implements Builder<AtomixClient> {
    * @return the client builder
    */
   public AtomixClientBuilder withServer(String host, int port) {
-    return withServer(Address.from(host, port));
-  }
-
-  /**
-   * Sets the server to which to connect.
-   *
-   * @param address the server address
-   * @return the client builder
-   */
-  public AtomixClientBuilder withServer(Address address) {
-    this.channelProvider = new ServerChannelProvider(address, channelConfig);
+    this.channelProvider = new ServerChannelProvider(host, port, channelConfig);
     return this;
   }
 
@@ -91,6 +95,6 @@ public class AtomixClientBuilder implements Builder<AtomixClient> {
 
   @Override
   public AtomixClient build() {
-    return new AtomixClient(channelProvider);
+    return new AtomixClient(namespace, channelProvider);
   }
 }

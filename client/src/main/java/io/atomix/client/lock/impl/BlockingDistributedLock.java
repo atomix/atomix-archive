@@ -15,18 +15,18 @@
  */
 package io.atomix.client.lock.impl;
 
-import com.google.common.base.Throwables;
-import io.atomix.client.Synchronous;
-import io.atomix.client.lock.AsyncDistributedLock;
-import io.atomix.client.lock.DistributedLock;
-import io.atomix.primitive.PrimitiveException;
-
 import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.locks.Condition;
+
+import com.google.common.base.Throwables;
+import io.atomix.client.PrimitiveException;
+import io.atomix.client.Synchronous;
+import io.atomix.client.lock.AsyncDistributedLock;
+import io.atomix.client.lock.DistributedLock;
 
 /**
  * Default implementation for a {@code DistributedLock} backed by a {@link AsyncDistributedLock}.
@@ -89,7 +89,7 @@ public class BlockingDistributedLock extends Synchronous<AsyncDistributedLock> i
       Thread.currentThread().interrupt();
       throw new PrimitiveException.Interrupted();
     } catch (TimeoutException e) {
-      throw new PrimitiveException.Timeout();
+      throw new PrimitiveException.ConcurrentModification();
     } catch (ExecutionException e) {
       Throwable cause = Throwables.getRootCause(e);
       if (cause instanceof PrimitiveException) {

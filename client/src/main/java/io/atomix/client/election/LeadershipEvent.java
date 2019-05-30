@@ -18,7 +18,7 @@ package io.atomix.client.election;
 import java.util.Objects;
 
 import com.google.common.base.MoreObjects;
-import io.atomix.utils.event.AbstractEvent;
+import io.atomix.client.event.AbstractEvent;
 
 /**
  * Describes leadership election event.

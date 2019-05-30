@@ -18,11 +18,12 @@ package io.atomix.client;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import io.atomix.api.primitive.PrimitiveId;
 import io.atomix.client.channel.ChannelProvider;
 import io.atomix.client.impl.DefaultPrimitiveManagementService;
 import io.atomix.client.impl.PrimitiveCacheImpl;
-import io.atomix.utils.concurrent.BlockingAwareThreadPoolContextFactory;
-import io.atomix.utils.concurrent.ThreadContextFactory;
+import io.atomix.client.utils.concurrent.BlockingAwareThreadPoolContextFactory;
+import io.atomix.client.utils.concurrent.ThreadContextFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -91,13 +92,15 @@ public class AtomixClient implements AtomixClientService {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(AtomixClient.class);
 
+  private final String namespace;
   private final ChannelProvider channelProvider;
   private final PrimitiveCache primitiveCache = new PrimitiveCacheImpl();
   private ThreadContextFactory threadContextFactory;
   private PrimitiveManagementService managementService;
   private final AtomicBoolean started = new AtomicBoolean();
 
-  protected AtomixClient(ChannelProvider channelProvider) {
+  protected AtomixClient(String namespace, ChannelProvider channelProvider) {
+    this.namespace = namespace;
     this.channelProvider = channelProvider;
   }
 
@@ -106,12 +109,19 @@ public class AtomixClient implements AtomixClientService {
     return threadContextFactory;
   }
 
+  private PrimitiveId getPrimitiveId(String name) {
+    return PrimitiveId.newBuilder()
+        .setName(name)
+        .setNamespace(namespace)
+        .build();
+  }
+
   @Override
-  public <B extends PrimitiveBuilder<B, C, P>, C extends PrimitiveConfig<C>, P extends SyncPrimitive> B primitiveBuilder(
+  public <B extends PrimitiveBuilder<B, P>, P extends SyncPrimitive> B primitiveBuilder(
       String name,
-      PrimitiveType<B, C, P> primitiveType) {
+      PrimitiveType<B, P> primitiveType) {
     checkRunning();
-    return primitiveType.newBuilder(name, primitiveType.newConfig(), managementService);
+    return primitiveType.newBuilder(getPrimitiveId(name), managementService);
   }
 
   /**

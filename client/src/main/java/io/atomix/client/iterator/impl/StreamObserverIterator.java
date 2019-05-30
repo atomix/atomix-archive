@@ -5,7 +5,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 import io.atomix.client.iterator.AsyncIterator;
-import io.atomix.utils.concurrent.Futures;
+import io.atomix.client.utils.concurrent.Futures;
 import io.grpc.stub.StreamObserver;
 
 /**

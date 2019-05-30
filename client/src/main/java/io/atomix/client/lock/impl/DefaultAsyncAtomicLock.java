@@ -16,7 +16,7 @@
 package io.atomix.client.lock.impl;
 
 import java.time.Duration;
-import java.util.Optional;
+import java.util.OptionalLong;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -35,90 +35,79 @@ import io.atomix.api.lock.UnlockRequest;
 import io.atomix.api.lock.UnlockResponse;
 import io.atomix.api.primitive.PrimitiveId;
 import io.atomix.client.PrimitiveManagementService;
-import io.atomix.client.impl.AbstractAsyncPrimitive;
-import io.atomix.client.impl.PrimitivePartition;
+import io.atomix.client.impl.AbstractManagedPrimitive;
 import io.atomix.client.lock.AsyncAtomicLock;
 import io.atomix.client.lock.AtomicLock;
-import io.atomix.utils.concurrent.Futures;
-import io.atomix.utils.concurrent.Scheduled;
-import io.atomix.utils.time.Version;
+import io.atomix.client.utils.concurrent.Scheduled;
 
 /**
  * Raft lock.
  */
-public class DefaultAsyncAtomicLock extends AbstractAsyncPrimitive<AsyncAtomicLock> implements AsyncAtomicLock {
-  private final LockServiceGrpc.LockServiceStub lock;
+public class DefaultAsyncAtomicLock extends AbstractManagedPrimitive<LockServiceGrpc.LockServiceStub, AsyncAtomicLock> implements AsyncAtomicLock {
   private final AtomicLong lockId = new AtomicLong();
 
-  public DefaultAsyncAtomicLock(PrimitiveId id, PrimitiveManagementService managementService, Duration timeout) {
-    super(id, managementService, timeout);
-    this.lock = LockServiceGrpc.newStub(managementService.getChannelFactory().getChannel());
+  public DefaultAsyncAtomicLock(
+      PrimitiveId id,
+      PrimitiveManagementService managementService,
+      Duration timeout) {
+    super(id, LockServiceGrpc.newStub(managementService.getChannelFactory().getChannel()), managementService, timeout);
   }
 
   @Override
-  public CompletableFuture<Version> lock() {
-    PrimitivePartition partition = getPartition();
-    return this.<LockResponse>execute(observer -> lock.lock(LockRequest.newBuilder()
-        .setId(id())
-        .setHeader(partition.getCommandHeader())
-        .setTimeout(com.google.protobuf.Duration.newBuilder()
-            .setSeconds(-1)
-            .build())
-        .build(), observer))
-        .thenCompose(response -> partition.order(new Version(response.getVersion()), response.getHeader()))
-        .thenApply(version -> {
-          lockId.set(version.value());
-          return version;
+  public CompletableFuture<Long> lock() {
+    return command(
+        (service, header, observer) -> service.lock(LockRequest.newBuilder()
+            .setLockId(getPrimitiveId())
+            .setHeader(header)
+            .setTimeout(com.google.protobuf.Duration.newBuilder()
+                .setSeconds(-1)
+                .build())
+            .build(), observer), LockResponse::getHeader)
+        .thenApply(response -> {
+          lockId.set(response.getVersion());
+          return response.getVersion();
         });
   }
 
   @Override
-  public CompletableFuture<Optional<Version>> tryLock() {
-    PrimitivePartition partition = getPartition();
-    return this.<LockResponse>execute(observer -> lock.lock(LockRequest.newBuilder()
-        .setId(id())
-        .setHeader(partition.getCommandHeader())
-        .setTimeout(com.google.protobuf.Duration.newBuilder()
-            .setSeconds(0)
-            .setNanos(0)
-            .build())
-        .build(), observer))
-        .thenCompose(response -> partition.order(
-            Optional.ofNullable(response.getVersion() > 0
-                ? new Version(response.getVersion())
-                : null),
-            response.getHeader()))
+  public CompletableFuture<OptionalLong> tryLock() {
+    return command(
+        (service, header, observer) -> service.lock(LockRequest.newBuilder()
+            .setLockId(getPrimitiveId())
+            .setHeader(header)
+            .setTimeout(com.google.protobuf.Duration.newBuilder()
+                .setSeconds(0)
+                .setNanos(0)
+                .build())
+            .build(), observer), LockResponse::getHeader)
+        .thenApply(response -> response.getVersion() > 0 ? OptionalLong.of(response.getVersion()) : OptionalLong.empty())
         .thenApply(version -> {
           if (version.isPresent()) {
-            lockId.set(version.get().value());
+            lockId.set(version.getAsLong());
           }
           return version;
         });
   }
 
   @Override
-  public CompletableFuture<Optional<Version>> tryLock(Duration timeout) {
-    CompletableFuture<Optional<Version>> future = new CompletableFuture<>();
-    Scheduled timer = context().schedule(timeout, () -> future.complete(Optional.empty()));
-    PrimitivePartition partition = getPartition();
-    this.<LockResponse>execute(observer -> lock.lock(LockRequest.newBuilder()
-        .setId(id())
-        .setHeader(partition.getCommandHeader())
-        .setTimeout(com.google.protobuf.Duration.newBuilder()
-            .setSeconds(timeout.getSeconds())
-            .setNanos(timeout.getNano())
-            .build())
-        .build(), observer))
-        .thenCompose(response -> partition.order(
-            Optional.ofNullable(response.getVersion() > 0
-                ? new Version(response.getVersion())
-                : null),
-            response.getHeader()))
+  public CompletableFuture<OptionalLong> tryLock(Duration timeout) {
+    CompletableFuture<OptionalLong> future = new CompletableFuture<>();
+    Scheduled timer = context().schedule(timeout, () -> future.complete(OptionalLong.empty()));
+    command(
+        (service, header, observer) -> service.lock(LockRequest.newBuilder()
+            .setLockId(getPrimitiveId())
+            .setHeader(header)
+            .setTimeout(com.google.protobuf.Duration.newBuilder()
+                .setSeconds(timeout.getSeconds())
+                .setNanos(timeout.getNano())
+                .build())
+            .build(), observer), LockResponse::getHeader)
+        .thenApply(response -> response.getVersion() > 0 ? OptionalLong.of(response.getVersion()) : OptionalLong.empty())
         .thenAccept(version -> {
           timer.cancel();
           if (!future.isDone()) {
             if (version.isPresent()) {
-              lockId.set(version.get().value());
+              lockId.set(version.getAsLong());
             }
             future.complete(version);
           }
@@ -136,82 +125,71 @@ public class DefaultAsyncAtomicLock extends AbstractAsyncPrimitive<AsyncAtomicLo
     // Use the current lock ID to ensure we only unlock the lock currently held by this process.
     long lock = this.lockId.getAndSet(0);
     if (lock != 0) {
-      PrimitivePartition partition = getPartition();
-      return this.<UnlockResponse>execute(observer -> this.lock.unlock(UnlockRequest.newBuilder()
-          .setId(id())
-          .setHeader(partition.getCommandHeader())
-          .setVersion(lock)
-          .build(), observer))
-          .thenCompose(response -> partition.order(null, response.getHeader()));
+      return command(
+          (service, header, observer) -> service.unlock(UnlockRequest.newBuilder()
+              .setLockId(getPrimitiveId())
+              .setHeader(header)
+              .setVersion(lock)
+              .build(), observer), UnlockResponse::getHeader)
+          .thenApply(response -> null);
     }
     return CompletableFuture.completedFuture(null);
   }
 
   @Override
-  public CompletableFuture<Boolean> unlock(Version version) {
-    PrimitivePartition partition = getPartition();
-    return this.<UnlockResponse>execute(observer -> this.lock.unlock(UnlockRequest.newBuilder()
-        .setId(id())
-        .setHeader(partition.getCommandHeader())
-        .setVersion(version.value())
-        .build(), observer))
-        .thenCompose(response -> partition.order(response.getUnlocked(), response.getHeader()));
+  public CompletableFuture<Boolean> unlock(long version) {
+    return command(
+        (service, header, observer) -> service.unlock(UnlockRequest.newBuilder()
+            .setLockId(getPrimitiveId())
+            .setHeader(header)
+            .setVersion(version)
+            .build(), observer), UnlockResponse::getHeader)
+        .thenApply(response -> response.getUnlocked());
   }
 
   @Override
   public CompletableFuture<Boolean> isLocked() {
-    return isLocked(new Version(0));
+    return isLocked(0);
   }
 
   @Override
-  public CompletableFuture<Boolean> isLocked(Version version) {
-    PrimitivePartition partition = getPartition();
-    return this.<IsLockedResponse>execute(observer -> this.lock.isLocked(IsLockedRequest.newBuilder()
-        .setId(id())
-        .setHeader(partition.getQueryHeader())
-        .setVersion(version.value())
-        .build(), observer))
-        .thenCompose(response -> partition.order(response.getIsLocked(), response.getHeader()));
+  public CompletableFuture<Boolean> isLocked(long version) {
+    return query(
+        (service, header, observer) -> service.isLocked(IsLockedRequest.newBuilder()
+            .setLockId(getPrimitiveId())
+            .setHeader(header)
+            .setVersion(version)
+            .build(), observer), IsLockedResponse::getHeader)
+        .thenApply(response -> response.getIsLocked());
   }
 
   @Override
-  public CompletableFuture<AsyncAtomicLock> connect() {
-    return this.<CreateResponse>execute(stream -> lock.create(CreateRequest.newBuilder()
-        .setId(id())
+  protected CompletableFuture<Long> openSession(Duration timeout) {
+    return this.<CreateResponse>session((service, header, observer) -> service.create(CreateRequest.newBuilder()
+        .setLockId(getPrimitiveId())
         .setTimeout(com.google.protobuf.Duration.newBuilder()
             .setSeconds(timeout.getSeconds())
             .setNanos(timeout.getNano())
             .build())
-        .build(), stream))
-        .thenAccept(response -> {
-          startKeepAlive(response.getHeader());
-        })
-        .thenApply(v -> this);
+        .build(), observer))
+        .thenApply(response -> response.getHeader().getSessionId());
   }
 
   @Override
-  protected CompletableFuture<Void> keepAlive() {
-    PrimitivePartition partition = getPartition();
-    return this.<KeepAliveResponse>execute(stream -> lock.keepAlive(KeepAliveRequest.newBuilder()
-        .setId(id())
-        .setHeader(partition.getSessionHeader())
-        .build(), stream))
-        .thenAccept(response -> completeKeepAlive(response.getHeader()));
+  protected CompletableFuture<Boolean> keepAlive() {
+    return this.<KeepAliveResponse>session((service, header, observer) -> service.keepAlive(KeepAliveRequest.newBuilder()
+        .setLockId(getPrimitiveId())
+        .build(), observer))
+        .thenApply(response -> true);
   }
 
   @Override
-  public CompletableFuture<Void> close() {
-    PrimitivePartition partition = getPartition();
-    return this.<CloseResponse>execute(stream -> lock.close(CloseRequest.newBuilder()
-        .setId(id())
-        .setHeader(partition.getSessionHeader())
-        .build(), stream))
-        .thenApply(response -> null);
-  }
-
-  @Override
-  public CompletableFuture<Void> delete() {
-    return Futures.exceptionalFuture(new UnsupportedOperationException());
+  protected CompletableFuture<Void> close(boolean delete) {
+    return this.<CloseResponse>session((service, header, observer) -> service.close(CloseRequest.newBuilder()
+        .setLockId(getPrimitiveId())
+        .setDelete(delete)
+        .build(), observer))
+        .thenApply(v -> null);
   }
 
   @Override

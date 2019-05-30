@@ -20,10 +20,10 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
+import io.atomix.client.PrimitiveException;
 import io.atomix.client.Synchronous;
 import io.atomix.client.counter.AsyncDistributedCounter;
 import io.atomix.client.counter.DistributedCounter;
-import io.atomix.primitive.PrimitiveException;
 
 /**
  * Default implementation for a {@code DistributedCounter} backed by a {@link AsyncDistributedCounter}.
@@ -86,7 +86,7 @@ public class BlockingDistributedCounter extends Synchronous<AsyncDistributedCoun
       Thread.currentThread().interrupt();
       throw new PrimitiveException.Interrupted();
     } catch (TimeoutException e) {
-      throw new PrimitiveException.Timeout();
+      throw new PrimitiveException.ConcurrentModification();
     } catch (ExecutionException e) {
       throw new PrimitiveException(e.getCause());
     }

@@ -15,19 +15,17 @@
  */
 package io.atomix.client.lock;
 
+import io.atomix.api.primitive.PrimitiveId;
 import io.atomix.client.PrimitiveManagementService;
 import io.atomix.client.PrimitiveType;
 import io.atomix.client.lock.impl.DefaultDistributedLockBuilder;
-import io.atomix.utils.component.Component;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
 
 /**
  * Distributed lock primitive type.
  */
-@Component
-public class DistributedLockType implements PrimitiveType<DistributedLockBuilder, DistributedLockConfig, DistributedLock> {
-  private static final String NAME = "lock";
+public class DistributedLockType implements PrimitiveType<DistributedLockBuilder, DistributedLock> {
   private static final DistributedLockType INSTANCE = new DistributedLockType();
 
   /**
@@ -40,24 +38,12 @@ public class DistributedLockType implements PrimitiveType<DistributedLockBuilder
   }
 
   @Override
-  public String name() {
-    return NAME;
-  }
-
-  @Override
-  public DistributedLockConfig newConfig() {
-    return new DistributedLockConfig();
-  }
-
-  @Override
-  public DistributedLockBuilder newBuilder(String name, DistributedLockConfig config, PrimitiveManagementService managementService) {
-    return new DefaultDistributedLockBuilder(name, config, managementService);
+  public DistributedLockBuilder newBuilder(PrimitiveId id, PrimitiveManagementService managementService) {
+    return new DefaultDistributedLockBuilder(id, managementService);
   }
 
   @Override
   public String toString() {
-    return toStringHelper(this)
-        .add("name", name())
-        .toString();
+    return toStringHelper(this).toString();
   }
 }

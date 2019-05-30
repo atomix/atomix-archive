@@ -37,18 +37,14 @@ public class LeaderElectionTest extends AbstractPrimitiveTest {
 
   @Test
   public void testRun() throws Throwable {
-    LeaderElection<String> election1 = client().<String>leaderElectionBuilder("test-election-run")
-        .withProtocol(protocol())
-        .build();
+    LeaderElection<String> election1 = client().<String>leaderElectionBuilder("test-election-run").build();
     Leadership<String> result1 = election1.run(node1);
     assertEquals(node1, result1.leader().id());
     assertEquals(1, result1.leader().term());
     assertEquals(1, result1.candidates().size());
     assertEquals(node1, result1.candidates().get(0));
 
-    LeaderElection<String> election2 = client().<String>leaderElectionBuilder("test-election-run")
-        .withProtocol(protocol())
-        .build();
+    LeaderElection<String> election2 = client().<String>leaderElectionBuilder("test-election-run").build();
     Leadership<String> result2 = election2.run(node2);
     assertEquals(node1, result2.leader().id());
     assertEquals(1, result2.leader().term());
@@ -59,13 +55,9 @@ public class LeaderElectionTest extends AbstractPrimitiveTest {
 
   @Test
   public void testWithdraw() throws Throwable {
-    LeaderElection<String> election1 = client().<String>leaderElectionBuilder("test-election-withdraw")
-        .withProtocol(protocol())
-        .build();
+    LeaderElection<String> election1 = client().<String>leaderElectionBuilder("test-election-withdraw").build();
     election1.run(node1);
-    LeaderElection<String> election2 = client().<String>leaderElectionBuilder("test-election-withdraw")
-        .withProtocol(protocol())
-        .build();
+    LeaderElection<String> election2 = client().<String>leaderElectionBuilder("test-election-withdraw").build();
     election2.run(node2);
 
     LeaderEventListener listener1 = new LeaderEventListener();
@@ -101,15 +93,9 @@ public class LeaderElectionTest extends AbstractPrimitiveTest {
 
   @Test
   public void testAnoint() throws Throwable {
-    LeaderElection<String> election1 = client().<String>leaderElectionBuilder("test-election-anoint")
-        .withProtocol(protocol())
-        .build();
-    LeaderElection<String> election2 = client().<String>leaderElectionBuilder("test-election-anoint")
-        .withProtocol(protocol())
-        .build();
-    LeaderElection<String> election3 = client().<String>leaderElectionBuilder("test-election-anoint")
-        .withProtocol(protocol())
-        .build();
+    LeaderElection<String> election1 = client().<String>leaderElectionBuilder("test-election-anoint").build();
+    LeaderElection<String> election2 = client().<String>leaderElectionBuilder("test-election-anoint").build();
+    LeaderElection<String> election3 = client().<String>leaderElectionBuilder("test-election-anoint").build();
     election1.run(node1);
     election2.run(node2);
 
@@ -149,15 +135,9 @@ public class LeaderElectionTest extends AbstractPrimitiveTest {
 
   @Test
   public void testPromote() throws Throwable {
-    LeaderElection<String> election1 = client().<String>leaderElectionBuilder("test-election-promote")
-        .withProtocol(protocol())
-        .build();
-    LeaderElection<String> election2 = client().<String>leaderElectionBuilder("test-election-promote")
-        .withProtocol(protocol())
-        .build();
-    LeaderElection<String> election3 = client().<String>leaderElectionBuilder("test-election-promote")
-        .withProtocol(protocol())
-        .build();
+    LeaderElection<String> election1 = client().<String>leaderElectionBuilder("test-election-promote").build();
+    LeaderElection<String> election2 = client().<String>leaderElectionBuilder("test-election-promote").build();
+    LeaderElection<String> election3 = client().<String>leaderElectionBuilder("test-election-promote").build();
     election1.run(node1);
     election2.run(node2);
 
@@ -201,13 +181,9 @@ public class LeaderElectionTest extends AbstractPrimitiveTest {
 
   @Test
   public void testLeaderSessionClose() throws Throwable {
-    LeaderElection<String> election1 = client().<String>leaderElectionBuilder("test-election-leader-session-close")
-        .withProtocol(protocol())
-        .build();
+    LeaderElection<String> election1 = client().<String>leaderElectionBuilder("test-election-leader-session-close").build();
     election1.run(node1);
-    LeaderElection<String> election2 = client().<String>leaderElectionBuilder("test-election-leader-session-close")
-        .withProtocol(protocol())
-        .build();
+    LeaderElection<String> election2 = client().<String>leaderElectionBuilder("test-election-leader-session-close").build();
     LeaderEventListener listener = new LeaderEventListener();
     election2.run(node2);
     election2.addListener(listener);
@@ -221,13 +197,9 @@ public class LeaderElectionTest extends AbstractPrimitiveTest {
 
   @Test
   public void testNonLeaderSessionClose() throws Throwable {
-    LeaderElection<String> election1 = client().<String>leaderElectionBuilder("test-election-non-leader-session-close")
-        .withProtocol(protocol())
-        .build();
+    LeaderElection<String> election1 = client().<String>leaderElectionBuilder("test-election-non-leader-session-close").build();
     election1.run(node1);
-    LeaderElection<String> election2 = client().<String>leaderElectionBuilder("test-election-non-leader-session-close")
-        .withProtocol(protocol())
-        .build();
+    LeaderElection<String> election2 = client().<String>leaderElectionBuilder("test-election-non-leader-session-close").build();
     LeaderEventListener listener = new LeaderEventListener();
     election2.run(node2);
     election1.addListener(listener);
@@ -241,12 +213,8 @@ public class LeaderElectionTest extends AbstractPrimitiveTest {
 
   @Test
   public void testQueries() throws Throwable {
-    LeaderElection<String> election1 = client().<String>leaderElectionBuilder("test-election-query")
-        .withProtocol(protocol())
-        .build();
-    LeaderElection<String> election2 = client().<String>leaderElectionBuilder("test-election-query")
-        .withProtocol(protocol())
-        .build();
+    LeaderElection<String> election1 = client().<String>leaderElectionBuilder("test-election-query").build();
+    LeaderElection<String> election2 = client().<String>leaderElectionBuilder("test-election-query").build();
     election1.run(node1);
     election2.run(node2);
     election2.run(node2);

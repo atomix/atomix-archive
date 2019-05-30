@@ -15,19 +15,17 @@
  */
 package io.atomix.client.log;
 
+import io.atomix.api.primitive.PrimitiveId;
 import io.atomix.client.PrimitiveManagementService;
 import io.atomix.client.PrimitiveType;
 import io.atomix.client.log.impl.DefaultDistributedLogBuilder;
-import io.atomix.utils.component.Component;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
 
 /**
  * Distributed log primitive type.
  */
-@Component
-public class DistributedLogType<T> implements PrimitiveType<DistributedLogBuilder<T>, DistributedLogConfig, DistributedLog<T>> {
-  private static final String NAME = "log";
+public class DistributedLogType<T> implements PrimitiveType<DistributedLogBuilder<T>, DistributedLog<T>> {
   private static final DistributedLogType INSTANCE = new DistributedLogType();
 
   /**
@@ -41,24 +39,12 @@ public class DistributedLogType<T> implements PrimitiveType<DistributedLogBuilde
   }
 
   @Override
-  public String name() {
-    return NAME;
-  }
-
-  @Override
-  public DistributedLogConfig newConfig() {
-    return new DistributedLogConfig();
-  }
-
-  @Override
-  public DistributedLogBuilder<T> newBuilder(String name, DistributedLogConfig config, PrimitiveManagementService managementService) {
-    return new DefaultDistributedLogBuilder<>(name, config, managementService);
+  public DistributedLogBuilder<T> newBuilder(PrimitiveId id, PrimitiveManagementService managementService) {
+    return new DefaultDistributedLogBuilder<>(id, managementService);
   }
 
   @Override
   public String toString() {
-    return toStringHelper(this)
-        .add("name", name())
-        .toString();
+    return toStringHelper(this).toString();
   }
 }

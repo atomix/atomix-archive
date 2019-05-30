@@ -15,25 +15,16 @@
  */
 package io.atomix.client.counter;
 
+import io.atomix.api.primitive.PrimitiveId;
 import io.atomix.client.PrimitiveBuilder;
 import io.atomix.client.PrimitiveManagementService;
-import io.atomix.service.protocol.PrimitiveProtocol;
-import io.atomix.service.protocol.ProxyCompatibleBuilder;
-import io.atomix.service.protocol.ServiceProtocol;
 
 /**
  * Builder for AtomicCounter.
  */
 public abstract class AtomicCounterBuilder
-    extends PrimitiveBuilder<AtomicCounterBuilder, AtomicCounterConfig, AtomicCounter>
-    implements ProxyCompatibleBuilder<AtomicCounterBuilder> {
-
-  protected AtomicCounterBuilder(String name, AtomicCounterConfig config, PrimitiveManagementService managementService) {
-    super(AtomicCounterType.instance(), name, config, managementService);
-  }
-
-  @Override
-  public AtomicCounterBuilder withProtocol(ServiceProtocol protocol) {
-    return withProtocol((PrimitiveProtocol) protocol);
+    extends PrimitiveBuilder<AtomicCounterBuilder, AtomicCounter> {
+  protected AtomicCounterBuilder(PrimitiveId id, PrimitiveManagementService managementService) {
+    super(id, managementService);
   }
 }

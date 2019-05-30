@@ -15,20 +15,17 @@
  */
 package io.atomix.client.map;
 
+import io.atomix.api.primitive.PrimitiveId;
 import io.atomix.client.PrimitiveManagementService;
 import io.atomix.client.PrimitiveType;
 import io.atomix.client.map.impl.DefaultDistributedMapBuilder;
-import io.atomix.utils.component.Component;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
 
 /**
  * Distributed map primitive type.
  */
-@Component
-public class DistributedMapType<K, V> implements PrimitiveType<DistributedMapBuilder<K, V>, DistributedMapConfig, DistributedMap<K, V>> {
-  private static final String NAME = "map";
-
+public class DistributedMapType<K, V> implements PrimitiveType<DistributedMapBuilder<K, V>, DistributedMap<K, V>> {
   private static final DistributedMapType INSTANCE = new DistributedMapType();
 
   /**
@@ -44,24 +41,12 @@ public class DistributedMapType<K, V> implements PrimitiveType<DistributedMapBui
   }
 
   @Override
-  public String name() {
-    return NAME;
-  }
-
-  @Override
-  public DistributedMapConfig newConfig() {
-    return new DistributedMapConfig();
-  }
-
-  @Override
-  public DistributedMapBuilder<K, V> newBuilder(String name, DistributedMapConfig config, PrimitiveManagementService managementService) {
-    return new DefaultDistributedMapBuilder<>(name, config, managementService);
+  public DistributedMapBuilder<K, V> newBuilder(PrimitiveId id, PrimitiveManagementService managementService) {
+    return new DefaultDistributedMapBuilder<>(id, managementService);
   }
 
   @Override
   public String toString() {
-    return toStringHelper(this)
-        .add("name", name())
-        .toString();
+    return toStringHelper(this).toString();
   }
 }

@@ -15,19 +15,17 @@
  */
 package io.atomix.client.set;
 
+import io.atomix.api.primitive.PrimitiveId;
 import io.atomix.client.PrimitiveManagementService;
 import io.atomix.client.PrimitiveType;
 import io.atomix.client.set.impl.DefaultDistributedSetBuilder;
-import io.atomix.utils.component.Component;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
 
 /**
  * Distributed set primitive type.
  */
-@Component
-public class DistributedSetType<E> implements PrimitiveType<DistributedSetBuilder<E>, DistributedSetConfig, DistributedSet<E>> {
-  private static final String NAME = "set";
+public class DistributedSetType<E> implements PrimitiveType<DistributedSetBuilder<E>, DistributedSet<E>> {
   private static final DistributedSetType INSTANCE = new DistributedSetType();
 
   /**
@@ -42,24 +40,12 @@ public class DistributedSetType<E> implements PrimitiveType<DistributedSetBuilde
   }
 
   @Override
-  public String name() {
-    return NAME;
-  }
-
-  @Override
-  public DistributedSetConfig newConfig() {
-    return new DistributedSetConfig();
-  }
-
-  @Override
-  public DistributedSetBuilder<E> newBuilder(String name, DistributedSetConfig config, PrimitiveManagementService managementService) {
-    return new DefaultDistributedSetBuilder<>(name, config, managementService);
+  public DistributedSetBuilder<E> newBuilder(PrimitiveId id, PrimitiveManagementService managementService) {
+    return new DefaultDistributedSetBuilder<>(id, managementService);
   }
 
   @Override
   public String toString() {
-    return toStringHelper(this)
-        .add("name", name())
-        .toString();
+    return toStringHelper(this).toString();
   }
 }

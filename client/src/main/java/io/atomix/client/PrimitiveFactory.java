@@ -67,8 +67,8 @@ public interface PrimitiveFactory {
    * @param <P>           the primitive type
    * @return the primitive builder
    */
-  <B extends PrimitiveBuilder<B, C, P>, C extends PrimitiveConfig<C>, P extends SyncPrimitive> B primitiveBuilder(
+  <B extends PrimitiveBuilder<B, P>, P extends SyncPrimitive> B primitiveBuilder(
       String name,
-      PrimitiveType<B, C, P> primitiveType);
+      PrimitiveType<B, P> primitiveType);
 
 }

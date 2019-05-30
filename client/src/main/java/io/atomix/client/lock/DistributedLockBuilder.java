@@ -15,25 +15,16 @@
  */
 package io.atomix.client.lock;
 
+import io.atomix.api.primitive.PrimitiveId;
 import io.atomix.client.PrimitiveManagementService;
 import io.atomix.client.impl.ManagedPrimitiveBuilder;
-import io.atomix.service.protocol.PrimitiveProtocol;
-import io.atomix.service.protocol.ProxyCompatibleBuilder;
-import io.atomix.service.protocol.ServiceProtocol;
 
 /**
  * Builder for DistributedLock.
  */
 public abstract class DistributedLockBuilder
-    extends ManagedPrimitiveBuilder<DistributedLockBuilder, DistributedLockConfig, DistributedLock>
-    implements ProxyCompatibleBuilder<DistributedLockBuilder> {
-
-  protected DistributedLockBuilder(String name, DistributedLockConfig config, PrimitiveManagementService managementService) {
-    super(DistributedLockType.instance(), name, config, managementService);
-  }
-
-  @Override
-  public DistributedLockBuilder withProtocol(ServiceProtocol protocol) {
-    return withProtocol((PrimitiveProtocol) protocol);
+    extends ManagedPrimitiveBuilder<DistributedLockBuilder, DistributedLock> {
+  protected DistributedLockBuilder(PrimitiveId id, PrimitiveManagementService managementService) {
+    super(id, managementService);
   }
 }

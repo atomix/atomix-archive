@@ -22,8 +22,8 @@ import java.util.concurrent.Executor;
 
 import com.google.common.util.concurrent.MoreExecutors;
 import io.atomix.client.AsyncPrimitive;
-import io.atomix.client.iterator.AsyncIterable;
 import io.atomix.client.PrimitiveType;
+import io.atomix.client.iterator.AsyncIterable;
 
 /**
  * Asynchronous distributed collection.

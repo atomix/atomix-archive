@@ -26,6 +26,7 @@ import java.util.function.Function;
 import java.util.function.Predicate;
 
 import com.google.common.collect.Maps;
+import io.atomix.client.Versioned;
 import io.atomix.client.collection.AsyncDistributedCollection;
 import io.atomix.client.collection.impl.TranscodingAsyncDistributedCollection;
 import io.atomix.client.impl.DelegatingAsyncPrimitive;
@@ -35,8 +36,7 @@ import io.atomix.client.map.AtomicMapEvent;
 import io.atomix.client.map.AtomicMapEventListener;
 import io.atomix.client.set.AsyncDistributedSet;
 import io.atomix.client.set.impl.TranscodingAsyncDistributedSet;
-import io.atomix.utils.concurrent.Futures;
-import io.atomix.client.Versioned;
+import io.atomix.client.utils.concurrent.Futures;
 
 /**
  * An {@code AsyncConsistentMap} that maps its operations to operations on a

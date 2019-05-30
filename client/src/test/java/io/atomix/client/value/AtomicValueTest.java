@@ -33,9 +33,7 @@ import static org.junit.Assert.assertTrue;
 public class AtomicValueTest extends AbstractPrimitiveTest {
   @Test
   public void testValue() throws Exception {
-    AtomicValue<String> value = client().<String>atomicValueBuilder("test-value")
-        .withProtocol(protocol())
-        .build();
+    AtomicValue<String> value = client().<String>atomicValueBuilder("test-value").build();
     assertNull(value.get().value());
     value.set("a");
     assertEquals("a", value.get().value());
@@ -48,12 +46,8 @@ public class AtomicValueTest extends AbstractPrimitiveTest {
 
   @Test
   public void testEvents() throws Exception {
-    AtomicValue<String> value1 = client().<String>atomicValueBuilder("test-value-events")
-        .withProtocol(protocol())
-        .build();
-    AtomicValue<String> value2 = client().<String>atomicValueBuilder("test-value-events")
-        .withProtocol(protocol())
-        .build();
+    AtomicValue<String> value1 = client().<String>atomicValueBuilder("test-value-events").build();
+    AtomicValue<String> value2 = client().<String>atomicValueBuilder("test-value-events").build();
 
     BlockingAtomicValueListener<String> listener1 = new BlockingAtomicValueListener<>();
     BlockingAtomicValueListener<String> listener2 = new BlockingAtomicValueListener<>();

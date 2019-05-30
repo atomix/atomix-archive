@@ -17,19 +17,19 @@ package io.atomix.client.idgenerator.impl;
 
 import java.util.concurrent.CompletableFuture;
 
+import io.atomix.api.primitive.PrimitiveId;
 import io.atomix.client.PrimitiveManagementService;
 import io.atomix.client.counter.impl.DefaultAsyncAtomicCounter;
 import io.atomix.client.idgenerator.AsyncAtomicIdGenerator;
 import io.atomix.client.idgenerator.AtomicIdGenerator;
 import io.atomix.client.idgenerator.AtomicIdGeneratorBuilder;
-import io.atomix.client.idgenerator.AtomicIdGeneratorConfig;
 
 /**
  * Default implementation of AtomicIdGeneratorBuilder.
  */
 public class DelegatingAtomicIdGeneratorBuilder extends AtomicIdGeneratorBuilder {
-  public DelegatingAtomicIdGeneratorBuilder(String name, AtomicIdGeneratorConfig config, PrimitiveManagementService managementService) {
-    super(name, config, managementService);
+  public DelegatingAtomicIdGeneratorBuilder(PrimitiveId id, PrimitiveManagementService managementService) {
+    super(id, managementService);
   }
 
   @Override

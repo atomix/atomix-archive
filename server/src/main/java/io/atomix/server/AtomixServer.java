@@ -180,7 +180,7 @@ public class AtomixServer {
     this(config(classLoader, configFiles));
   }
 
-  protected AtomixServer(ServerConfig config) {
+  public AtomixServer(ServerConfig config) {
     this(config, Thread.currentThread().getContextClassLoader(), Component.Scope.RUNTIME);
   }
 

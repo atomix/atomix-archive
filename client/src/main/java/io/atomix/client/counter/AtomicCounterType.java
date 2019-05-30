@@ -15,18 +15,17 @@
  */
 package io.atomix.client.counter;
 
+import io.atomix.api.primitive.PrimitiveId;
 import io.atomix.client.PrimitiveManagementService;
 import io.atomix.client.PrimitiveType;
 import io.atomix.client.counter.impl.DefaultAtomicCounterBuilder;
-import io.atomix.utils.component.Component;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
 
 /**
  * Atomic counter primitive type.
  */
-@Component
-public class AtomicCounterType implements PrimitiveType<AtomicCounterBuilder, AtomicCounterConfig, AtomicCounter> {
+public class AtomicCounterType implements PrimitiveType<AtomicCounterBuilder, AtomicCounter> {
   private static final String NAME = "atomic-counter";
   private static final AtomicCounterType INSTANCE = new AtomicCounterType();
 
@@ -40,24 +39,12 @@ public class AtomicCounterType implements PrimitiveType<AtomicCounterBuilder, At
   }
 
   @Override
-  public String name() {
-    return NAME;
-  }
-
-  @Override
-  public AtomicCounterConfig newConfig() {
-    return new AtomicCounterConfig();
-  }
-
-  @Override
-  public AtomicCounterBuilder newBuilder(String name, AtomicCounterConfig config, PrimitiveManagementService managementService) {
-    return new DefaultAtomicCounterBuilder(name, config, managementService);
+  public AtomicCounterBuilder newBuilder(PrimitiveId id, PrimitiveManagementService managementService) {
+    return new DefaultAtomicCounterBuilder(id, managementService);
   }
 
   @Override
   public String toString() {
-    return toStringHelper(this)
-        .add("name", name())
-        .toString();
+    return toStringHelper(this).toString();
   }
 }

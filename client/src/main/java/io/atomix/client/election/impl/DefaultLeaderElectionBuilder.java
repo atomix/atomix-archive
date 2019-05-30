@@ -18,25 +18,25 @@ package io.atomix.client.election.impl;
 import java.util.concurrent.CompletableFuture;
 
 import com.google.common.io.BaseEncoding;
+import io.atomix.api.primitive.PrimitiveId;
 import io.atomix.client.PrimitiveManagementService;
 import io.atomix.client.election.AsyncLeaderElection;
 import io.atomix.client.election.LeaderElection;
 import io.atomix.client.election.LeaderElectionBuilder;
-import io.atomix.client.election.LeaderElectionConfig;
-import io.atomix.utils.serializer.Serializer;
+import io.atomix.client.utils.serializer.Serializer;
 
 /**
  * Default implementation of {@code LeaderElectorBuilder}.
  */
 public class DefaultLeaderElectionBuilder<T> extends LeaderElectionBuilder<T> {
-  public DefaultLeaderElectionBuilder(String name, LeaderElectionConfig config, PrimitiveManagementService managementService) {
-    super(name, config, managementService);
+  public DefaultLeaderElectionBuilder(PrimitiveId id, PrimitiveManagementService managementService) {
+    super(id, managementService);
   }
 
   @Override
   @SuppressWarnings("unchecked")
   public CompletableFuture<LeaderElection<T>> buildAsync() {
-    return new DefaultAsyncLeaderElection(getPrimitiveId(), managementService, config.getSessionTimeout())
+    return new DefaultAsyncLeaderElection(getPrimitiveId(), managementService, sessionTimeout)
         .connect()
         .thenApply(election -> {
           Serializer serializer = serializer();

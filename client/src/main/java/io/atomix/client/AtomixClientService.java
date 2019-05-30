@@ -20,11 +20,11 @@ import io.atomix.client.map.DistributedMapBuilder;
 import io.atomix.client.map.DistributedMapType;
 import io.atomix.client.set.DistributedSetBuilder;
 import io.atomix.client.set.DistributedSetType;
+import io.atomix.client.utils.concurrent.ThreadContextFactory;
 import io.atomix.client.value.AtomicValueBuilder;
 import io.atomix.client.value.AtomicValueType;
 import io.atomix.client.value.DistributedValueBuilder;
 import io.atomix.client.value.DistributedValueType;
-import io.atomix.utils.concurrent.ThreadContextFactory;
 
 /**
  * Manages the creation of distributed primitive instances.
@@ -90,8 +90,8 @@ public interface AtomixClientService extends PrimitiveFactory {
    * </pre>
    *
    * @param name the primitive name
-   * @param <K> key type
-   * @param <V> value type
+   * @param <K>  key type
+   * @param <V>  value type
    * @return builder for a distributed map
    */
   default <K, V> DistributedMapBuilder<K, V> mapBuilder(String name) {
@@ -114,8 +114,8 @@ public interface AtomixClientService extends PrimitiveFactory {
    * </pre>
    *
    * @param name the primitive name
-   * @param <K> key type
-   * @param <V> value type
+   * @param <K>  key type
+   * @param <V>  value type
    * @return builder for a atomic map
    */
   default <K, V> AtomicMapBuilder<K, V> atomicMapBuilder(String name) {
@@ -138,7 +138,7 @@ public interface AtomixClientService extends PrimitiveFactory {
    * </pre>
    *
    * @param name the primitive name
-   * @param <E> set element type
+   * @param <E>  set element type
    * @return builder for an distributed set
    */
   default <E> DistributedSetBuilder<E> setBuilder(String name) {
@@ -227,7 +227,7 @@ public interface AtomixClientService extends PrimitiveFactory {
    * </pre>
    *
    * @param name the primitive name
-   * @param <V> atomic value type
+   * @param <V>  atomic value type
    * @return atomic value builder
    */
   default <V> DistributedValueBuilder<V> valueBuilder(String name) {
@@ -250,7 +250,7 @@ public interface AtomixClientService extends PrimitiveFactory {
    * </pre>
    *
    * @param name the primitive name
-   * @param <V> atomic value type
+   * @param <V>  atomic value type
    * @return atomic value builder
    */
   default <V> AtomicValueBuilder<V> atomicValueBuilder(String name) {

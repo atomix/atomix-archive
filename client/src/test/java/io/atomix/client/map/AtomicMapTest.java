@@ -45,9 +45,7 @@ public class AtomicMapTest extends AbstractPrimitiveTest {
     final String fooValue = "Hello foo!";
     final String barValue = "Hello bar!";
 
-    AtomicMap<String, String> map = client().<String, String>atomicMapBuilder("testBasicMapOperationMap")
-        .withProtocol(protocol())
-        .withSessionTimeout(Duration.ofSeconds(1))
+    AtomicMap<String, String> map = client().<String, String>atomicMapBuilder("testBasicMapOperationMap").withSessionTimeout(Duration.ofSeconds(1))
         .build();
 
     assertTrue(map.isEmpty());
@@ -122,9 +120,7 @@ public class AtomicMapTest extends AbstractPrimitiveTest {
     final String value2 = "value2";
     final String value3 = "value3";
 
-    AtomicMap<String, String> map = client().<String, String>atomicMapBuilder("testMapComputeOperationsMap")
-        .withProtocol(protocol())
-        .build();
+    AtomicMap<String, String> map = client().<String, String>atomicMapBuilder("testMapComputeOperationsMap").build();
 
     assertEquals(value1, map.computeIfAbsent("foo", k -> value1).value());
     assertEquals(value1, map.computeIfAbsent("foo", k -> value2).value());
@@ -141,9 +137,7 @@ public class AtomicMapTest extends AbstractPrimitiveTest {
     final String value2 = "value2";
     final String value3 = "value3";
 
-    AtomicMap<String, String> map = client().<String, String>atomicMapBuilder("testMapListenerMap")
-        .withProtocol(protocol())
-        .withSessionTimeout(Duration.ofSeconds(5))
+    AtomicMap<String, String> map = client().<String, String>atomicMapBuilder("testMapListenerMap").withSessionTimeout(Duration.ofSeconds(5))
         .build();
     TestAtomicMapEventListener listener = new TestAtomicMapEventListener();
 
@@ -214,9 +208,7 @@ public class AtomicMapTest extends AbstractPrimitiveTest {
 
   @Test
   public void testMapViews() throws Exception {
-    AtomicMap<String, String> map = client().<String, String>atomicMapBuilder("testMapViews")
-        .withProtocol(protocol())
-        .build();
+    AtomicMap<String, String> map = client().<String, String>atomicMapBuilder("testMapViews").build();
 
     assertFalse(map.keySet().iterator().hasNext());
     assertFalse(map.entrySet().iterator().hasNext());

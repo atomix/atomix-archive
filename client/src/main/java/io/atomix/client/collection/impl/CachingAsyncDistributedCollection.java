@@ -27,7 +27,6 @@ import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import com.google.common.util.concurrent.MoreExecutors;
 import io.atomix.client.PrimitiveState;
-import io.atomix.client.cache.CacheConfig;
 import io.atomix.client.collection.AsyncDistributedCollection;
 import io.atomix.client.collection.CollectionEventListener;
 import org.slf4j.Logger;
@@ -53,12 +52,12 @@ public class CachingAsyncDistributedCollection<E> extends DelegatingAsyncDistrib
    * Constructor to configure cache size.
    *
    * @param backingCollection a distributed collection for backing
-   * @param cacheConfig       the cache configuration
+   * @param cacheSize         the cache size
    */
-  public CachingAsyncDistributedCollection(AsyncDistributedCollection<E> backingCollection, CacheConfig cacheConfig) {
+  public CachingAsyncDistributedCollection(AsyncDistributedCollection<E> backingCollection, int cacheSize) {
     super(backingCollection);
     cache = CacheBuilder.newBuilder()
-        .maximumSize(cacheConfig.getSize())
+        .maximumSize(cacheSize)
         .build(CacheLoader.from(CachingAsyncDistributedCollection.super::contains));
     cacheUpdater = event -> {
       cache.invalidate(event.element());

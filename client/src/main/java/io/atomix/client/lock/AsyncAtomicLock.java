@@ -16,13 +16,12 @@
 package io.atomix.client.lock;
 
 import java.time.Duration;
-import java.util.Optional;
+import java.util.OptionalLong;
 import java.util.concurrent.CompletableFuture;
 
 import io.atomix.client.AsyncPrimitive;
 import io.atomix.client.DistributedPrimitive;
 import io.atomix.client.PrimitiveType;
-import io.atomix.utils.time.Version;
 
 /**
  * Asynchronous lock primitive.
@@ -38,14 +37,14 @@ public interface AsyncAtomicLock extends AsyncPrimitive {
    *
    * @return future to be completed once the lock has been acquired
    */
-  CompletableFuture<Version> lock();
+  CompletableFuture<Long> lock();
 
   /**
    * Attempts to acquire the lock.
    *
    * @return future to be completed with a boolean indicating whether the lock was acquired
    */
-  CompletableFuture<Optional<Version>> tryLock();
+  CompletableFuture<OptionalLong> tryLock();
 
   /**
    * Attempts to acquire the lock for a specified amount of time.
@@ -53,7 +52,7 @@ public interface AsyncAtomicLock extends AsyncPrimitive {
    * @param timeout the timeout after which to give up attempting to acquire the lock
    * @return future to be completed with a boolean indicating whether the lock was acquired
    */
-  CompletableFuture<Optional<Version>> tryLock(Duration timeout);
+  CompletableFuture<OptionalLong> tryLock(Duration timeout);
 
   /**
    * Unlocks the lock.
@@ -68,7 +67,7 @@ public interface AsyncAtomicLock extends AsyncPrimitive {
    * @param version the lock version
    * @return future to be completed once the lock has been released
    */
-  CompletableFuture<Boolean> unlock(Version version);
+  CompletableFuture<Boolean> unlock(long version);
 
   /**
    * Returns a boolean indicating whether the lock is locked.
@@ -83,7 +82,7 @@ public interface AsyncAtomicLock extends AsyncPrimitive {
    * @param version the lock version
    * @return indicates whether the lock is locked
    */
-  CompletableFuture<Boolean> isLocked(Version version);
+  CompletableFuture<Boolean> isLocked(long version);
 
   @Override
   default AtomicLock sync() {

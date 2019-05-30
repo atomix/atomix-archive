@@ -29,8 +29,8 @@ import io.atomix.api.primitive.PrimitiveId;
 import io.atomix.client.log.AsyncDistributedLogPartition;
 import io.atomix.client.log.DistributedLogPartition;
 import io.atomix.client.log.Record;
-import io.atomix.utils.concurrent.Futures;
-import io.atomix.utils.serializer.Serializer;
+import io.atomix.client.utils.concurrent.Futures;
+import io.atomix.client.utils.serializer.Serializer;
 import io.grpc.stub.StreamObserver;
 
 /**
@@ -114,8 +114,6 @@ public class DefaultAsyncDistributedLogPartition<E> implements AsyncDistributedL
       }
     }
     producer.onNext(ProduceRequest.newBuilder()
-        .setId(id)
-        .setPartition(partitionId)
         .setValue(ByteString.copyFrom(bytes))
         .build());
     return CompletableFuture.completedFuture(null);
@@ -129,8 +127,6 @@ public class DefaultAsyncDistributedLogPartition<E> implements AsyncDistributedL
   @Override
   public CompletableFuture<Void> consume(long offset, Consumer<Record<E>> consumer) {
     log.consume(ConsumeRequest.newBuilder()
-            .setId(id)
-            .setPartition(partitionId)
             .setOffset(offset)
             .build(),
         new StreamObserver<LogRecord>() {

@@ -20,9 +20,9 @@ import java.util.concurrent.CompletableFuture;
 import java.util.function.BiFunction;
 import java.util.function.Predicate;
 
-import io.atomix.client.map.AsyncAtomicMap;
-import io.atomix.utils.concurrent.Futures;
 import io.atomix.client.Versioned;
+import io.atomix.client.map.AsyncAtomicMap;
+import io.atomix.client.utils.concurrent.Futures;
 
 /**
  * An unmodifiable {@link AsyncAtomicMap}.

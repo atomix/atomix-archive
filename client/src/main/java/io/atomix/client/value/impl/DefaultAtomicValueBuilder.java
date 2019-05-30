@@ -18,12 +18,12 @@ package io.atomix.client.value.impl;
 import java.util.concurrent.CompletableFuture;
 
 import com.google.common.io.BaseEncoding;
+import io.atomix.api.primitive.PrimitiveId;
 import io.atomix.client.PrimitiveManagementService;
+import io.atomix.client.utils.serializer.Serializer;
 import io.atomix.client.value.AsyncAtomicValue;
 import io.atomix.client.value.AtomicValue;
 import io.atomix.client.value.AtomicValueBuilder;
-import io.atomix.client.value.AtomicValueConfig;
-import io.atomix.utils.serializer.Serializer;
 
 /**
  * Default implementation of AtomicValueBuilder.
@@ -31,14 +31,14 @@ import io.atomix.utils.serializer.Serializer;
  * @param <V> value type
  */
 public class DefaultAtomicValueBuilder<V> extends AtomicValueBuilder<V> {
-  public DefaultAtomicValueBuilder(String name, AtomicValueConfig config, PrimitiveManagementService managementService) {
-    super(name, config, managementService);
+  public DefaultAtomicValueBuilder(PrimitiveId id, PrimitiveManagementService managementService) {
+    super(id, managementService);
   }
 
   @Override
   @SuppressWarnings("unchecked")
   public CompletableFuture<AtomicValue<V>> buildAsync() {
-    return new DefaultAsyncAtomicValue(getPrimitiveId(), managementService, config.getSessionTimeout())
+    return new DefaultAsyncAtomicValue(getPrimitiveId(), managementService, sessionTimeout)
         .connect()
         .thenApply(rawValue -> {
           Serializer serializer = serializer();

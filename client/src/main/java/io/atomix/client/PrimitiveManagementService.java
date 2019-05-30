@@ -16,7 +16,7 @@
 package io.atomix.client;
 
 import io.atomix.client.channel.ChannelFactory;
-import io.atomix.utils.concurrent.ThreadContextFactory;
+import io.atomix.client.utils.concurrent.ThreadContextFactory;
 
 /**
  * Primitive management service.

@@ -15,19 +15,19 @@
  */
 package io.atomix.client.value.impl;
 
-import com.google.common.base.Throwables;
-import io.atomix.client.Synchronous;
-import io.atomix.client.value.AsyncAtomicValue;
-import io.atomix.client.value.AtomicValue;
-import io.atomix.client.value.AtomicValueEventListener;
-import io.atomix.primitive.PrimitiveException;
-import io.atomix.client.Versioned;
-
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+
+import com.google.common.base.Throwables;
+import io.atomix.client.PrimitiveException;
+import io.atomix.client.Synchronous;
+import io.atomix.client.Versioned;
+import io.atomix.client.value.AsyncAtomicValue;
+import io.atomix.client.value.AtomicValue;
+import io.atomix.client.value.AtomicValueEventListener;
 
 /**
  * Default implementation for a {@code AtomicValue} backed by a {@link AsyncAtomicValue}.

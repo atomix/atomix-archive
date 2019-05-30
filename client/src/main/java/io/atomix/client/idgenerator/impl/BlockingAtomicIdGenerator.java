@@ -20,10 +20,10 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
+import io.atomix.client.PrimitiveException;
 import io.atomix.client.Synchronous;
 import io.atomix.client.idgenerator.AsyncAtomicIdGenerator;
 import io.atomix.client.idgenerator.AtomicIdGenerator;
-import io.atomix.primitive.PrimitiveException;
 
 /**
  * Default implementation for a {@code AtomicIdGenerator} backed by a {@link AsyncAtomicIdGenerator}.

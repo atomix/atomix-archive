@@ -16,20 +16,18 @@
 package io.atomix.client.log.impl;
 
 import java.time.Duration;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.function.BiFunction;
 import java.util.function.Consumer;
 
-import com.google.common.hash.Hashing;
 import com.google.common.io.BaseEncoding;
-import io.atomix.api.log.CreateTopicRequest;
-import io.atomix.api.log.CreateTopicResponse;
 import io.atomix.api.log.LogServiceGrpc;
 import io.atomix.api.primitive.PrimitiveId;
+import io.atomix.client.Partitioner;
 import io.atomix.client.PrimitiveManagementService;
 import io.atomix.client.PrimitiveType;
 import io.atomix.client.log.AsyncDistributedLog;
@@ -37,9 +35,8 @@ import io.atomix.client.log.AsyncDistributedLogPartition;
 import io.atomix.client.log.DistributedLog;
 import io.atomix.client.log.DistributedLogType;
 import io.atomix.client.log.Record;
-import io.atomix.utils.concurrent.Futures;
-import io.atomix.utils.serializer.Serializer;
-import io.grpc.stub.StreamObserver;
+import io.atomix.client.utils.concurrent.Futures;
+import io.atomix.client.utils.serializer.Serializer;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -47,28 +44,33 @@ import static com.google.common.base.Preconditions.checkNotNull;
  * Default distributed log.
  */
 public class DefaultAsyncDistributedLog<E> implements AsyncDistributedLog<E> {
-  private static final BiFunction<String, List<Integer>, Integer> DEFAULT_PARTITIONER = (key, partitions) -> {
-    int hash = Math.abs(Hashing.murmur3_32().hashUnencodedChars(key).asInt());
-    return partitions.get(Hashing.consistentHash(hash, partitions.size()));
-  };
-
   private final PrimitiveId id;
   private final LogServiceGrpc.LogServiceStub log;
-  private final BiFunction<String, List<Integer>, Integer> partitioner;
+  private final Partitioner<String> partitioner;
   private final Map<Integer, DefaultAsyncDistributedLogPartition<E>> partitions = new ConcurrentHashMap<>();
   private final List<AsyncDistributedLogPartition<E>> sortedPartitions = new CopyOnWriteArrayList<>();
   private final List<Integer> partitionIds = new CopyOnWriteArrayList<>();
   private final Serializer serializer;
 
-  public DefaultAsyncDistributedLog(PrimitiveId id, PrimitiveManagementService managementService, Serializer serializer) {
-    this(id, managementService, DEFAULT_PARTITIONER, serializer);
+  public DefaultAsyncDistributedLog(
+      PrimitiveId id,
+      PrimitiveManagementService managementService,
+      Collection<DefaultAsyncDistributedLogPartition<E>> partitions,
+      Serializer serializer) {
+    this(id, managementService, partitions, Partitioner.MURMUR3, serializer);
   }
 
-  public DefaultAsyncDistributedLog(PrimitiveId id, PrimitiveManagementService managementService, BiFunction<String, List<Integer>, Integer> partitioner, Serializer serializer) {
+  public DefaultAsyncDistributedLog(
+      PrimitiveId id,
+      PrimitiveManagementService managementService,
+      Collection<DefaultAsyncDistributedLogPartition<E>> partitions,
+      Partitioner<String> partitioner,
+      Serializer serializer) {
     this.id = checkNotNull(id);
     this.log = LogServiceGrpc.newStub(managementService.getChannelFactory().getChannel());
     this.partitioner = checkNotNull(partitioner);
     this.serializer = checkNotNull(serializer);
+    partitions.forEach(partition -> this.partitions.put(partition.id(), partition));
   }
 
   @Override
@@ -115,13 +117,13 @@ public class DefaultAsyncDistributedLog<E> implements AsyncDistributedLog<E> {
 
   @Override
   public AsyncDistributedLogPartition<E> getPartition(E entry) {
-    return partitions.get(partitioner.apply(BaseEncoding.base16().encode(encode(entry)), partitionIds));
+    return partitions.get(partitioner.partition(BaseEncoding.base16().encode(encode(entry)), partitionIds));
   }
 
   @Override
   public CompletableFuture<Void> produce(E entry) {
     byte[] bytes = encode(entry);
-    return partitions.get(partitioner.apply(BaseEncoding.base16().encode(encode(entry)), partitionIds)).produce(bytes);
+    return partitions.get(partitioner.partition(BaseEncoding.base16().encode(encode(entry)), partitionIds)).produce(bytes);
   }
 
   @Override
@@ -134,49 +136,6 @@ public class DefaultAsyncDistributedLog<E> implements AsyncDistributedLog<E> {
   @Override
   public DistributedLog<E> sync(Duration operationTimeout) {
     return new BlockingDistributedLog<>(this, operationTimeout.toMillis());
-  }
-
-  /**
-   * Connects the distributed log.
-   *
-   * @return a future to be completed once the log has connected
-   */
-  public CompletableFuture<AsyncDistributedLog<E>> connect() {
-    return this.<CreateTopicResponse>execute(observer -> log.createTopic(CreateTopicRequest.newBuilder()
-        .setId(id)
-        .build(), observer))
-        .thenApply(response -> {
-          for (int i = 1; i <= response.getPartitions(); i++) {
-            DefaultAsyncDistributedLogPartition<E> partition = new DefaultAsyncDistributedLogPartition<>(id, i, log, serializer);
-            partitions.put(i, partition);
-            sortedPartitions.add(partition);
-            partitionIds.add(i);
-          }
-          return this;
-        });
-  }
-
-  private <T> CompletableFuture<T> execute(Consumer<StreamObserver<T>> callback) {
-    CompletableFuture<T> future = new CompletableFuture<>();
-    callback.accept(new StreamObserver<T>() {
-      @Override
-      public void onNext(T value) {
-        future.complete(value);
-      }
-
-      @Override
-      public void onError(Throwable t) {
-        future.completeExceptionally(t);
-      }
-
-      @Override
-      public void onCompleted() {
-        if (!future.isDone()) {
-          future.complete(null);
-        }
-      }
-    });
-    return future;
   }
 
   @Override
