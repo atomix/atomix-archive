@@ -3,14 +3,15 @@ package io.atomix.client.impl;
 import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-import io.atomix.api.headers.SessionHeader;
-import io.atomix.api.headers.SessionResponseHeader;
-import io.atomix.api.headers.SessionStreamHeader;
-import io.atomix.api.primitive.PrimitiveId;
+import io.atomix.api.headers.Name;
+import io.atomix.api.headers.RequestHeader;
+import io.atomix.api.headers.ResponseHeader;
+import io.atomix.api.headers.StreamHeader;
 import io.atomix.client.AsyncPrimitive;
 import io.atomix.client.ManagedAsyncPrimitive;
 import io.atomix.client.PrimitiveState;
@@ -34,20 +35,21 @@ public abstract class AbstractManagedPrimitive<S, P extends AsyncPrimitive> exte
   private Scheduled keepAliveTimer;
 
   protected AbstractManagedPrimitive(
-      PrimitiveId id,
+      Name name,
       S service,
       ThreadContext context,
       Duration timeout) {
-    super(id, service, context);
+    super(name, service, context);
     this.timeout = timeout;
   }
 
-  private SessionHeader getSessionHeader() {
-    return SessionHeader.newBuilder()
+  private RequestHeader getSessionHeader() {
+    return RequestHeader.newBuilder()
+        .setName(getName())
         .setSessionId(state.getSessionId())
-        .setLastSequenceNumber(state.getCommandResponse())
+        .setSequenceNumber(state.getCommandResponse())
         .addAllStreams(sequencer.streams().stream()
-            .map(stream -> SessionStreamHeader.newBuilder()
+            .map(stream -> StreamHeader.newBuilder()
                 .setStreamId(stream.streamId())
                 .setIndex(stream.getStreamIndex())
                 .setLastItemNumber(stream.getStreamSequence())
@@ -56,9 +58,9 @@ public abstract class AbstractManagedPrimitive<S, P extends AsyncPrimitive> exte
         .build();
   }
 
-  protected <T> CompletableFuture<T> session(SessionFunction<S, T> function) {
+  protected <T> CompletableFuture<T> session(BiConsumer<RequestHeader, StreamObserver<T>> function) {
     CompletableFuture<T> future = new CompletableFuture<>();
-    function.apply(getService(), getSessionHeader(), new StreamObserver<T>() {
+    function.accept(getSessionHeader(), new StreamObserver<T>() {
       @Override
       public void onNext(T response) {
         future.complete(response);
@@ -77,29 +79,29 @@ public abstract class AbstractManagedPrimitive<S, P extends AsyncPrimitive> exte
   }
 
   protected <T> CompletableFuture<T> command(
-      SessionCommandFunction<S, T> function,
-      Function<T, SessionResponseHeader> headerFunction) {
-    return executor.execute(function, headerFunction);
+      BiConsumer<RequestHeader, StreamObserver<T>> function,
+      Function<T, ResponseHeader> headerFunction) {
+    return executor.executeCommand(function, headerFunction);
   }
 
   protected <T> CompletableFuture<Long> command(
-      SessionCommandFunction<S, T> function,
-      Function<T, SessionResponseHeader> headerFunction,
+      BiConsumer<RequestHeader, StreamObserver<T>> function,
+      Function<T, ResponseHeader> headerFunction,
       StreamObserver<T> handler) {
-    return executor.execute(function, headerFunction, handler);
+    return executor.executeCommand(function, headerFunction, handler);
   }
 
   protected <T> CompletableFuture<T> query(
-      SessionQueryFunction<S, T> function,
-      Function<T, SessionResponseHeader> headerFunction) {
-    return executor.execute(function, headerFunction);
+      BiConsumer<RequestHeader, StreamObserver<T>> function,
+      Function<T, ResponseHeader> headerFunction) {
+    return executor.executeQuery(function, headerFunction);
   }
 
   protected <T> CompletableFuture<Void> query(
-      SessionQueryFunction<S, T> function,
-      Function<T, SessionResponseHeader> headerFunction,
+      BiConsumer<RequestHeader, StreamObserver<T>> function,
+      Function<T, ResponseHeader> headerFunction,
       StreamObserver<T> handler) {
-    return executor.execute(function, headerFunction, handler);
+    return executor.executeQuery(function, headerFunction, handler);
   }
 
   protected void state(Consumer<PrimitiveState> consumer) {
@@ -122,7 +124,7 @@ public abstract class AbstractManagedPrimitive<S, P extends AsyncPrimitive> exte
           name(),
           type(),
           timeout);
-      state = new PrimitiveSessionState(sessionId, timeout.toMillis());
+      state = new PrimitiveSessionState(getName(), sessionId, timeout.toMillis());
       sequencer = new PrimitiveSessionSequencer(state, context);
       executor = new PrimitiveSessionExecutor<>(getService(), state, context, sequencer, context());
       keepAlive(System.currentTimeMillis());

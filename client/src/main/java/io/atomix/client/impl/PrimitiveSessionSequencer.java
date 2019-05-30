@@ -22,8 +22,8 @@ import java.util.Map;
 import java.util.Queue;
 
 import com.google.common.annotations.VisibleForTesting;
-import io.atomix.api.headers.SessionResponseHeader;
-import io.atomix.api.headers.SessionStreamHeader;
+import io.atomix.api.headers.ResponseHeader;
+import io.atomix.api.headers.StreamHeader;
 import io.atomix.client.DistributedPrimitive;
 import io.atomix.client.utils.logging.ContextualLoggerFactory;
 import io.atomix.client.utils.logging.LoggerContext;
@@ -98,7 +98,7 @@ final class PrimitiveSessionSequencer {
    * @param context  The publish request.
    * @param callback The callback to sequence.
    */
-  public void sequenceStream(SessionStreamHeader context, Runnable callback) {
+  public void sequenceStream(StreamHeader context, Runnable callback) {
     streams.computeIfAbsent(context.getStreamId(), StreamSequencer::new)
         .sequenceEvent(context, callback);
   }
@@ -117,7 +117,7 @@ final class PrimitiveSessionSequencer {
    * @param context  The response to sequence.
    * @param callback The callback to sequence.
    */
-  public void sequenceResponse(long sequence, SessionResponseHeader context, Runnable callback) {
+  public void sequenceResponse(long sequence, ResponseHeader context, Runnable callback) {
     // If the request sequence number is equal to the next response sequence number, attempt to complete the response.
     if (sequence == responseSequence + 1) {
       if (completeResponse(context, callback)) {
@@ -163,7 +163,7 @@ final class PrimitiveSessionSequencer {
   /**
    * Completes a sequenced response if possible.
    */
-  private boolean completeResponse(SessionResponseHeader response, Runnable callback) {
+  private boolean completeResponse(ResponseHeader response, Runnable callback) {
     // If the response is null, that indicates an exception occurred. The best we can do is complete
     // the response in sequential order.
     if (response == null) {
@@ -174,7 +174,7 @@ final class PrimitiveSessionSequencer {
 
     // Iterate through all streams in the response context and complete streams up to the stream sequence number.
     boolean complete = true;
-    for (SessionStreamHeader stream : response.getStreamsList()) {
+    for (StreamHeader stream : response.getStreamsList()) {
       complete = complete && completeStream(stream);
     }
 
@@ -192,7 +192,7 @@ final class PrimitiveSessionSequencer {
   /**
    * Completes sequenced values in the given stream.
    */
-  private boolean completeStream(SessionStreamHeader stream) {
+  private boolean completeStream(StreamHeader stream) {
     StreamSequencer sequencer = streams.get(stream.getStreamId());
     if (sequencer == null) {
       return stream.getLastItemNumber() == 0;
@@ -226,10 +226,10 @@ final class PrimitiveSessionSequencer {
    * Response callback holder.
    */
   private static final class ResponseCallback implements Runnable {
-    private final SessionResponseHeader context;
+    private final ResponseHeader context;
     private final Runnable callback;
 
-    private ResponseCallback(SessionResponseHeader context, Runnable callback) {
+    private ResponseCallback(ResponseHeader context, Runnable callback) {
       this.context = context;
       this.callback = callback;
     }
@@ -307,7 +307,7 @@ final class PrimitiveSessionSequencer {
      * @param context  the stream context
      * @param callback the callback to execute
      */
-    void sequenceEvent(SessionStreamHeader context, Runnable callback) {
+    void sequenceEvent(StreamHeader context, Runnable callback) {
       // If the sequence number is equal to the next stream sequence number, accept the event.
       if (context.getLastItemNumber() == streamSequence + 1) {
         streamSequence = context.getLastItemNumber();
@@ -330,7 +330,7 @@ final class PrimitiveSessionSequencer {
      * @param context the stream context
      * @return indicates whether the stream was completed up to the given context
      */
-    boolean completeStream(SessionStreamHeader context) {
+    boolean completeStream(StreamHeader context) {
       // For each pending event with an eventIndex less than or equal to the response eventIndex, complete the event.
       // This is safe since we know that sequenced responses should see sequential order of events.
       EventCallback eventCallback = eventCallbacks.peek();
@@ -382,10 +382,10 @@ final class PrimitiveSessionSequencer {
    * Event callback holder.
    */
   private static final class EventCallback implements Runnable {
-    private final SessionStreamHeader event;
+    private final StreamHeader event;
     private final Runnable callback;
 
-    private EventCallback(SessionStreamHeader event, Runnable callback) {
+    private EventCallback(StreamHeader event, Runnable callback) {
       this.event = event;
       this.callback = callback;
     }

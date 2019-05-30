@@ -15,7 +15,7 @@
  */
 package io.atomix.client.log;
 
-import io.atomix.api.primitive.PrimitiveId;
+import io.atomix.api.headers.Name;
 import io.atomix.client.PrimitiveBuilder;
 import io.atomix.client.PrimitiveManagementService;
 
@@ -23,7 +23,7 @@ import io.atomix.client.PrimitiveManagementService;
  * Builder for DistributedLog.
  */
 public abstract class DistributedLogBuilder<E> extends PrimitiveBuilder<DistributedLogBuilder<E>, DistributedLog<E>> {
-  public DistributedLogBuilder(PrimitiveId id, PrimitiveManagementService managementService) {
-    super(id, managementService);
+  public DistributedLogBuilder(Name name, PrimitiveManagementService managementService) {
+    super(name, managementService);
   }
 }

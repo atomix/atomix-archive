@@ -23,7 +23,7 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 
-import io.atomix.api.primitive.PrimitiveId;
+import io.atomix.api.headers.Name;
 import io.atomix.client.collection.CollectionEventListener;
 import io.atomix.client.impl.PartitionedAsyncPrimitive;
 import io.atomix.client.iterator.AsyncIterator;
@@ -38,10 +38,10 @@ import io.atomix.client.utils.concurrent.Futures;
  */
 public class PartitionedAsyncDistributedSet extends PartitionedAsyncPrimitive<AsyncDistributedSet<String>> implements AsyncDistributedSet<String> {
   public PartitionedAsyncDistributedSet(
-      PrimitiveId id,
+      Name name,
       Map<Integer, AsyncDistributedSet<String>> partitions,
       Partitioner<String> partitioner) {
-    super(id, partitions, partitioner);
+    super(name, partitions, partitioner);
   }
 
   @Override

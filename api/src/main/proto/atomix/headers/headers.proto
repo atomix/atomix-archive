@@ -5,39 +5,28 @@ package atomix.headers;
 option java_package = "io.atomix.api.headers";
 option java_multiple_files = true;
 
+// Namespaced primitive name
+message Name {
+    string name = 1;
+    string namespace = 2;
+}
+
 message RequestHeader {
-    uint64 index = 1;
+    Name name = 1;
+    uint64 session_id = 2;
+    uint64 index = 3;
+    uint64 sequence_number = 4;
+    repeated StreamHeader streams = 5;
 }
 
 message ResponseHeader {
-    uint64 index = 1;
-}
-
-message SessionHeader {
-    uint64 session_id = 1;
-    uint64 last_sequence_number = 2;
-    repeated SessionStreamHeader streams = 3;
-}
-
-message SessionCommandHeader {
-    uint64 session_id = 1;
-    uint64 sequence_number = 2;
-}
-
-message SessionQueryHeader {
-    uint64 session_id = 1;
-    uint64 last_index = 2;
-    uint64 last_sequence_number = 3;
-}
-
-message SessionResponseHeader {
     uint64 session_id = 1;
     uint64 index = 2;
     uint64 sequence_number = 3;
-    repeated SessionStreamHeader streams = 4;
+    repeated StreamHeader streams = 4;
 }
 
-message SessionStreamHeader {
+message StreamHeader {
     uint64 stream_id = 1;
     uint64 index = 2;
     uint64 last_item_number = 3;

@@ -20,12 +20,12 @@ import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 
 import com.google.protobuf.ByteString;
+import io.atomix.api.headers.Name;
 import io.atomix.api.log.ConsumeRequest;
 import io.atomix.api.log.LogRecord;
 import io.atomix.api.log.LogServiceGrpc;
 import io.atomix.api.log.ProduceRequest;
 import io.atomix.api.log.ProduceResponse;
-import io.atomix.api.primitive.PrimitiveId;
 import io.atomix.client.log.AsyncDistributedLogPartition;
 import io.atomix.client.log.DistributedLogPartition;
 import io.atomix.client.log.Record;
@@ -37,14 +37,14 @@ import io.grpc.stub.StreamObserver;
  * Default asynchronous distributed log partition implementation.
  */
 public class DefaultAsyncDistributedLogPartition<E> implements AsyncDistributedLogPartition<E> {
-  private final PrimitiveId id;
+  private final Name name;
   private final int partitionId;
   private final LogServiceGrpc.LogServiceStub log;
   private final Serializer serializer;
   private volatile StreamObserver<ProduceRequest> producer;
 
-  public DefaultAsyncDistributedLogPartition(PrimitiveId id, int partitionId, LogServiceGrpc.LogServiceStub log, Serializer serializer) {
-    this.id = id;
+  public DefaultAsyncDistributedLogPartition(Name name, int partitionId, LogServiceGrpc.LogServiceStub log, Serializer serializer) {
+    this.name = name;
     this.partitionId = partitionId;
     this.log = log;
     this.serializer = serializer;
@@ -57,7 +57,7 @@ public class DefaultAsyncDistributedLogPartition<E> implements AsyncDistributedL
 
   @Override
   public String name() {
-    return id.getName();
+    return name.getName();
   }
 
   /**

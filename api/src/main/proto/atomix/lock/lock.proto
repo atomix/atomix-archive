@@ -2,7 +2,6 @@ syntax = "proto3";
 
 import "google/protobuf/duration.proto";
 import "atomix/headers/headers.proto";
-import "atomix/primitive/primitive.proto";
 
 package atomix.lock;
 
@@ -10,63 +9,58 @@ option java_package = "io.atomix.api.lock";
 option java_multiple_files = true;
 
 message CreateRequest {
-    atomix.primitive.PrimitiveId lock_id = 1;
+    atomix.headers.RequestHeader header = 1;
     google.protobuf.Duration timeout = 2;
 }
 
 message CreateResponse {
-    atomix.headers.SessionHeader header = 1;
+    atomix.headers.ResponseHeader header = 1;
 }
 
 message KeepAliveRequest {
-    atomix.primitive.PrimitiveId lock_id = 1;
-    atomix.headers.SessionHeader header = 2;
+    atomix.headers.RequestHeader header = 1;
 }
 
 message KeepAliveResponse {
-    atomix.headers.SessionHeader header = 1;
+    atomix.headers.ResponseHeader header = 1;
 }
 
 message CloseRequest {
-    atomix.primitive.PrimitiveId lock_id = 1;
-    atomix.headers.SessionHeader header = 2;
-    bool delete = 3;
+    atomix.headers.RequestHeader header = 1;
+    bool delete = 2;
 }
 
 message CloseResponse {
-
+    atomix.headers.ResponseHeader header = 1;
 }
 
 message LockRequest {
-    atomix.primitive.PrimitiveId lock_id = 1;
-    atomix.headers.SessionCommandHeader header = 2;
-    google.protobuf.Duration timeout = 3;
+    atomix.headers.RequestHeader header = 1;
+    google.protobuf.Duration timeout = 2;
 }
 
 message LockResponse {
-    atomix.headers.SessionResponseHeader header = 1;
+    atomix.headers.ResponseHeader header = 1;
     uint64 version = 2;
 }
 
 message UnlockRequest {
-    atomix.primitive.PrimitiveId lock_id = 1;
-    atomix.headers.SessionCommandHeader header = 2;
-    uint64 version = 3;
+    atomix.headers.RequestHeader header = 1;
+    uint64 version = 2;
 }
 
 message UnlockResponse {
-    atomix.headers.SessionResponseHeader header = 1;
+    atomix.headers.ResponseHeader header = 1;
     bool unlocked = 2;
 }
 
 message IsLockedRequest {
-    atomix.primitive.PrimitiveId lock_id = 1;
-    atomix.headers.SessionQueryHeader header = 2;
-    uint64 version = 3;
+    atomix.headers.RequestHeader header = 1;
+    uint64 version = 2;
 }
 
 message IsLockedResponse {
-    atomix.headers.SessionResponseHeader header = 1;
+    atomix.headers.ResponseHeader header = 1;
     bool isLocked = 2;
 }
 

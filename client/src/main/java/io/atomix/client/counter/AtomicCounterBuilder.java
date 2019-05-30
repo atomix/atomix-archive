@@ -15,7 +15,7 @@
  */
 package io.atomix.client.counter;
 
-import io.atomix.api.primitive.PrimitiveId;
+import io.atomix.api.headers.Name;
 import io.atomix.client.PrimitiveBuilder;
 import io.atomix.client.PrimitiveManagementService;
 
@@ -24,7 +24,7 @@ import io.atomix.client.PrimitiveManagementService;
  */
 public abstract class AtomicCounterBuilder
     extends PrimitiveBuilder<AtomicCounterBuilder, AtomicCounter> {
-  protected AtomicCounterBuilder(PrimitiveId id, PrimitiveManagementService managementService) {
-    super(id, managementService);
+  protected AtomicCounterBuilder(Name name, PrimitiveManagementService managementService) {
+    super(name, managementService);
   }
 }

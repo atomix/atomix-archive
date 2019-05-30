@@ -15,7 +15,7 @@
  */
 package io.atomix.client.idgenerator;
 
-import io.atomix.api.primitive.PrimitiveId;
+import io.atomix.api.headers.Name;
 import io.atomix.client.PrimitiveBuilder;
 import io.atomix.client.PrimitiveManagementService;
 
@@ -24,7 +24,7 @@ import io.atomix.client.PrimitiveManagementService;
  */
 public abstract class AtomicIdGeneratorBuilder
     extends PrimitiveBuilder<AtomicIdGeneratorBuilder, AtomicIdGenerator> {
-  protected AtomicIdGeneratorBuilder(PrimitiveId id, PrimitiveManagementService managementService) {
-    super(id, managementService);
+  protected AtomicIdGeneratorBuilder(Name name, PrimitiveManagementService managementService) {
+    super(name, managementService);
   }
 }

@@ -9,6 +9,7 @@ option java_multiple_files = true;
 message ServiceId {
     string type = 1;
     string name = 2;
+    string namespace = 3;
 }
 
 message ServiceSnapshot {

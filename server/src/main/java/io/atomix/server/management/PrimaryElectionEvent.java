@@ -1,6 +1,6 @@
 package io.atomix.server.management;
 
-import io.atomix.api.partition.PrimaryTerm;
+import io.atomix.api.controller.PrimaryTerm;
 import io.atomix.utils.event.AbstractEvent;
 
 /**

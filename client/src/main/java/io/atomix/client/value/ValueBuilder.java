@@ -15,7 +15,7 @@
  */
 package io.atomix.client.value;
 
-import io.atomix.api.primitive.PrimitiveId;
+import io.atomix.api.headers.Name;
 import io.atomix.client.PrimitiveManagementService;
 import io.atomix.client.SyncPrimitive;
 import io.atomix.client.impl.ManagedPrimitiveBuilder;
@@ -27,7 +27,7 @@ import io.atomix.client.impl.ManagedPrimitiveBuilder;
  */
 public abstract class ValueBuilder<B extends ValueBuilder<B, P, V>, P extends SyncPrimitive, V>
     extends ManagedPrimitiveBuilder<B, P> {
-  protected ValueBuilder(PrimitiveId id, PrimitiveManagementService managementService) {
-    super(id, managementService);
+  protected ValueBuilder(Name name, PrimitiveManagementService managementService) {
+    super(name, managementService);
   }
 }

@@ -119,7 +119,7 @@ public class RaftStateMachineManager implements StateMachine.Context, AutoClosea
    */
   private boolean isRunningOutOfMemory() {
     StorageLevel level = raft.getStorage().storageLevel();
-    if (level == StorageLevel.MEMORY || level == StorageLevel.MAPPED) {
+    if (level == StorageLevel.MAPPED) {
       long freeMemory = raft.getStorage().statistics().getFreeMemory();
       long totalMemory = raft.getStorage().statistics().getTotalMemory();
       if (freeMemory > 0 && totalMemory > 0) {

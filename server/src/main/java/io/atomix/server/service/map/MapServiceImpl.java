@@ -18,9 +18,8 @@ package io.atomix.server.service.map;
 import java.time.Duration;
 import java.util.stream.Collectors;
 
-import io.atomix.api.headers.SessionHeader;
-import io.atomix.api.headers.SessionResponseHeader;
-import io.atomix.api.headers.SessionStreamHeader;
+import io.atomix.api.headers.ResponseHeader;
+import io.atomix.api.headers.StreamHeader;
 import io.atomix.api.map.ClearRequest;
 import io.atomix.api.map.ClearResponse;
 import io.atomix.api.map.CloseRequest;
@@ -72,14 +71,14 @@ public class MapServiceImpl extends MapServiceGrpc.MapServiceImplBase {
 
   @Override
   public void create(CreateRequest request, StreamObserver<CreateResponse> responseObserver) {
-    executor.execute(request.getMapId(), CreateResponse::getDefaultInstance, responseObserver,
+    executor.execute(request.getHeader().getName(), CreateResponse::getDefaultInstance, responseObserver,
         map -> map.openSession(OpenSessionRequest.newBuilder()
             .setTimeout(Duration.ofSeconds(request.getTimeout().getSeconds())
                 .plusNanos(request.getTimeout().getNanos())
                 .toMillis())
             .build())
             .thenApply(response -> CreateResponse.newBuilder()
-                .setHeader(SessionHeader.newBuilder()
+                .setHeader(ResponseHeader.newBuilder()
                     .setSessionId(response.getSessionId())
                     .build())
                 .build()));
@@ -87,13 +86,13 @@ public class MapServiceImpl extends MapServiceGrpc.MapServiceImplBase {
 
   @Override
   public void keepAlive(KeepAliveRequest request, StreamObserver<KeepAliveResponse> responseObserver) {
-    executor.execute(request.getMapId(), KeepAliveResponse::getDefaultInstance, responseObserver,
+    executor.execute(request.getHeader().getName(), KeepAliveResponse::getDefaultInstance, responseObserver,
         map -> map.keepAlive(io.atomix.service.protocol.KeepAliveRequest.newBuilder()
             .setSessionId(request.getHeader().getSessionId())
-            .setCommandSequence(request.getHeader().getLastSequenceNumber())
+            .setCommandSequence(request.getHeader().getSequenceNumber())
             .build())
             .thenApply(response -> KeepAliveResponse.newBuilder()
-                .setHeader(SessionHeader.newBuilder()
+                .setHeader(ResponseHeader.newBuilder()
                     .setSessionId(request.getHeader().getSessionId())
                     .build())
                 .build()));
@@ -101,7 +100,7 @@ public class MapServiceImpl extends MapServiceGrpc.MapServiceImplBase {
 
   @Override
   public void close(CloseRequest request, StreamObserver<CloseResponse> responseObserver) {
-    executor.execute(request.getMapId(), CloseResponse::getDefaultInstance, responseObserver,
+    executor.execute(request.getHeader().getName(), CloseResponse::getDefaultInstance, responseObserver,
         map -> map.closeSession(CloseSessionRequest.newBuilder()
             .setSessionId(request.getHeader().getSessionId())
             .build())
@@ -110,21 +109,21 @@ public class MapServiceImpl extends MapServiceGrpc.MapServiceImplBase {
 
   @Override
   public void size(SizeRequest request, StreamObserver<SizeResponse> responseObserver) {
-    executor.execute(request.getMapId(), SizeResponse::getDefaultInstance, responseObserver,
+    executor.execute(request.getHeader().getName(), SizeResponse::getDefaultInstance, responseObserver,
         map -> map.size(SessionQueryContext.newBuilder()
                 .setSessionId(request.getHeader().getSessionId())
-                .setLastIndex(request.getHeader().getLastIndex())
-                .setLastSequenceNumber(request.getHeader().getLastSequenceNumber())
+                .setLastIndex(request.getHeader().getIndex())
+                .setLastSequenceNumber(request.getHeader().getSequenceNumber())
                 .build(),
             io.atomix.server.service.map.SizeRequest.newBuilder().build())
             .thenApply(response -> SizeResponse.newBuilder()
                 .setSize(response.getRight().getSize())
-                .setHeader(SessionResponseHeader.newBuilder()
+                .setHeader(ResponseHeader.newBuilder()
                     .setSessionId(request.getHeader().getSessionId())
                     .setIndex(response.getLeft().getIndex())
                     .setSequenceNumber(response.getLeft().getSequence())
                     .addAllStreams(response.getLeft().getStreamsList().stream()
-                        .map(stream -> SessionStreamHeader.newBuilder()
+                        .map(stream -> StreamHeader.newBuilder()
                             .setStreamId(stream.getStreamId())
                             .setIndex(stream.getIndex())
                             .setLastItemNumber(stream.getSequence())
@@ -136,7 +135,7 @@ public class MapServiceImpl extends MapServiceGrpc.MapServiceImplBase {
 
   @Override
   public void put(PutRequest request, StreamObserver<PutResponse> responseObserver) {
-    executor.execute(request.getMapId(), PutResponse::getDefaultInstance, responseObserver,
+    executor.execute(request.getHeader().getName(), PutResponse::getDefaultInstance, responseObserver,
         map -> map.put(SessionCommandContext.newBuilder()
                 .setSessionId(request.getHeader().getSessionId())
                 .setSequenceNumber(request.getHeader().getSequenceNumber())
@@ -148,12 +147,12 @@ public class MapServiceImpl extends MapServiceGrpc.MapServiceImplBase {
                 .setVersion(request.getVersion())
                 .build())
             .thenApply(response -> PutResponse.newBuilder()
-                .setHeader(SessionResponseHeader.newBuilder()
+                .setHeader(ResponseHeader.newBuilder()
                     .setSessionId(request.getHeader().getSessionId())
                     .setIndex(response.getLeft().getIndex())
                     .setSequenceNumber(response.getLeft().getSequence())
                     .addAllStreams(response.getLeft().getStreamsList().stream()
-                        .map(stream -> SessionStreamHeader.newBuilder()
+                        .map(stream -> StreamHeader.newBuilder()
                             .setStreamId(stream.getStreamId())
                             .setIndex(stream.getIndex())
                             .setLastItemNumber(stream.getSequence())
@@ -168,22 +167,22 @@ public class MapServiceImpl extends MapServiceGrpc.MapServiceImplBase {
 
   @Override
   public void exists(ExistsRequest request, StreamObserver<ExistsResponse> responseObserver) {
-    executor.execute(request.getMapId(), ExistsResponse::getDefaultInstance, responseObserver,
+    executor.execute(request.getHeader().getName(), ExistsResponse::getDefaultInstance, responseObserver,
         map -> map.containsKey(SessionQueryContext.newBuilder()
                 .setSessionId(request.getHeader().getSessionId())
-                .setLastIndex(request.getHeader().getLastIndex())
-                .setLastSequenceNumber(request.getHeader().getLastSequenceNumber())
+                .setLastIndex(request.getHeader().getIndex())
+                .setLastSequenceNumber(request.getHeader().getSequenceNumber())
                 .build(),
             ContainsKeyRequest.newBuilder()
                 .addKeys(request.getKey())
                 .build())
             .thenApply(response -> ExistsResponse.newBuilder()
-                .setHeader(SessionResponseHeader.newBuilder()
+                .setHeader(ResponseHeader.newBuilder()
                     .setSessionId(request.getHeader().getSessionId())
                     .setIndex(response.getLeft().getIndex())
                     .setSequenceNumber(response.getLeft().getSequence())
                     .addAllStreams(response.getLeft().getStreamsList().stream()
-                        .map(stream -> SessionStreamHeader.newBuilder()
+                        .map(stream -> StreamHeader.newBuilder()
                             .setStreamId(stream.getStreamId())
                             .setIndex(stream.getIndex())
                             .setLastItemNumber(stream.getSequence())
@@ -196,22 +195,22 @@ public class MapServiceImpl extends MapServiceGrpc.MapServiceImplBase {
 
   @Override
   public void get(GetRequest request, StreamObserver<GetResponse> responseObserver) {
-    executor.execute(request.getMapId(), GetResponse::getDefaultInstance, responseObserver,
+    executor.execute(request.getHeader().getName(), GetResponse::getDefaultInstance, responseObserver,
         map -> map.get(SessionQueryContext.newBuilder()
                 .setSessionId(request.getHeader().getSessionId())
-                .setLastIndex(request.getHeader().getLastIndex())
-                .setLastSequenceNumber(request.getHeader().getLastSequenceNumber())
+                .setLastIndex(request.getHeader().getIndex())
+                .setLastSequenceNumber(request.getHeader().getSequenceNumber())
                 .build(),
             io.atomix.server.service.map.GetRequest.newBuilder()
                 .setKey(request.getKey())
                 .build())
             .thenApply(response -> GetResponse.newBuilder()
-                .setHeader(SessionResponseHeader.newBuilder()
+                .setHeader(ResponseHeader.newBuilder()
                     .setSessionId(request.getHeader().getSessionId())
                     .setIndex(response.getLeft().getIndex())
                     .setSequenceNumber(response.getLeft().getSequence())
                     .addAllStreams(response.getLeft().getStreamsList().stream()
-                        .map(stream -> SessionStreamHeader.newBuilder()
+                        .map(stream -> StreamHeader.newBuilder()
                             .setStreamId(stream.getStreamId())
                             .setIndex(stream.getIndex())
                             .setLastItemNumber(stream.getSequence())
@@ -225,7 +224,7 @@ public class MapServiceImpl extends MapServiceGrpc.MapServiceImplBase {
 
   @Override
   public void replace(ReplaceRequest request, StreamObserver<ReplaceResponse> responseObserver) {
-    executor.execute(request.getMapId(), ReplaceResponse::getDefaultInstance, responseObserver,
+    executor.execute(request.getHeader().getName(), ReplaceResponse::getDefaultInstance, responseObserver,
         map -> map.replace(SessionCommandContext.newBuilder()
                 .setSessionId(request.getHeader().getSessionId())
                 .setSequenceNumber(request.getHeader().getSequenceNumber())
@@ -234,12 +233,12 @@ public class MapServiceImpl extends MapServiceGrpc.MapServiceImplBase {
                 .setKey(request.getKey())
                 .build())
             .thenApply(response -> ReplaceResponse.newBuilder()
-                .setHeader(SessionResponseHeader.newBuilder()
+                .setHeader(ResponseHeader.newBuilder()
                     .setSessionId(request.getHeader().getSessionId())
                     .setIndex(response.getLeft().getIndex())
                     .setSequenceNumber(response.getLeft().getSequence())
                     .addAllStreams(response.getLeft().getStreamsList().stream()
-                        .map(stream -> SessionStreamHeader.newBuilder()
+                        .map(stream -> StreamHeader.newBuilder()
                             .setStreamId(stream.getStreamId())
                             .setIndex(stream.getIndex())
                             .setLastItemNumber(stream.getSequence())
@@ -254,7 +253,7 @@ public class MapServiceImpl extends MapServiceGrpc.MapServiceImplBase {
 
   @Override
   public void remove(RemoveRequest request, StreamObserver<RemoveResponse> responseObserver) {
-    executor.execute(request.getMapId(), RemoveResponse::getDefaultInstance, responseObserver,
+    executor.execute(request.getHeader().getName(), RemoveResponse::getDefaultInstance, responseObserver,
         map -> map.remove(SessionCommandContext.newBuilder()
                 .setSessionId(request.getHeader().getSessionId())
                 .setSequenceNumber(request.getHeader().getSequenceNumber())
@@ -263,12 +262,12 @@ public class MapServiceImpl extends MapServiceGrpc.MapServiceImplBase {
                 .setKey(request.getKey())
                 .build())
             .thenApply(response -> RemoveResponse.newBuilder()
-                .setHeader(SessionResponseHeader.newBuilder()
+                .setHeader(ResponseHeader.newBuilder()
                     .setSessionId(request.getHeader().getSessionId())
                     .setIndex(response.getLeft().getIndex())
                     .setSequenceNumber(response.getLeft().getSequence())
                     .addAllStreams(response.getLeft().getStreamsList().stream()
-                        .map(stream -> SessionStreamHeader.newBuilder()
+                        .map(stream -> StreamHeader.newBuilder()
                             .setStreamId(stream.getStreamId())
                             .setIndex(stream.getIndex())
                             .setLastItemNumber(stream.getSequence())
@@ -283,19 +282,19 @@ public class MapServiceImpl extends MapServiceGrpc.MapServiceImplBase {
 
   @Override
   public void clear(ClearRequest request, StreamObserver<ClearResponse> responseObserver) {
-    executor.execute(request.getMapId(), ClearResponse::getDefaultInstance, responseObserver,
+    executor.execute(request.getHeader().getName(), ClearResponse::getDefaultInstance, responseObserver,
         map -> map.clear(SessionCommandContext.newBuilder()
                 .setSessionId(request.getHeader().getSessionId())
                 .setSequenceNumber(request.getHeader().getSequenceNumber())
                 .build(),
             io.atomix.server.service.map.ClearRequest.newBuilder().build())
             .thenApply(response -> ClearResponse.newBuilder()
-                .setHeader(SessionResponseHeader.newBuilder()
+                .setHeader(ResponseHeader.newBuilder()
                     .setSessionId(request.getHeader().getSessionId())
                     .setIndex(response.getLeft().getIndex())
                     .setSequenceNumber(response.getLeft().getSequence())
                     .addAllStreams(response.getLeft().getStreamsList().stream()
-                        .map(stream -> SessionStreamHeader.newBuilder()
+                        .map(stream -> StreamHeader.newBuilder()
                             .setStreamId(stream.getStreamId())
                             .setIndex(stream.getIndex())
                             .setLastItemNumber(stream.getSequence())
@@ -307,18 +306,18 @@ public class MapServiceImpl extends MapServiceGrpc.MapServiceImplBase {
 
   @Override
   public void events(EventRequest request, StreamObserver<EventResponse> responseObserver) {
-    executor.<Pair<SessionStreamContext, ListenResponse>, EventResponse>execute(request.getMapId(), EventResponse::getDefaultInstance, responseObserver,
+    executor.<Pair<SessionStreamContext, ListenResponse>, EventResponse>execute(request.getHeader().getName(), EventResponse::getDefaultInstance, responseObserver,
         (map, handler) -> map.listen(SessionCommandContext.newBuilder()
                 .setSessionId(request.getHeader().getSessionId())
                 .setSequenceNumber(request.getHeader().getSequenceNumber())
                 .build(),
             ListenRequest.newBuilder().build(), handler),
         response -> EventResponse.newBuilder()
-            .setHeader(SessionResponseHeader.newBuilder()
+            .setHeader(ResponseHeader.newBuilder()
                 .setSessionId(request.getHeader().getSessionId())
                 .setIndex(response.getLeft().getIndex())
                 .setSequenceNumber(response.getLeft().getSequence())
-                .addStreams(SessionStreamHeader.newBuilder()
+                .addStreams(StreamHeader.newBuilder()
                     .setStreamId(response.getLeft().getStreamId())
                     .setIndex(response.getLeft().getIndex())
                     .setLastItemNumber(response.getLeft().getSequence())

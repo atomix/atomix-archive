@@ -15,7 +15,7 @@
  */
 package io.atomix.client.set;
 
-import io.atomix.api.primitive.PrimitiveId;
+import io.atomix.api.headers.Name;
 import io.atomix.client.PrimitiveManagementService;
 import io.atomix.client.PrimitiveType;
 import io.atomix.client.set.impl.DefaultDistributedSetBuilder;
@@ -40,8 +40,8 @@ public class DistributedSetType<E> implements PrimitiveType<DistributedSetBuilde
   }
 
   @Override
-  public DistributedSetBuilder<E> newBuilder(PrimitiveId id, PrimitiveManagementService managementService) {
-    return new DefaultDistributedSetBuilder<>(id, managementService);
+  public DistributedSetBuilder<E> newBuilder(Name name, PrimitiveManagementService managementService) {
+    return new DefaultDistributedSetBuilder<>(name, managementService);
   }
 
   @Override

@@ -15,7 +15,7 @@
  */
 package io.atomix.client.map;
 
-import io.atomix.api.primitive.PrimitiveId;
+import io.atomix.api.headers.Name;
 import io.atomix.client.PrimitiveManagementService;
 
 /**
@@ -26,7 +26,7 @@ import io.atomix.client.PrimitiveManagementService;
  */
 public abstract class DistributedMapBuilder<K, V>
     extends MapBuilder<DistributedMapBuilder<K, V>, DistributedMap<K, V>, K, V> {
-  protected DistributedMapBuilder(PrimitiveId id, PrimitiveManagementService managementService) {
-    super(id, managementService);
+  protected DistributedMapBuilder(Name name, PrimitiveManagementService managementService) {
+    super(name, managementService);
   }
 }

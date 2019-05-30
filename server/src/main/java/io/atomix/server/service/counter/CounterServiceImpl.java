@@ -53,7 +53,7 @@ public class CounterServiceImpl extends CounterServiceGrpc.CounterServiceImplBas
 
   @Override
   public void create(CreateRequest request, StreamObserver<CreateResponse> responseObserver) {
-    executor.execute(request.getCounterId(), CreateResponse::getDefaultInstance, responseObserver,
+    executor.execute(request.getHeader().getName(), CreateResponse::getDefaultInstance, responseObserver,
         counter -> counter.create()
             .thenApply(v -> CreateResponse.newBuilder()
                 .setHeader(ResponseHeader.newBuilder().build())
@@ -62,14 +62,14 @@ public class CounterServiceImpl extends CounterServiceGrpc.CounterServiceImplBas
 
   @Override
   public void close(CloseRequest request, StreamObserver<CloseResponse> responseObserver) {
-    executor.execute(request.getCounterId(), CloseResponse::getDefaultInstance, responseObserver,
+    executor.execute(request.getHeader().getName(), CloseResponse::getDefaultInstance, responseObserver,
         counter -> counter.delete()
             .thenApply(v -> CloseResponse.newBuilder().build()));
   }
 
   @Override
   public void set(SetRequest request, StreamObserver<SetResponse> responseObserver) {
-    executor.execute(request.getCounterId(), SetResponse::getDefaultInstance, responseObserver,
+    executor.execute(request.getHeader().getName(), SetResponse::getDefaultInstance, responseObserver,
         counter -> counter.set(
             RequestContext.newBuilder()
                 .setIndex(request.getHeader().getIndex())
@@ -86,7 +86,7 @@ public class CounterServiceImpl extends CounterServiceGrpc.CounterServiceImplBas
 
   @Override
   public void get(GetRequest request, StreamObserver<GetResponse> responseObserver) {
-    executor.execute(request.getCounterId(), GetResponse::getDefaultInstance, responseObserver,
+    executor.execute(request.getHeader().getName(), GetResponse::getDefaultInstance, responseObserver,
         counter -> counter.get(
             RequestContext.newBuilder()
                 .setIndex(request.getHeader().getIndex())
@@ -102,7 +102,7 @@ public class CounterServiceImpl extends CounterServiceGrpc.CounterServiceImplBas
 
   @Override
   public void checkAndSet(CheckAndSetRequest request, StreamObserver<CheckAndSetResponse> responseObserver) {
-    executor.execute(request.getCounterId(), CheckAndSetResponse::getDefaultInstance, responseObserver,
+    executor.execute(request.getHeader().getName(), CheckAndSetResponse::getDefaultInstance, responseObserver,
         counter -> counter.checkAndSet(
             RequestContext.newBuilder()
                 .setIndex(request.getHeader().getIndex())
@@ -121,7 +121,7 @@ public class CounterServiceImpl extends CounterServiceGrpc.CounterServiceImplBas
 
   @Override
   public void increment(IncrementRequest request, StreamObserver<IncrementResponse> responseObserver) {
-    executor.execute(request.getCounterId(), IncrementResponse::getDefaultInstance, responseObserver,
+    executor.execute(request.getHeader().getName(), IncrementResponse::getDefaultInstance, responseObserver,
         counter -> counter.increment(
             RequestContext.newBuilder()
                 .setIndex(request.getHeader().getIndex())
@@ -140,7 +140,7 @@ public class CounterServiceImpl extends CounterServiceGrpc.CounterServiceImplBas
 
   @Override
   public void decrement(DecrementRequest request, StreamObserver<DecrementResponse> responseObserver) {
-    executor.execute(request.getCounterId(), DecrementResponse::getDefaultInstance, responseObserver,
+    executor.execute(request.getHeader().getName(), DecrementResponse::getDefaultInstance, responseObserver,
         counter -> counter.decrement(RequestContext.newBuilder()
                 .setIndex(request.getHeader().getIndex())
                 .build(),

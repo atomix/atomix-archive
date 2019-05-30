@@ -15,7 +15,7 @@
  */
 package io.atomix.client.map;
 
-import io.atomix.api.primitive.PrimitiveId;
+import io.atomix.api.headers.Name;
 import io.atomix.client.PrimitiveManagementService;
 import io.atomix.client.PrimitiveType;
 import io.atomix.client.map.impl.DefaultAtomicMapBuilder;
@@ -41,8 +41,8 @@ public class AtomicMapType<K, V> implements PrimitiveType<AtomicMapBuilder<K, V>
   }
 
   @Override
-  public AtomicMapBuilder<K, V> newBuilder(PrimitiveId id, PrimitiveManagementService managementService) {
-    return new DefaultAtomicMapBuilder<>(id, managementService);
+  public AtomicMapBuilder<K, V> newBuilder(Name name, PrimitiveManagementService managementService) {
+    return new DefaultAtomicMapBuilder<>(name, managementService);
   }
 
   @Override

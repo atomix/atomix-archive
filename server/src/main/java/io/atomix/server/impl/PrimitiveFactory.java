@@ -2,9 +2,9 @@ package io.atomix.server.impl;
 
 import java.util.function.BiFunction;
 
-import io.atomix.api.primitive.PrimitiveId;
-import io.atomix.service.PrimitiveService;
+import io.atomix.api.headers.Name;
 import io.atomix.server.protocol.ProtocolClient;
+import io.atomix.service.PrimitiveService;
 import io.atomix.service.protocol.ServiceId;
 import io.atomix.service.proxy.ServiceProxy;
 
@@ -31,7 +31,7 @@ public class PrimitiveFactory<P extends ServiceProxy> {
    * @param id the primitive ID
    * @return the primitive
    */
-  public P getPrimitive(PrimitiveId id) {
+  public P getPrimitive(Name id) {
     return primitiveFactory.apply(getServiceId(id), client);
   }
 
@@ -41,9 +41,10 @@ public class PrimitiveFactory<P extends ServiceProxy> {
    * @param id the primitive ID
    * @return the service ID
    */
-  private ServiceId getServiceId(PrimitiveId id) {
+  private ServiceId getServiceId(Name id) {
     return ServiceId.newBuilder()
         .setName(id.getName())
+        .setNamespace(id.getNamespace())
         .setType(serviceType.name())
         .build();
   }

@@ -18,7 +18,7 @@ package io.atomix.client;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import io.atomix.api.primitive.PrimitiveId;
+import io.atomix.api.headers.Name;
 import io.atomix.client.channel.ChannelProvider;
 import io.atomix.client.impl.DefaultPrimitiveManagementService;
 import io.atomix.client.impl.PrimitiveCacheImpl;
@@ -110,8 +110,8 @@ public class AtomixClient implements AtomixClientService {
     return threadContextFactory;
   }
 
-  private PrimitiveId getPrimitiveId(String name) {
-    return PrimitiveId.newBuilder()
+  private Name getPrimitiveName(String name) {
+    return Name.newBuilder()
         .setName(name)
         .setNamespace(namespace)
         .build();
@@ -122,7 +122,7 @@ public class AtomixClient implements AtomixClientService {
       String name,
       PrimitiveType<B, P> primitiveType) {
     checkRunning();
-    return primitiveType.newBuilder(getPrimitiveId(name), managementService);
+    return primitiveType.newBuilder(getPrimitiveName(name), managementService);
   }
 
   /**

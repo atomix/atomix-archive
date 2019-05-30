@@ -15,7 +15,7 @@
  */
 package io.atomix.client.lock;
 
-import io.atomix.api.primitive.PrimitiveId;
+import io.atomix.api.headers.Name;
 import io.atomix.client.PrimitiveManagementService;
 import io.atomix.client.impl.ManagedPrimitiveBuilder;
 
@@ -24,7 +24,7 @@ import io.atomix.client.impl.ManagedPrimitiveBuilder;
  */
 public abstract class AtomicLockBuilder
     extends ManagedPrimitiveBuilder<AtomicLockBuilder, AtomicLock> {
-  protected AtomicLockBuilder(PrimitiveId id, PrimitiveManagementService managementService) {
-    super(id, managementService);
+  protected AtomicLockBuilder(Name name, PrimitiveManagementService managementService) {
+    super(name, managementService);
   }
 }

@@ -4,10 +4,8 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
-import java.util.stream.Collectors;
 
-import io.atomix.api.partition.GroupMember;
-import io.atomix.api.partition.PrimaryTerm;
+import io.atomix.api.controller.PrimaryTerm;
 import io.atomix.protocols.log.Term;
 import io.atomix.protocols.log.TermProvider;
 import io.atomix.server.management.PrimaryElection;
@@ -18,10 +16,10 @@ import io.atomix.server.management.PrimaryElectionEvent;
  */
 public class PrimaryElectionTermProvider implements TermProvider {
   private final PrimaryElection election;
-  private final GroupMember member;
+  private final String member;
   private final Map<Consumer<Term>, Consumer<PrimaryElectionEvent>> eventListeners = new ConcurrentHashMap<>();
 
-  public PrimaryElectionTermProvider(PrimaryElection election, GroupMember member) {
+  public PrimaryElectionTermProvider(PrimaryElection election, String member) {
     this.election = election;
     this.member = member;
   }
@@ -29,10 +27,8 @@ public class PrimaryElectionTermProvider implements TermProvider {
   private Term toTerm(PrimaryTerm term) {
     return new Term(
         term.getTerm(),
-        term.getPrimary().getMember(),
-        term.getCandidatesList().stream()
-            .map(GroupMember::getMember)
-            .collect(Collectors.toList()));
+        term.getPrimary(),
+        term.getCandidatesList());
   }
 
   @Override

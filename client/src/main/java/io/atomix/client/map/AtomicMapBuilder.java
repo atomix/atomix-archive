@@ -15,7 +15,7 @@
  */
 package io.atomix.client.map;
 
-import io.atomix.api.primitive.PrimitiveId;
+import io.atomix.api.headers.Name;
 import io.atomix.client.PrimitiveManagementService;
 
 /**
@@ -26,7 +26,7 @@ import io.atomix.client.PrimitiveManagementService;
  */
 public abstract class AtomicMapBuilder<K, V>
     extends MapBuilder<AtomicMapBuilder<K, V>, AtomicMap<K, V>, K, V> {
-  protected AtomicMapBuilder(PrimitiveId id, PrimitiveManagementService managementService) {
-    super(id, managementService);
+  protected AtomicMapBuilder(Name name, PrimitiveManagementService managementService) {
+    super(name, managementService);
   }
 }

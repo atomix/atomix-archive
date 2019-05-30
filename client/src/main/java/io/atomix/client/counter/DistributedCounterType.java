@@ -15,7 +15,7 @@
  */
 package io.atomix.client.counter;
 
-import io.atomix.api.primitive.PrimitiveId;
+import io.atomix.api.headers.Name;
 import io.atomix.client.PrimitiveManagementService;
 import io.atomix.client.PrimitiveType;
 import io.atomix.client.counter.impl.DefaultDistributedCounterBuilder;
@@ -38,8 +38,8 @@ public class DistributedCounterType implements PrimitiveType<DistributedCounterB
   }
 
   @Override
-  public DistributedCounterBuilder newBuilder(PrimitiveId id, PrimitiveManagementService managementService) {
-    return new DefaultDistributedCounterBuilder(id, managementService);
+  public DistributedCounterBuilder newBuilder(Name name, PrimitiveManagementService managementService) {
+    return new DefaultDistributedCounterBuilder(name, managementService);
   }
 
   @Override

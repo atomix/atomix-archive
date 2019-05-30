@@ -4,100 +4,91 @@ package atomix.set;
 
 import "google/protobuf/duration.proto";
 import "atomix/headers/headers.proto";
-import "atomix/primitive/primitive.proto";
 
 option java_package = "io.atomix.api.set";
 option java_multiple_files = true;
 
 message CreateRequest {
-    atomix.primitive.PrimitiveId set_id = 1;
+    atomix.headers.RequestHeader header = 1;
     google.protobuf.Duration timeout = 2;
 }
 
 message CreateResponse {
-    atomix.headers.SessionHeader header = 1;
+    atomix.headers.ResponseHeader header = 1;
 }
 
 message KeepAliveRequest {
-    atomix.primitive.PrimitiveId set_id = 1;
-    atomix.headers.SessionHeader header = 2;
+    atomix.headers.RequestHeader header = 1;
 }
 
 message KeepAliveResponse {
-    atomix.headers.SessionHeader header = 1;
+    atomix.headers.ResponseHeader header = 1;
 }
 
 message CloseRequest {
-    atomix.primitive.PrimitiveId set_id = 1;
-    atomix.headers.SessionHeader header = 2;
-    bool delete = 3;
+    atomix.headers.RequestHeader header = 1;
+    bool delete = 2;
 }
 
 message CloseResponse {
-
+    atomix.headers.ResponseHeader header = 1;
 }
 
 message SizeRequest {
-    atomix.primitive.PrimitiveId set_id = 1;
-    atomix.headers.SessionQueryHeader header = 2;
+    atomix.headers.RequestHeader header = 1;
 }
 
 message SizeResponse {
-    atomix.headers.SessionResponseHeader header = 1;
+    atomix.headers.ResponseHeader header = 1;
     int32 size = 2;
 }
 
 message ContainsRequest {
-    atomix.primitive.PrimitiveId set_id = 1;
-    atomix.headers.SessionQueryHeader header = 2;
-    repeated string values = 3;
+    atomix.headers.RequestHeader header = 1;
+    repeated string values = 2;
 }
 
 message ContainsResponse {
-    atomix.headers.SessionResponseHeader header = 1;
+    atomix.headers.ResponseHeader header = 1;
     bool contains = 2;
 }
 
 message AddRequest {
-    atomix.primitive.PrimitiveId set_id = 1;
-    atomix.headers.SessionCommandHeader header = 2;
-    repeated string values = 3;
+    atomix.headers.RequestHeader header = 1;
+    repeated string values = 2;
 }
 
 message AddResponse {
-    atomix.headers.SessionResponseHeader header = 1;
+    atomix.headers.ResponseHeader header = 1;
     ResponseStatus status = 2;
     bool added = 3;
 }
 
 message RemoveRequest {
-    atomix.primitive.PrimitiveId set_id = 1;
-    atomix.headers.SessionCommandHeader header = 2;
-    repeated string values = 3;
+    atomix.headers.RequestHeader header = 1;
+    repeated string values = 2;
 }
 
 message RemoveResponse {
-    atomix.headers.SessionResponseHeader header = 1;
+    atomix.headers.ResponseHeader header = 1;
     ResponseStatus status = 2;
     bool removed = 3;
 }
 
 message ClearRequest {
-    atomix.primitive.PrimitiveId set_id = 1;
-    atomix.headers.SessionCommandHeader header = 2;
+    atomix.headers.RequestHeader header = 1;
 }
 
 message ClearResponse {
-    atomix.headers.SessionResponseHeader header = 1;
+    atomix.headers.ResponseHeader header = 1;
 }
 
 message EventRequest {
-    atomix.primitive.PrimitiveId set_id = 1;
-    atomix.headers.SessionCommandHeader header = 2;
+    atomix.headers.RequestHeader header = 1;
 }
 
 message EventResponse {
-    atomix.headers.SessionResponseHeader header = 1;
+    atomix.headers.ResponseHeader header = 1;
     Type type = 2;
     string value = 3;
 
@@ -108,12 +99,11 @@ message EventResponse {
 }
 
 message IterateRequest {
-    atomix.primitive.PrimitiveId set_id = 1;
-    atomix.headers.SessionQueryHeader header = 2;
+    atomix.headers.RequestHeader header = 1;
 }
 
 message IterateResponse {
-    atomix.headers.SessionResponseHeader header = 1;
+    atomix.headers.ResponseHeader header = 1;
     string value = 2;
 }
 

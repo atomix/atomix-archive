@@ -7,7 +7,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArraySet;
 
 import com.google.protobuf.ByteString;
-import io.atomix.api.primitive.PrimitiveId;
+import io.atomix.api.headers.Name;
 import io.atomix.api.value.CheckAndSetRequest;
 import io.atomix.api.value.CheckAndSetResponse;
 import io.atomix.api.value.CloseRequest;
@@ -42,15 +42,14 @@ public class DefaultAsyncAtomicValue
   private volatile CompletableFuture<Long> listenFuture;
   private final Set<AtomicValueEventListener<String>> eventListeners = new CopyOnWriteArraySet<>();
 
-  public DefaultAsyncAtomicValue(PrimitiveId id, Partition partition, ThreadContext context, Duration timeout) {
-    super(id, ValueServiceGrpc.newStub(partition.getChannelFactory().getChannel()), context, timeout);
+  public DefaultAsyncAtomicValue(Name name, Partition partition, ThreadContext context, Duration timeout) {
+    super(name, ValueServiceGrpc.newStub(partition.getChannelFactory().getChannel()), context, timeout);
   }
 
   @Override
   public CompletableFuture<Versioned<String>> get() {
     return query(
-        (value, header, observer) -> value.get(GetRequest.newBuilder()
-            .setValueId(getPrimitiveId())
+        (header, observer) -> getService().get(GetRequest.newBuilder()
             .build(), observer),
         GetResponse::getHeader)
         .thenApply(response -> response.getVersion() > 0
@@ -61,8 +60,7 @@ public class DefaultAsyncAtomicValue
   @Override
   public CompletableFuture<Versioned<String>> getAndSet(String value) {
     return command(
-        (service, header, observer) -> service.set(SetRequest.newBuilder()
-            .setValueId(getPrimitiveId())
+        (header, observer) -> getService().set(SetRequest.newBuilder()
             .setHeader(header)
             .setValue(ByteString.copyFromUtf8(value))
             .build(), observer), SetResponse::getHeader)
@@ -74,8 +72,7 @@ public class DefaultAsyncAtomicValue
   @Override
   public CompletableFuture<Versioned<String>> set(String value) {
     return command(
-        (service, header, observer) -> service.set(SetRequest.newBuilder()
-            .setValueId(getPrimitiveId())
+        (header, observer) -> getService().set(SetRequest.newBuilder()
             .setHeader(header)
             .setValue(ByteString.copyFromUtf8(value))
             .build(), observer), SetResponse::getHeader)
@@ -87,8 +84,7 @@ public class DefaultAsyncAtomicValue
   @Override
   public CompletableFuture<Optional<Versioned<String>>> compareAndSet(String expect, String update) {
     return command(
-        (service, header, observer) -> service.checkAndSet(CheckAndSetRequest.newBuilder()
-            .setValueId(getPrimitiveId())
+        (header, observer) -> getService().checkAndSet(CheckAndSetRequest.newBuilder()
             .setHeader(header)
             .setCheck(ByteString.copyFromUtf8(expect))
             .setUpdate(ByteString.copyFromUtf8(update))
@@ -100,8 +96,7 @@ public class DefaultAsyncAtomicValue
   @Override
   public CompletableFuture<Optional<Versioned<String>>> compareAndSet(long version, String value) {
     return command(
-        (service, header, observer) -> service.checkAndSet(CheckAndSetRequest.newBuilder()
-            .setValueId(getPrimitiveId())
+        (header, observer) -> getService().checkAndSet(CheckAndSetRequest.newBuilder()
             .setHeader(header)
             .setVersion(version)
             .setUpdate(ByteString.copyFromUtf8(value))
@@ -113,8 +108,7 @@ public class DefaultAsyncAtomicValue
   private synchronized CompletableFuture<Void> listen() {
     if (listenFuture == null && !eventListeners.isEmpty()) {
       listenFuture = command(
-          (service, header, observer) -> service.event(EventRequest.newBuilder()
-              .setValueId(getPrimitiveId())
+          (header, observer) -> getService().event(EventRequest.newBuilder()
               .setHeader(header)
               .build(), observer),
           EventResponse::getHeader,
@@ -168,8 +162,7 @@ public class DefaultAsyncAtomicValue
 
   @Override
   protected CompletableFuture<Long> openSession(Duration timeout) {
-    return this.<CreateResponse>session((service, header, observer) -> service.create(CreateRequest.newBuilder()
-        .setValueId(getPrimitiveId())
+    return this.<CreateResponse>session((header, observer) -> getService().create(CreateRequest.newBuilder()
         .setTimeout(com.google.protobuf.Duration.newBuilder()
             .setSeconds(timeout.getSeconds())
             .setNanos(timeout.getNano())
@@ -180,16 +173,14 @@ public class DefaultAsyncAtomicValue
 
   @Override
   protected CompletableFuture<Boolean> keepAlive() {
-    return this.<KeepAliveResponse>session((service, header, observer) -> service.keepAlive(KeepAliveRequest.newBuilder()
-        .setValueId(getPrimitiveId())
+    return this.<KeepAliveResponse>session((header, observer) -> getService().keepAlive(KeepAliveRequest.newBuilder()
         .build(), observer))
         .thenApply(response -> true);
   }
 
   @Override
   protected CompletableFuture<Void> close(boolean delete) {
-    return this.<CloseResponse>session((service, header, observer) -> service.close(CloseRequest.newBuilder()
-        .setValueId(getPrimitiveId())
+    return this.<CloseResponse>session((header, observer) -> getService().close(CloseRequest.newBuilder()
         .setDelete(delete)
         .build(), observer))
         .thenApply(v -> null);

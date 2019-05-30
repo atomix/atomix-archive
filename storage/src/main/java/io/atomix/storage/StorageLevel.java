@@ -21,12 +21,6 @@ package io.atomix.storage;
 public enum StorageLevel {
 
   /**
-   * Stores data in memory only.
-   */
-  @Deprecated
-  MEMORY,
-
-  /**
    * Stores data in a memory-mapped file.
    */
   MAPPED,

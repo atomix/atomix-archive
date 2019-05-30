@@ -3,10 +3,10 @@ package io.atomix.client.test;
 import java.util.Collection;
 import java.util.concurrent.CompletableFuture;
 
-import io.atomix.api.partition.GetPartitionGroupsRequest;
-import io.atomix.api.partition.GetPartitionGroupsResponse;
+import io.atomix.api.controller.ControllerServiceGrpc;
+import io.atomix.api.controller.GetPartitionGroupsRequest;
+import io.atomix.api.controller.GetPartitionGroupsResponse;
 import io.atomix.api.partition.PartitionGroup;
-import io.atomix.api.partition.PartitionServiceGrpc;
 import io.atomix.server.NodeConfig;
 import io.atomix.server.ServerConfig;
 import io.atomix.server.management.impl.ServiceRegistryImpl;
@@ -16,7 +16,7 @@ import io.grpc.stub.StreamObserver;
 /**
  * Test controller.
  */
-public class TestController extends PartitionServiceGrpc.PartitionServiceImplBase implements Managed {
+public class TestController extends ControllerServiceGrpc.ControllerServiceImplBase implements Managed {
   private final ServiceRegistryImpl serviceRegistry = new ServiceRegistryImpl();
   private final int port;
   private final Collection<PartitionGroup> groups;

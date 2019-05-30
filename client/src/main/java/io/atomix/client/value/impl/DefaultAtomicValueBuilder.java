@@ -18,7 +18,7 @@ package io.atomix.client.value.impl;
 import java.util.concurrent.CompletableFuture;
 
 import com.google.common.io.BaseEncoding;
-import io.atomix.api.primitive.PrimitiveId;
+import io.atomix.api.headers.Name;
 import io.atomix.client.PrimitiveManagementService;
 import io.atomix.client.utils.serializer.Serializer;
 import io.atomix.client.value.AsyncAtomicValue;
@@ -31,8 +31,8 @@ import io.atomix.client.value.AtomicValueBuilder;
  * @param <V> value type
  */
 public class DefaultAtomicValueBuilder<V> extends AtomicValueBuilder<V> {
-  public DefaultAtomicValueBuilder(PrimitiveId id, PrimitiveManagementService managementService) {
-    super(id, managementService);
+  public DefaultAtomicValueBuilder(Name name, PrimitiveManagementService managementService) {
+    super(name, managementService);
   }
 
   @Override
@@ -40,8 +40,8 @@ public class DefaultAtomicValueBuilder<V> extends AtomicValueBuilder<V> {
   public CompletableFuture<AtomicValue<V>> buildAsync() {
     return managementService.getPartitionService().getPartitionGroup(group)
         .thenCompose(group -> new DefaultAsyncAtomicValue(
-            getPrimitiveId(),
-            group.getPartition(partitioner.partition(getPrimitiveId().getName(), group.getPartitionIds())),
+            getName(),
+            group.getPartition(partitioner.partition(getName().getName(), group.getPartitionIds())),
             managementService.getThreadFactory().createContext(),
             sessionTimeout)
             .connect()

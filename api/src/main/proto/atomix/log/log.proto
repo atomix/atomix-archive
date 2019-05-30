@@ -1,7 +1,5 @@
 syntax = "proto3";
 
-import "atomix/primitive/primitive.proto";
-
 package atomix.log;
 
 option java_package = "io.atomix.api.log";

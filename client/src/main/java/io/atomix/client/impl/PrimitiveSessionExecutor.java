@@ -29,9 +29,8 @@ import java.util.function.BiConsumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
 
-import io.atomix.api.headers.SessionCommandHeader;
-import io.atomix.api.headers.SessionQueryHeader;
-import io.atomix.api.headers.SessionResponseHeader;
+import io.atomix.api.headers.RequestHeader;
+import io.atomix.api.headers.ResponseHeader;
 import io.atomix.client.PrimitiveException;
 import io.atomix.client.PrimitiveState;
 import io.atomix.client.utils.concurrent.ThreadContext;
@@ -75,34 +74,34 @@ final class PrimitiveSessionExecutor<S> {
     this.threadContext = checkNotNull(threadContext, "threadContext cannot be null");
   }
 
-  protected <T> CompletableFuture<T> execute(
-      SessionCommandFunction<S, T> function,
-      Function<T, SessionResponseHeader> responseHeaderFunction) {
+  protected <T> CompletableFuture<T> executeCommand(
+      BiConsumer<RequestHeader, StreamObserver<T>> function,
+      Function<T, ResponseHeader> responseHeaderFunction) {
     CompletableFuture<T> future = new CompletableFuture<>();
     threadContext.execute(() -> invokeCommand(function, responseHeaderFunction, future));
     return future;
   }
 
-  protected <T> CompletableFuture<Long> execute(
-      SessionCommandFunction<S, T> function,
-      Function<T, SessionResponseHeader> responseHeaderFunction,
+  protected <T> CompletableFuture<Long> executeCommand(
+      BiConsumer<RequestHeader, StreamObserver<T>> function,
+      Function<T, ResponseHeader> responseHeaderFunction,
       StreamObserver<T> observer) {
     CompletableFuture<Long> future = new CompletableFuture<>();
     threadContext.execute(() -> invokeCommand(function, responseHeaderFunction, observer, future));
     return future;
   }
 
-  protected <T> CompletableFuture<T> execute(
-      SessionQueryFunction<S, T> function,
-      Function<T, SessionResponseHeader> responseHeaderFunction) {
+  protected <T> CompletableFuture<T> executeQuery(
+      BiConsumer<RequestHeader, StreamObserver<T>> function,
+      Function<T, ResponseHeader> responseHeaderFunction) {
     CompletableFuture<T> future = new CompletableFuture<>();
     threadContext.execute(() -> invokeQuery(function, responseHeaderFunction, future));
     return future;
   }
 
-  protected <T> CompletableFuture<Void> execute(
-      SessionQueryFunction<S, T> function,
-      Function<T, SessionResponseHeader> responseHeaderFunction,
+  protected <T> CompletableFuture<Void> executeQuery(
+      BiConsumer<RequestHeader, StreamObserver<T>> function,
+      Function<T, ResponseHeader> responseHeaderFunction,
       StreamObserver<T> observer) {
     CompletableFuture<Void> future = new CompletableFuture<>();
     threadContext.execute(() -> invokeQuery(function, responseHeaderFunction, observer, future));
@@ -113,10 +112,11 @@ final class PrimitiveSessionExecutor<S> {
    * Submits a command request to the cluster.
    */
   private <T> void invokeCommand(
-      RequestFunction<S, SessionCommandHeader, T> requestFunction,
-      Function<T, SessionResponseHeader> responseHeaderFunction,
+      BiConsumer<RequestHeader, StreamObserver<T>> requestFunction,
+      Function<T, ResponseHeader> responseHeaderFunction,
       CompletableFuture<T> future) {
-    SessionCommandHeader header = SessionCommandHeader.newBuilder()
+    RequestHeader header = RequestHeader.newBuilder()
+        .setName(state.getName())
         .setSessionId(state.getSessionId())
         .setSequenceNumber(state.nextCommandRequest())
         .build();
@@ -127,11 +127,12 @@ final class PrimitiveSessionExecutor<S> {
    * Submits a command request to the cluster.
    */
   private <T> void invokeCommand(
-      RequestFunction<S, SessionCommandHeader, T> requestFunction,
-      Function<T, SessionResponseHeader> responseHeaderFunction,
+      BiConsumer<RequestHeader, StreamObserver<T>> requestFunction,
+      Function<T, ResponseHeader> responseHeaderFunction,
       StreamObserver<T> observer,
       CompletableFuture<Long> future) {
-    SessionCommandHeader header = SessionCommandHeader.newBuilder()
+    RequestHeader header = RequestHeader.newBuilder()
+        .setName(state.getName())
         .setSessionId(state.getSessionId())
         .setSequenceNumber(state.nextCommandRequest())
         .build();
@@ -142,12 +143,13 @@ final class PrimitiveSessionExecutor<S> {
    * Submits a query request to the cluster.
    */
   private <T> void invokeQuery(
-      RequestFunction<S, SessionQueryHeader, T> requestFunction,
-      Function<T, SessionResponseHeader> responseHeaderFunction,
+      BiConsumer<RequestHeader, StreamObserver<T>> requestFunction,
+      Function<T, ResponseHeader> responseHeaderFunction,
       CompletableFuture<T> future) {
-    SessionQueryHeader header = SessionQueryHeader.newBuilder()
+    RequestHeader header = RequestHeader.newBuilder()
+        .setName(state.getName())
         .setSessionId(state.getSessionId())
-        .setLastSequenceNumber(state.getCommandRequest())
+        .setSequenceNumber(state.getCommandRequest())
         .build();
     invoke(new QueryAttempt<>(sequencer.nextRequest(), requestFunction, header, responseHeaderFunction, future));
   }
@@ -156,13 +158,14 @@ final class PrimitiveSessionExecutor<S> {
    * Submits a query request to the cluster.
    */
   private <T> void invokeQuery(
-      RequestFunction<S, SessionQueryHeader, T> requestFunction,
-      Function<T, SessionResponseHeader> responseHeaderFunction,
+      BiConsumer<RequestHeader, StreamObserver<T>> requestFunction,
+      Function<T, ResponseHeader> responseHeaderFunction,
       StreamObserver<T> observer,
       CompletableFuture<Void> future) {
-    SessionQueryHeader header = SessionQueryHeader.newBuilder()
+    RequestHeader header = RequestHeader.newBuilder()
+        .setName(state.getName())
         .setSessionId(state.getSessionId())
-        .setLastSequenceNumber(state.getCommandRequest())
+        .setSequenceNumber(state.getCommandRequest())
         .build();
     invoke(new QueryStreamAttempt<>(sequencer.nextRequest(), requestFunction, header, responseHeaderFunction, observer, future));
   }
@@ -172,7 +175,7 @@ final class PrimitiveSessionExecutor<S> {
    *
    * @param attempt The attempt to submit.
    */
-  private void invoke(OperationAttempt<?, ?, ?> attempt) {
+  private void invoke(OperationAttempt<?, ?> attempt) {
     if (state.getState() == PrimitiveState.CLOSED) {
       attempt.fail(new PrimitiveException.ConcurrentModification("session closed"));
     } else {
@@ -229,15 +232,21 @@ final class PrimitiveSessionExecutor<S> {
   /**
    * Operation attempt.
    */
-  private abstract class OperationAttempt<T, U, V> {
+  private abstract class OperationAttempt<T, U> {
     protected final long id;
-    protected final RequestFunction<S, T, U> requestFunction;
-    protected final T requestHeader;
-    protected final Function<U, SessionResponseHeader> responseHeaderFunction;
+    protected final BiConsumer<RequestHeader, StreamObserver<T>> requestFunction;
+    protected final RequestHeader requestHeader;
+    protected final Function<T, ResponseHeader> responseHeaderFunction;
     protected final int attempt;
-    protected final CompletableFuture<V> future;
+    protected final CompletableFuture<U> future;
 
-    protected OperationAttempt(long id, RequestFunction<S, T, U> requestFunction, T requestHeader, Function<U, SessionResponseHeader> responseHeaderFunction, int attempt, CompletableFuture<V> future) {
+    protected OperationAttempt(
+        long id,
+        BiConsumer<RequestHeader, StreamObserver<T>> requestFunction,
+        RequestHeader requestHeader,
+        Function<T, ResponseHeader> responseHeaderFunction,
+        int attempt,
+        CompletableFuture<U> future) {
       this.id = id;
       this.requestFunction = requestFunction;
       this.requestHeader = requestHeader;
@@ -252,7 +261,7 @@ final class PrimitiveSessionExecutor<S> {
      * @param response the response for which to return the header
      * @return the header for the given response
      */
-    protected SessionResponseHeader getHeader(U response) {
+    protected ResponseHeader getHeader(T response) {
       return responseHeaderFunction.apply(response);
     }
 
@@ -261,8 +270,8 @@ final class PrimitiveSessionExecutor<S> {
      *
      * @param observer the response observer
      */
-    protected void execute(StreamObserver<U> observer) {
-      requestFunction.apply(service, requestHeader, observer);
+    protected void execute(StreamObserver<T> observer) {
+      requestFunction.accept(requestHeader, observer);
     }
 
     /**
@@ -270,11 +279,11 @@ final class PrimitiveSessionExecutor<S> {
      *
      * @return the result future
      */
-    protected CompletableFuture<U> execute() {
-      CompletableFuture<U> future = new CompletableFuture<>();
-      execute(new StreamObserver<U>() {
+    protected CompletableFuture<T> execute() {
+      CompletableFuture<T> future = new CompletableFuture<>();
+      execute(new StreamObserver<T>() {
         @Override
-        public void onNext(U response) {
+        public void onNext(T response) {
           future.complete(response);
         }
 
@@ -300,7 +309,7 @@ final class PrimitiveSessionExecutor<S> {
      *
      * @return The next instance of the attempt.
      */
-    protected abstract OperationAttempt<T, U, V> next();
+    protected abstract OperationAttempt<T, U> next();
 
     /**
      * Returns a new instance of the default exception for the operation.
@@ -324,7 +333,7 @@ final class PrimitiveSessionExecutor<S> {
      * @param response The operation response.
      * @param callback The callback to run in sequence.
      */
-    protected final void sequence(SessionResponseHeader response, Runnable callback) {
+    protected final void sequence(ResponseHeader response, Runnable callback) {
       sequencer.sequenceResponse(id, response, callback);
     }
 
@@ -374,22 +383,21 @@ final class PrimitiveSessionExecutor<S> {
   /**
    * Command operation attempt.
    */
-  private final class CommandAttempt<T> extends OperationAttempt<SessionCommandHeader, T, T> implements BiConsumer<T, Throwable> {
-
+  private final class CommandAttempt<T> extends OperationAttempt<T, T> implements BiConsumer<T, Throwable> {
     CommandAttempt(
         long id,
-        RequestFunction<S, SessionCommandHeader, T> requestFunction,
-        SessionCommandHeader requestHeader,
-        Function<T, SessionResponseHeader> responseHeaderFunction,
+        BiConsumer<RequestHeader, StreamObserver<T>> requestFunction,
+        RequestHeader requestHeader,
+        Function<T, ResponseHeader> responseHeaderFunction,
         CompletableFuture<T> future) {
       super(id, requestFunction, requestHeader, responseHeaderFunction, 1, future);
     }
 
     CommandAttempt(
         long id,
-        RequestFunction<S, SessionCommandHeader, T> requestFunction,
-        SessionCommandHeader requestHeader,
-        Function<T, SessionResponseHeader> responseHeaderFunction,
+        BiConsumer<RequestHeader, StreamObserver<T>> requestFunction,
+        RequestHeader requestHeader,
+        Function<T, ResponseHeader> responseHeaderFunction,
         int attempt,
         CompletableFuture<T> future) {
       super(id, requestFunction, requestHeader, responseHeaderFunction, attempt, future);
@@ -434,7 +442,7 @@ final class PrimitiveSessionExecutor<S> {
      */
     @SuppressWarnings("unchecked")
     protected void complete(T response) {
-      SessionResponseHeader header = getHeader(response);
+      ResponseHeader header = getHeader(response);
       sequence(header, () -> {
         state.setCommandResponse(id);
         state.setResponseIndex(header.getIndex());
@@ -446,21 +454,21 @@ final class PrimitiveSessionExecutor<S> {
   /**
    * Query operation attempt.
    */
-  private final class QueryAttempt<T> extends OperationAttempt<SessionQueryHeader, T, T> implements BiConsumer<T, Throwable> {
+  private final class QueryAttempt<T> extends OperationAttempt<T, T> implements BiConsumer<T, Throwable> {
     QueryAttempt(
         long id,
-        RequestFunction<S, SessionQueryHeader, T> requestFunction,
-        SessionQueryHeader requestHeader,
-        Function<T, SessionResponseHeader> responseHeaderFunction,
+        BiConsumer<RequestHeader, StreamObserver<T>> requestFunction,
+        RequestHeader requestHeader,
+        Function<T, ResponseHeader> responseHeaderFunction,
         CompletableFuture<T> future) {
       super(id, requestFunction, requestHeader, responseHeaderFunction, 1, future);
     }
 
     QueryAttempt(
         long id,
-        RequestFunction<S, SessionQueryHeader, T> requestFunction,
-        SessionQueryHeader requestHeader,
-        Function<T, SessionResponseHeader> responseHeaderFunction,
+        BiConsumer<RequestHeader, StreamObserver<T>> requestFunction,
+        RequestHeader requestHeader,
+        Function<T, ResponseHeader> responseHeaderFunction,
         int attempt,
         CompletableFuture<T> future) {
       super(id, requestFunction, requestHeader, responseHeaderFunction, attempt, future);
@@ -505,7 +513,7 @@ final class PrimitiveSessionExecutor<S> {
      */
     @SuppressWarnings("unchecked")
     protected void complete(T response) {
-      SessionResponseHeader header = getHeader(response);
+      ResponseHeader header = getHeader(response);
       sequence(header, () -> {
         state.setResponseIndex(header.getIndex());
         future.complete(response);
@@ -517,16 +525,16 @@ final class PrimitiveSessionExecutor<S> {
    * Command operation attempt.
    */
   private final class CommandStreamAttempt<T>
-      extends OperationAttempt<SessionCommandHeader, T, Long>
+      extends OperationAttempt<T, Long>
       implements StreamObserver<T> {
     private final StreamObserver<T> responseObserver;
     private final AtomicBoolean complete = new AtomicBoolean();
 
     CommandStreamAttempt(
         long id,
-        RequestFunction<S, SessionCommandHeader, T> requestFunction,
-        SessionCommandHeader requestHeader,
-        Function<T, SessionResponseHeader> responseHeaderFunction,
+        BiConsumer<RequestHeader, StreamObserver<T>> requestFunction,
+        RequestHeader requestHeader,
+        Function<T, ResponseHeader> responseHeaderFunction,
         StreamObserver<T> responseObserver,
         CompletableFuture<Long> future) {
       super(id, requestFunction, requestHeader, responseHeaderFunction, 1, future);
@@ -535,9 +543,9 @@ final class PrimitiveSessionExecutor<S> {
 
     CommandStreamAttempt(
         long id,
-        RequestFunction<S, SessionCommandHeader, T> requestFunction,
-        SessionCommandHeader requestHeader,
-        Function<T, SessionResponseHeader> responseHeaderFunction,
+        BiConsumer<RequestHeader, StreamObserver<T>> requestFunction,
+        RequestHeader requestHeader,
+        Function<T, ResponseHeader> responseHeaderFunction,
         StreamObserver<T> responseObserver,
         int attempt,
         CompletableFuture<Long> future) {
@@ -562,7 +570,7 @@ final class PrimitiveSessionExecutor<S> {
 
     @Override
     public void onNext(T response) {
-      SessionResponseHeader header = getHeader(response);
+      ResponseHeader header = getHeader(response);
       if (complete.compareAndSet(false, true)) {
         sequence(header, () -> future.complete(header.getIndex()));
       }
@@ -600,16 +608,16 @@ final class PrimitiveSessionExecutor<S> {
    * Query operation attempt.
    */
   private final class QueryStreamAttempt<T>
-      extends OperationAttempt<SessionQueryHeader, T, Void>
+      extends OperationAttempt<T, Void>
       implements StreamObserver<T> {
     private final StreamObserver<T> responseObserver;
     private final AtomicBoolean complete = new AtomicBoolean();
 
     QueryStreamAttempt(
         long id,
-        RequestFunction<S, SessionQueryHeader, T> requestFunction,
-        SessionQueryHeader requestHeader,
-        Function<T, SessionResponseHeader> responseHeaderFunction,
+        BiConsumer<RequestHeader, StreamObserver<T>> requestFunction,
+        RequestHeader requestHeader,
+        Function<T, ResponseHeader> responseHeaderFunction,
         StreamObserver<T> responseObserver,
         CompletableFuture<Void> future) {
       super(id, requestFunction, requestHeader, responseHeaderFunction, 1, future);
@@ -618,9 +626,9 @@ final class PrimitiveSessionExecutor<S> {
 
     QueryStreamAttempt(
         long id,
-        RequestFunction<S, SessionQueryHeader, T> requestFunction,
-        SessionQueryHeader requestHeader,
-        Function<T, SessionResponseHeader> responseHeaderFunction,
+        BiConsumer<RequestHeader, StreamObserver<T>> requestFunction,
+        RequestHeader requestHeader,
+        Function<T, ResponseHeader> responseHeaderFunction,
         StreamObserver<T> responseObserver,
         int attempt,
         CompletableFuture<Void> future) {
@@ -645,7 +653,7 @@ final class PrimitiveSessionExecutor<S> {
 
     @Override
     public void onNext(T response) {
-      SessionResponseHeader header = getHeader(response);
+      ResponseHeader header = getHeader(response);
       if (complete.compareAndSet(false, true)) {
         sequence(null, () -> {
           state.setResponseIndex(header.getIndex());

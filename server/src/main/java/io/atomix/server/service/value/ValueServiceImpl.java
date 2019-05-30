@@ -18,9 +18,8 @@ package io.atomix.server.service.value;
 import java.time.Duration;
 import java.util.stream.Collectors;
 
-import io.atomix.api.headers.SessionHeader;
-import io.atomix.api.headers.SessionResponseHeader;
-import io.atomix.api.headers.SessionStreamHeader;
+import io.atomix.api.headers.ResponseHeader;
+import io.atomix.api.headers.StreamHeader;
 import io.atomix.api.value.CheckAndSetRequest;
 import io.atomix.api.value.CheckAndSetResponse;
 import io.atomix.api.value.CloseRequest;
@@ -62,14 +61,14 @@ public class ValueServiceImpl extends ValueServiceGrpc.ValueServiceImplBase {
 
   @Override
   public void create(CreateRequest request, StreamObserver<CreateResponse> responseObserver) {
-    executor.execute(request.getValueId(), CreateResponse::getDefaultInstance, responseObserver,
+    executor.execute(request.getHeader().getName(), CreateResponse::getDefaultInstance, responseObserver,
         value -> value.openSession(OpenSessionRequest.newBuilder()
             .setTimeout(Duration.ofSeconds(request.getTimeout().getSeconds())
                 .plusNanos(request.getTimeout().getNanos())
                 .toMillis())
             .build())
             .thenApply(response -> CreateResponse.newBuilder()
-                .setHeader(SessionHeader.newBuilder()
+                .setHeader(ResponseHeader.newBuilder()
                     .setSessionId(response.getSessionId())
                     .build())
                 .build()));
@@ -77,13 +76,13 @@ public class ValueServiceImpl extends ValueServiceGrpc.ValueServiceImplBase {
 
   @Override
   public void keepAlive(KeepAliveRequest request, StreamObserver<KeepAliveResponse> responseObserver) {
-    executor.execute(request.getValueId(), KeepAliveResponse::getDefaultInstance, responseObserver,
+    executor.execute(request.getHeader().getName(), KeepAliveResponse::getDefaultInstance, responseObserver,
         value -> value.keepAlive(io.atomix.service.protocol.KeepAliveRequest.newBuilder()
             .setSessionId(request.getHeader().getSessionId())
-            .setCommandSequence(request.getHeader().getLastSequenceNumber())
+            .setCommandSequence(request.getHeader().getSequenceNumber())
             .build())
             .thenApply(response -> KeepAliveResponse.newBuilder()
-                .setHeader(SessionHeader.newBuilder()
+                .setHeader(ResponseHeader.newBuilder()
                     .setSessionId(request.getHeader().getSessionId())
                     .build())
                 .build()));
@@ -91,7 +90,7 @@ public class ValueServiceImpl extends ValueServiceGrpc.ValueServiceImplBase {
 
   @Override
   public void close(CloseRequest request, StreamObserver<CloseResponse> responseObserver) {
-    executor.execute(request.getValueId(), CloseResponse::getDefaultInstance, responseObserver,
+    executor.execute(request.getHeader().getName(), CloseResponse::getDefaultInstance, responseObserver,
         value -> value.closeSession(io.atomix.service.protocol.CloseSessionRequest.newBuilder()
             .setSessionId(request.getHeader().getSessionId())
             .build()).thenApply(response -> CloseResponse.newBuilder().build()));
@@ -99,7 +98,7 @@ public class ValueServiceImpl extends ValueServiceGrpc.ValueServiceImplBase {
 
   @Override
   public void set(SetRequest request, StreamObserver<SetResponse> responseObserver) {
-    executor.execute(request.getValueId(), SetResponse::getDefaultInstance, responseObserver,
+    executor.execute(request.getHeader().getName(), SetResponse::getDefaultInstance, responseObserver,
         value -> value.set(
             SessionCommandContext.newBuilder()
                 .setSessionId(request.getHeader().getSessionId())
@@ -109,12 +108,12 @@ public class ValueServiceImpl extends ValueServiceGrpc.ValueServiceImplBase {
                 .setValue(request.getValue())
                 .build())
             .thenApply(response -> SetResponse.newBuilder()
-                .setHeader(SessionResponseHeader.newBuilder()
+                .setHeader(ResponseHeader.newBuilder()
                     .setSessionId(request.getHeader().getSessionId())
                     .setIndex(response.getLeft().getIndex())
                     .setSequenceNumber(response.getLeft().getSequence())
                     .addAllStreams(response.getLeft().getStreamsList().stream()
-                        .map(stream -> SessionStreamHeader.newBuilder()
+                        .map(stream -> StreamHeader.newBuilder()
                             .setStreamId(stream.getStreamId())
                             .setIndex(stream.getIndex())
                             .setLastItemNumber(stream.getSequence())
@@ -129,21 +128,21 @@ public class ValueServiceImpl extends ValueServiceGrpc.ValueServiceImplBase {
 
   @Override
   public void get(GetRequest request, StreamObserver<GetResponse> responseObserver) {
-    executor.execute(request.getValueId(), GetResponse::getDefaultInstance, responseObserver,
+    executor.execute(request.getHeader().getName(), GetResponse::getDefaultInstance, responseObserver,
         value -> value.get(
             SessionQueryContext.newBuilder()
                 .setSessionId(request.getHeader().getSessionId())
-                .setLastIndex(request.getHeader().getLastIndex())
-                .setLastSequenceNumber(request.getHeader().getLastSequenceNumber())
+                .setLastIndex(request.getHeader().getIndex())
+                .setLastSequenceNumber(request.getHeader().getSequenceNumber())
                 .build(),
             io.atomix.server.service.value.GetRequest.newBuilder().build())
             .thenApply(response -> GetResponse.newBuilder()
-                .setHeader(SessionResponseHeader.newBuilder()
+                .setHeader(ResponseHeader.newBuilder()
                     .setSessionId(request.getHeader().getSessionId())
                     .setIndex(response.getLeft().getIndex())
                     .setSequenceNumber(response.getLeft().getSequence())
                     .addAllStreams(response.getLeft().getStreamsList().stream()
-                        .map(stream -> SessionStreamHeader.newBuilder()
+                        .map(stream -> StreamHeader.newBuilder()
                             .setStreamId(stream.getStreamId())
                             .setIndex(stream.getIndex())
                             .setLastItemNumber(stream.getSequence())
@@ -157,7 +156,7 @@ public class ValueServiceImpl extends ValueServiceGrpc.ValueServiceImplBase {
 
   @Override
   public void checkAndSet(CheckAndSetRequest request, StreamObserver<CheckAndSetResponse> responseObserver) {
-    executor.execute(request.getValueId(), CheckAndSetResponse::getDefaultInstance, responseObserver,
+    executor.execute(request.getHeader().getName(), CheckAndSetResponse::getDefaultInstance, responseObserver,
         value -> value.checkAndSet(
             SessionCommandContext.newBuilder()
                 .setSessionId(request.getHeader().getSessionId())
@@ -169,12 +168,12 @@ public class ValueServiceImpl extends ValueServiceGrpc.ValueServiceImplBase {
                 .setVersion(request.getVersion())
                 .build())
             .thenApply(response -> CheckAndSetResponse.newBuilder()
-                .setHeader(SessionResponseHeader.newBuilder()
+                .setHeader(ResponseHeader.newBuilder()
                     .setSessionId(request.getHeader().getSessionId())
                     .setIndex(response.getLeft().getIndex())
                     .setSequenceNumber(response.getLeft().getSequence())
                     .addAllStreams(response.getLeft().getStreamsList().stream()
-                        .map(stream -> SessionStreamHeader.newBuilder()
+                        .map(stream -> StreamHeader.newBuilder()
                             .setStreamId(stream.getStreamId())
                             .setIndex(stream.getIndex())
                             .setLastItemNumber(stream.getSequence())
@@ -188,7 +187,7 @@ public class ValueServiceImpl extends ValueServiceGrpc.ValueServiceImplBase {
 
   @Override
   public void event(EventRequest request, StreamObserver<EventResponse> responseObserver) {
-    executor.<Pair<SessionStreamContext, ListenResponse>, EventResponse>execute(request.getValueId(), EventResponse::getDefaultInstance, responseObserver,
+    executor.<Pair<SessionStreamContext, ListenResponse>, EventResponse>execute(request.getHeader().getName(), EventResponse::getDefaultInstance, responseObserver,
         (value, handler) -> value.listen(
             SessionCommandContext.newBuilder()
                 .setSessionId(request.getHeader().getSessionId())
@@ -197,11 +196,11 @@ public class ValueServiceImpl extends ValueServiceGrpc.ValueServiceImplBase {
             ListenRequest.newBuilder().build(),
             handler),
         response -> EventResponse.newBuilder()
-            .setHeader(SessionResponseHeader.newBuilder()
+            .setHeader(ResponseHeader.newBuilder()
                 .setSessionId(request.getHeader().getSessionId())
                 .setIndex(response.getLeft().getIndex())
                 .setSequenceNumber(response.getLeft().getSequence())
-                .addStreams(SessionStreamHeader.newBuilder()
+                .addStreams(StreamHeader.newBuilder()
                     .setStreamId(response.getLeft().getStreamId())
                     .setIndex(response.getLeft().getIndex())
                     .setLastItemNumber(response.getLeft().getSequence())

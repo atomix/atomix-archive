@@ -15,7 +15,7 @@
  */
 package io.atomix.client.election;
 
-import io.atomix.api.primitive.PrimitiveId;
+import io.atomix.api.headers.Name;
 import io.atomix.client.PrimitiveManagementService;
 import io.atomix.client.impl.ManagedPrimitiveBuilder;
 
@@ -24,7 +24,7 @@ import io.atomix.client.impl.ManagedPrimitiveBuilder;
  */
 public abstract class LeaderElectionBuilder<T>
     extends ManagedPrimitiveBuilder<LeaderElectionBuilder<T>, LeaderElection<T>> {
-  protected LeaderElectionBuilder(PrimitiveId id, PrimitiveManagementService managementService) {
-    super(id, managementService);
+  protected LeaderElectionBuilder(Name name, PrimitiveManagementService managementService) {
+    super(name, managementService);
   }
 }

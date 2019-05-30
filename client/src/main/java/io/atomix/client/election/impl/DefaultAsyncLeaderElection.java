@@ -42,7 +42,7 @@ import io.atomix.api.election.PromoteRequest;
 import io.atomix.api.election.PromoteResponse;
 import io.atomix.api.election.WithdrawRequest;
 import io.atomix.api.election.WithdrawResponse;
-import io.atomix.api.primitive.PrimitiveId;
+import io.atomix.api.headers.Name;
 import io.atomix.client.election.AsyncLeaderElection;
 import io.atomix.client.election.Leader;
 import io.atomix.client.election.LeaderElection;
@@ -63,15 +63,14 @@ public class DefaultAsyncLeaderElection
   private volatile CompletableFuture<Long> listenFuture;
   private final Set<LeadershipEventListener<String>> eventListeners = new CopyOnWriteArraySet<>();
 
-  public DefaultAsyncLeaderElection(PrimitiveId id, Partition partition, ThreadContext context, Duration timeout) {
-    super(id, LeaderElectionServiceGrpc.newStub(partition.getChannelFactory().getChannel()), context, timeout);
+  public DefaultAsyncLeaderElection(Name name, Partition partition, ThreadContext context, Duration timeout) {
+    super(name, LeaderElectionServiceGrpc.newStub(partition.getChannelFactory().getChannel()), context, timeout);
   }
 
   @Override
   public CompletableFuture<Leadership<String>> run(String identifier) {
     return command(
-        (election, header, observer) -> election.enter(EnterRequest.newBuilder()
-            .setElectionId(getPrimitiveId())
+        (header, observer) -> getService().enter(EnterRequest.newBuilder()
             .setHeader(header)
             .setCandidateId(identifier)
             .build(), observer), EnterResponse::getHeader)
@@ -84,8 +83,7 @@ public class DefaultAsyncLeaderElection
   @Override
   public CompletableFuture<Void> withdraw(String identifier) {
     return command(
-        (election, header, observer) -> election.withdraw(WithdrawRequest.newBuilder()
-            .setElectionId(getPrimitiveId())
+        (header, observer) -> getService().withdraw(WithdrawRequest.newBuilder()
             .setHeader(header)
             .setCandidateId(identifier)
             .build(), observer), WithdrawResponse::getHeader)
@@ -95,8 +93,7 @@ public class DefaultAsyncLeaderElection
   @Override
   public CompletableFuture<Boolean> anoint(String identifier) {
     return command(
-        (election, header, observer) -> election.anoint(AnointRequest.newBuilder()
-            .setElectionId(getPrimitiveId())
+        (header, observer) -> getService().anoint(AnointRequest.newBuilder()
             .setHeader(header)
             .setCandidateId(identifier)
             .build(), observer), AnointResponse::getHeader)
@@ -106,8 +103,7 @@ public class DefaultAsyncLeaderElection
   @Override
   public CompletableFuture<Void> evict(String identifier) {
     return command(
-        (election, header, observer) -> election.evict(EvictRequest.newBuilder()
-            .setElectionId(getPrimitiveId())
+        (header, observer) -> getService().evict(EvictRequest.newBuilder()
             .setHeader(header)
             .setCandidateId(identifier)
             .build(), observer), EvictResponse::getHeader)
@@ -117,8 +113,7 @@ public class DefaultAsyncLeaderElection
   @Override
   public CompletableFuture<Boolean> promote(String identifier) {
     return command(
-        (election, header, observer) -> election.promote(PromoteRequest.newBuilder()
-            .setElectionId(getPrimitiveId())
+        (header, observer) -> getService().promote(PromoteRequest.newBuilder()
             .setHeader(header)
             .setCandidateId(identifier)
             .build(), observer), PromoteResponse::getHeader)
@@ -128,8 +123,7 @@ public class DefaultAsyncLeaderElection
   @Override
   public CompletableFuture<Leadership<String>> getLeadership() {
     return query(
-        (election, header, observer) -> election.getLeadership(GetLeadershipRequest.newBuilder()
-            .setElectionId(getPrimitiveId())
+        (header, observer) -> getService().getLeadership(GetLeadershipRequest.newBuilder()
             .setHeader(header)
             .build(), observer), GetLeadershipResponse::getHeader)
         .thenApply(response -> new Leadership<>(!Strings.isNullOrEmpty(response.getLeader())
@@ -141,8 +135,7 @@ public class DefaultAsyncLeaderElection
   private synchronized CompletableFuture<Void> listen() {
     if (listenFuture == null && !eventListeners.isEmpty()) {
       listenFuture = command(
-          (service, header, observer) -> service.events(EventRequest.newBuilder()
-              .setElectionId(getPrimitiveId())
+          (header, observer) -> getService().events(EventRequest.newBuilder()
               .setHeader(header)
               .build(), observer),
           EventResponse::getHeader,
@@ -198,8 +191,7 @@ public class DefaultAsyncLeaderElection
 
   @Override
   protected CompletableFuture<Long> openSession(Duration timeout) {
-    return this.<CreateResponse>session((service, header, observer) -> service.create(CreateRequest.newBuilder()
-        .setElectionId(getPrimitiveId())
+    return this.<CreateResponse>session((header, observer) -> getService().create(CreateRequest.newBuilder()
         .setTimeout(com.google.protobuf.Duration.newBuilder()
             .setSeconds(timeout.getSeconds())
             .setNanos(timeout.getNano())
@@ -210,16 +202,14 @@ public class DefaultAsyncLeaderElection
 
   @Override
   protected CompletableFuture<Boolean> keepAlive() {
-    return this.<KeepAliveResponse>session((service, header, observer) -> service.keepAlive(KeepAliveRequest.newBuilder()
-        .setElectionId(getPrimitiveId())
+    return this.<KeepAliveResponse>session((header, observer) -> getService().keepAlive(KeepAliveRequest.newBuilder()
         .build(), observer))
         .thenApply(response -> true);
   }
 
   @Override
   protected CompletableFuture<Void> close(boolean delete) {
-    return this.<CloseResponse>session((service, header, observer) -> service.close(CloseRequest.newBuilder()
-        .setElectionId(getPrimitiveId())
+    return this.<CloseResponse>session((header, observer) -> getService().close(CloseRequest.newBuilder()
         .setDelete(delete)
         .build(), observer))
         .thenApply(v -> null);

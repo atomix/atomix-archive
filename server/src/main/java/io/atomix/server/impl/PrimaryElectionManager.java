@@ -23,12 +23,11 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.function.Consumer;
 
-import io.atomix.api.partition.EnterRequest;
-import io.atomix.api.partition.EnterResponse;
-import io.atomix.api.partition.GroupMember;
+import io.atomix.api.controller.ControllerServiceGrpc;
+import io.atomix.api.controller.PartitionElectionRequest;
+import io.atomix.api.controller.PartitionElectionResponse;
+import io.atomix.api.controller.PrimaryTerm;
 import io.atomix.api.partition.PartitionId;
-import io.atomix.api.partition.PrimaryElectionServiceGrpc;
-import io.atomix.api.partition.PrimaryTerm;
 import io.atomix.server.management.ControllerService;
 import io.atomix.server.management.PrimaryElection;
 import io.atomix.server.management.PrimaryElectionEvent;
@@ -39,8 +38,6 @@ import io.atomix.utils.component.Managed;
 import io.atomix.utils.concurrent.ThreadContext;
 import io.atomix.utils.concurrent.ThreadService;
 import io.grpc.stub.StreamObserver;
-
-import static com.google.common.base.Preconditions.checkNotNull;
 
 /**
  * Leader elector based primary election.
@@ -54,13 +51,8 @@ public class PrimaryElectionManager implements PrimaryElectionService, Managed {
   @Dependency
   private ThreadService threadService;
 
-  private PrimaryElectionServiceGrpc.PrimaryElectionServiceStub election;
+  private ControllerServiceGrpc.ControllerServiceStub election;
   private ThreadContext context;
-
-  PrimaryElectionManager(PrimaryElectionServiceGrpc.PrimaryElectionServiceStub election, ThreadContext context) {
-    this.election = checkNotNull(election);
-    this.context = checkNotNull(context);
-  }
 
   @Override
   public PrimaryElection getElectionFor(PartitionId partitionId) {
@@ -69,7 +61,7 @@ public class PrimaryElectionManager implements PrimaryElectionService, Managed {
 
   @Override
   public CompletableFuture<Void> start() {
-    election = PrimaryElectionServiceGrpc.newStub(controllerService.getChannel());
+    election = ControllerServiceGrpc.newStub(controllerService.getChannel());
     context = threadService.createContext();
     return CompletableFuture.completedFuture(null);
   }
@@ -88,18 +80,18 @@ public class PrimaryElectionManager implements PrimaryElectionService, Managed {
     }
 
     @Override
-    public CompletableFuture<PrimaryTerm> enter(GroupMember member) {
+    public CompletableFuture<PrimaryTerm> enter(String member) {
       CompletableFuture<PrimaryTerm> future = new CompletableFuture<>();
       synchronized (futures) {
         futures.add(future);
       }
 
-      election.enter(EnterRequest.newBuilder()
+      election.enterElection(PartitionElectionRequest.newBuilder()
           .setPartitionId(partitionId)
           .setMember(member)
-          .build(), new StreamObserver<EnterResponse>() {
+          .build(), new StreamObserver<PartitionElectionResponse>() {
         @Override
-        public void onNext(EnterResponse response) {
+        public void onNext(PartitionElectionResponse response) {
           term = response.getTerm();
           Queue<CompletableFuture<PrimaryTerm>> futures;
           synchronized (PrimaryElectionImpl.this) {

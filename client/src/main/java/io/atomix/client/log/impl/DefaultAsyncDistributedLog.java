@@ -24,8 +24,8 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
 
 import com.google.common.io.BaseEncoding;
+import io.atomix.api.headers.Name;
 import io.atomix.api.log.LogServiceGrpc;
-import io.atomix.api.primitive.PrimitiveId;
 import io.atomix.client.PrimitiveType;
 import io.atomix.client.log.AsyncDistributedLog;
 import io.atomix.client.log.AsyncDistributedLogPartition;
@@ -43,7 +43,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
  * Default distributed log.
  */
 public class DefaultAsyncDistributedLog<E> implements AsyncDistributedLog<E> {
-  private final PrimitiveId id;
+  private final Name name;
   private final Partitioner<String> partitioner;
   private final Map<Integer, DefaultAsyncDistributedLogPartition<E>> partitions = new ConcurrentHashMap<>();
   private final List<AsyncDistributedLogPartition<E>> sortedPartitions = new CopyOnWriteArrayList<>();
@@ -51,24 +51,24 @@ public class DefaultAsyncDistributedLog<E> implements AsyncDistributedLog<E> {
   private final Serializer serializer;
 
   public DefaultAsyncDistributedLog(
-      PrimitiveId id,
+      Name name,
       PartitionGroup partitionGroup,
       Serializer serializer) {
-    this(id, partitionGroup, Partitioner.MURMUR3, serializer);
+    this(name, partitionGroup, Partitioner.MURMUR3, serializer);
   }
 
   public DefaultAsyncDistributedLog(
-      PrimitiveId id,
+      Name name,
       PartitionGroup partitionGroup,
       Partitioner<String> partitioner,
       Serializer serializer) {
-    this.id = checkNotNull(id);
+    this.name = checkNotNull(name);
     this.partitioner = checkNotNull(partitioner);
     this.serializer = checkNotNull(serializer);
     partitionGroup.getPartitions().forEach(partition -> this.partitions.put(
         partition.id(),
         new DefaultAsyncDistributedLogPartition<>(
-            id,
+            name,
             partition.id(),
             LogServiceGrpc.newStub(partition.getChannelFactory().getChannel()),
             serializer)));
@@ -76,7 +76,7 @@ public class DefaultAsyncDistributedLog<E> implements AsyncDistributedLog<E> {
 
   @Override
   public String name() {
-    return id.getName();
+    return name.getName();
   }
 
   @Override

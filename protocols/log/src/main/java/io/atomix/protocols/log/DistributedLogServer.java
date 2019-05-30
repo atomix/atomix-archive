@@ -20,7 +20,6 @@ import java.time.Duration;
 
 import io.atomix.protocols.log.impl.DefaultDistributedLogServer;
 import io.atomix.protocols.log.protocol.LogServerProtocol;
-import io.atomix.storage.StorageLevel;
 import io.atomix.utils.Managed;
 import io.atomix.utils.concurrent.ThreadContextFactory;
 import io.atomix.utils.concurrent.ThreadModel;

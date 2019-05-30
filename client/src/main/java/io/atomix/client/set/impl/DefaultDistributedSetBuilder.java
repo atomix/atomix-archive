@@ -21,7 +21,7 @@ import java.util.stream.Collectors;
 
 import com.google.common.collect.Maps;
 import com.google.common.io.BaseEncoding;
-import io.atomix.api.primitive.PrimitiveId;
+import io.atomix.api.headers.Name;
 import io.atomix.client.PrimitiveManagementService;
 import io.atomix.client.set.AsyncDistributedSet;
 import io.atomix.client.set.DistributedSet;
@@ -34,8 +34,8 @@ import io.atomix.client.utils.serializer.Serializer;
  * @param <E> type for set elements
  */
 public class DefaultDistributedSetBuilder<E> extends DistributedSetBuilder<E> {
-  public DefaultDistributedSetBuilder(PrimitiveId id, PrimitiveManagementService managementService) {
-    super(id, managementService);
+  public DefaultDistributedSetBuilder(Name name, PrimitiveManagementService managementService) {
+    super(name, managementService);
   }
 
   @Override
@@ -45,9 +45,9 @@ public class DefaultDistributedSetBuilder<E> extends DistributedSetBuilder<E> {
         .thenCompose(group -> {
           Map<Integer, AsyncDistributedSet<String>> partitions = group.getPartitions().stream()
               .map(partition -> Maps.immutableEntry(partition.id(), new DefaultAsyncDistributedSet(
-                  getPrimitiveId(), partition, managementService.getThreadFactory().createContext(), sessionTimeout)))
+                  getName(), partition, managementService.getThreadFactory().createContext(), sessionTimeout)))
               .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
-          return new PartitionedAsyncDistributedSet(id, partitions, partitioner).connect();
+          return new PartitionedAsyncDistributedSet(name, partitions, partitioner).connect();
         })
         .thenApply(rawSet -> {
           Serializer serializer = serializer();

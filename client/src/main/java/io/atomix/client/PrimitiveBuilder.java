@@ -18,7 +18,7 @@ package io.atomix.client;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 
-import io.atomix.api.primitive.PrimitiveId;
+import io.atomix.api.headers.Name;
 import io.atomix.client.partition.Partitioner;
 import io.atomix.client.utils.serializer.Serializer;
 
@@ -31,25 +31,25 @@ import static com.google.common.base.Preconditions.checkNotNull;
  * @param <P> primitive type
  */
 public abstract class PrimitiveBuilder<B extends PrimitiveBuilder<B, P>, P extends SyncPrimitive> {
-  protected final PrimitiveId id;
+  protected final Name name;
   protected String group;
   protected Partitioner<String> partitioner = Partitioner.MURMUR3;
   protected boolean readOnly;
   protected Serializer serializer;
   protected final PrimitiveManagementService managementService;
 
-  public PrimitiveBuilder(PrimitiveId id, PrimitiveManagementService managementService) {
-    this.id = checkNotNull(id, "id cannot be null");
+  protected PrimitiveBuilder(Name name, PrimitiveManagementService managementService) {
+    this.name = checkNotNull(name, "name cannot be null");
     this.managementService = checkNotNull(managementService, "managementService cannot be null");
   }
 
   /**
-   * Returns the primitive ID for the primitive.
+   * Returns the namespaced primitive name.
    *
-   * @return the primitive ID
+   * @return the namespaced primitive name
    */
-  protected PrimitiveId getPrimitiveId() {
-    return id;
+  protected Name getName() {
+    return name;
   }
 
   /**
@@ -178,6 +178,6 @@ public abstract class PrimitiveBuilder<B extends PrimitiveBuilder<B, P>, P exten
    * @return a singleton instance of the primitive
    */
   public CompletableFuture<P> getAsync() {
-    return managementService.getPrimitiveCache().getPrimitive(id, this::buildAsync);
+    return managementService.getPrimitiveCache().getPrimitive(name, this::buildAsync);
   }
 }

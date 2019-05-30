@@ -15,7 +15,7 @@
  */
 package io.atomix.client.counter;
 
-import io.atomix.api.primitive.PrimitiveId;
+import io.atomix.api.headers.Name;
 import io.atomix.client.PrimitiveManagementService;
 import io.atomix.client.PrimitiveType;
 import io.atomix.client.counter.impl.DefaultAtomicCounterBuilder;
@@ -39,8 +39,8 @@ public class AtomicCounterType implements PrimitiveType<AtomicCounterBuilder, At
   }
 
   @Override
-  public AtomicCounterBuilder newBuilder(PrimitiveId id, PrimitiveManagementService managementService) {
-    return new DefaultAtomicCounterBuilder(id, managementService);
+  public AtomicCounterBuilder newBuilder(Name name, PrimitiveManagementService managementService) {
+    return new DefaultAtomicCounterBuilder(name, managementService);
   }
 
   @Override

@@ -15,7 +15,7 @@
  */
 package io.atomix.client.log;
 
-import io.atomix.api.primitive.PrimitiveId;
+import io.atomix.api.headers.Name;
 import io.atomix.client.PrimitiveManagementService;
 import io.atomix.client.PrimitiveType;
 import io.atomix.client.log.impl.DefaultDistributedLogBuilder;
@@ -39,8 +39,8 @@ public class DistributedLogType<T> implements PrimitiveType<DistributedLogBuilde
   }
 
   @Override
-  public DistributedLogBuilder<T> newBuilder(PrimitiveId id, PrimitiveManagementService managementService) {
-    return new DefaultDistributedLogBuilder<>(id, managementService);
+  public DistributedLogBuilder<T> newBuilder(Name name, PrimitiveManagementService managementService) {
+    return new DefaultDistributedLogBuilder<>(name, managementService);
   }
 
   @Override

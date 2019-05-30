@@ -4,7 +4,6 @@ import java.util.concurrent.CompletableFuture;
 
 import com.google.common.base.Strings;
 import com.google.protobuf.Descriptors;
-import io.atomix.api.partition.GroupMember;
 import io.atomix.protocols.log.impl.PrimaryElectionTermProvider;
 import io.atomix.protocols.log.protocol.DistributedLogServiceGrpc;
 import io.atomix.protocols.log.protocol.LogClientProtocol;
@@ -14,7 +13,6 @@ import io.atomix.server.management.ProtocolManagementService;
 import io.atomix.server.protocol.LogProtocol;
 import io.atomix.server.protocol.Protocol;
 import io.atomix.service.client.LogClient;
-import io.atomix.storage.StorageLevel;
 import io.atomix.utils.component.Component;
 
 /**
@@ -103,10 +101,7 @@ public class DistributedLogProtocol implements LogProtocol {
         .withThreadContextFactory(managementService.getThreadService().getFactory())
         .withTermProvider(new PrimaryElectionTermProvider(
             managementService.getPrimaryElectionService().getElectionFor(managementService.getPartitionId()),
-            GroupMember.newBuilder()
-                .setMember(config.getMember())
-                .setGroup(config.getGroup())
-                .build()))
+            config.getMember()))
         .build();
   }
 }

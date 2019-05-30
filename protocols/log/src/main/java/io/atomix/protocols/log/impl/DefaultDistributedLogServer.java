@@ -71,7 +71,7 @@ public class DefaultDistributedLogServer implements DistributedLogServer {
       SegmentedJournal<LogEntry> journal = SegmentedJournal.<LogEntry>builder()
           .withName(serverId)
           .withDirectory(directory)
-          .withStorageLevel(storageLevel)
+          .withStorageLevel(io.atomix.storage.StorageLevel.valueOf(storageLevel.name()))
           .withCodec(new DistributedLogCodec())
           .withMaxSegmentSize(maxSegmentSize)
           .withMaxEntrySize(maxEntrySize)

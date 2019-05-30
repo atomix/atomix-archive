@@ -2,11 +2,12 @@ package io.atomix.client.impl;
 
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.BiConsumer;
 import java.util.function.Function;
 
+import io.atomix.api.headers.Name;
 import io.atomix.api.headers.RequestHeader;
 import io.atomix.api.headers.ResponseHeader;
-import io.atomix.api.primitive.PrimitiveId;
 import io.atomix.client.AsyncPrimitive;
 import io.atomix.client.ManagedAsyncPrimitive;
 import io.atomix.client.utils.concurrent.ThreadContext;
@@ -18,29 +19,29 @@ import static com.google.common.base.Preconditions.checkNotNull;
  * Simple asynchronous primitive.
  */
 public abstract class AbstractAsyncPrimitive<S, P extends AsyncPrimitive> implements ManagedAsyncPrimitive<P> {
-  private final PrimitiveId id;
+  private final Name name;
   private final S service;
   private final ThreadContext context;
   private final AtomicLong index = new AtomicLong();
 
-  public AbstractAsyncPrimitive(PrimitiveId id, S service, ThreadContext context) {
-    this.id = checkNotNull(id);
+  public AbstractAsyncPrimitive(Name name, S service, ThreadContext context) {
+    this.name = checkNotNull(name);
     this.service = checkNotNull(service);
     this.context = context;
   }
 
   @Override
   public String name() {
-    return id.getName();
+    return name.getName();
   }
 
   /**
-   * Returns the primitive ID.
+   * Returns the primitive name.
    *
-   * @return the primitive ID
+   * @return the primitive name
    */
-  protected PrimitiveId getPrimitiveId() {
-    return id;
+  protected Name getName() {
+    return name;
   }
 
   /**
@@ -63,15 +64,16 @@ public abstract class AbstractAsyncPrimitive<S, P extends AsyncPrimitive> implem
 
   private RequestHeader getRequestHeader() {
     return RequestHeader.newBuilder()
+        .setName(name)
         .setIndex(index.get())
         .build();
   }
 
   protected <T> CompletableFuture<T> execute(
-      OperationFunction<S, T> function,
+      BiConsumer<RequestHeader, StreamObserver<T>> callback,
       Function<T, ResponseHeader> headerFunction) {
     CompletableFuture<T> future = new CompletableFuture<>();
-    function.apply(getService(), getRequestHeader(), new StreamObserver<T>() {
+    callback.accept(getRequestHeader(), new StreamObserver<T>() {
       @Override
       public void onNext(T response) {
         index.accumulateAndGet(headerFunction.apply(response).getIndex(), Math::max);
@@ -91,10 +93,10 @@ public abstract class AbstractAsyncPrimitive<S, P extends AsyncPrimitive> implem
   }
 
   protected <T> CompletableFuture<Void> execute(
-      OperationFunction<S, T> function,
+      BiConsumer<RequestHeader, StreamObserver<T>> callback,
       Function<T, ResponseHeader> headerFunction,
       StreamObserver<T> observer) {
-    function.apply(getService(), getRequestHeader(), new StreamObserver<T>() {
+    callback.accept(getRequestHeader(), new StreamObserver<T>() {
       @Override
       public void onNext(T response) {
         index.accumulateAndGet(headerFunction.apply(response).getIndex(), Math::max);

@@ -15,7 +15,7 @@
  */
 package io.atomix.client.map;
 
-import io.atomix.api.primitive.PrimitiveId;
+import io.atomix.api.headers.Name;
 import io.atomix.client.PrimitiveManagementService;
 import io.atomix.client.PrimitiveType;
 import io.atomix.client.map.impl.DefaultDistributedMapBuilder;
@@ -41,8 +41,8 @@ public class DistributedMapType<K, V> implements PrimitiveType<DistributedMapBui
   }
 
   @Override
-  public DistributedMapBuilder<K, V> newBuilder(PrimitiveId id, PrimitiveManagementService managementService) {
-    return new DefaultDistributedMapBuilder<>(id, managementService);
+  public DistributedMapBuilder<K, V> newBuilder(Name name, PrimitiveManagementService managementService) {
+    return new DefaultDistributedMapBuilder<>(name, managementService);
   }
 
   @Override

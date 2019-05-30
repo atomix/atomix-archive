@@ -8,7 +8,7 @@ import java.util.function.BiFunction;
 import java.util.function.Predicate;
 
 import com.google.common.collect.Maps;
-import io.atomix.api.primitive.PrimitiveId;
+import io.atomix.api.headers.Name;
 import io.atomix.client.Versioned;
 import io.atomix.client.collection.AsyncDistributedCollection;
 import io.atomix.client.collection.CollectionEvent;
@@ -32,10 +32,10 @@ public class PartitionedAsyncAtomicMap
     extends PartitionedAsyncPrimitive<AsyncAtomicMap<String, byte[]>>
     implements AsyncAtomicMap<String, byte[]> {
   public PartitionedAsyncAtomicMap(
-      PrimitiveId id,
+      Name name,
       Map<Integer, AsyncAtomicMap<String, byte[]>> partitions,
       Partitioner<String> partitioner) {
-    super(id, partitions, partitioner);
+    super(name, partitions, partitioner);
   }
 
   @Override

@@ -17,7 +17,7 @@ package io.atomix.client.counter.impl;
 
 import java.util.concurrent.CompletableFuture;
 
-import io.atomix.api.primitive.PrimitiveId;
+import io.atomix.api.headers.Name;
 import io.atomix.client.PrimitiveManagementService;
 import io.atomix.client.counter.AsyncAtomicCounter;
 import io.atomix.client.counter.AtomicCounter;
@@ -27,8 +27,8 @@ import io.atomix.client.counter.AtomicCounterBuilder;
  * Atomic counter proxy builder.
  */
 public class DefaultAtomicCounterBuilder extends AtomicCounterBuilder {
-  public DefaultAtomicCounterBuilder(PrimitiveId id, PrimitiveManagementService managementService) {
-    super(id, managementService);
+  public DefaultAtomicCounterBuilder(Name name, PrimitiveManagementService managementService) {
+    super(name, managementService);
   }
 
   @Override
@@ -36,8 +36,8 @@ public class DefaultAtomicCounterBuilder extends AtomicCounterBuilder {
   public CompletableFuture<AtomicCounter> buildAsync() {
     return managementService.getPartitionService().getPartitionGroup(group)
         .thenCompose(group -> new DefaultAsyncAtomicCounter(
-            getPrimitiveId(),
-            group.getPartition(partitioner.partition(getPrimitiveId().getName(), group.getPartitionIds())),
+            getName(),
+            group.getPartition(partitioner.partition(getName().getName(), group.getPartitionIds())),
             managementService.getThreadFactory().createContext())
             .connect()
             .thenApply(AsyncAtomicCounter::sync));

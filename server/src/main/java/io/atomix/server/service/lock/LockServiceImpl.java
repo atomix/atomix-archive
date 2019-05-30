@@ -18,9 +18,8 @@ package io.atomix.server.service.lock;
 import java.time.Duration;
 import java.util.stream.Collectors;
 
-import io.atomix.api.headers.SessionHeader;
-import io.atomix.api.headers.SessionResponseHeader;
-import io.atomix.api.headers.SessionStreamHeader;
+import io.atomix.api.headers.ResponseHeader;
+import io.atomix.api.headers.StreamHeader;
 import io.atomix.api.lock.CloseRequest;
 import io.atomix.api.lock.CloseResponse;
 import io.atomix.api.lock.CreateRequest;
@@ -58,14 +57,14 @@ public class LockServiceImpl extends LockServiceGrpc.LockServiceImplBase {
 
   @Override
   public void create(CreateRequest request, StreamObserver<CreateResponse> responseObserver) {
-    executor.execute(request.getLockId(), CreateResponse::getDefaultInstance, responseObserver,
+    executor.execute(request.getHeader().getName(), CreateResponse::getDefaultInstance, responseObserver,
         lock -> lock.openSession(OpenSessionRequest.newBuilder()
             .setTimeout(Duration.ofSeconds(request.getTimeout().getSeconds())
                 .plusNanos(request.getTimeout().getNanos())
                 .toMillis())
             .build())
             .thenApply(response -> CreateResponse.newBuilder()
-                .setHeader(SessionHeader.newBuilder()
+                .setHeader(ResponseHeader.newBuilder()
                     .setSessionId(response.getSessionId())
                     .build())
                 .build()));
@@ -73,13 +72,13 @@ public class LockServiceImpl extends LockServiceGrpc.LockServiceImplBase {
 
   @Override
   public void keepAlive(KeepAliveRequest request, StreamObserver<KeepAliveResponse> responseObserver) {
-    executor.execute(request.getLockId(), KeepAliveResponse::getDefaultInstance, responseObserver,
+    executor.execute(request.getHeader().getName(), KeepAliveResponse::getDefaultInstance, responseObserver,
         lock -> lock.keepAlive(io.atomix.service.protocol.KeepAliveRequest.newBuilder()
             .setSessionId(request.getHeader().getSessionId())
-            .setCommandSequence(request.getHeader().getLastSequenceNumber())
+            .setCommandSequence(request.getHeader().getSequenceNumber())
             .build())
             .thenApply(response -> KeepAliveResponse.newBuilder()
-                .setHeader(SessionHeader.newBuilder()
+                .setHeader(ResponseHeader.newBuilder()
                     .setSessionId(request.getHeader().getSessionId())
                     .build())
                 .build()));
@@ -87,7 +86,7 @@ public class LockServiceImpl extends LockServiceGrpc.LockServiceImplBase {
 
   @Override
   public void close(CloseRequest request, StreamObserver<CloseResponse> responseObserver) {
-    executor.execute(request.getLockId(), CloseResponse::getDefaultInstance, responseObserver,
+    executor.execute(request.getHeader().getName(), CloseResponse::getDefaultInstance, responseObserver,
         lock -> lock.closeSession(io.atomix.service.protocol.CloseSessionRequest.newBuilder()
             .setSessionId(request.getHeader().getSessionId())
             .build()).thenApply(response -> CloseResponse.newBuilder().build()));
@@ -95,7 +94,7 @@ public class LockServiceImpl extends LockServiceGrpc.LockServiceImplBase {
 
   @Override
   public void lock(LockRequest request, StreamObserver<LockResponse> responseObserver) {
-    executor.execute(request.getLockId(), LockResponse::getDefaultInstance, responseObserver,
+    executor.execute(request.getHeader().getName(), LockResponse::getDefaultInstance, responseObserver,
         lock -> lock.lock(
             SessionCommandContext.newBuilder()
                 .setSessionId(request.getHeader().getSessionId())
@@ -107,12 +106,12 @@ public class LockServiceImpl extends LockServiceGrpc.LockServiceImplBase {
                     .toMillis())
                 .build())
             .thenApply(response -> LockResponse.newBuilder()
-                .setHeader(SessionResponseHeader.newBuilder()
+                .setHeader(ResponseHeader.newBuilder()
                     .setSessionId(request.getHeader().getSessionId())
                     .setIndex(response.getLeft().getIndex())
                     .setSequenceNumber(response.getLeft().getSequence())
                     .addAllStreams(response.getLeft().getStreamsList().stream()
-                        .map(stream -> SessionStreamHeader.newBuilder()
+                        .map(stream -> StreamHeader.newBuilder()
                             .setStreamId(stream.getStreamId())
                             .setIndex(stream.getIndex())
                             .setLastItemNumber(stream.getSequence())
@@ -125,7 +124,7 @@ public class LockServiceImpl extends LockServiceGrpc.LockServiceImplBase {
 
   @Override
   public void unlock(UnlockRequest request, StreamObserver<UnlockResponse> responseObserver) {
-    executor.execute(request.getLockId(), UnlockResponse::getDefaultInstance, responseObserver,
+    executor.execute(request.getHeader().getName(), UnlockResponse::getDefaultInstance, responseObserver,
         lock -> lock.unlock(
             SessionCommandContext.newBuilder()
                 .setSessionId(request.getHeader().getSessionId())
@@ -135,12 +134,12 @@ public class LockServiceImpl extends LockServiceGrpc.LockServiceImplBase {
                 .setIndex(request.getVersion())
                 .build())
             .thenApply(response -> UnlockResponse.newBuilder()
-                .setHeader(SessionResponseHeader.newBuilder()
+                .setHeader(ResponseHeader.newBuilder()
                     .setSessionId(request.getHeader().getSessionId())
                     .setIndex(response.getLeft().getIndex())
                     .setSequenceNumber(response.getLeft().getSequence())
                     .addAllStreams(response.getLeft().getStreamsList().stream()
-                        .map(stream -> SessionStreamHeader.newBuilder()
+                        .map(stream -> StreamHeader.newBuilder()
                             .setStreamId(stream.getStreamId())
                             .setIndex(stream.getIndex())
                             .setLastItemNumber(stream.getSequence())
@@ -153,23 +152,23 @@ public class LockServiceImpl extends LockServiceGrpc.LockServiceImplBase {
 
   @Override
   public void isLocked(IsLockedRequest request, StreamObserver<IsLockedResponse> responseObserver) {
-    executor.execute(request.getLockId(), IsLockedResponse::getDefaultInstance, responseObserver,
+    executor.execute(request.getHeader().getName(), IsLockedResponse::getDefaultInstance, responseObserver,
         lock -> lock.isLocked(
             SessionQueryContext.newBuilder()
                 .setSessionId(request.getHeader().getSessionId())
-                .setLastIndex(request.getHeader().getLastIndex())
-                .setLastSequenceNumber(request.getHeader().getLastSequenceNumber())
+                .setLastIndex(request.getHeader().getIndex())
+                .setLastSequenceNumber(request.getHeader().getSequenceNumber())
                 .build(),
             io.atomix.server.service.lock.IsLockedRequest.newBuilder()
                 .setIndex(request.getVersion())
                 .build())
             .thenApply(response -> IsLockedResponse.newBuilder()
-                .setHeader(SessionResponseHeader.newBuilder()
+                .setHeader(ResponseHeader.newBuilder()
                     .setSessionId(request.getHeader().getSessionId())
                     .setIndex(response.getLeft().getIndex())
                     .setSequenceNumber(response.getLeft().getSequence())
                     .addAllStreams(response.getLeft().getStreamsList().stream()
-                        .map(stream -> SessionStreamHeader.newBuilder()
+                        .map(stream -> StreamHeader.newBuilder()
                             .setStreamId(stream.getStreamId())
                             .setIndex(stream.getIndex())
                             .setLastItemNumber(stream.getSequence())

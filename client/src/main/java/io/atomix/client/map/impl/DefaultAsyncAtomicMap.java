@@ -11,6 +11,7 @@ import java.util.function.Predicate;
 
 import com.google.common.collect.Maps;
 import com.google.protobuf.ByteString;
+import io.atomix.api.headers.Name;
 import io.atomix.api.map.ClearRequest;
 import io.atomix.api.map.ClearResponse;
 import io.atomix.api.map.CloseRequest;
@@ -37,7 +38,6 @@ import io.atomix.api.map.ReplaceResponse;
 import io.atomix.api.map.ResponseStatus;
 import io.atomix.api.map.SizeRequest;
 import io.atomix.api.map.SizeResponse;
-import io.atomix.api.primitive.PrimitiveId;
 import io.atomix.client.PrimitiveException;
 import io.atomix.client.Versioned;
 import io.atomix.client.collection.AsyncDistributedCollection;
@@ -66,15 +66,14 @@ public class DefaultAsyncAtomicMap extends AbstractManagedPrimitive<MapServiceGr
   private volatile CompletableFuture<Long> listenFuture;
   private final Map<AtomicMapEventListener<String, byte[]>, Executor> eventListeners = new ConcurrentHashMap<>();
 
-  public DefaultAsyncAtomicMap(PrimitiveId id, Partition partition, ThreadContext context, Duration timeout) {
-    super(id, MapServiceGrpc.newStub(partition.getChannelFactory().getChannel()), context, timeout);
+  public DefaultAsyncAtomicMap(Name name, Partition partition, ThreadContext context, Duration timeout) {
+    super(name, MapServiceGrpc.newStub(partition.getChannelFactory().getChannel()), context, timeout);
   }
 
   @Override
   public CompletableFuture<Integer> size() {
     return query(
-        (map, header, observer) -> map.size(SizeRequest.newBuilder()
-            .setMapId(getPrimitiveId())
+        (header, observer) -> getService().size(SizeRequest.newBuilder()
             .setHeader(header)
             .build(), observer),
         SizeResponse::getHeader)
@@ -84,8 +83,7 @@ public class DefaultAsyncAtomicMap extends AbstractManagedPrimitive<MapServiceGr
   @Override
   public CompletableFuture<Boolean> containsKey(String key) {
     return query(
-        (map, header, observer) -> map.exists(ExistsRequest.newBuilder()
-            .setMapId(getPrimitiveId())
+        (header, observer) -> getService().exists(ExistsRequest.newBuilder()
             .setHeader(header)
             .build(), observer),
         ExistsResponse::getHeader)
@@ -100,8 +98,7 @@ public class DefaultAsyncAtomicMap extends AbstractManagedPrimitive<MapServiceGr
   @Override
   public CompletableFuture<Versioned<byte[]>> get(String key) {
     return query(
-        (map, header, observer) -> map.get(GetRequest.newBuilder()
-            .setMapId(getPrimitiveId())
+        (header, observer) -> getService().get(GetRequest.newBuilder()
             .setHeader(header)
             .setKey(key)
             .build(), observer),
@@ -114,8 +111,7 @@ public class DefaultAsyncAtomicMap extends AbstractManagedPrimitive<MapServiceGr
   @Override
   public CompletableFuture<Versioned<byte[]>> getOrDefault(String key, byte[] defaultValue) {
     return query(
-        (map, header, observer) -> map.get(GetRequest.newBuilder()
-            .setMapId(getPrimitiveId())
+        (header, observer) -> getService().get(GetRequest.newBuilder()
             .setHeader(header)
             .setKey(key)
             .build(), observer),
@@ -131,8 +127,7 @@ public class DefaultAsyncAtomicMap extends AbstractManagedPrimitive<MapServiceGr
       Predicate<? super byte[]> condition,
       BiFunction<? super String, ? super byte[], ? extends byte[]> remappingFunction) {
     return query(
-        (map, header, observer) -> map.get(GetRequest.newBuilder()
-            .setMapId(getPrimitiveId())
+        (header, observer) -> getService().get(GetRequest.newBuilder()
             .setHeader(header)
             .setKey(key)
             .build(), observer),
@@ -162,8 +157,7 @@ public class DefaultAsyncAtomicMap extends AbstractManagedPrimitive<MapServiceGr
           // If the response was empty, add the value only if the key is empty.
           if (response.getVersion() == 0) {
             return command(
-                (map, header, observer) -> map.put(PutRequest.newBuilder()
-                    .setMapId(getPrimitiveId())
+                (header, observer) -> getService().put(PutRequest.newBuilder()
                     .setHeader(header)
                     .setKey(key)
                     .setValue(ByteString.copyFrom(computedValue))
@@ -192,8 +186,7 @@ public class DefaultAsyncAtomicMap extends AbstractManagedPrimitive<MapServiceGr
           // if the key has not changed.
           else {
             return command(
-                (map, header, observer) -> map.replace(ReplaceRequest.newBuilder()
-                    .setMapId(getPrimitiveId())
+                (header, observer) -> getService().replace(ReplaceRequest.newBuilder()
                     .setHeader(header)
                     .setKey(key)
                     .setPreviousVersion(response.getVersion())
@@ -214,8 +207,7 @@ public class DefaultAsyncAtomicMap extends AbstractManagedPrimitive<MapServiceGr
   @Override
   public CompletableFuture<Versioned<byte[]>> put(String key, byte[] value, Duration ttl) {
     return command(
-        (map, header, observer) -> map.put(PutRequest.newBuilder()
-            .setMapId(getPrimitiveId())
+        (header, observer) -> getService().put(PutRequest.newBuilder()
             .setHeader(header)
             .setKey(key)
             .setValue(ByteString.copyFrom(value))
@@ -236,8 +228,7 @@ public class DefaultAsyncAtomicMap extends AbstractManagedPrimitive<MapServiceGr
   @Override
   public CompletableFuture<Versioned<byte[]>> putIfAbsent(String key, byte[] value, Duration ttl) {
     return command(
-        (map, header, observer) -> map.put(PutRequest.newBuilder()
-            .setMapId(getPrimitiveId())
+        (header, observer) -> getService().put(PutRequest.newBuilder()
             .setHeader(header)
             .setKey(key)
             .setValue(ByteString.copyFrom(value))
@@ -259,8 +250,7 @@ public class DefaultAsyncAtomicMap extends AbstractManagedPrimitive<MapServiceGr
   @Override
   public CompletableFuture<Versioned<byte[]>> remove(String key) {
     return command(
-        (map, header, observer) -> map.remove(RemoveRequest.newBuilder()
-            .setMapId(getPrimitiveId())
+        (header, observer) -> getService().remove(RemoveRequest.newBuilder()
             .setHeader(header)
             .setKey(key)
             .build(), observer),
@@ -279,8 +269,7 @@ public class DefaultAsyncAtomicMap extends AbstractManagedPrimitive<MapServiceGr
   @Override
   public CompletableFuture<Void> clear() {
     return command(
-        (map, header, observer) -> map.clear(ClearRequest.newBuilder()
-            .setMapId(getPrimitiveId())
+        (header, observer) -> getService().clear(ClearRequest.newBuilder()
             .setHeader(header)
             .build(), observer),
         ClearResponse::getHeader)
@@ -305,8 +294,7 @@ public class DefaultAsyncAtomicMap extends AbstractManagedPrimitive<MapServiceGr
   @Override
   public CompletableFuture<Boolean> remove(String key, byte[] value) {
     return command(
-        (map, header, observer) -> map.remove(RemoveRequest.newBuilder()
-            .setMapId(getPrimitiveId())
+        (header, observer) -> getService().remove(RemoveRequest.newBuilder()
             .setHeader(header)
             .setKey(key)
             .setValue(ByteString.copyFrom(value))
@@ -323,8 +311,7 @@ public class DefaultAsyncAtomicMap extends AbstractManagedPrimitive<MapServiceGr
   @Override
   public CompletableFuture<Boolean> remove(String key, long version) {
     return command(
-        (map, header, observer) -> map.remove(RemoveRequest.newBuilder()
-            .setMapId(getPrimitiveId())
+        (header, observer) -> getService().remove(RemoveRequest.newBuilder()
             .setHeader(header)
             .setKey(key)
             .setVersion(version)
@@ -341,8 +328,7 @@ public class DefaultAsyncAtomicMap extends AbstractManagedPrimitive<MapServiceGr
   @Override
   public CompletableFuture<Versioned<byte[]>> replace(String key, byte[] value) {
     return command(
-        (map, header, observer) -> map.replace(ReplaceRequest.newBuilder()
-            .setMapId(getPrimitiveId())
+        (header, observer) -> getService().replace(ReplaceRequest.newBuilder()
             .setHeader(header)
             .setKey(key)
             .setNewValue(ByteString.copyFrom(value))
@@ -363,8 +349,7 @@ public class DefaultAsyncAtomicMap extends AbstractManagedPrimitive<MapServiceGr
   @Override
   public CompletableFuture<Boolean> replace(String key, byte[] oldValue, byte[] newValue) {
     return command(
-        (map, header, observer) -> map.replace(ReplaceRequest.newBuilder()
-            .setMapId(getPrimitiveId())
+        (header, observer) -> getService().replace(ReplaceRequest.newBuilder()
             .setHeader(header)
             .setKey(key)
             .setPreviousValue(ByteString.copyFrom(oldValue))
@@ -382,8 +367,7 @@ public class DefaultAsyncAtomicMap extends AbstractManagedPrimitive<MapServiceGr
   @Override
   public CompletableFuture<Boolean> replace(String key, long oldVersion, byte[] newValue) {
     return command(
-        (map, header, observer) -> map.replace(ReplaceRequest.newBuilder()
-            .setMapId(getPrimitiveId())
+        (header, observer) -> getService().replace(ReplaceRequest.newBuilder()
             .setHeader(header)
             .setKey(key)
             .setPreviousVersion(oldVersion)
@@ -401,8 +385,7 @@ public class DefaultAsyncAtomicMap extends AbstractManagedPrimitive<MapServiceGr
   private synchronized CompletableFuture<Void> listen() {
     if (listenFuture == null && !eventListeners.isEmpty()) {
       listenFuture = command(
-          (service, header, observer) -> service.events(EventRequest.newBuilder()
-              .setMapId(getPrimitiveId())
+          (header, observer) -> getService().events(EventRequest.newBuilder()
               .setHeader(header)
               .build(), observer),
           EventResponse::getHeader,
@@ -471,8 +454,7 @@ public class DefaultAsyncAtomicMap extends AbstractManagedPrimitive<MapServiceGr
 
   @Override
   protected CompletableFuture<Long> openSession(Duration timeout) {
-    return this.<CreateResponse>session((service, header, observer) -> service.create(CreateRequest.newBuilder()
-        .setMapId(getPrimitiveId())
+    return this.<CreateResponse>session((header, observer) -> getService().create(CreateRequest.newBuilder()
         .setTimeout(com.google.protobuf.Duration.newBuilder()
             .setSeconds(timeout.getSeconds())
             .setNanos(timeout.getNano())
@@ -483,16 +465,14 @@ public class DefaultAsyncAtomicMap extends AbstractManagedPrimitive<MapServiceGr
 
   @Override
   protected CompletableFuture<Boolean> keepAlive() {
-    return this.<KeepAliveResponse>session((service, header, observer) -> service.keepAlive(KeepAliveRequest.newBuilder()
-        .setMapId(getPrimitiveId())
+    return this.<KeepAliveResponse>session((header, observer) -> getService().keepAlive(KeepAliveRequest.newBuilder()
         .build(), observer))
         .thenApply(response -> true);
   }
 
   @Override
   protected CompletableFuture<Void> close(boolean delete) {
-    return this.<CloseResponse>session((service, header, observer) -> service.close(CloseRequest.newBuilder()
-        .setMapId(getPrimitiveId())
+    return this.<CloseResponse>session((header, observer) -> getService().close(CloseRequest.newBuilder()
         .setDelete(delete)
         .build(), observer))
         .thenApply(v -> null);
@@ -578,8 +558,7 @@ public class DefaultAsyncAtomicMap extends AbstractManagedPrimitive<MapServiceGr
     public AsyncIterator<Map.Entry<String, Versioned<byte[]>>> iterator() {
       StreamObserverIterator<Map.Entry<String, Versioned<byte[]>>> iterator = new StreamObserverIterator<>();
       query(
-          (map, header, observer) -> map.entries(EntriesRequest.newBuilder()
-              .setMapId(getPrimitiveId())
+          (header, observer) -> getService().entries(EntriesRequest.newBuilder()
               .setHeader(header)
               .build(), observer),
           EntriesResponse::getHeader,
@@ -665,8 +644,7 @@ public class DefaultAsyncAtomicMap extends AbstractManagedPrimitive<MapServiceGr
     public AsyncIterator<String> iterator() {
       StreamObserverIterator<String> iterator = new StreamObserverIterator<>();
       query(
-          (map, header, observer) -> map.entries(EntriesRequest.newBuilder()
-              .setMapId(getPrimitiveId())
+          (header, observer) -> getService().entries(EntriesRequest.newBuilder()
               .setHeader(header)
               .build(), observer),
           EntriesResponse::getHeader,
@@ -732,8 +710,7 @@ public class DefaultAsyncAtomicMap extends AbstractManagedPrimitive<MapServiceGr
     public AsyncIterator<Versioned<byte[]>> iterator() {
       StreamObserverIterator<Versioned<byte[]>> iterator = new StreamObserverIterator<>();
       query(
-          (map, header, observer) -> map.entries(EntriesRequest.newBuilder()
-              .setMapId(getPrimitiveId())
+          (header, observer) -> getService().entries(EntriesRequest.newBuilder()
               .setHeader(header)
               .build(), observer),
           EntriesResponse::getHeader,

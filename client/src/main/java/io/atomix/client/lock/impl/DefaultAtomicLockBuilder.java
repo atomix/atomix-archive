@@ -17,7 +17,7 @@ package io.atomix.client.lock.impl;
 
 import java.util.concurrent.CompletableFuture;
 
-import io.atomix.api.primitive.PrimitiveId;
+import io.atomix.api.headers.Name;
 import io.atomix.client.PrimitiveManagementService;
 import io.atomix.client.lock.AsyncAtomicLock;
 import io.atomix.client.lock.AtomicLock;
@@ -27,8 +27,8 @@ import io.atomix.client.lock.AtomicLockBuilder;
  * Default distributed lock builder implementation.
  */
 public class DefaultAtomicLockBuilder extends AtomicLockBuilder {
-  public DefaultAtomicLockBuilder(PrimitiveId id, PrimitiveManagementService managementService) {
-    super(id, managementService);
+  public DefaultAtomicLockBuilder(Name name, PrimitiveManagementService managementService) {
+    super(name, managementService);
   }
 
   @Override
@@ -36,8 +36,8 @@ public class DefaultAtomicLockBuilder extends AtomicLockBuilder {
   public CompletableFuture<AtomicLock> buildAsync() {
     return managementService.getPartitionService().getPartitionGroup(group)
         .thenCompose(group -> new DefaultAsyncAtomicLock(
-            getPrimitiveId(),
-            group.getPartition(partitioner.partition(getPrimitiveId().getName(), group.getPartitionIds())),
+            getName(),
+            group.getPartition(partitioner.partition(getName().getName(), group.getPartitionIds())),
             managementService.getThreadFactory().createContext(),
             sessionTimeout)
             .connect()

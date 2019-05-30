@@ -33,8 +33,8 @@ import io.atomix.api.counter.IncrementRequest;
 import io.atomix.api.counter.IncrementResponse;
 import io.atomix.api.counter.SetRequest;
 import io.atomix.api.counter.SetResponse;
+import io.atomix.api.headers.Name;
 import io.atomix.api.headers.ResponseHeader;
-import io.atomix.api.primitive.PrimitiveId;
 import io.atomix.client.counter.AsyncAtomicCounter;
 import io.atomix.client.counter.AtomicCounter;
 import io.atomix.client.impl.AbstractAsyncPrimitive;
@@ -47,14 +47,13 @@ import io.atomix.client.utils.concurrent.ThreadContext;
 public class DefaultAsyncAtomicCounter
     extends AbstractAsyncPrimitive<CounterServiceGrpc.CounterServiceStub, AsyncAtomicCounter>
     implements AsyncAtomicCounter {
-  public DefaultAsyncAtomicCounter(PrimitiveId id, Partition partition, ThreadContext context) {
-    super(id, CounterServiceGrpc.newStub(partition.getChannelFactory().getChannel()), context);
+  public DefaultAsyncAtomicCounter(Name name, Partition partition, ThreadContext context) {
+    super(name, CounterServiceGrpc.newStub(partition.getChannelFactory().getChannel()), context);
   }
 
   @Override
   public CompletableFuture<Long> get() {
-    return execute((counter, header, observer) -> counter.get(GetRequest.newBuilder()
-        .setCounterId(getPrimitiveId())
+    return execute((header, observer) -> getService().get(GetRequest.newBuilder()
         .setHeader(header)
         .build(), observer), GetResponse::getHeader)
         .thenApply(response -> response.getValue());
@@ -62,8 +61,7 @@ public class DefaultAsyncAtomicCounter
 
   @Override
   public CompletableFuture<Void> set(long value) {
-    return execute((counter, header, observer) -> counter.set(SetRequest.newBuilder()
-        .setCounterId(getPrimitiveId())
+    return execute((header, observer) -> getService().set(SetRequest.newBuilder()
         .setHeader(header)
         .setValue(value)
         .build(), observer), SetResponse::getHeader)
@@ -72,8 +70,7 @@ public class DefaultAsyncAtomicCounter
 
   @Override
   public CompletableFuture<Boolean> compareAndSet(long expectedValue, long updateValue) {
-    return execute((counter, header, observer) -> counter.checkAndSet(CheckAndSetRequest.newBuilder()
-        .setCounterId(getPrimitiveId())
+    return execute((header, observer) -> getService().checkAndSet(CheckAndSetRequest.newBuilder()
         .setHeader(header)
         .setExpect(expectedValue)
         .setUpdate(updateValue)
@@ -83,8 +80,7 @@ public class DefaultAsyncAtomicCounter
 
   @Override
   public CompletableFuture<Long> addAndGet(long delta) {
-    return execute((counter, header, observer) -> counter.increment(IncrementRequest.newBuilder()
-        .setCounterId(getPrimitiveId())
+    return execute((header, observer) -> getService().increment(IncrementRequest.newBuilder()
         .setHeader(header)
         .setDelta(delta)
         .build(), observer), IncrementResponse::getHeader)
@@ -93,8 +89,7 @@ public class DefaultAsyncAtomicCounter
 
   @Override
   public CompletableFuture<Long> getAndAdd(long delta) {
-    return execute((counter, header, observer) -> counter.increment(IncrementRequest.newBuilder()
-        .setCounterId(getPrimitiveId())
+    return execute((header, observer) -> getService().increment(IncrementRequest.newBuilder()
         .setHeader(header)
         .setDelta(delta)
         .build(), observer), IncrementResponse::getHeader)
@@ -103,8 +98,7 @@ public class DefaultAsyncAtomicCounter
 
   @Override
   public CompletableFuture<Long> incrementAndGet() {
-    return execute((counter, header, observer) -> counter.increment(IncrementRequest.newBuilder()
-        .setCounterId(getPrimitiveId())
+    return execute((header, observer) -> getService().increment(IncrementRequest.newBuilder()
         .setHeader(header)
         .setDelta(1)
         .build(), observer), IncrementResponse::getHeader)
@@ -113,8 +107,7 @@ public class DefaultAsyncAtomicCounter
 
   @Override
   public CompletableFuture<Long> getAndIncrement() {
-    return execute((counter, header, observer) -> counter.increment(IncrementRequest.newBuilder()
-        .setCounterId(getPrimitiveId())
+    return execute((header, observer) -> getService().increment(IncrementRequest.newBuilder()
         .setHeader(header)
         .setDelta(1)
         .build(), observer), IncrementResponse::getHeader)
@@ -123,8 +116,7 @@ public class DefaultAsyncAtomicCounter
 
   @Override
   public CompletableFuture<Long> decrementAndGet() {
-    return execute((counter, header, observer) -> counter.decrement(DecrementRequest.newBuilder()
-        .setCounterId(getPrimitiveId())
+    return execute((header, observer) -> getService().decrement(DecrementRequest.newBuilder()
         .setHeader(header)
         .setDelta(1)
         .build(), observer), DecrementResponse::getHeader)
@@ -133,8 +125,7 @@ public class DefaultAsyncAtomicCounter
 
   @Override
   public CompletableFuture<Long> getAndDecrement() {
-    return execute((counter, header, observer) -> counter.decrement(DecrementRequest.newBuilder()
-        .setCounterId(getPrimitiveId())
+    return execute((header, observer) -> getService().decrement(DecrementRequest.newBuilder()
         .setHeader(header)
         .setDelta(1)
         .build(), observer), DecrementResponse::getHeader)
@@ -143,24 +134,21 @@ public class DefaultAsyncAtomicCounter
 
   @Override
   public CompletableFuture<AsyncAtomicCounter> connect() {
-    return execute((counter, header, observer) -> counter.create(CreateRequest.newBuilder()
-        .setCounterId(getPrimitiveId())
+    return execute((header, observer) -> getService().create(CreateRequest.newBuilder()
         .build(), observer), CreateResponse::getHeader)
         .thenApply(v -> this);
   }
 
   @Override
   public CompletableFuture<Void> close() {
-    return this.<CloseResponse>execute((counter, header, observer) -> counter.close(CloseRequest.newBuilder()
-        .setCounterId(getPrimitiveId())
+    return this.<CloseResponse>execute((header, observer) -> getService().close(CloseRequest.newBuilder()
         .build(), observer), response -> ResponseHeader.getDefaultInstance())
         .thenApply(v -> null);
   }
 
   @Override
   public CompletableFuture<Void> delete() {
-    return this.<CloseResponse>execute((counter, header, observer) -> counter.close(CloseRequest.newBuilder()
-        .setCounterId(getPrimitiveId())
+    return this.<CloseResponse>execute((header, observer) -> getService().close(CloseRequest.newBuilder()
         .setDelete(true)
         .build(), observer), response -> ResponseHeader.getDefaultInstance())
         .thenApply(v -> null);

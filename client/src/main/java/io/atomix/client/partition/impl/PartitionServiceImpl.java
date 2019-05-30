@@ -3,9 +3,9 @@ package io.atomix.client.partition.impl;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 
-import io.atomix.api.partition.GetPartitionGroupsRequest;
-import io.atomix.api.partition.GetPartitionGroupsResponse;
-import io.atomix.api.partition.PartitionServiceGrpc;
+import io.atomix.api.controller.ControllerServiceGrpc;
+import io.atomix.api.controller.GetPartitionGroupsRequest;
+import io.atomix.api.controller.GetPartitionGroupsResponse;
 import io.atomix.client.channel.ChannelFactory;
 import io.atomix.client.partition.PartitionGroup;
 import io.atomix.client.partition.PartitionService;
@@ -15,10 +15,10 @@ import io.grpc.stub.StreamObserver;
  * Partition service implementation.
  */
 public class PartitionServiceImpl implements PartitionService {
-  private final PartitionServiceGrpc.PartitionServiceStub service;
+  private final ControllerServiceGrpc.ControllerServiceStub service;
 
   public PartitionServiceImpl(ChannelFactory channelFactory) {
-    this.service = PartitionServiceGrpc.newStub(channelFactory.getChannel());
+    this.service = ControllerServiceGrpc.newStub(channelFactory.getChannel());
   }
 
   @Override

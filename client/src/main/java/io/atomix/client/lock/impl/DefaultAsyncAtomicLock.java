@@ -20,6 +20,7 @@ import java.util.OptionalLong;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicLong;
 
+import io.atomix.api.headers.Name;
 import io.atomix.api.lock.CloseRequest;
 import io.atomix.api.lock.CloseResponse;
 import io.atomix.api.lock.CreateRequest;
@@ -33,7 +34,6 @@ import io.atomix.api.lock.LockResponse;
 import io.atomix.api.lock.LockServiceGrpc;
 import io.atomix.api.lock.UnlockRequest;
 import io.atomix.api.lock.UnlockResponse;
-import io.atomix.api.primitive.PrimitiveId;
 import io.atomix.client.impl.AbstractManagedPrimitive;
 import io.atomix.client.lock.AsyncAtomicLock;
 import io.atomix.client.lock.AtomicLock;
@@ -47,15 +47,14 @@ import io.atomix.client.utils.concurrent.ThreadContext;
 public class DefaultAsyncAtomicLock extends AbstractManagedPrimitive<LockServiceGrpc.LockServiceStub, AsyncAtomicLock> implements AsyncAtomicLock {
   private final AtomicLong lockId = new AtomicLong();
 
-  public DefaultAsyncAtomicLock(PrimitiveId id, Partition partition, ThreadContext context, Duration timeout) {
-    super(id, LockServiceGrpc.newStub(partition.getChannelFactory().getChannel()), context, timeout);
+  public DefaultAsyncAtomicLock(Name name, Partition partition, ThreadContext context, Duration timeout) {
+    super(name, LockServiceGrpc.newStub(partition.getChannelFactory().getChannel()), context, timeout);
   }
 
   @Override
   public CompletableFuture<Long> lock() {
     return command(
-        (service, header, observer) -> service.lock(LockRequest.newBuilder()
-            .setLockId(getPrimitiveId())
+        (header, observer) -> getService().lock(LockRequest.newBuilder()
             .setHeader(header)
             .setTimeout(com.google.protobuf.Duration.newBuilder()
                 .setSeconds(-1)
@@ -70,8 +69,7 @@ public class DefaultAsyncAtomicLock extends AbstractManagedPrimitive<LockService
   @Override
   public CompletableFuture<OptionalLong> tryLock() {
     return command(
-        (service, header, observer) -> service.lock(LockRequest.newBuilder()
-            .setLockId(getPrimitiveId())
+        (header, observer) -> getService().lock(LockRequest.newBuilder()
             .setHeader(header)
             .setTimeout(com.google.protobuf.Duration.newBuilder()
                 .setSeconds(0)
@@ -92,8 +90,7 @@ public class DefaultAsyncAtomicLock extends AbstractManagedPrimitive<LockService
     CompletableFuture<OptionalLong> future = new CompletableFuture<>();
     Scheduled timer = context().schedule(timeout, () -> future.complete(OptionalLong.empty()));
     command(
-        (service, header, observer) -> service.lock(LockRequest.newBuilder()
-            .setLockId(getPrimitiveId())
+        (header, observer) -> getService().lock(LockRequest.newBuilder()
             .setHeader(header)
             .setTimeout(com.google.protobuf.Duration.newBuilder()
                 .setSeconds(timeout.getSeconds())
@@ -124,8 +121,7 @@ public class DefaultAsyncAtomicLock extends AbstractManagedPrimitive<LockService
     long lock = this.lockId.getAndSet(0);
     if (lock != 0) {
       return command(
-          (service, header, observer) -> service.unlock(UnlockRequest.newBuilder()
-              .setLockId(getPrimitiveId())
+          (header, observer) -> getService().unlock(UnlockRequest.newBuilder()
               .setHeader(header)
               .setVersion(lock)
               .build(), observer), UnlockResponse::getHeader)
@@ -137,8 +133,7 @@ public class DefaultAsyncAtomicLock extends AbstractManagedPrimitive<LockService
   @Override
   public CompletableFuture<Boolean> unlock(long version) {
     return command(
-        (service, header, observer) -> service.unlock(UnlockRequest.newBuilder()
-            .setLockId(getPrimitiveId())
+        (header, observer) -> getService().unlock(UnlockRequest.newBuilder()
             .setHeader(header)
             .setVersion(version)
             .build(), observer), UnlockResponse::getHeader)
@@ -153,8 +148,7 @@ public class DefaultAsyncAtomicLock extends AbstractManagedPrimitive<LockService
   @Override
   public CompletableFuture<Boolean> isLocked(long version) {
     return query(
-        (service, header, observer) -> service.isLocked(IsLockedRequest.newBuilder()
-            .setLockId(getPrimitiveId())
+        (header, observer) -> getService().isLocked(IsLockedRequest.newBuilder()
             .setHeader(header)
             .setVersion(version)
             .build(), observer), IsLockedResponse::getHeader)
@@ -163,8 +157,7 @@ public class DefaultAsyncAtomicLock extends AbstractManagedPrimitive<LockService
 
   @Override
   protected CompletableFuture<Long> openSession(Duration timeout) {
-    return this.<CreateResponse>session((service, header, observer) -> service.create(CreateRequest.newBuilder()
-        .setLockId(getPrimitiveId())
+    return this.<CreateResponse>session((header, observer) -> getService().create(CreateRequest.newBuilder()
         .setTimeout(com.google.protobuf.Duration.newBuilder()
             .setSeconds(timeout.getSeconds())
             .setNanos(timeout.getNano())
@@ -175,16 +168,14 @@ public class DefaultAsyncAtomicLock extends AbstractManagedPrimitive<LockService
 
   @Override
   protected CompletableFuture<Boolean> keepAlive() {
-    return this.<KeepAliveResponse>session((service, header, observer) -> service.keepAlive(KeepAliveRequest.newBuilder()
-        .setLockId(getPrimitiveId())
+    return this.<KeepAliveResponse>session((header, observer) -> getService().keepAlive(KeepAliveRequest.newBuilder()
         .build(), observer))
         .thenApply(response -> true);
   }
 
   @Override
   protected CompletableFuture<Void> close(boolean delete) {
-    return this.<CloseResponse>session((service, header, observer) -> service.close(CloseRequest.newBuilder()
-        .setLockId(getPrimitiveId())
+    return this.<CloseResponse>session((header, observer) -> getService().close(CloseRequest.newBuilder()
         .setDelete(delete)
         .build(), observer))
         .thenApply(v -> null);

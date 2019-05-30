@@ -15,7 +15,7 @@
  */
 package io.atomix.client.map;
 
-import io.atomix.api.primitive.PrimitiveId;
+import io.atomix.api.headers.Name;
 import io.atomix.client.PrimitiveManagementService;
 import io.atomix.client.SyncPrimitive;
 import io.atomix.client.cache.CachedPrimitiveBuilder;
@@ -25,7 +25,7 @@ import io.atomix.client.cache.CachedPrimitiveBuilder;
  */
 public abstract class MapBuilder<B extends MapBuilder<B, P, K, V>, P extends SyncPrimitive, K, V>
     extends CachedPrimitiveBuilder<B, P> {
-  protected MapBuilder(PrimitiveId id, PrimitiveManagementService managementService) {
-    super(id, managementService);
+  protected MapBuilder(Name name, PrimitiveManagementService managementService) {
+    super(name, managementService);
   }
 }

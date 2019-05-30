@@ -7,7 +7,7 @@ import java.util.function.Supplier;
 
 import com.google.common.base.Strings;
 import com.google.protobuf.Message;
-import io.atomix.api.primitive.PrimitiveId;
+import io.atomix.api.headers.Name;
 import io.atomix.service.proxy.ServiceProxy;
 import io.atomix.utils.stream.StreamHandler;
 import io.grpc.Metadata;
@@ -33,7 +33,7 @@ public class RequestExecutor<P extends ServiceProxy> {
    * @param function         the function to execute
    */
   public <R extends Message> void execute(
-      PrimitiveId id,
+      Name id,
       Supplier<R> defaultResponseSupplier,
       StreamObserver<R> responseObserver,
       Function<P, CompletableFuture<R>> function) {
@@ -57,7 +57,7 @@ public class RequestExecutor<P extends ServiceProxy> {
    * @param function         the function to execute
    */
   public <T, R extends Message> void execute(
-      PrimitiveId id,
+      Name id,
       Supplier<R> defaultResponseSupplier,
       StreamObserver<R> responseObserver,
       BiFunction<P, StreamHandler<T>, CompletableFuture<?>> function,
@@ -96,7 +96,7 @@ public class RequestExecutor<P extends ServiceProxy> {
    * @param responseObserver        the response observer
    * @return indicates whether the ID is valid
    */
-  private <R extends Message> boolean isValidId(PrimitiveId id, Supplier<R> defaultResponseSupplier, StreamObserver<R> responseObserver) {
+  private <R extends Message> boolean isValidId(Name id, Supplier<R> defaultResponseSupplier, StreamObserver<R> responseObserver) {
     if (Strings.isNullOrEmpty(id.getName())) {
       fail(Status.INVALID_ARGUMENT, "Primitive name not specified", defaultResponseSupplier, responseObserver);
       return false;

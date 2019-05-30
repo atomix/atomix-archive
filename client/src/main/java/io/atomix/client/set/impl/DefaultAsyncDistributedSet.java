@@ -8,7 +8,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
 
-import io.atomix.api.primitive.PrimitiveId;
+import io.atomix.api.headers.Name;
 import io.atomix.api.set.AddRequest;
 import io.atomix.api.set.AddResponse;
 import io.atomix.api.set.ClearRequest;
@@ -52,8 +52,8 @@ public class DefaultAsyncDistributedSet
   private volatile CompletableFuture<Long> listenFuture;
   private final Map<CollectionEventListener<String>, Executor> eventListeners = new ConcurrentHashMap<>();
 
-  public DefaultAsyncDistributedSet(PrimitiveId id, Partition partition, ThreadContext context, Duration timeout) {
-    super(id, SetServiceGrpc.newStub(partition.getChannelFactory().getChannel()), context, timeout);
+  public DefaultAsyncDistributedSet(Name name, Partition partition, ThreadContext context, Duration timeout) {
+    super(name, SetServiceGrpc.newStub(partition.getChannelFactory().getChannel()), context, timeout);
   }
 
   @Override
@@ -69,8 +69,7 @@ public class DefaultAsyncDistributedSet
   @Override
   public CompletableFuture<Integer> size() {
     return query(
-        (set, header, observer) -> set.size(SizeRequest.newBuilder()
-            .setSetId(getPrimitiveId())
+        (header, observer) -> getService().size(SizeRequest.newBuilder()
             .setHeader(header)
             .build(), observer),
         SizeResponse::getHeader)
@@ -91,8 +90,7 @@ public class DefaultAsyncDistributedSet
   @SuppressWarnings("unchecked")
   public CompletableFuture<Boolean> addAll(Collection<? extends String> c) {
     return command(
-        (set, header, observer) -> set.add(AddRequest.newBuilder()
-            .setSetId(getPrimitiveId())
+        (header, observer) -> getService().add(AddRequest.newBuilder()
             .setHeader(header)
             .addAllValues((Collection) c)
             .build(), observer),
@@ -103,8 +101,7 @@ public class DefaultAsyncDistributedSet
   @Override
   public CompletableFuture<Boolean> containsAll(Collection<? extends String> c) {
     return query(
-        (set, header, observer) -> set.contains(ContainsRequest.newBuilder()
-            .setSetId(getPrimitiveId())
+        (header, observer) -> getService().contains(ContainsRequest.newBuilder()
             .setHeader(header)
             .addAllValues((Collection) c)
             .build(), observer),
@@ -120,8 +117,7 @@ public class DefaultAsyncDistributedSet
   @Override
   public CompletableFuture<Boolean> removeAll(Collection<? extends String> c) {
     return command(
-        (set, header, observer) -> set.remove(RemoveRequest.newBuilder()
-            .setSetId(getPrimitiveId())
+        (header, observer) -> getService().remove(RemoveRequest.newBuilder()
             .setHeader(header)
             .addAllValues((Collection) c)
             .build(), observer),
@@ -132,8 +128,7 @@ public class DefaultAsyncDistributedSet
   @Override
   public CompletableFuture<Void> clear() {
     return command(
-        (set, header, observer) -> set.clear(ClearRequest.newBuilder()
-            .setSetId(getPrimitiveId())
+        (header, observer) -> getService().clear(ClearRequest.newBuilder()
             .setHeader(header)
             .build(), observer),
         ClearResponse::getHeader)
@@ -143,8 +138,7 @@ public class DefaultAsyncDistributedSet
   private synchronized CompletableFuture<Void> listen() {
     if (listenFuture == null && !eventListeners.isEmpty()) {
       listenFuture = command(
-          (service, header, observer) -> service.listen(EventRequest.newBuilder()
-              .setSetId(getPrimitiveId())
+          (header, observer) -> getService().listen(EventRequest.newBuilder()
               .setHeader(header)
               .build(), observer),
           EventResponse::getHeader,
@@ -204,8 +198,7 @@ public class DefaultAsyncDistributedSet
   public AsyncIterator<String> iterator() {
     StreamObserverIterator<String> iterator = new StreamObserverIterator<>();
     query(
-        (set, header, observer) -> set.iterate(IterateRequest.newBuilder()
-            .setSetId(getPrimitiveId())
+        (header, observer) -> getService().iterate(IterateRequest.newBuilder()
             .setHeader(header)
             .build(), observer),
         IterateResponse::getHeader,
@@ -217,8 +210,7 @@ public class DefaultAsyncDistributedSet
 
   @Override
   protected CompletableFuture<Long> openSession(Duration timeout) {
-    return this.<CreateResponse>session((service, header, observer) -> service.create(CreateRequest.newBuilder()
-        .setSetId(getPrimitiveId())
+    return this.<CreateResponse>session((header, observer) -> getService().create(CreateRequest.newBuilder()
         .setTimeout(com.google.protobuf.Duration.newBuilder()
             .setSeconds(timeout.getSeconds())
             .setNanos(timeout.getNano())
@@ -229,16 +221,14 @@ public class DefaultAsyncDistributedSet
 
   @Override
   protected CompletableFuture<Boolean> keepAlive() {
-    return this.<KeepAliveResponse>session((service, header, observer) -> service.keepAlive(KeepAliveRequest.newBuilder()
-        .setSetId(getPrimitiveId())
+    return this.<KeepAliveResponse>session((header, observer) -> getService().keepAlive(KeepAliveRequest.newBuilder()
         .build(), observer))
         .thenApply(response -> true);
   }
 
   @Override
   protected CompletableFuture<Void> close(boolean delete) {
-    return this.<CloseResponse>session((service, header, observer) -> service.close(CloseRequest.newBuilder()
-        .setSetId(getPrimitiveId())
+    return this.<CloseResponse>session((header, observer) -> getService().close(CloseRequest.newBuilder()
         .setDelete(delete)
         .build(), observer))
         .thenApply(v -> null);

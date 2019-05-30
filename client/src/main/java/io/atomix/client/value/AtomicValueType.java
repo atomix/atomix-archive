@@ -15,7 +15,7 @@
  */
 package io.atomix.client.value;
 
-import io.atomix.api.primitive.PrimitiveId;
+import io.atomix.api.headers.Name;
 import io.atomix.client.PrimitiveManagementService;
 import io.atomix.client.PrimitiveType;
 import io.atomix.client.value.impl.DefaultAtomicValueBuilder;
@@ -40,8 +40,8 @@ public class AtomicValueType<V> implements PrimitiveType<AtomicValueBuilder<V>, 
   }
 
   @Override
-  public AtomicValueBuilder<V> newBuilder(PrimitiveId id, PrimitiveManagementService managementService) {
-    return new DefaultAtomicValueBuilder<>(id, managementService);
+  public AtomicValueBuilder<V> newBuilder(Name name, PrimitiveManagementService managementService) {
+    return new DefaultAtomicValueBuilder<>(name, managementService);
   }
 
   @Override
