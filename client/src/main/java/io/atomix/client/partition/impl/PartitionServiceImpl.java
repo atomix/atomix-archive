@@ -6,6 +6,7 @@ import java.util.function.Consumer;
 import io.atomix.api.controller.ControllerServiceGrpc;
 import io.atomix.api.controller.GetPartitionGroupsRequest;
 import io.atomix.api.controller.GetPartitionGroupsResponse;
+import io.atomix.api.partition.PartitionGroupId;
 import io.atomix.client.channel.ChannelFactory;
 import io.atomix.client.partition.PartitionGroup;
 import io.atomix.client.partition.PartitionService;
@@ -22,15 +23,16 @@ public class PartitionServiceImpl implements PartitionService {
   }
 
   @Override
-  public CompletableFuture<PartitionGroup> getPartitionGroup(String name) {
+  public CompletableFuture<PartitionGroup> getPartitionGroup(PartitionGroupId id) {
     return this.<GetPartitionGroupsResponse>execute(observer ->
-        service.getPartitionGroups(GetPartitionGroupsRequest.newBuilder().build(), observer))
+        service.getPartitionGroups(GetPartitionGroupsRequest.newBuilder()
+            .setId(id)
+            .build(), observer))
         .thenApply(response -> {
-          io.atomix.api.partition.PartitionGroup group = response.getGroupsList().stream()
-              .filter(g -> g.getName().equals(name))
-              .findFirst()
-              .orElse(null);
-          return new PartitionGroupImpl(group);
+          if (response.getGroupsList().isEmpty()) {
+            return null;
+          }
+          return new PartitionGroupImpl(response.getGroups(0));
         });
   }
 

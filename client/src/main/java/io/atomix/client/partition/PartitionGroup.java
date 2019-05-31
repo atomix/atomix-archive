@@ -3,17 +3,19 @@ package io.atomix.client.partition;
 import java.util.Collection;
 import java.util.List;
 
+import io.atomix.api.partition.PartitionGroupId;
+
 /**
  * Partition group.
  */
 public interface PartitionGroup {
 
   /**
-   * Returns the partition group name.
+   * Returns the partition group ID.
    *
-   * @return the partition group name
+   * @return the partition group ID
    */
-  String name();
+  PartitionGroupId id();
 
   /**
    * Returns a partition by ID.

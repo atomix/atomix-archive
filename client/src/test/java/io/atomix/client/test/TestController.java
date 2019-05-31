@@ -2,7 +2,9 @@ package io.atomix.client.test;
 
 import java.util.Collection;
 import java.util.concurrent.CompletableFuture;
+import java.util.stream.Collectors;
 
+import com.google.common.base.Strings;
 import io.atomix.api.controller.ControllerServiceGrpc;
 import io.atomix.api.controller.GetPartitionGroupsRequest;
 import io.atomix.api.controller.GetPartitionGroupsResponse;
@@ -28,9 +30,25 @@ public class TestController extends ControllerServiceGrpc.ControllerServiceImplB
 
   @Override
   public void getPartitionGroups(GetPartitionGroupsRequest request, StreamObserver<GetPartitionGroupsResponse> responseObserver) {
-    responseObserver.onNext(GetPartitionGroupsResponse.newBuilder()
-        .addAllGroups(groups)
-        .build());
+    String name = !Strings.isNullOrEmpty(request.getId().getName()) ? request.getId().getName() : null;
+    String namespace = !Strings.isNullOrEmpty(request.getId().getNamespace()) ? request.getId().getNamespace() : null;
+    if (name != null && namespace != null) {
+      responseObserver.onNext(GetPartitionGroupsResponse.newBuilder()
+          .addAllGroups(groups.stream()
+              .filter(group -> group.getId().getName().equals(name) && group.getId().getNamespace().equals(namespace))
+              .collect(Collectors.toList()))
+          .build());
+    } else if (namespace != null) {
+      responseObserver.onNext(GetPartitionGroupsResponse.newBuilder()
+          .addAllGroups(groups.stream()
+              .filter(group -> group.getId().getNamespace().equals(namespace))
+              .collect(Collectors.toList()))
+          .build());
+    } else {
+      responseObserver.onNext(GetPartitionGroupsResponse.newBuilder()
+          .addAllGroups(groups)
+          .build());
+    }
     responseObserver.onCompleted();
   }
 

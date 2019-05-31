@@ -7,6 +7,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 
+import io.atomix.api.partition.PartitionGroupId;
 import io.atomix.client.partition.Partition;
 import io.atomix.client.partition.PartitionGroup;
 
@@ -25,8 +26,8 @@ public class PartitionGroupImpl implements PartitionGroup {
   }
 
   @Override
-  public String name() {
-    return group.getName();
+  public PartitionGroupId id() {
+    return group.getId();
   }
 
   @Override

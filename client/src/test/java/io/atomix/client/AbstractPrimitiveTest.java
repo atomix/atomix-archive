@@ -33,6 +33,7 @@ import com.google.protobuf.Any;
 import io.atomix.api.partition.Partition;
 import io.atomix.api.partition.PartitionEndpoint;
 import io.atomix.api.partition.PartitionGroup;
+import io.atomix.api.partition.PartitionGroupId;
 import io.atomix.api.partition.PartitionGroupSpec;
 import io.atomix.api.partition.PartitionId;
 import io.atomix.client.test.TestController;
@@ -73,7 +74,10 @@ public abstract class AbstractPrimitiveTest {
     return new AtomixServer(ServerConfig.newBuilder()
         .setPartition(PartitionId.newBuilder()
             .setPartition(partitionId)
-            .setGroup("test")
+            .setGroup(PartitionGroupId.newBuilder()
+                .setName("test")
+                .setNamespace("default")
+                .build())
             .build())
         .setNode(NodeConfig.newBuilder()
             .setId(memberId)
@@ -98,9 +102,13 @@ public abstract class AbstractPrimitiveTest {
     deleteData();
     clients = new CopyOnWriteArrayList<>();
     PartitionGroup partitionGroup = PartitionGroup.newBuilder()
-        .setName("test")
-        .setSpec(PartitionGroupSpec.newBuilder()
+        .setId(PartitionGroupId.newBuilder()
             .setName("test")
+            .setNamespace("default")
+            .build())
+        .setSpec(PartitionGroupSpec.newBuilder()
+            .setPartitions(3)
+            .setPartitionSize(1)
             .build())
         .addPartitions(Partition.newBuilder()
             .setPartitionId(1)
