@@ -11,11 +11,12 @@ option java_multiple_files = true;
 
 // Atomix server configuration
 message ServerConfig {
-    NodeConfig node = 1;
-    atomix.partition.PartitionId partition = 2;
-    NodeConfig controller = 3;
-    TlsConfig tls = 4;
-    ProtocolConfig protocol = 5;
+    int32 partition_id = 1;
+    atomix.partition.PartitionGroupId partition_group = 2;
+    NodeConfig node = 3;
+    NodeConfig controller = 4;
+    TlsConfig tls = 5;
+    ProtocolConfig protocol = 6;
 }
 
 // TLS configuration

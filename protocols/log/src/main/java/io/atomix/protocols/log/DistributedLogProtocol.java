@@ -99,9 +99,7 @@ public class DistributedLogProtocol implements LogProtocol {
     return DistributedLogClient.builder()
         .withProtocol(protocol)
         .withThreadContextFactory(managementService.getThreadService().getFactory())
-        .withTermProvider(new PrimaryElectionTermProvider(
-            managementService.getPrimaryElectionService().getElectionFor(managementService.getPartitionId()),
-            config.getMember()))
+        .withTermProvider(new PrimaryElectionTermProvider(managementService.getPrimaryElectionService()))
         .build();
   }
 }

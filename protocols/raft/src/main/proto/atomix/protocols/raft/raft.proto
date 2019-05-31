@@ -35,7 +35,6 @@ enum ReadConsistency {
 }
 
 message RaftProtocolConfig {
-    string member_id = 1;
     repeated string members = 2;
     google.protobuf.Duration election_timeout = 3;
     google.protobuf.Duration heartbeat_interval = 4;

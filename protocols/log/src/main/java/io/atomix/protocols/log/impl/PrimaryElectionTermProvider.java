@@ -8,20 +8,18 @@ import java.util.function.Consumer;
 import io.atomix.api.controller.PrimaryTerm;
 import io.atomix.protocols.log.Term;
 import io.atomix.protocols.log.TermProvider;
-import io.atomix.server.management.PrimaryElection;
 import io.atomix.server.management.PrimaryElectionEvent;
+import io.atomix.server.management.PrimaryElectionService;
 
 /**
  * Primary election service based term provider.
  */
 public class PrimaryElectionTermProvider implements TermProvider {
-  private final PrimaryElection election;
-  private final String member;
+  private final PrimaryElectionService election;
   private final Map<Consumer<Term>, Consumer<PrimaryElectionEvent>> eventListeners = new ConcurrentHashMap<>();
 
-  public PrimaryElectionTermProvider(PrimaryElection election, String member) {
+  public PrimaryElectionTermProvider(PrimaryElectionService election) {
     this.election = election;
-    this.member = member;
   }
 
   private Term toTerm(PrimaryTerm term) {
@@ -38,7 +36,7 @@ public class PrimaryElectionTermProvider implements TermProvider {
 
   @Override
   public CompletableFuture<Term> join() {
-    return election.enter(member).thenApply(this::toTerm);
+    return election.enter().thenApply(this::toTerm);
   }
 
   @Override

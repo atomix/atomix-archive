@@ -1,6 +1,5 @@
 package io.atomix.server.management;
 
-import io.atomix.api.partition.PartitionId;
 import io.atomix.server.protocol.ProtocolTypeRegistry;
 import io.atomix.service.ServiceTypeRegistry;
 import io.atomix.utils.concurrent.ThreadService;
@@ -11,11 +10,11 @@ import io.atomix.utils.concurrent.ThreadService;
 public interface ProtocolManagementService {
 
   /**
-   * Returns the local partition ID.
+   * Returns the local node
    *
-   * @return the local partition ID
+   * @return the local node
    */
-  PartitionId getPartitionId();
+  Node getNode();
 
   /**
    * Returns the service registry.

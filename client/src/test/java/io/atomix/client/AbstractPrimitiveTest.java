@@ -35,7 +35,6 @@ import io.atomix.api.partition.PartitionEndpoint;
 import io.atomix.api.partition.PartitionGroup;
 import io.atomix.api.partition.PartitionGroupId;
 import io.atomix.api.partition.PartitionGroupSpec;
-import io.atomix.api.partition.PartitionId;
 import io.atomix.client.test.TestController;
 import io.atomix.client.utils.concurrent.Futures;
 import io.atomix.protocols.raft.RaftProtocol;
@@ -72,12 +71,10 @@ public abstract class AbstractPrimitiveTest {
   private AtomixServer createServer(int partitionId, String host, int port) {
     String memberId = String.format("test-%d", partitionId);
     return new AtomixServer(ServerConfig.newBuilder()
-        .setPartition(PartitionId.newBuilder()
-            .setPartition(partitionId)
-            .setGroup(PartitionGroupId.newBuilder()
-                .setName("test")
-                .setNamespace("default")
-                .build())
+        .setPartitionId(partitionId)
+        .setPartitionGroup(PartitionGroupId.newBuilder()
+            .setName("test")
+            .setNamespace("default")
             .build())
         .setNode(NodeConfig.newBuilder()
             .setId(memberId)
@@ -87,7 +84,6 @@ public abstract class AbstractPrimitiveTest {
         .setProtocol(ProtocolConfig.newBuilder()
             .setType(RaftProtocol.TYPE.name())
             .setConfig(Any.pack(RaftProtocolConfig.newBuilder()
-                .setMemberId(memberId)
                 .addMembers(memberId)
                 .setStorage(RaftStorageConfig.newBuilder()
                     .setDirectory("target/test-data/test/" + memberId)

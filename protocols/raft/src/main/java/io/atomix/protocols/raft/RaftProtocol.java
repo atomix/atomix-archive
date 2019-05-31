@@ -86,7 +86,7 @@ public class RaftProtocol implements ServiceProtocol {
         .plusNanos(config.getElectionTimeout().getNanos());
     Duration heartbeatInterval = Duration.ofSeconds(config.getHeartbeatInterval().getSeconds())
         .plusNanos(config.getHeartbeatInterval().getNanos());
-    return RaftServer.builder(config.getMemberId())
+    return RaftServer.builder(managementService.getNode().id())
         .withProtocol(new GrpcServerProtocol(
             managementService.getServiceProvider().getFactory(RaftServiceGrpc::newStub),
             managementService.getServiceRegistry()))

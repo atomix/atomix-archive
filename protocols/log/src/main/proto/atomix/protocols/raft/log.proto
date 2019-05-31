@@ -22,9 +22,8 @@ enum ReplicationStrategy {
 }
 
 message LogProtocolConfig {
-    string member = 1;
-    LogStorageConfig storage = 2;
-    LogCompactionConfig compaction = 3;
+    LogStorageConfig storage = 1;
+    LogCompactionConfig compaction = 2;
 }
 
 message LogStorageConfig {
