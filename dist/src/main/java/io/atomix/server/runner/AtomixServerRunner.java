@@ -136,10 +136,15 @@ public class AtomixServerRunner {
     if (logConfig != null) {
       System.setProperty("logback.configurationFile", logConfig);
     }
-    System.setProperty("atomix.log.directory", namespace.getString("log_dir"));
-    System.setProperty("atomix.log.level", namespace.getString("log_level"));
-    System.setProperty("atomix.log.console.level", namespace.getString("console_log_level"));
-    System.setProperty("atomix.log.file.level", namespace.getString("file_log_level"));
+    if (System.getProperty("atomix.log.directory") == null) {
+      System.setProperty("atomix.log.directory", "log");
+    }
+    if (System.getProperty("atomix.log.file.level") == null) {
+      System.setProperty("atomix.log.file.level", "INFO");
+    }
+    if (System.getProperty("atomix.log.console.level") == null) {
+      System.setProperty("atomix.log.console.level", "INFO");
+    }
     return LoggerFactory.getLogger(AtomixServerRunner.class);
   }
 

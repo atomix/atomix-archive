@@ -27,7 +27,7 @@
     <!-- Adds the dependencies of our application to the lib directory -->
     <dependencySets>
         <dependencySet>
-            <useProjectArtifact>false</useProjectArtifact>
+            <useProjectArtifact>true</useProjectArtifact>
             <useTransitiveDependencies>true</useTransitiveDependencies>
             <outputDirectory>lib/system</outputDirectory>
             <unpack>false</unpack>
