@@ -26,6 +26,7 @@ import com.google.protobuf.Message;
 import io.atomix.utils.concurrent.Futures;
 import io.atomix.utils.concurrent.SingleThreadContext;
 import io.atomix.utils.concurrent.ThreadContext;
+import io.atomix.utils.config.ConfigurationException;
 import io.github.classgraph.ClassGraph;
 import io.github.classgraph.ClassInfo;
 import io.github.classgraph.ScanResult;
@@ -53,6 +54,33 @@ public class ComponentManager<C extends Message, M> {
     this.rootClass = root;
     this.classLoader = classLoader;
     this.scope = scope;
+  }
+
+  /**
+   * Loads the component instance of the given type.
+   *
+   * @param type the component type
+   * @param <T>  the component type
+   * @return the component instance
+   */
+  @SuppressWarnings("unchecked")
+  public static <T> T getComponent(Class<T> type) {
+    final ClassGraph classGraph = new ClassGraph()
+        .enableClassInfo()
+        .enableAnnotationInfo();
+    try (ScanResult result = classGraph.scan()) {
+      for (ClassInfo classInfo : result.getClassesWithAnnotation(Component.class.getName())) {
+        Class<?> componentClass = classInfo.loadClass();
+        if (type.isAssignableFrom(componentClass)) {
+          try {
+            return (T) componentClass.newInstance();
+          } catch (InstantiationException | IllegalAccessException e) {
+            throw new ConfigurationException("Failed to instantiate component", e);
+          }
+        }
+      }
+    }
+    return null;
   }
 
   /**

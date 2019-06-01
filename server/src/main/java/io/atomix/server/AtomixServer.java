@@ -29,11 +29,13 @@ import java.util.stream.Stream;
 import com.google.common.collect.Lists;
 import com.google.common.io.Resources;
 import io.atomix.server.management.impl.ServerManager;
+import io.atomix.server.protocol.ProtocolTypeRegistry;
 import io.atomix.utils.Version;
 import io.atomix.utils.component.Component;
 import io.atomix.utils.component.ComponentManager;
 import io.atomix.utils.config.ConfigMapper;
 import io.atomix.utils.config.ConfigurationException;
+import io.atomix.utils.config.PolymorphicTypeMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -145,8 +147,14 @@ public class AtomixServer {
    * @param files       the files to load
    * @return a new Atomix configuration from the given resource
    */
+  @SuppressWarnings("unchecked")
   private static ServerConfig config(ClassLoader classLoader, List<File> files) {
-    ConfigMapper mapper = new ConfigMapper(classLoader);
+    ProtocolTypeRegistry protocolTypes = ComponentManager.getComponent(ProtocolTypeRegistry.class);
+    ConfigMapper mapper = new ConfigMapper(classLoader, new PolymorphicTypeMapper(
+        ProtocolConfig.getDescriptor(),
+        ProtocolConfig.getDescriptor().findFieldByName("type"),
+        ProtocolConfig.getDescriptor().findFieldByName("config"),
+        protocolTypes));
     return mapper.loadFiles(ServerConfig.getDescriptor(), files, Lists.newArrayList(RESOURCES));
   }
 

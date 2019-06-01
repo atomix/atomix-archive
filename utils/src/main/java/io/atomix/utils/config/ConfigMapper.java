@@ -64,6 +64,25 @@ public class ConfigMapper {
   }
 
   /**
+   * Loads the given configuration string using the mapper.
+   *
+   * @param descriptor the type descriptor
+   * @param text       the configuration text
+   * @param <T>        the resulting type
+   * @return the loaded configuration
+   */
+  @SuppressWarnings("unchecked")
+  public <T> T loadString(Descriptors.Descriptor descriptor, String text) {
+    ObjectMapper mapper = new ObjectMapper(new YAMLFactory());
+    try {
+      ObjectNode node = (ObjectNode) mapper.readTree(text);
+      return (T) map(node, descriptor);
+    } catch (IOException e) {
+      throw new ConfigurationException("Failed to parse configuration", e);
+    }
+  }
+
+  /**
    * Loads the given configuration file using the mapper, falling back to the given resources.
    *
    * @param descriptor the type descriptor
@@ -209,8 +228,8 @@ public class ConfigMapper {
       }
 
       String typeName = config.get(type.getNameField().getJsonName()).asText();
-      Descriptors.Descriptor typeDescriptor = descriptor = type.getConfigDescriptor(typeName);
-      if (descriptor == null) {
+      Descriptors.Descriptor typeDescriptor = type.getConfigDescriptor(typeName);
+      if (typeDescriptor == null) {
         throw new ConfigurationException("Unknown polymorphic type " + typeName);
       }
 
