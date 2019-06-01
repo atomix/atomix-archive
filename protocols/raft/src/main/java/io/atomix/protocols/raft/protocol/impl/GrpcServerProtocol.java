@@ -1,7 +1,10 @@
 package io.atomix.protocols.raft.protocol.impl;
 
 import java.net.ConnectException;
+import java.util.Collection;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 import java.util.function.Function;
@@ -30,8 +33,10 @@ import io.atomix.protocols.raft.protocol.TransferRequest;
 import io.atomix.protocols.raft.protocol.TransferResponse;
 import io.atomix.protocols.raft.protocol.VoteRequest;
 import io.atomix.protocols.raft.protocol.VoteResponse;
+import io.atomix.server.NodeConfig;
 import io.atomix.server.management.ServiceFactory;
 import io.atomix.server.management.ServiceRegistry;
+import io.atomix.utils.concurrent.Futures;
 import io.atomix.utils.stream.StreamHandler;
 import io.grpc.stub.StreamObserver;
 
@@ -46,6 +51,7 @@ public class GrpcServerProtocol extends RaftServiceGrpc.RaftServiceImplBase impl
   }
 
   private final ServiceFactory<RaftServiceGrpc.RaftServiceStub> factory;
+  private final Map<String, NodeConfig> members = new ConcurrentHashMap<>();
   private Function<QueryRequest, CompletableFuture<QueryResponse>> queryHandler;
   private BiFunction<QueryRequest, StreamHandler<QueryResponse>, CompletableFuture<Void>> queryStreamHandler;
   private Function<CommandRequest, CompletableFuture<CommandResponse>> commandHandler;
@@ -60,8 +66,12 @@ public class GrpcServerProtocol extends RaftServiceGrpc.RaftServiceImplBase impl
   private Function<VoteRequest, CompletableFuture<VoteResponse>> voteHandler;
   private Function<AppendRequest, CompletableFuture<AppendResponse>> appendHandler;
 
-  public GrpcServerProtocol(ServiceFactory<RaftServiceGrpc.RaftServiceStub> factory, ServiceRegistry registry) {
+  public GrpcServerProtocol(
+      ServiceFactory<RaftServiceGrpc.RaftServiceStub> factory,
+      ServiceRegistry registry,
+      Collection<NodeConfig> members) {
     this.factory = factory;
+    members.forEach(member -> this.members.put(member.getId(), member));
     registry.register(this);
   }
 
@@ -374,8 +384,13 @@ public class GrpcServerProtocol extends RaftServiceGrpc.RaftServiceImplBase impl
   }
 
   protected <T> CompletableFuture<T> execute(String memberId, BiConsumer<RaftServiceGrpc.RaftServiceStub, StreamObserver<T>> callback) {
+    NodeConfig member = members.get(memberId);
+    if (member == null) {
+      return Futures.exceptionalFuture(CONNECT_EXCEPTION);
+    }
+
     CompletableFuture<T> future = new CompletableFuture<>();
-    callback.accept(factory.getService(memberId), new StreamObserver<T>() {
+    callback.accept(factory.getService(member.getHost(), member.getPort()), new StreamObserver<T>() {
       @Override
       public void onNext(T response) {
         future.complete(response);
@@ -395,7 +410,12 @@ public class GrpcServerProtocol extends RaftServiceGrpc.RaftServiceImplBase impl
   }
 
   protected <T> CompletableFuture<Void> execute(String memberId, StreamHandler<T> handler, BiConsumer<RaftServiceGrpc.RaftServiceStub, StreamObserver<T>> callback) {
-    callback.accept(factory.getService(memberId), new StreamObserver<T>() {
+    NodeConfig member = members.get(memberId);
+    if (member == null) {
+      return Futures.exceptionalFuture(CONNECT_EXCEPTION);
+    }
+
+    callback.accept(factory.getService(member.getHost(), member.getPort()), new StreamObserver<T>() {
       @Override
       public void onNext(T value) {
         handler.next(value);

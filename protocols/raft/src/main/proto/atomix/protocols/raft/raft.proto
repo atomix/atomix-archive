@@ -3,6 +3,7 @@ syntax = "proto3";
 package atomix.protocols.raft;
 
 import "google/protobuf/duration.proto";
+import "atomix/server/config.proto";
 import "atomix/utils/memory.proto";
 
 option java_package = "io.atomix.protocols.raft.protocol";
@@ -35,7 +36,7 @@ enum ReadConsistency {
 }
 
 message RaftProtocolConfig {
-    repeated string members = 2;
+    repeated atomix.server.NodeConfig members = 2;
     google.protobuf.Duration election_timeout = 3;
     google.protobuf.Duration heartbeat_interval = 4;
     RaftStorageConfig storage = 5;

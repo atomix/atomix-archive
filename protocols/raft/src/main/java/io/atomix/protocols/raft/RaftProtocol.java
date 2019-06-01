@@ -2,6 +2,7 @@ package io.atomix.protocols.raft;
 
 import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
+import java.util.stream.Collectors;
 
 import com.google.common.base.Strings;
 import com.google.protobuf.Descriptors;
@@ -10,6 +11,7 @@ import io.atomix.protocols.raft.protocol.RaftServiceGrpc;
 import io.atomix.protocols.raft.protocol.impl.GrpcClientProtocol;
 import io.atomix.protocols.raft.protocol.impl.GrpcServerProtocol;
 import io.atomix.protocols.raft.storage.RaftStorage;
+import io.atomix.server.NodeConfig;
 import io.atomix.server.management.ProtocolManagementService;
 import io.atomix.server.protocol.Protocol;
 import io.atomix.server.protocol.ProtocolClient;
@@ -73,12 +75,12 @@ public class RaftProtocol implements ServiceProtocol {
 
   private CompletableFuture<Void> startServer() {
     server = buildServer();
-    return server.bootstrap(config.getMembersList()).thenApply(v -> null);
+    return server.bootstrap(config.getMembersList().stream().map(NodeConfig::getId).collect(Collectors.toList())).thenApply(v -> null);
   }
 
   private CompletableFuture<Void> startClient() {
     client = buildClient();
-    return client.connect(config.getMembersList()).thenApply(v -> null);
+    return client.connect(config.getMembersList().stream().map(NodeConfig::getId).collect(Collectors.toList())).thenApply(v -> null);
   }
 
   private RaftServer buildServer() {
@@ -97,7 +99,8 @@ public class RaftProtocol implements ServiceProtocol {
     return RaftServer.builder(managementService.getNode().id())
         .withProtocol(new GrpcServerProtocol(
             managementService.getServiceProvider().getFactory(RaftServiceGrpc::newStub),
-            managementService.getServiceRegistry()))
+            managementService.getServiceRegistry(),
+            config.getMembersList()))
         .withStateMachine(new ServiceManagerStateMachine(managementService.getServiceTypeRegistry()))
         .withElectionTimeout(electionTimeout)
         .withHeartbeatInterval(heartbeatInterval)
@@ -126,7 +129,9 @@ public class RaftProtocol implements ServiceProtocol {
 
   private RaftClient buildClient() {
     return RaftClient.builder()
-        .withProtocol(new GrpcClientProtocol(managementService.getServiceProvider().getFactory(RaftServiceGrpc::newStub)))
+        .withProtocol(new GrpcClientProtocol(
+                managementService.getServiceProvider().getFactory(RaftServiceGrpc::newStub),
+            config.getMembersList()))
         .withThreadContextFactory(managementService.getThreadService().getFactory())
         .build();
   }
