@@ -30,6 +30,7 @@ import com.google.common.collect.Lists;
 import com.google.common.io.Resources;
 import io.atomix.server.management.impl.ServerManager;
 import io.atomix.server.protocol.ProtocolTypeRegistry;
+import io.atomix.server.protocol.impl.ProtocolTypeRegistryImpl;
 import io.atomix.utils.Version;
 import io.atomix.utils.component.Component;
 import io.atomix.utils.component.ComponentManager;
@@ -149,7 +150,8 @@ public class AtomixServer {
    */
   @SuppressWarnings("unchecked")
   private static ServerConfig config(ClassLoader classLoader, List<File> files) {
-    ProtocolTypeRegistry protocolTypes = ComponentManager.getComponent(ProtocolTypeRegistry.class);
+    ComponentManager manager = new ComponentManager(ProtocolTypeRegistryImpl.class);
+    ProtocolTypeRegistry protocolTypes = (ProtocolTypeRegistry) manager.start(null).join();
     ConfigMapper mapper = new ConfigMapper(classLoader, new PolymorphicTypeMapper(
         ProtocolConfig.getDescriptor(),
         ProtocolConfig.getDescriptor().findFieldByName("type"),

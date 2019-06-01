@@ -42,7 +42,7 @@ public class ProtocolTypeRegistryImpl implements ProtocolTypeRegistry, Managed {
   public Protocol.Type getType(String typeName) {
     Protocol.Type type = typeMap.get(typeName);
     if (type == null) {
-      throw new ServiceException("Unknown service type " + typeName);
+      throw new ServiceException("Unknown protocol type " + typeName);
     }
     return type;
   }
