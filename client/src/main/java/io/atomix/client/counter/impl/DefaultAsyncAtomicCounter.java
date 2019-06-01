@@ -135,6 +135,7 @@ public class DefaultAsyncAtomicCounter
   @Override
   public CompletableFuture<AsyncAtomicCounter> connect() {
     return execute((header, observer) -> getService().create(CreateRequest.newBuilder()
+        .setHeader(header)
         .build(), observer), CreateResponse::getHeader)
         .thenApply(v -> this);
   }
@@ -142,6 +143,7 @@ public class DefaultAsyncAtomicCounter
   @Override
   public CompletableFuture<Void> close() {
     return this.<CloseResponse>execute((header, observer) -> getService().close(CloseRequest.newBuilder()
+        .setHeader(header)
         .build(), observer), response -> ResponseHeader.getDefaultInstance())
         .thenApply(v -> null);
   }
@@ -149,6 +151,7 @@ public class DefaultAsyncAtomicCounter
   @Override
   public CompletableFuture<Void> delete() {
     return this.<CloseResponse>execute((header, observer) -> getService().close(CloseRequest.newBuilder()
+        .setHeader(header)
         .setDelete(true)
         .build(), observer), response -> ResponseHeader.getDefaultInstance())
         .thenApply(v -> null);

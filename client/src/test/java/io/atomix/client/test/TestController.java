@@ -58,6 +58,7 @@ public class TestController extends ControllerServiceGrpc.ControllerServiceImplB
         .setNode(NodeConfig.newBuilder()
             .setPort(port)
             .build())
-        .build());
+        .build())
+        .thenRun(() -> serviceRegistry.register(this));
   }
 }

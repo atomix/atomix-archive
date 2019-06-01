@@ -56,17 +56,19 @@ public class ServerManager implements Managed<ServerConfig> {
     }
 
     Protocol protocol = protocolType.newProtocol(protocolConfig, managementService);
-    if (protocol instanceof ServiceProtocol) {
-      managementService.getServiceRegistry().register(new CounterServiceImpl((ServiceProtocol) protocol));
-      managementService.getServiceRegistry().register(new LeaderElectionServiceImpl((ServiceProtocol) protocol));
-      managementService.getServiceRegistry().register(new LockServiceImpl((ServiceProtocol) protocol));
-      managementService.getServiceRegistry().register(new MapServiceImpl((ServiceProtocol) protocol));
-      managementService.getServiceRegistry().register(new SetServiceImpl((ServiceProtocol) protocol));
-      managementService.getServiceRegistry().register(new ValueServiceImpl((ServiceProtocol) protocol));
-    }
-    if (protocol instanceof LogProtocol) {
-      managementService.getServiceRegistry().register(new LogServiceImpl((LogProtocol) protocol));
-    }
-    return protocol.start();
+    return protocol.start()
+        .thenRun(() -> {
+          if (protocol instanceof ServiceProtocol) {
+            managementService.getServiceRegistry().register(new CounterServiceImpl((ServiceProtocol) protocol));
+            managementService.getServiceRegistry().register(new LeaderElectionServiceImpl((ServiceProtocol) protocol));
+            managementService.getServiceRegistry().register(new LockServiceImpl((ServiceProtocol) protocol));
+            managementService.getServiceRegistry().register(new MapServiceImpl((ServiceProtocol) protocol));
+            managementService.getServiceRegistry().register(new SetServiceImpl((ServiceProtocol) protocol));
+            managementService.getServiceRegistry().register(new ValueServiceImpl((ServiceProtocol) protocol));
+          }
+          if (protocol instanceof LogProtocol) {
+            managementService.getServiceRegistry().register(new LogServiceImpl((LogProtocol) protocol));
+          }
+        });
   }
 }

@@ -26,6 +26,8 @@ import io.atomix.utils.concurrent.Futures;
 import io.atomix.utils.stream.StreamHandler;
 import org.apache.commons.lang3.tuple.Pair;
 
+import static com.google.common.base.Preconditions.checkNotNull;
+
 /**
  * Default primitive client.
  */
@@ -34,8 +36,8 @@ public class DefaultServiceClient implements ServiceClient {
   private final ProtocolClient client;
 
   public DefaultServiceClient(ServiceId serviceId, ProtocolClient client) {
-    this.serviceId = serviceId;
-    this.client = client;
+    this.serviceId = checkNotNull(serviceId);
+    this.client = checkNotNull(client);
   }
 
   @Override

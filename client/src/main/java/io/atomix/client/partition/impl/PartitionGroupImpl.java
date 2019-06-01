@@ -21,7 +21,10 @@ public class PartitionGroupImpl implements PartitionGroup {
 
   public PartitionGroupImpl(io.atomix.api.partition.PartitionGroup group) {
     this.group = group;
-    group.getPartitionsList().forEach(partition -> partitions.put(partition.getPartitionId(), new PartitionImpl(partition)));
+    group.getPartitionsList().forEach(partition -> {
+      partitions.put(partition.getPartitionId(), new PartitionImpl(partition));
+      partitionIds.add(partition.getPartitionId());
+    });
     Collections.sort(partitionIds);
   }
 
