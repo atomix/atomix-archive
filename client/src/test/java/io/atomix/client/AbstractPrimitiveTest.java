@@ -97,6 +97,7 @@ public abstract class AbstractPrimitiveTest {
   public void setupTest() throws Exception {
     deleteData();
     clients = new CopyOnWriteArrayList<>();
+    servers = new CopyOnWriteArrayList<>();
     PartitionGroup partitionGroup = PartitionGroup.newBuilder()
         .setId(PartitionGroupId.newBuilder()
             .setName("test")

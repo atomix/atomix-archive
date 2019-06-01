@@ -209,7 +209,11 @@ public class ComponentManager<C extends Message, M> {
           LOGGER.info("Starting component {}", instance);
           component.setStarted(true);
           if (instance instanceof Managed) {
-            return ((Managed) instance).start(component.config());
+            try {
+              return ((Managed) instance).start(component.config());
+            } catch (Exception e) {
+              return Futures.exceptionalFuture(e);
+            }
           }
           return CompletableFuture.completedFuture(null);
         } catch (Exception e) {
@@ -481,6 +485,7 @@ public class ComponentManager<C extends Message, M> {
 
         // If this is a getter method, get the configuration and map it.
         if (method.getName().startsWith("get")
+            && !method.getName().startsWith("getDefaultInstance")
             && method.getParameterCount() == 0
             && Message.class.isAssignableFrom(method.getReturnType())) {
           mapConfigs((Message) method.invoke(config));
