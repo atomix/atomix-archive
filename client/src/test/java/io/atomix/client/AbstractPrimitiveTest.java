@@ -62,7 +62,7 @@ public abstract class AbstractPrimitiveTest {
    */
   protected AtomixClient client() throws Exception {
     AtomixClient client = AtomixClient.builder()
-        .withServer("localhost", 5000)
+        .withServer("localhost", 6000)
         .build();
     client.start().get(10, TimeUnit.SECONDS);
     return client;
@@ -75,6 +75,11 @@ public abstract class AbstractPrimitiveTest {
         .setPartitionGroup(PartitionGroupId.newBuilder()
             .setName("test")
             .setNamespace("default")
+            .build())
+        .setController(NodeConfig.newBuilder()
+            .setId("controller")
+            .setHost("localhost")
+            .setPort(6000)
             .build())
         .setNode(NodeConfig.newBuilder()
             .setId(memberId)
