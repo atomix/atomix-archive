@@ -3,7 +3,7 @@ syntax = "proto3";
 package atomix.server;
 
 import "google/protobuf/any.proto";
-import "atomix/partition/partition.proto";
+import "atomix/controller/partition.proto";
 
 option java_package = "io.atomix.server";
 option java_outer_classname = "AtomixConfigProto";
@@ -12,7 +12,7 @@ option java_multiple_files = true;
 // Atomix server configuration
 message ServerConfig {
     int32 partition_id = 1;
-    atomix.partition.PartitionGroupId partition_group = 2;
+    atomix.controller.PartitionGroupId partition_group = 2;
     NodeConfig node = 3;
     NodeConfig controller = 4;
     TlsConfig tls = 5;

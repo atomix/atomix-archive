@@ -18,8 +18,8 @@ package io.atomix.client;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 
+import io.atomix.api.controller.PartitionGroupId;
 import io.atomix.api.headers.Name;
-import io.atomix.api.partition.PartitionGroupId;
 import io.atomix.client.partition.Partitioner;
 import io.atomix.client.utils.serializer.Serializer;
 

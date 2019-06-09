@@ -1,6 +1,6 @@
 package io.atomix.server.management;
 
-import io.atomix.api.partition.PartitionId;
+import io.atomix.api.controller.PartitionId;
 
 /**
  * Partition ID service.

@@ -7,10 +7,10 @@ import io.atomix.client.partition.Partition;
  * Partition implementation.
  */
 public class PartitionImpl implements Partition {
-  private final io.atomix.api.partition.Partition partition;
+  private final io.atomix.api.controller.Partition partition;
   private final ChannelFactory channelFactory;
 
-  public PartitionImpl(io.atomix.api.partition.Partition partition) {
+  public PartitionImpl(io.atomix.api.controller.Partition partition) {
     this.partition = partition;
     this.channelFactory = new PartitionChannelFactory(partition);
   }

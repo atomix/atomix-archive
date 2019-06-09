@@ -8,7 +8,7 @@ import com.google.common.base.Strings;
 import io.atomix.api.controller.ControllerServiceGrpc;
 import io.atomix.api.controller.GetPartitionGroupsRequest;
 import io.atomix.api.controller.GetPartitionGroupsResponse;
-import io.atomix.api.partition.PartitionGroup;
+import io.atomix.api.controller.PartitionGroup;
 import io.atomix.server.NodeConfig;
 import io.atomix.server.ServerConfig;
 import io.atomix.server.management.impl.ServiceRegistryImpl;

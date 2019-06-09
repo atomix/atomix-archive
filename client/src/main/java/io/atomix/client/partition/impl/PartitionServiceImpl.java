@@ -6,7 +6,7 @@ import java.util.function.Consumer;
 import io.atomix.api.controller.ControllerServiceGrpc;
 import io.atomix.api.controller.GetPartitionGroupsRequest;
 import io.atomix.api.controller.GetPartitionGroupsResponse;
-import io.atomix.api.partition.PartitionGroupId;
+import io.atomix.api.controller.PartitionGroupId;
 import io.atomix.client.channel.ChannelFactory;
 import io.atomix.client.partition.PartitionGroup;
 import io.atomix.client.partition.PartitionService;

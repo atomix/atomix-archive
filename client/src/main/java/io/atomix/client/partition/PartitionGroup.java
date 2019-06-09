@@ -3,7 +3,7 @@ package io.atomix.client.partition;
 import java.util.Collection;
 import java.util.List;
 
-import io.atomix.api.partition.PartitionGroupId;
+import io.atomix.api.controller.PartitionGroupId;
 
 /**
  * Partition group.

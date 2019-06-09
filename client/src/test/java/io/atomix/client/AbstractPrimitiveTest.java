@@ -30,11 +30,11 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import com.google.protobuf.Any;
-import io.atomix.api.partition.Partition;
-import io.atomix.api.partition.PartitionEndpoint;
-import io.atomix.api.partition.PartitionGroup;
-import io.atomix.api.partition.PartitionGroupId;
-import io.atomix.api.partition.PartitionGroupSpec;
+import io.atomix.api.controller.Partition;
+import io.atomix.api.controller.PartitionEndpoint;
+import io.atomix.api.controller.PartitionGroup;
+import io.atomix.api.controller.PartitionGroupId;
+import io.atomix.api.controller.PartitionGroupSpec;
 import io.atomix.client.test.TestController;
 import io.atomix.client.utils.concurrent.Futures;
 import io.atomix.protocols.raft.RaftProtocol;

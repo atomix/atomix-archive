@@ -2,7 +2,7 @@ package io.atomix.server.management.impl;
 
 import java.util.concurrent.CompletableFuture;
 
-import io.atomix.api.partition.PartitionId;
+import io.atomix.api.controller.PartitionId;
 import io.atomix.server.ServerConfig;
 import io.atomix.server.management.PartitionService;
 import io.atomix.utils.component.Component;

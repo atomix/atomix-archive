@@ -7,7 +7,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 
-import io.atomix.api.partition.PartitionGroupId;
+import io.atomix.api.controller.PartitionGroupId;
 import io.atomix.client.partition.Partition;
 import io.atomix.client.partition.PartitionGroup;
 
@@ -15,11 +15,11 @@ import io.atomix.client.partition.PartitionGroup;
  * Partition group implementation.
  */
 public class PartitionGroupImpl implements PartitionGroup {
-  private final io.atomix.api.partition.PartitionGroup group;
+  private final io.atomix.api.controller.PartitionGroup group;
   private final Map<Integer, Partition> partitions = new ConcurrentHashMap<>();
   private final List<Integer> partitionIds = new CopyOnWriteArrayList<>();
 
-  public PartitionGroupImpl(io.atomix.api.partition.PartitionGroup group) {
+  public PartitionGroupImpl(io.atomix.api.controller.PartitionGroup group) {
     this.group = group;
     group.getPartitionsList().forEach(partition -> {
       partitions.put(partition.getPartitionId(), new PartitionImpl(partition));

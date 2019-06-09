@@ -1,7 +1,7 @@
 package io.atomix.client.partition.impl;
 
-import io.atomix.api.partition.Partition;
-import io.atomix.api.partition.PartitionEndpoint;
+import io.atomix.api.controller.Partition;
+import io.atomix.api.controller.PartitionEndpoint;
 import io.atomix.client.channel.ChannelFactory;
 import io.grpc.Channel;
 import io.grpc.netty.shaded.io.grpc.netty.NettyChannelBuilder;
