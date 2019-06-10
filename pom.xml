@@ -182,7 +182,6 @@
 
   <modules>
     <module>api</module>
-    <module>client</module>
     <module>codegen</module>
     <module>dist</module>
     <module>protocols</module>
