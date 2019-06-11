@@ -16,10 +16,7 @@
 package io.atomix.protocols.raft.protocol.impl;
 
 import java.net.ConnectException;
-import java.util.Collection;
-import java.util.Map;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiConsumer;
 
 import io.atomix.protocols.raft.protocol.CommandRequest;
@@ -28,9 +25,7 @@ import io.atomix.protocols.raft.protocol.QueryRequest;
 import io.atomix.protocols.raft.protocol.QueryResponse;
 import io.atomix.protocols.raft.protocol.RaftClientProtocol;
 import io.atomix.protocols.raft.protocol.RaftServiceGrpc;
-import io.atomix.server.NodeConfig;
 import io.atomix.server.management.ServiceFactory;
-import io.atomix.utils.concurrent.Futures;
 import io.atomix.utils.stream.StreamHandler;
 import io.grpc.stub.StreamObserver;
 
@@ -45,11 +40,9 @@ public class GrpcClientProtocol implements RaftClientProtocol {
   }
 
   private final ServiceFactory<RaftServiceGrpc.RaftServiceStub> factory;
-  private final Map<String, NodeConfig> members = new ConcurrentHashMap<>();
 
-  public GrpcClientProtocol(ServiceFactory<RaftServiceGrpc.RaftServiceStub> factory, Collection<NodeConfig> members) {
+  public GrpcClientProtocol(ServiceFactory<RaftServiceGrpc.RaftServiceStub> factory) {
     this.factory = factory;
-    members.forEach(member -> this.members.put(member.getId(), member));
   }
 
   @Override
@@ -72,14 +65,9 @@ public class GrpcClientProtocol implements RaftClientProtocol {
     return execute(server, handler, (raft, observer) -> raft.commandStream(request, observer));
   }
 
-  protected <T> CompletableFuture<T> execute(String memberId, BiConsumer<RaftServiceGrpc.RaftServiceStub, StreamObserver<T>> callback) {
-    NodeConfig member = members.get(memberId);
-    if (member == null) {
-      return Futures.exceptionalFuture(CONNECT_EXCEPTION);
-    }
-
+  protected <T> CompletableFuture<T> execute(String member, BiConsumer<RaftServiceGrpc.RaftServiceStub, StreamObserver<T>> callback) {
     CompletableFuture<T> future = new CompletableFuture<>();
-    callback.accept(factory.getService(member.getHost(), member.getPort()), new StreamObserver<T>() {
+    callback.accept(factory.getService(member), new StreamObserver<T>() {
       @Override
       public void onNext(T response) {
         future.complete(response);
@@ -98,13 +86,8 @@ public class GrpcClientProtocol implements RaftClientProtocol {
     return future;
   }
 
-  protected <T> CompletableFuture<Void> execute(String memberId, StreamHandler<T> handler, BiConsumer<RaftServiceGrpc.RaftServiceStub, StreamObserver<T>> callback) {
-    NodeConfig member = members.get(memberId);
-    if (member == null) {
-      return Futures.exceptionalFuture(CONNECT_EXCEPTION);
-    }
-
-    callback.accept(factory.getService(member.getHost(), member.getPort()), new StreamObserver<T>() {
+  protected <T> CompletableFuture<Void> execute(String member, StreamHandler<T> handler, BiConsumer<RaftServiceGrpc.RaftServiceStub, StreamObserver<T>> callback) {
+    callback.accept(factory.getService(member), new StreamObserver<T>() {
       @Override
       public void onNext(T value) {
         handler.next(value);

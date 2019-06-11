@@ -13,24 +13,44 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.atomix.server.management.impl;
+package io.atomix.server.management;
 
+import java.util.Collection;
+
+import io.atomix.api.controller.NodeConfig;
 import io.atomix.api.controller.PartitionId;
-import io.atomix.server.management.ConfigService;
-import io.atomix.server.management.PartitionService;
-import io.atomix.utils.component.Component;
-import io.atomix.utils.component.Dependency;
 
 /**
- * Partition service implementation.
+ * Server configuration service.
  */
-@Component
-public class PartitionServiceImpl implements PartitionService {
-  @Dependency
-  private ConfigService configService;
+public interface ConfigService {
 
-  @Override
-  public PartitionId getPartitionId() {
-    return configService.getPartition();
-  }
+  /**
+   * Returns the partition ID.
+   *
+   * @return the partition ID
+   */
+  PartitionId getPartition();
+
+  /**
+   * Returns the controller configuration.
+   *
+   * @return the controller configuration
+   */
+  NodeConfig getController();
+
+  /**
+   * Returns the node configuration.
+   *
+   * @return the node configuration
+   */
+  NodeConfig getNode();
+
+  /**
+   * Returns the cluster configuration.
+   *
+   * @return the cluster configuration
+   */
+  Collection<NodeConfig> getCluster();
+
 }

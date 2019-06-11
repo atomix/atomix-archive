@@ -23,15 +23,8 @@ import org.junit.Test;
 public class ComponentManagerTest {
   @Test
   public void testComponentManager() throws Exception {
-    ComponentManager<TestComponentConfig, TestComponent> manager = new ComponentManager<>(TestComponent.class);
-    manager.start(TestComponentConfig.newBuilder()
-        .setTestComponent1Config(TestComponent1Config.newBuilder()
-            .setValue("1")
-            .build())
-        .setTestComponent2Config(TestComponent2Config.newBuilder()
-            .setValue("2")
-            .build())
-        .build()).join();
+    ComponentManager<TestComponent> manager = new ComponentManager<>(TestComponent.class);
+    manager.start().join();
     manager.stop().join();
   }
 }

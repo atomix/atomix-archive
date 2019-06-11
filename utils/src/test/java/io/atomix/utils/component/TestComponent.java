@@ -22,8 +22,8 @@ import static org.junit.Assert.assertNotNull;
 /**
  * Test component.
  */
-@Component(TestComponentConfig.class)
-public class TestComponent implements Managed<TestComponentConfig> {
+@Component
+public class TestComponent implements Managed {
   @Dependency
   private TestComponentInterface1 component1;
   @Dependency
@@ -32,7 +32,7 @@ public class TestComponent implements Managed<TestComponentConfig> {
   private TestComponent3 component3;
 
   @Override
-  public CompletableFuture<Void> start(TestComponentConfig config) {
+  public CompletableFuture<Void> start() {
     assertNotNull(component1);
     assertNotNull(component2);
     assertNotNull(component3);

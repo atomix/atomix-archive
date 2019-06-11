@@ -15,13 +15,13 @@
  */
 package io.atomix.server.management.impl;
 
-import java.io.File;
 import java.io.IOException;
 import java.util.concurrent.CompletableFuture;
 
-import io.atomix.server.ServerConfig;
+import io.atomix.server.management.ClusterService;
 import io.atomix.server.management.ServiceRegistry;
 import io.atomix.utils.component.Component;
+import io.atomix.utils.component.Dependency;
 import io.atomix.utils.component.Managed;
 import io.atomix.utils.concurrent.Futures;
 import io.grpc.BindableService;
@@ -42,9 +42,13 @@ import static io.atomix.utils.concurrent.Threads.namedThreads;
 /**
  * Service registry implementation.
  */
-@Component(ServerConfig.class)
-public class ServiceRegistryImpl implements ServiceRegistry, Managed<ServerConfig> {
+@Component
+public class ServiceRegistryImpl implements ServiceRegistry, Managed {
   private static final Logger LOGGER = LoggerFactory.getLogger(ChannelServiceImpl.class);
+
+  @Dependency
+  private ClusterService clusterService;
+
   private final MutableHandlerRegistry registry = new MutableHandlerRegistry();
   private Server server;
   private EventLoopGroup bossGroup;
@@ -57,23 +61,14 @@ public class ServiceRegistryImpl implements ServiceRegistry, Managed<ServerConfi
   }
 
   @Override
-  public CompletableFuture<Void> start(ServerConfig config) {
+  public CompletableFuture<Void> start() {
     initEventLoopGroup();
-    if (config.getTls().getEnabled()) {
-      server = NettyServerBuilder.forPort(config.getNode().getPort())
-          .useTransportSecurity(
-              new File(config.getTls().getCertPath()),
-              new File(config.getTls().getKeyPath()))
-          .fallbackHandlerRegistry(registry)
-          .build();
-    } else {
-      server = NettyServerBuilder.forPort(config.getNode().getPort())
-          .fallbackHandlerRegistry(registry)
-          .channelType(serverChannelClass)
-          .bossEventLoopGroup(bossGroup)
-          .workerEventLoopGroup(workerGroup)
-          .build();
-    }
+    server = NettyServerBuilder.forPort(clusterService.getLocalNode().port())
+        .fallbackHandlerRegistry(registry)
+        .channelType(serverChannelClass)
+        .bossEventLoopGroup(bossGroup)
+        .workerEventLoopGroup(workerGroup)
+        .build();
     try {
       server.start();
     } catch (IOException e) {

@@ -15,18 +15,19 @@
  */
 package io.atomix.protocols.raft;
 
+import java.io.IOException;
+import java.io.InputStream;
 import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
 import com.google.common.base.Strings;
-import com.google.protobuf.Descriptors;
 import io.atomix.protocols.raft.protocol.RaftProtocolConfig;
 import io.atomix.protocols.raft.protocol.RaftServiceGrpc;
 import io.atomix.protocols.raft.protocol.impl.GrpcClientProtocol;
 import io.atomix.protocols.raft.protocol.impl.GrpcServerProtocol;
 import io.atomix.protocols.raft.storage.RaftStorage;
-import io.atomix.server.NodeConfig;
+import io.atomix.server.management.Node;
 import io.atomix.server.management.ProtocolManagementService;
 import io.atomix.server.protocol.Protocol;
 import io.atomix.server.protocol.ProtocolClient;
@@ -51,13 +52,8 @@ public class RaftProtocol implements ServiceProtocol {
     }
 
     @Override
-    public Class<RaftProtocolConfig> getConfigClass() {
-      return RaftProtocolConfig.class;
-    }
-
-    @Override
-    public Descriptors.Descriptor getConfigDescriptor() {
-      return RaftProtocolConfig.getDescriptor();
+    public RaftProtocolConfig parseConfig(InputStream is) throws IOException {
+      return RaftProtocolConfig.parseFrom(is);
     }
 
     @Override
@@ -90,12 +86,22 @@ public class RaftProtocol implements ServiceProtocol {
 
   private CompletableFuture<Void> startServer() {
     server = buildServer();
-    return server.bootstrap(config.getMembersList().stream().map(NodeConfig::getId).collect(Collectors.toList())).thenApply(v -> null);
+    return server.bootstrap(managementService.getCluster()
+        .getNodes()
+        .stream()
+        .map(Node::address)
+        .collect(Collectors.toList()))
+        .thenApply(v -> null);
   }
 
   private CompletableFuture<Void> startClient() {
     client = buildClient();
-    return client.connect(config.getMembersList().stream().map(NodeConfig::getId).collect(Collectors.toList())).thenApply(v -> null);
+    return client.connect(managementService.getCluster()
+        .getNodes()
+        .stream()
+        .map(Node::address)
+        .collect(Collectors.toList()))
+        .thenApply(v -> null);
   }
 
   private RaftServer buildServer() {
@@ -111,11 +117,10 @@ public class RaftProtocol implements ServiceProtocol {
       heartbeatInterval = Duration.ofMillis(250);
     }
 
-    return RaftServer.builder(managementService.getNode().id())
+    return RaftServer.builder(managementService.getCluster().getLocalNode().id())
         .withProtocol(new GrpcServerProtocol(
             managementService.getServiceProvider().getFactory(RaftServiceGrpc::newStub),
-            managementService.getServiceRegistry(),
-            config.getMembersList()))
+            managementService.getServiceRegistry()))
         .withStateMachine(new ServiceManagerStateMachine(managementService.getServiceTypeRegistry()))
         .withElectionTimeout(electionTimeout)
         .withHeartbeatInterval(heartbeatInterval)
@@ -123,12 +128,12 @@ public class RaftProtocol implements ServiceProtocol {
             .withPrefix("raft")
             .withDirectory(!Strings.isNullOrEmpty(config.getStorage().getDirectory()) ? config.getStorage().getDirectory() : ".data")
             .withStorageLevel(StorageLevel.valueOf(config.getStorage().getLevel().name()))
-            .withMaxSegmentSize((int) (config.getStorage().getSegmentSize().getSize() > 0
-                ? config.getStorage().getSegmentSize().getSize()
-                : 1024 * 1024 * 32))
-            .withMaxEntrySize((int) (config.getStorage().getMaxEntrySize().getSize() > 0
-                ? config.getStorage().getMaxEntrySize().getSize()
-                : 1024 * 1024))
+            .withMaxSegmentSize(config.getStorage().getSegmentSize() > 0
+                ? config.getStorage().getSegmentSize()
+                : 1024 * 1024 * 32)
+            .withMaxEntrySize(config.getStorage().getMaxEntrySize() > 0
+                ? config.getStorage().getMaxEntrySize()
+                : 1024 * 1024)
             .withFlushOnCommit(config.getStorage().getFlushOnCommit())
             .withDynamicCompaction(config.getCompaction().getDynamic())
             .withFreeDiskBuffer(config.getCompaction().getFreeDiskBuffer() > 0
@@ -145,8 +150,7 @@ public class RaftProtocol implements ServiceProtocol {
   private RaftClient buildClient() {
     return RaftClient.builder()
         .withProtocol(new GrpcClientProtocol(
-                managementService.getServiceProvider().getFactory(RaftServiceGrpc::newStub),
-            config.getMembersList()))
+            managementService.getServiceProvider().getFactory(RaftServiceGrpc::newStub)))
         .withThreadContextFactory(managementService.getThreadService().getFactory())
         .build();
   }

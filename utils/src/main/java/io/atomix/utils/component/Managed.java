@@ -20,7 +20,7 @@ import java.util.concurrent.CompletableFuture;
 /**
  * Managed component.
  */
-public interface Managed<C> {
+public interface Managed {
 
   /**
    * Starts the managed component.
@@ -29,16 +29,6 @@ public interface Managed<C> {
    */
   default CompletableFuture<Void> start() {
     return CompletableFuture.completedFuture(null);
-  }
-
-  /**
-   * Starts the managed component.
-   *
-   * @param config the component configuration
-   * @return a future to be completed once the component has been started
-   */
-  default CompletableFuture<Void> start(C config) {
-    return start();
   }
 
   /**

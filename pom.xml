@@ -183,7 +183,6 @@
   <modules>
     <module>api</module>
     <module>codegen</module>
-    <module>dist</module>
     <module>protocols</module>
     <module>service</module>
     <module>server</module>

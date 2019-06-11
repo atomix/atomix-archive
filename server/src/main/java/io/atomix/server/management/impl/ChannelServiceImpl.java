@@ -17,7 +17,6 @@ package io.atomix.server.management.impl;
 
 import java.util.concurrent.CompletableFuture;
 
-import io.atomix.server.TlsConfig;
 import io.atomix.server.management.ChannelService;
 import io.atomix.utils.component.Component;
 import io.atomix.utils.component.Managed;
@@ -37,52 +36,33 @@ import static io.atomix.utils.concurrent.Threads.namedThreads;
 /**
  * gRPC service registry.
  */
-@Component(TlsConfig.class)
-public class ChannelServiceImpl implements ChannelService, Managed<TlsConfig> {
+@Component
+public class ChannelServiceImpl implements ChannelService, Managed {
   private static final Logger LOGGER = LoggerFactory.getLogger(ChannelServiceImpl.class);
-  private TlsConfig config;
   private EventLoopGroup clientGroup;
   private Class<? extends io.netty.channel.Channel> clientChannelClass;
 
   @Override
   public Channel getChannel(String target) {
-    NettyChannelBuilder builder;
-    if (config.getEnabled()) {
-      builder = NettyChannelBuilder.forTarget(target)
-          .nameResolverFactory(new DnsNameResolverProvider())
-          .channelType(clientChannelClass)
-          .eventLoopGroup(clientGroup)
-          .useTransportSecurity();
-    } else {
-      builder = NettyChannelBuilder.forTarget(target)
-          .nameResolverFactory(new DnsNameResolverProvider())
-          .channelType(clientChannelClass)
-          .eventLoopGroup(clientGroup)
-          .usePlaintext();
-    }
-    return builder.build();
+    return NettyChannelBuilder.forTarget(target)
+        .nameResolverFactory(new DnsNameResolverProvider())
+        .channelType(clientChannelClass)
+        .eventLoopGroup(clientGroup)
+        .usePlaintext()
+        .build();
   }
 
   @Override
   public Channel getChannel(String host, int port) {
-    NettyChannelBuilder builder;
-    if (config.getEnabled()) {
-      builder = NettyChannelBuilder.forAddress(host, port)
-          .channelType(clientChannelClass)
-          .eventLoopGroup(clientGroup)
-          .useTransportSecurity();
-    } else {
-      builder = NettyChannelBuilder.forAddress(host, port)
-          .channelType(clientChannelClass)
-          .eventLoopGroup(clientGroup)
-          .usePlaintext();
-    }
-    return builder.build();
+    return NettyChannelBuilder.forAddress(host, port)
+        .channelType(clientChannelClass)
+        .eventLoopGroup(clientGroup)
+        .usePlaintext()
+        .build();
   }
 
   @Override
-  public CompletableFuture<Void> start(TlsConfig config) {
-    this.config = config;
+  public CompletableFuture<Void> start() {
     initEventLoopGroup();
     return CompletableFuture.completedFuture(null);
   }

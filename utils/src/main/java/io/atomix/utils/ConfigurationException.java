@@ -13,17 +13,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.atomix.utils.component;
+package io.atomix.utils;
 
-import java.lang.annotation.ElementType;
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
-import java.lang.annotation.Target;
+import io.atomix.utils.AtomixRuntimeException;
 
 /**
- * Component annotation.
+ * Atomix configuration exception.
  */
-@Target(ElementType.TYPE)
-@Retention(RetentionPolicy.RUNTIME)
-public @interface Component {
+public class ConfigurationException extends AtomixRuntimeException {
+  public ConfigurationException(String message) {
+    super(message);
+  }
+
+  public ConfigurationException(String message, Throwable cause) {
+    super(message, cause);
+  }
 }

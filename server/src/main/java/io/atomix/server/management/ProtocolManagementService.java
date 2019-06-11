@@ -15,7 +15,7 @@
  */
 package io.atomix.server.management;
 
-import io.atomix.server.protocol.ProtocolTypeRegistry;
+import io.atomix.server.protocol.Protocol;
 import io.atomix.service.ServiceTypeRegistry;
 import io.atomix.utils.concurrent.ThreadService;
 
@@ -25,11 +25,18 @@ import io.atomix.utils.concurrent.ThreadService;
 public interface ProtocolManagementService {
 
   /**
-   * Returns the local node
+   * Returns the protocol type.
    *
-   * @return the local node
+   * @return the protocol type
    */
-  Node getNode();
+  Protocol.Type getProtocolType();
+
+  /**
+   * Returns the cluster service.
+   *
+   * @return the cluster service
+   */
+  ClusterService getCluster();
 
   /**
    * Returns the service registry.
@@ -51,13 +58,6 @@ public interface ProtocolManagementService {
    * @return the thread service
    */
   ThreadService getThreadService();
-
-  /**
-   * Returns the protocol type registry.
-   *
-   * @return the protocol type registry
-   */
-  ProtocolTypeRegistry getProtocolTypeRegistry();
 
   /**
    * Returns the service type registry.

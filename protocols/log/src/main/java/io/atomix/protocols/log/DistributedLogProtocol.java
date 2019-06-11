@@ -15,10 +15,11 @@
  */
 package io.atomix.protocols.log;
 
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.concurrent.CompletableFuture;
 
 import com.google.common.base.Strings;
-import com.google.protobuf.Descriptors;
 import io.atomix.protocols.log.impl.PrimaryElectionTermProvider;
 import io.atomix.protocols.log.protocol.DistributedLogServiceGrpc;
 import io.atomix.protocols.log.protocol.LogClientProtocol;
@@ -46,13 +47,8 @@ public class DistributedLogProtocol implements LogProtocol {
     }
 
     @Override
-    public Class<LogProtocolConfig> getConfigClass() {
-      return LogProtocolConfig.class;
-    }
-
-    @Override
-    public Descriptors.Descriptor getConfigDescriptor() {
-      return LogProtocolConfig.getDescriptor();
+    public LogProtocolConfig parseConfig(InputStream is) throws IOException {
+      return LogProtocolConfig.parseFrom(is);
     }
 
     @Override
@@ -99,12 +95,12 @@ public class DistributedLogProtocol implements LogProtocol {
         .withProtocol(protocol)
         .withDirectory(!Strings.isNullOrEmpty(config.getStorage().getDirectory()) ? config.getStorage().getDirectory() : ".data")
         .withStorageLevel(StorageLevel.valueOf(config.getStorage().getLevel().name()))
-        .withMaxSegmentSize((int) (config.getStorage().getSegmentSize().getSize() > 0
-            ? config.getStorage().getSegmentSize().getSize()
-            : 1024 * 1024 * 32))
-        .withMaxEntrySize((int) (config.getStorage().getMaxEntrySize().getSize() > 0
-            ? config.getStorage().getMaxEntrySize().getSize()
-            : 1024 * 1024))
+        .withMaxSegmentSize(config.getStorage().getSegmentSize() > 0
+            ? config.getStorage().getSegmentSize()
+            : 1024 * 1024 * 32)
+        .withMaxEntrySize(config.getStorage().getMaxEntrySize() > 0
+            ? config.getStorage().getMaxEntrySize()
+            : 1024 * 1024)
         .withFlushOnCommit(config.getStorage().getFlushOnCommit())
         .withThreadContextFactory(managementService.getThreadService().getFactory())
         .build();

@@ -15,9 +15,12 @@
  */
 package io.atomix.server.protocol;
 
+import java.io.IOException;
+import java.io.InputStream;
+
 import com.google.protobuf.Message;
 import io.atomix.server.management.ProtocolManagementService;
-import io.atomix.utils.ConfiguredType;
+import io.atomix.utils.NamedType;
 import io.atomix.utils.component.Managed;
 
 /**
@@ -28,7 +31,16 @@ public interface Protocol extends Managed {
   /**
    * Service type.
    */
-  interface Type<C extends Message> extends ConfiguredType<C> {
+  interface Type<C extends Message> extends NamedType {
+
+    /**
+     * Parses the configuration from the given bytes.
+     *
+     * @param is the configuration input stream
+     * @return the configuration
+     * @throws IOException
+     */
+    C parseConfig(InputStream is) throws IOException;
 
     /**
      * Creates a new protocol instance from the given configuration.

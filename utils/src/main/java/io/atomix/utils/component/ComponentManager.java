@@ -17,8 +17,6 @@ package io.atomix.utils.component;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
-import java.lang.reflect.Method;
-import java.lang.reflect.Modifier;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -29,7 +27,6 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import com.google.common.base.CaseFormat;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import com.google.common.graph.ElementOrder;
@@ -37,7 +34,6 @@ import com.google.common.graph.GraphBuilder;
 import com.google.common.graph.Graphs;
 import com.google.common.graph.ImmutableGraph;
 import com.google.common.graph.MutableGraph;
-import com.google.protobuf.Message;
 import io.atomix.utils.concurrent.Futures;
 import io.atomix.utils.concurrent.SingleThreadContext;
 import io.atomix.utils.concurrent.ThreadContext;
@@ -50,33 +46,30 @@ import org.slf4j.LoggerFactory;
 /**
  * Component manager.
  */
-public class ComponentManager<C extends Message, M> {
+public class ComponentManager<M> {
   private static final Logger LOGGER = LoggerFactory.getLogger(ComponentManager.class);
   private final Class<M> rootClass;
   private final ClassLoader classLoader;
-  private final Component.Scope scope;
   private final Map<Class, List<ComponentInstance>> components = new HashMap<>();
   private final ThreadContext threadContext = new SingleThreadContext("atomix-component-manager");
   private MutableGraph<ComponentInstance> dependencyGraph;
   private final AtomicBoolean prepared = new AtomicBoolean();
 
   public ComponentManager(Class<M> root) {
-    this(root, ComponentManager.class.getClassLoader(), Component.Scope.RUNTIME);
+    this(root, ComponentManager.class.getClassLoader());
   }
 
-  public ComponentManager(Class<M> root, ClassLoader classLoader, Component.Scope scope) {
+  public ComponentManager(Class<M> root, ClassLoader classLoader) {
     this.rootClass = root;
     this.classLoader = classLoader;
-    this.scope = scope;
   }
 
   /**
    * Starts the root component.
    *
-   * @param config the component configuration
    * @return a future to be completed with the root component instance
    */
-  public CompletableFuture<M> start(C config) {
+  public CompletableFuture<M> start() {
     if (!prepared.compareAndSet(false, true)) {
       return Futures.exceptionalFuture(new IllegalStateException("Component manager is already running"));
     }
@@ -84,7 +77,6 @@ public class ComponentManager<C extends Message, M> {
     ComponentInstance<M> instance = new ComponentInstance<>(
         rootClass,
         rootClass.getAnnotation(Component.class),
-        config,
         true);
     M root;
     try {
@@ -115,8 +107,6 @@ public class ComponentManager<C extends Message, M> {
   }
 
   private void prepare(ComponentInstance<M> root) throws Exception {
-    final ConfigMap configMap = new ConfigMap(root.config());
-
     final ClassGraph classGraph = new ClassGraph()
         .enableClassInfo()
         .enableAnnotationInfo()
@@ -126,34 +116,14 @@ public class ComponentManager<C extends Message, M> {
       for (ClassInfo classInfo : result.getClassesWithAnnotation(Component.class.getName())) {
         Class<?> componentClass = classInfo.loadClass();
         Component componentAnnotation = componentClass.getAnnotation(Component.class);
-        Message componentConfig = componentAnnotation.value() != Component.ConfigNone.class
-            ? configMap.getConfig(componentAnnotation.value())
-            : null;
 
-        ComponentInstance<?> componentInstance = new ComponentInstance<>(componentClass, componentAnnotation, componentConfig);
+        ComponentInstance<?> componentInstance = new ComponentInstance<>(componentClass, componentAnnotation);
         components.put(componentClass, Lists.newArrayList(componentInstance));
 
         for (Class<?> componentInterface : getInterfaces(componentClass)) {
           components.compute(componentInterface, (k, oldComponents) -> {
             if (oldComponents == null) {
               return Lists.newArrayList(componentInstance);
-            }
-
-            for (int i = 0; i < oldComponents.size(); i++) {
-              ComponentInstance oldComponent = oldComponents.get(i);
-              if (!oldComponent.isScope(scope) && componentInstance.isScope(scope)) {
-                List<ComponentInstance> newComponents = Lists.newArrayList(componentInstance);
-                newComponents.addAll(oldComponents);
-                return newComponents;
-              } else if (!oldComponent.isConfigurable() && componentInstance.isConfigurable() && componentInstance.isConfigured()) {
-                List<ComponentInstance> newComponents = Lists.newArrayList(componentInstance);
-                newComponents.addAll(oldComponents);
-                return newComponents;
-              } else if (oldComponent.isConfigurable() && componentInstance.isConfigurable() && !oldComponent.isConfigured() && componentInstance.isConfigured()) {
-                List<ComponentInstance> newComponents = Lists.newArrayList(componentInstance);
-                newComponents.addAll(oldComponents);
-                return newComponents;
-              }
             }
 
             List<ComponentInstance> newComponents = Lists.newArrayList(oldComponents);
@@ -225,7 +195,7 @@ public class ComponentManager<C extends Message, M> {
           component.setStarted(true);
           if (instance instanceof Managed) {
             try {
-              return ((Managed) instance).start(component.config());
+              return ((Managed) instance).start();
             } catch (Exception e) {
               return Futures.exceptionalFuture(e);
             }
@@ -352,19 +322,17 @@ public class ComponentManager<C extends Message, M> {
   private static class ComponentInstance<T> {
     private final Class<T> type;
     private final Component component;
-    private final Message config;
     private final boolean root;
     private volatile T instance;
     private volatile boolean started;
 
-    ComponentInstance(Class<T> type, Component component, Message config) {
-      this(type, component, config, false);
+    ComponentInstance(Class<T> type, Component component) {
+      this(type, component, false);
     }
 
-    ComponentInstance(Class<T> type, Component component, Message config, boolean root) {
+    ComponentInstance(Class<T> type, Component component, boolean root) {
       this.type = type;
       this.component = component;
-      this.config = config;
       this.root = root;
     }
 
@@ -405,43 +373,6 @@ public class ComponentManager<C extends Message, M> {
     }
 
     /**
-     * Returns a boolean indicating whether the component is in the given scope.
-     *
-     * @param scope the scope to check
-     * @return indicates whether the component is in the given scope
-     */
-    public boolean isScope(Component.Scope scope) {
-      return scope == component.scope();
-    }
-
-    /**
-     * Returns a boolean indicating whether the component is configurable.
-     *
-     * @return indicates whether the component is configurable
-     */
-    public boolean isConfigurable() {
-      return component.value() != Component.ConfigNone.class;
-    }
-
-    /**
-     * Returns a boolean indicating whether the component is configured.
-     *
-     * @return indicates whether the component is configured
-     */
-    public boolean isConfigured() {
-      return config != null;
-    }
-
-    /**
-     * Returns the component configuration.
-     *
-     * @return the component configuration
-     */
-    public Message config() {
-      return config;
-    }
-
-    /**
      * Constructs a new component instance.
      *
      * @return a new component instance
@@ -458,73 +389,6 @@ public class ComponentManager<C extends Message, M> {
     @Override
     public String toString() {
       return type.getName();
-    }
-  }
-
-  private static class ConfigMap {
-    private final Map<Class, Message> configs = new HashMap<>();
-
-    ConfigMap(Message config) throws Exception {
-      mapConfigs(config);
-    }
-
-    /**
-     * Returns a configuration value of the given type.
-     *
-     * @param type the configuration type
-     * @param <T>  the configuration type
-     * @return the configuration object
-     */
-    @SuppressWarnings("unchecked")
-    public <T extends Message> T getConfig(Class<T> type) {
-      return (T) configs.get(type);
-    }
-
-    private void mapConfigs(Message config) throws Exception {
-      if (config != null) {
-        Class<?> configClass = config.getClass();
-        while (configClass != Object.class) {
-          configs.putIfAbsent(configClass, config);
-          mapConfigs(configClass, config);
-          configClass = configClass.getSuperclass();
-        }
-      }
-    }
-
-    private void mapConfigs(Class<?> configClass, Message config) throws Exception {
-      // Iterate through methods first to find getters for configuration classes.
-      for (Method method : configClass.getDeclaredMethods()) {
-        if (Modifier.isStatic(method.getModifiers())) {
-          continue;
-        }
-
-        // If this is a getter method, get the configuration and map it.
-        if (method.getName().startsWith("get")
-            && !method.getName().startsWith("getDefaultInstance")
-            && method.getParameterCount() == 0
-            && Message.class.isAssignableFrom(method.getReturnType())) {
-          mapConfigs((Message) method.invoke(config));
-        }
-      }
-
-      for (Field field : configClass.getDeclaredFields()) {
-        if (Modifier.isTransient(field.getModifiers()) || Modifier.isStatic(field.getModifiers())) {
-          continue;
-        }
-
-        if (Message.class.isAssignableFrom(field.getType())) {
-          try {
-            configClass.getMethod(getterName(field));
-          } catch (NoSuchMethodException e) {
-            field.setAccessible(true);
-            mapConfigs((Message) field.get(config));
-          }
-        }
-      }
-    }
-
-    private static String getterName(Field field) {
-      return "get" + CaseFormat.LOWER_CAMEL.to(CaseFormat.UPPER_CAMEL, field.getName());
     }
   }
 }

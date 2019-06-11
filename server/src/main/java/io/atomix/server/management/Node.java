@@ -15,6 +15,8 @@
  */
 package io.atomix.server.management;
 
+import java.util.Objects;
+
 /**
  * Node info.
  */
@@ -54,5 +56,28 @@ public class Node {
    */
   public int port() {
     return port;
+  }
+
+  /**
+   * Returns the node address.
+   *
+   * @return the node address
+   */
+  public String address() {
+    return port > 0 ? String.format("%s:%d", host, port) : host;
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(id, host, port);
+  }
+
+  @Override
+  public boolean equals(Object object) {
+    if (object instanceof Node) {
+      Node that = (Node) object;
+      return this.id.equals(that.id) && this.host.equals(that.host) && this.port == that.port;
+    }
+    return false;
   }
 }

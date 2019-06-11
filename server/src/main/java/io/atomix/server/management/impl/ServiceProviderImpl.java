@@ -19,9 +19,8 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 
-import com.google.common.base.Strings;
-import io.atomix.server.NodeConfig;
 import io.atomix.server.management.ChannelService;
+import io.atomix.server.management.Node;
 import io.atomix.server.management.ServiceFactory;
 import io.atomix.server.management.ServiceProvider;
 import io.atomix.utils.component.Component;
@@ -43,21 +42,21 @@ public class ServiceProviderImpl implements ServiceProvider {
 
   private class ServiceFactoryImpl<T> implements ServiceFactory<T> {
     private final Function<Channel, T> factory;
-    private final Map<NodeConfig, T> services = new ConcurrentHashMap<>();
+    private final Map<Node, T> services = new ConcurrentHashMap<>();
 
     ServiceFactoryImpl(Function<Channel, T> factory) {
       this.factory = factory;
     }
 
-    private T getService(NodeConfig node) {
+    private T getService(Node node) {
       T service = services.get(node);
       if (service == null) {
         service = services.compute(node, (id, value) -> {
           if (value == null) {
-            if (!Strings.isNullOrEmpty(node.getId())) {
-              value = factory.apply(channelService.getChannel(node.getHost()));
+            if (node.port() == 0) {
+              value = factory.apply(channelService.getChannel(node.host()));
             } else {
-              value = factory.apply(channelService.getChannel(node.getHost(), node.getPort()));
+              value = factory.apply(channelService.getChannel(node.host(), node.port()));
             }
           }
           return value;
@@ -68,17 +67,12 @@ public class ServiceProviderImpl implements ServiceProvider {
 
     @Override
     public T getService(String target) {
-      return getService(NodeConfig.newBuilder()
-          .setId(target)
-          .build());
+      return getService(new Node(target, target, 0));
     }
 
     @Override
     public T getService(String host, int port) {
-      return getService(NodeConfig.newBuilder()
-          .setHost(host)
-          .setPort(port)
-          .build());
+      return getService(new Node(host, host, port));
     }
   }
 }

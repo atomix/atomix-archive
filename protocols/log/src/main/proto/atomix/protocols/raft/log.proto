@@ -16,7 +16,6 @@ syntax = "proto3";
 package atomix.protocols.log;
 
 import "google/protobuf/duration.proto";
-import "atomix/utils/memory.proto";
 
 option java_package = "io.atomix.protocols.log";
 option java_multiple_files = true;
@@ -42,8 +41,8 @@ message LogProtocolConfig {
 message LogStorageConfig {
     string directory = 1;
     StorageLevel level = 2;
-    atomix.utils.MemorySize max_entry_size = 3;
-    atomix.utils.MemorySize segment_size = 4;
+    uint32 max_entry_size = 3;
+    uint32 segment_size = 4;
     bool flush_on_commit = 5;
 }
 
@@ -53,6 +52,6 @@ enum StorageLevel {
 }
 
 message LogCompactionConfig {
-    atomix.utils.MemorySize size = 1;
+    uint64 size = 1;
     google.protobuf.Duration age = 2;
 }

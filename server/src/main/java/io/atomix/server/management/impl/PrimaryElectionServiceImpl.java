@@ -27,8 +27,8 @@ import io.atomix.api.controller.ControllerServiceGrpc;
 import io.atomix.api.controller.PartitionElectionRequest;
 import io.atomix.api.controller.PartitionElectionResponse;
 import io.atomix.api.controller.PrimaryTerm;
+import io.atomix.server.management.ClusterService;
 import io.atomix.server.management.ControllerService;
-import io.atomix.server.management.NodeService;
 import io.atomix.server.management.PartitionService;
 import io.atomix.server.management.PrimaryElectionEvent;
 import io.atomix.server.management.PrimaryElectionService;
@@ -46,7 +46,7 @@ public class PrimaryElectionServiceImpl implements PrimaryElectionService, Manag
   @Dependency
   private ControllerService controllerService;
   @Dependency
-  private NodeService nodeService;
+  private ClusterService clusterService;
   @Dependency
   private PartitionService partitionService;
   @Dependency
@@ -72,7 +72,7 @@ public class PrimaryElectionServiceImpl implements PrimaryElectionService, Manag
 
     election.enterElection(PartitionElectionRequest.newBuilder()
         .setPartitionId(partitionService.getPartitionId())
-        .setMember(nodeService.getNode().id())
+        .setMember(clusterService.getLocalNode().id())
         .build(), new StreamObserver<PartitionElectionResponse>() {
       @Override
       public void onNext(PartitionElectionResponse response) {

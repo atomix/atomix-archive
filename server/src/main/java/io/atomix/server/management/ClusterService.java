@@ -13,17 +13,34 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.atomix.utils.component;
+package io.atomix.server.management;
 
-import java.lang.annotation.ElementType;
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
-import java.lang.annotation.Target;
+import java.util.Collection;
 
 /**
- * Component annotation.
+ * Cluster service.
  */
-@Target(ElementType.TYPE)
-@Retention(RetentionPolicy.RUNTIME)
-public @interface Component {
+public interface ClusterService {
+
+  /**
+   * Returns the local node.
+   *
+   * @return the local node
+   */
+  Node getLocalNode();
+
+  /**
+   * Returns the controller node.
+   *
+   * @return the controller node
+   */
+  Node getControllerNode();
+
+  /**
+   * Returns a collection of nodes in the cluster.
+   *
+   * @return a collection of nodes in the cluster
+   */
+  Collection<Node> getNodes();
+
 }
