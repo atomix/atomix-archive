@@ -77,6 +77,11 @@ public class AtomixServerRunner {
     final ArgumentParser parser = ArgumentParsers.newArgumentParser("AtomixServer")
         .defaultHelp(true)
         .description("Runs the Atomix server with the given arguments.");
+    parser.addArgument("node")
+        .metavar("ID")
+        .type(String.class)
+        .required(true)
+        .help("The local node ID.");
     parser.addArgument("config")
         .metavar("FILE")
         .type(File.class)
@@ -120,7 +125,7 @@ public class AtomixServerRunner {
    * @return the Atomix instance
    */
   private static AtomixServer buildServer(Namespace namespace) throws Exception {
-    ConfigServiceImpl.load(namespace.get("config"));
+    ConfigServiceImpl.load(namespace.getString("node"), namespace.get("config"));
     return new AtomixServer(namespace.get("protocol"));
   }
 }

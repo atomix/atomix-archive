@@ -34,19 +34,26 @@ import io.atomix.utils.component.Component;
 @Component
 public class ConfigServiceImpl implements ConfigService {
 
-  static PartitionConfig config = null;
+  static NodeConfig node;
+  static PartitionConfig config;
 
   /**
    * Loads the given configuration file.
    *
-   * @param file the configuration file
+   * @param nodeId the local node ID
+   * @param file   the configuration file
    */
-  public static void load(File file) throws IOException {
+  public static void load(String nodeId, File file) throws IOException {
     try (FileInputStream is = new FileInputStream(file)) {
       PartitionConfig.Builder builder = PartitionConfig.newBuilder();
       JsonFormat.parser().ignoringUnknownFields().merge(new InputStreamReader(is), builder);
       config = builder.build();
     }
+
+    node = config.getMembersList().stream()
+        .filter(member -> member.getId().equals(nodeId))
+        .findFirst()
+        .orElse(null);
   }
 
   @Override
@@ -61,7 +68,7 @@ public class ConfigServiceImpl implements ConfigService {
 
   @Override
   public NodeConfig getNode() {
-    return config.getNode();
+    return node;
   }
 
   @Override
