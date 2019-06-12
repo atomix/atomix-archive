@@ -20,6 +20,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 
 import io.atomix.server.management.ChannelService;
+import io.atomix.server.management.ClusterService;
 import io.atomix.server.management.Node;
 import io.atomix.server.management.ServiceFactory;
 import io.atomix.server.management.ServiceProvider;
@@ -32,6 +33,8 @@ import io.grpc.Channel;
  */
 @Component
 public class ServiceProviderImpl implements ServiceProvider {
+  @Dependency
+  private ClusterService clusterService;
   @Dependency
   private ChannelService channelService;
 
@@ -53,11 +56,7 @@ public class ServiceProviderImpl implements ServiceProvider {
       if (service == null) {
         service = services.compute(node, (id, value) -> {
           if (value == null) {
-            if (node.port() == 0) {
-              value = factory.apply(channelService.getChannel(node.host()));
-            } else {
-              value = factory.apply(channelService.getChannel(node.host(), node.port()));
-            }
+            value = factory.apply(channelService.getChannel(node.host(), node.port()));
           }
           return value;
         });
@@ -66,8 +65,8 @@ public class ServiceProviderImpl implements ServiceProvider {
     }
 
     @Override
-    public T getService(String target) {
-      return getService(new Node(target, target, 0));
+    public T getService(String nodeId) {
+      return getService(clusterService.getNode(nodeId));
     }
 
     @Override

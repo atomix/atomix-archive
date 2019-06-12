@@ -23,14 +23,6 @@ import io.grpc.Channel;
 public interface ChannelService {
 
   /**
-   * Gets a channel for the given target.
-   *
-   * @param target the target
-   * @return the channel
-   */
-  Channel getChannel(String target);
-
-  /**
    * Gets a channel for the given node.
    *
    * @param host the node host

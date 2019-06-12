@@ -21,7 +21,6 @@ import io.atomix.server.management.ChannelService;
 import io.atomix.utils.component.Component;
 import io.atomix.utils.component.Managed;
 import io.grpc.Channel;
-import io.grpc.internal.DnsNameResolverProvider;
 import io.grpc.netty.NettyChannelBuilder;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.epoll.EpollEventLoopGroup;
@@ -41,16 +40,6 @@ public class ChannelServiceImpl implements ChannelService, Managed {
   private static final Logger LOGGER = LoggerFactory.getLogger(ChannelServiceImpl.class);
   private EventLoopGroup clientGroup;
   private Class<? extends io.netty.channel.Channel> clientChannelClass;
-
-  @Override
-  public Channel getChannel(String target) {
-    return NettyChannelBuilder.forTarget(target)
-        .nameResolverFactory(new DnsNameResolverProvider())
-        .channelType(clientChannelClass)
-        .eventLoopGroup(clientGroup)
-        .usePlaintext()
-        .build();
-  }
 
   @Override
   public Channel getChannel(String host, int port) {

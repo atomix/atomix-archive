@@ -16,8 +16,9 @@
 package io.atomix.server.management.impl;
 
 import java.util.Collection;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.ConcurrentHashMap;
 
 import io.atomix.api.controller.NodeConfig;
 import io.atomix.server.management.ClusterService;
@@ -37,7 +38,7 @@ public class ClusterServiceImpl implements ClusterService, Managed {
 
   private Node localNode;
   private Node controllerNode;
-  private Collection<Node> nodes;
+  private final Map<String, Node> nodes = new ConcurrentHashMap<>();
 
   @Override
   public Node getLocalNode() {
@@ -51,7 +52,12 @@ public class ClusterServiceImpl implements ClusterService, Managed {
 
   @Override
   public Collection<Node> getNodes() {
-    return nodes;
+    return nodes.values();
+  }
+
+  @Override
+  public Node getNode(String id) {
+    return nodes.get(id);
   }
 
   @Override
@@ -64,9 +70,8 @@ public class ClusterServiceImpl implements ClusterService, Managed {
         configService.getController().getId(),
         configService.getController().getHost(),
         configService.getController().getPort());
-    nodes = new CopyOnWriteArrayList<>();
     for (NodeConfig node : configService.getCluster()) {
-      nodes.add(new Node(
+      nodes.put(node.getId(), new Node(
           node.getId(),
           node.getHost(),
           node.getPort()));

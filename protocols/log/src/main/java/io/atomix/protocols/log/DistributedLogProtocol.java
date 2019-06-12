@@ -17,9 +17,11 @@ package io.atomix.protocols.log;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.util.concurrent.CompletableFuture;
 
 import com.google.common.base.Strings;
+import com.google.protobuf.util.JsonFormat;
 import io.atomix.protocols.log.impl.PrimaryElectionTermProvider;
 import io.atomix.protocols.log.protocol.DistributedLogServiceGrpc;
 import io.atomix.protocols.log.protocol.LogClientProtocol;
@@ -48,7 +50,9 @@ public class DistributedLogProtocol implements LogProtocol {
 
     @Override
     public LogProtocolConfig parseConfig(InputStream is) throws IOException {
-      return LogProtocolConfig.parseFrom(is);
+      LogProtocolConfig.Builder builder = LogProtocolConfig.newBuilder();
+      JsonFormat.parser().ignoringUnknownFields().merge(new InputStreamReader(is), builder);
+      return builder.build();
     }
 
     @Override

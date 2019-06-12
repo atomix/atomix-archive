@@ -17,11 +17,13 @@ package io.atomix.protocols.raft;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
 import com.google.common.base.Strings;
+import com.google.protobuf.util.JsonFormat;
 import io.atomix.protocols.raft.protocol.RaftProtocolConfig;
 import io.atomix.protocols.raft.protocol.RaftServiceGrpc;
 import io.atomix.protocols.raft.protocol.impl.GrpcClientProtocol;
@@ -53,7 +55,9 @@ public class RaftProtocol implements ServiceProtocol {
 
     @Override
     public RaftProtocolConfig parseConfig(InputStream is) throws IOException {
-      return RaftProtocolConfig.parseFrom(is);
+      RaftProtocolConfig.Builder builder = RaftProtocolConfig.newBuilder();
+      JsonFormat.parser().ignoringUnknownFields().merge(new InputStreamReader(is), builder);
+      return builder.build();
     }
 
     @Override
@@ -89,7 +93,7 @@ public class RaftProtocol implements ServiceProtocol {
     return server.bootstrap(managementService.getCluster()
         .getNodes()
         .stream()
-        .map(Node::address)
+        .map(Node::id)
         .collect(Collectors.toList()))
         .thenApply(v -> null);
   }
@@ -99,7 +103,7 @@ public class RaftProtocol implements ServiceProtocol {
     return client.connect(managementService.getCluster()
         .getNodes()
         .stream()
-        .map(Node::address)
+        .map(Node::id)
         .collect(Collectors.toList()))
         .thenApply(v -> null);
   }

@@ -43,4 +43,12 @@ public interface ClusterService {
    */
   Collection<Node> getNodes();
 
+  /**
+   * Returns a node by ID.
+   *
+   * @param id the node ID
+   * @return the node
+   */
+  Node getNode(String id);
+
 }

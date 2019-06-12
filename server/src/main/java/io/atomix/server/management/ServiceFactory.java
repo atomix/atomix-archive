@@ -23,10 +23,10 @@ public interface ServiceFactory<T> {
   /**
    * Returns a service for the given member.
    *
-   * @param target the member target
+   * @param member the member
    * @return the service for the given member
    */
-  T getService(String target);
+  T getService(String member);
 
   /**
    * Returns a service for the given member.
