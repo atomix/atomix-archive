@@ -108,6 +108,9 @@ public class AtomixServerRunner {
     if (System.getProperty("atomix.log.directory") == null) {
       System.setProperty("atomix.log.directory", "log");
     }
+    if (System.getProperty("atomix.log.level") == null) {
+      System.setProperty("atomix.log.level", "INFO");
+    }
     if (System.getProperty("atomix.log.file.level") == null) {
       System.setProperty("atomix.log.file.level", "INFO");
     }
