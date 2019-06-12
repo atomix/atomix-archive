@@ -39,7 +39,11 @@ public class AtomixServerRunner {
   public static void main(String[] args) throws Exception {
     // Parse the command line arguments.
     final Namespace namespace = parseArgs(args);
-    final Logger logger = createLogger(namespace);
+    final Logger logger = createLogger();
+
+    logger.info("Node ID: {}", namespace.getString("node"));
+    logger.info("Partition Config: {}", namespace.<File>get("config"));
+    logger.info("Protocol Config: {}", namespace.<File>get("protocol"));
 
     logger.info("Starting server");
     final AtomixServer atomix = buildServer(namespace);
@@ -98,14 +102,9 @@ public class AtomixServerRunner {
   /**
    * Configures and creates a new logger for the given namespace.
    *
-   * @param namespace the namespace from which to create the logger configuration
    * @return a new agent logger
    */
-  static Logger createLogger(Namespace namespace) {
-    String logConfig = namespace.getString("log_config");
-    if (logConfig != null) {
-      System.setProperty("logback.configurationFile", logConfig);
-    }
+  static Logger createLogger() {
     if (System.getProperty("atomix.log.directory") == null) {
       System.setProperty("atomix.log.directory", "log");
     }

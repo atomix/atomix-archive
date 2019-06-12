@@ -16,6 +16,7 @@ ATOMIX_ROOT="$(dirname "$(dirname "$0")")"
 java \
   -XX:+UseConcMarkSweepGC \
   $JAVA_OPTS \
+  -Dlogback.configurationFile="$ATOMIX_ROOT/conf/logback.xml" \
   -Datomix.log.directory="$ATOMIX_ROOT/log" \
   -Datomix.config.file="$ATOMIX_ROOT/conf/atomix.conf" \
   -cp .:"$ATOMIX_ROOT/lib/*" \
