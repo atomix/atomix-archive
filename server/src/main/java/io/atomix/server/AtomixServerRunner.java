@@ -49,6 +49,11 @@ public class AtomixServerRunner {
     final AtomixServer atomix = buildServer(namespace);
     atomix.start().join();
 
+    String readyFile = System.getProperty("atomix.readyFile", "/tmp/atomix-ready");
+    if (!new File(readyFile).createNewFile()) {
+      logger.warn("Failed to create ready file {}", readyFile);
+    }
+
     synchronized (AtomixServer.class) {
       while (atomix.isRunning()) {
         AtomixServer.class.wait();
