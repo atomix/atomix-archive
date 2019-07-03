@@ -15,42 +15,23 @@
  */
 package io.atomix.server.management.impl;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.io.InputStreamReader;
 import java.util.Collection;
 
-import com.google.protobuf.util.JsonFormat;
 import io.atomix.api.controller.NodeConfig;
 import io.atomix.api.controller.PartitionConfig;
 import io.atomix.api.controller.PartitionId;
 import io.atomix.server.management.ConfigService;
-import io.atomix.utils.component.Component;
 
 /**
  * Configuration service.
  */
-@Component
 public class ConfigServiceImpl implements ConfigService {
+  private final NodeConfig node;
+  private final PartitionConfig config;
 
-  static NodeConfig node;
-  static PartitionConfig config;
-
-  /**
-   * Loads the given configuration file.
-   *
-   * @param nodeId the local node ID
-   * @param file   the configuration file
-   */
-  public static void load(String nodeId, File file) throws IOException {
-    try (FileInputStream is = new FileInputStream(file)) {
-      PartitionConfig.Builder builder = PartitionConfig.newBuilder();
-      JsonFormat.parser().ignoringUnknownFields().merge(new InputStreamReader(is), builder);
-      config = builder.build();
-    }
-
-    node = config.getMembersList().stream()
+  public ConfigServiceImpl(String nodeId, PartitionConfig partitionConfig) {
+    this.config = partitionConfig;
+    this.node = partitionConfig.getMembersList().stream()
         .filter(member -> member.getId().equals(nodeId))
         .findFirst()
         .orElse(null);

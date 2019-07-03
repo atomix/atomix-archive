@@ -60,6 +60,11 @@ public class ProtocolManager implements ProtocolManagementService {
   }
 
   @Override
+  public PartitionService getPartitionService() {
+    return partitionService;
+  }
+
+  @Override
   public ServiceRegistry getServiceRegistry() {
     return serviceRegistry;
   }

@@ -16,8 +16,18 @@
 package io.atomix.server;
 
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.InputStreamReader;
 
-import io.atomix.server.management.impl.ConfigServiceImpl;
+import com.google.protobuf.Message;
+import com.google.protobuf.util.JsonFormat;
+import io.atomix.api.controller.PartitionConfig;
+import io.atomix.server.protocol.Protocol;
+import io.atomix.utils.component.Component;
+import io.github.classgraph.ClassGraph;
+import io.github.classgraph.ClassInfo;
+import io.github.classgraph.ScanResult;
 import net.sourceforge.argparse4j.ArgumentParsers;
 import net.sourceforge.argparse4j.inf.ArgumentParser;
 import net.sourceforge.argparse4j.inf.ArgumentParserException;
@@ -126,13 +136,51 @@ public class AtomixServerRunner {
   }
 
   /**
+   * Finds the protocol type from the classpath.
+   *
+   * @return the protocol type
+   */
+  private static Protocol.Type findProtocolType() throws Exception {
+    final ClassGraph classGraph = new ClassGraph()
+        .enableClassInfo()
+        .enableAnnotationInfo();
+
+    try (ScanResult result = classGraph.scan()) {
+      for (ClassInfo classInfo : result.getClassesWithAnnotation(Component.class.getName())) {
+        Class<?> componentClass = classInfo.loadClass();
+        if (Protocol.Type.class.isAssignableFrom(componentClass)) {
+          return (Protocol.Type) componentClass.newInstance();
+        }
+      }
+    }
+    throw new IllegalStateException("no protocol implementation found");
+  }
+
+  private static PartitionConfig parsePartitionConfig(File configFile) throws IOException {
+    try (FileInputStream is = new FileInputStream(configFile)) {
+      PartitionConfig.Builder builder = PartitionConfig.newBuilder();
+      JsonFormat.parser().ignoringUnknownFields().merge(new InputStreamReader(is), builder);
+      return builder.build();
+    }
+  }
+
+  private static Message parseProtocolConfig(Protocol.Type protocolType, File configFile) throws IOException {
+    try (FileInputStream is = new FileInputStream(configFile)) {
+      return protocolType.parseConfig(is);
+    }
+  }
+
+  /**
    * Builds a new Atomix instance from the given namespace.
    *
    * @param namespace the namespace from which to build the instance
    * @return the Atomix instance
    */
   private static AtomixServer buildServer(Namespace namespace) throws Exception {
-    ConfigServiceImpl.load(namespace.getString("node"), namespace.get("config"));
-    return new AtomixServer(namespace.get("protocol"));
+    String nodeId = namespace.getString("node");
+    PartitionConfig partitionConfig = parsePartitionConfig(namespace.get("config"));
+    Protocol.Type protocolType = findProtocolType();
+    Message protocolConfig = parseProtocolConfig(protocolType, namespace.get("protocol"));
+    return new AtomixServer(nodeId, partitionConfig, protocolType, protocolConfig);
   }
 }

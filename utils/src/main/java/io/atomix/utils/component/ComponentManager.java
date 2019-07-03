@@ -49,18 +49,16 @@ import org.slf4j.LoggerFactory;
 public class ComponentManager<M> {
   private static final Logger LOGGER = LoggerFactory.getLogger(ComponentManager.class);
   private final Class<M> rootClass;
+  private final Object[] staticComponents;
   private final ClassLoader classLoader;
   private final Map<Class, List<ComponentInstance>> components = new HashMap<>();
   private final ThreadContext threadContext = new SingleThreadContext("atomix-component-manager");
   private MutableGraph<ComponentInstance> dependencyGraph;
   private final AtomicBoolean prepared = new AtomicBoolean();
 
-  public ComponentManager(Class<M> root) {
-    this(root, ComponentManager.class.getClassLoader());
-  }
-
-  public ComponentManager(Class<M> root, ClassLoader classLoader) {
+  public ComponentManager(Class<M> root, Object[] staticComponents, ClassLoader classLoader) {
     this.rootClass = root;
+    this.staticComponents = staticComponents;
     this.classLoader = classLoader;
   }
 
@@ -77,6 +75,7 @@ public class ComponentManager<M> {
     ComponentInstance<M> instance = new ComponentInstance<>(
         rootClass,
         rootClass.getAnnotation(Component.class),
+        null,
         true);
     M root;
     try {
@@ -106,7 +105,14 @@ public class ComponentManager<M> {
     return future;
   }
 
+  @SuppressWarnings("unchecked")
   private void prepare(ComponentInstance<M> root) throws Exception {
+    for (Object object : staticComponents) {
+      Class componentClass = object.getClass();
+      Component componentAnnotation = object.getClass().getAnnotation(Component.class);
+      addComponent(new ComponentInstance<>(componentClass, componentAnnotation, object));
+    }
+
     final ClassGraph classGraph = new ClassGraph()
         .enableClassInfo()
         .enableAnnotationInfo()
@@ -118,23 +124,26 @@ public class ComponentManager<M> {
         Component componentAnnotation = componentClass.getAnnotation(Component.class);
 
         ComponentInstance<?> componentInstance = new ComponentInstance<>(componentClass, componentAnnotation);
-        components.put(componentClass, Lists.newArrayList(componentInstance));
-
-        for (Class<?> componentInterface : getInterfaces(componentClass)) {
-          components.compute(componentInterface, (k, oldComponents) -> {
-            if (oldComponents == null) {
-              return Lists.newArrayList(componentInstance);
-            }
-
-            List<ComponentInstance> newComponents = Lists.newArrayList(oldComponents);
-            newComponents.add(componentInstance);
-            return newComponents;
-          });
-        }
+        addComponent(componentInstance);
       }
     }
 
     dependencyGraph = buildDependencies(root);
+  }
+
+  private void addComponent(ComponentInstance<?> componentInstance) throws Exception {
+    components.put(componentInstance.type, Lists.newArrayList(componentInstance));
+    for (Class<?> componentInterface : getInterfaces(componentInstance.type)) {
+      components.compute(componentInterface, (k, oldComponents) -> {
+        if (oldComponents == null) {
+          return Lists.newArrayList(componentInstance);
+        }
+
+        List<ComponentInstance> newComponents = Lists.newArrayList(oldComponents);
+        newComponents.add(componentInstance);
+        return newComponents;
+      });
+    }
   }
 
   private MutableGraph<ComponentInstance> buildDependencies(ComponentInstance<M> root) throws Exception {
@@ -327,12 +336,17 @@ public class ComponentManager<M> {
     private volatile boolean started;
 
     ComponentInstance(Class<T> type, Component component) {
-      this(type, component, false);
+      this(type, component, null, false);
     }
 
-    ComponentInstance(Class<T> type, Component component, boolean root) {
+    ComponentInstance(Class<T> type, Component component, T instance) {
+      this(type, component, instance, false);
+    }
+
+    ComponentInstance(Class<T> type, Component component, T instance, boolean root) {
       this.type = type;
       this.component = component;
+      this.instance = instance;
       this.root = root;
     }
 

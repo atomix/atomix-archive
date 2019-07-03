@@ -50,10 +50,18 @@ public class ServiceRegistryImpl implements ServiceRegistry, Managed {
   private ClusterService clusterService;
 
   private final MutableHandlerRegistry registry = new MutableHandlerRegistry();
+  private int port;
   private Server server;
   private EventLoopGroup bossGroup;
   private EventLoopGroup workerGroup;
   private Class<? extends ServerChannel> serverChannelClass;
+
+  public ServiceRegistryImpl() {
+  }
+
+  public ServiceRegistryImpl(int port) {
+    this.port = port;
+  }
 
   @Override
   public void register(BindableService service) {
@@ -62,8 +70,11 @@ public class ServiceRegistryImpl implements ServiceRegistry, Managed {
 
   @Override
   public CompletableFuture<Void> start() {
+    if (port == 0) {
+      port = clusterService.getLocalNode().port();
+    }
     initEventLoopGroup();
-    server = NettyServerBuilder.forPort(clusterService.getLocalNode().port())
+    server = NettyServerBuilder.forPort(port)
         .fallbackHandlerRegistry(registry)
         .channelType(serverChannelClass)
         .bossEventLoopGroup(bossGroup)

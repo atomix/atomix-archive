@@ -26,6 +26,8 @@ import io.atomix.api.map.CloseRequest;
 import io.atomix.api.map.CloseResponse;
 import io.atomix.api.map.CreateRequest;
 import io.atomix.api.map.CreateResponse;
+import io.atomix.api.map.EntriesRequest;
+import io.atomix.api.map.EntriesResponse;
 import io.atomix.api.map.EventRequest;
 import io.atomix.api.map.EventResponse;
 import io.atomix.api.map.ExistsRequest;
@@ -302,6 +304,32 @@ public class MapServiceImpl extends MapServiceGrpc.MapServiceImplBase {
                         .collect(Collectors.toList()))
                     .build())
                 .build()));
+  }
+
+  @Override
+  public void entries(EntriesRequest request, StreamObserver<EntriesResponse> responseObserver) {
+    executor.<Pair<SessionStreamContext, io.atomix.server.service.map.EntriesResponse>, EntriesResponse>execute(request.getHeader().getName(), EntriesResponse::getDefaultInstance, responseObserver,
+        (map, handler) -> map.entries(SessionQueryContext.newBuilder()
+                .setSessionId(request.getHeader().getSessionId())
+                .setLastIndex(request.getHeader().getIndex())
+                .setLastSequenceNumber(request.getHeader().getSequenceNumber())
+                .build(),
+            io.atomix.server.service.map.EntriesRequest.newBuilder().build(), handler),
+        response -> EntriesResponse.newBuilder()
+            .setHeader(ResponseHeader.newBuilder()
+                .setSessionId(request.getHeader().getSessionId())
+                .setIndex(response.getLeft().getIndex())
+                .setSequenceNumber(response.getLeft().getSequence())
+                .addStreams(StreamHeader.newBuilder()
+                    .setStreamId(response.getLeft().getStreamId())
+                    .setIndex(response.getLeft().getIndex())
+                    .setLastItemNumber(response.getLeft().getSequence())
+                    .build())
+                .build())
+            .setKey(response.getRight().getKey())
+            .setValue(response.getRight().getValue())
+            .setVersion(response.getRight().getVersion())
+            .build());
   }
 
   @Override

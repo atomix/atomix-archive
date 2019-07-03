@@ -15,16 +15,15 @@
  */
 package io.atomix.server;
 
-import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import com.google.common.io.Resources;
 import com.google.protobuf.Message;
+import io.atomix.api.controller.PartitionConfig;
+import io.atomix.server.management.impl.ConfigServiceImpl;
 import io.atomix.server.management.impl.ProtocolManager;
 import io.atomix.server.protocol.LogProtocol;
 import io.atomix.server.protocol.Protocol;
@@ -39,7 +38,6 @@ import io.atomix.server.service.value.ValueServiceImpl;
 import io.atomix.utils.ConfigurationException;
 import io.atomix.utils.Version;
 import io.atomix.utils.component.ComponentManager;
-import io.atomix.utils.concurrent.Futures;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -66,15 +64,21 @@ public class AtomixServer {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(AtomixServer.class);
 
-  private final File config;
+  private final String nodeId;
+  private final PartitionConfig partitionConfig;
+  private final Message protocolConfig;
+  private final Protocol.Type protocolType;
   private volatile ComponentManager<ProtocolManager> manager;
   private volatile ProtocolManager protocolManager;
   private volatile Protocol protocol;
   private final AtomicBoolean started = new AtomicBoolean();
   private Thread shutdownHook = null;
 
-  public AtomixServer(File config) {
-    this.config = config;
+  public AtomixServer(String nodeId, PartitionConfig partitionConfig, Protocol.Type protocolType, Message protocolConfig) {
+    this.nodeId = nodeId;
+    this.partitionConfig = partitionConfig;
+    this.protocolType = protocolType;
+    this.protocolConfig = protocolConfig;
   }
 
   /**
@@ -97,17 +101,11 @@ public class AtomixServer {
    */
   @SuppressWarnings("unchecked")
   public synchronized CompletableFuture<AtomixServer> start() {
-    manager = new ComponentManager<>(ProtocolManager.class, AtomixServer.class.getClassLoader());
+    manager = new ComponentManager<>(ProtocolManager.class, new Object[]{new ConfigServiceImpl(nodeId, partitionConfig)}, AtomixServer.class.getClassLoader());
     return manager.start()
         .thenCompose(protocolManager -> {
           this.protocolManager = protocolManager;
-          Message protocolConfig;
-          try (InputStream is = new FileInputStream(config)) {
-            protocolConfig = protocolManager.getProtocolType().parseConfig(is);
-          } catch (IOException e) {
-            return Futures.exceptionalFuture(e);
-          }
-          this.protocol = protocolManager.getProtocolType().newProtocol(protocolConfig, protocolManager);
+          this.protocol = protocolType.newProtocol(protocolConfig, protocolManager);
           return protocol.start();
         })
         .thenRun(() -> {

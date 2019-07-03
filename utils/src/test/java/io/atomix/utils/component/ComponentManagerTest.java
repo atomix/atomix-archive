@@ -23,7 +23,7 @@ import org.junit.Test;
 public class ComponentManagerTest {
   @Test
   public void testComponentManager() throws Exception {
-    ComponentManager<TestComponent> manager = new ComponentManager<>(TestComponent.class);
+    ComponentManager<TestComponent> manager = new ComponentManager<>(TestComponent.class, new Object[]{}, Thread.currentThread().getContextClassLoader());
     manager.start().join();
     manager.stop().join();
   }

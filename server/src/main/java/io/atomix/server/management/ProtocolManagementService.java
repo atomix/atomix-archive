@@ -39,6 +39,13 @@ public interface ProtocolManagementService {
   ClusterService getCluster();
 
   /**
+   * Returns the partition service.
+   *
+   * @return the partition service
+   */
+  PartitionService getPartitionService();
+
+  /**
    * Returns the service registry.
    *
    * @return the service registry
