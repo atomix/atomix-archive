@@ -102,6 +102,18 @@
             </configuration>
           </execution>
           <execution>
+            <id>download-primitive-api</id>
+            <phase>generate-sources</phase>
+            <goals>
+              <goal>download-single</goal>
+            </goals>
+            <configuration>
+              <url>https://raw.githubusercontent.com/atomix/atomix-api/master</url>
+              <fromFile>proto/atomix/primitive/primitive.proto</fromFile>
+              <toDir>${project.build.directory}/proto/atomix/primitive</toDir>
+            </configuration>
+          </execution>
+          <execution>
             <id>download-counter-api</id>
             <phase>generate-sources</phase>
             <goals>
@@ -135,6 +147,18 @@
               <url>https://raw.githubusercontent.com/atomix/atomix-api/master</url>
               <fromFile>proto/atomix/headers/headers.proto</fromFile>
               <toDir>${project.build.directory}/proto/atomix/headers</toDir>
+            </configuration>
+          </execution>
+          <execution>
+            <id>download-list-api</id>
+            <phase>generate-sources</phase>
+            <goals>
+              <goal>download-single</goal>
+            </goals>
+            <configuration>
+              <url>https://raw.githubusercontent.com/atomix/atomix-api/master</url>
+              <fromFile>proto/atomix/list/list.proto</fromFile>
+              <toDir>${project.build.directory}/proto/atomix/list</toDir>
             </configuration>
           </execution>
           <execution>
@@ -220,6 +244,10 @@
                   option java_package = "io.atomix.api.controller";
                   option java_multiple_files = true;
                 </echo>
+                <echo file="${project.build.directory}/proto/atomix/primitive/primitive.proto" append="true">
+                  option java_package = "io.atomix.api.primitive";
+                  option java_multiple_files = true;
+                </echo>
                 <echo file="${project.build.directory}/proto/atomix/counter/counter.proto" append="true">
                   option java_package = "io.atomix.api.counter";
                   option java_multiple_files = true;
@@ -230,6 +258,10 @@
                 </echo>
                 <echo file="${project.build.directory}/proto/atomix/headers/headers.proto" append="true">
                   option java_package = "io.atomix.api.headers";
+                  option java_multiple_files = true;
+                </echo>
+                <echo file="${project.build.directory}/proto/atomix/list/list.proto" append="true">
+                  option java_package = "io.atomix.api.list";
                   option java_multiple_files = true;
                 </echo>
                 <echo file="${project.build.directory}/proto/atomix/lock/lock.proto" append="true">

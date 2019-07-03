@@ -22,7 +22,7 @@ import java.util.function.Supplier;
 
 import com.google.common.base.Strings;
 import com.google.protobuf.Message;
-import io.atomix.api.headers.Name;
+import io.atomix.api.primitive.Name;
 import io.atomix.service.proxy.ServiceProxy;
 import io.atomix.utils.stream.StreamHandler;
 import io.grpc.Metadata;
