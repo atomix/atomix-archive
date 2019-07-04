@@ -22,13 +22,13 @@ import io.grpc.Channel;
  */
 public interface ChannelService {
 
-  /**
-   * Gets a channel for the given node.
-   *
-   * @param host the node host
-   * @param port the node port
-   * @return the channel
-   */
-  Channel getChannel(String host, int port);
+    /**
+     * Gets a channel for the given node.
+     *
+     * @param host the node host
+     * @param port the node port
+     * @return the channel
+     */
+    Channel getChannel(String host, int port);
 
 }

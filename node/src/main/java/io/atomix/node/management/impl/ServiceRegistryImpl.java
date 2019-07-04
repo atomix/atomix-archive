@@ -44,72 +44,72 @@ import static io.atomix.utils.concurrent.Threads.namedThreads;
  */
 @Component
 public class ServiceRegistryImpl implements ServiceRegistry, Managed {
-  private static final Logger LOGGER = LoggerFactory.getLogger(ChannelServiceImpl.class);
+    private static final Logger LOGGER = LoggerFactory.getLogger(ChannelServiceImpl.class);
 
-  @Dependency
-  private ClusterService clusterService;
+    @Dependency
+    private ClusterService clusterService;
 
-  private final MutableHandlerRegistry registry = new MutableHandlerRegistry();
-  private int port;
-  private Server server;
-  private EventLoopGroup bossGroup;
-  private EventLoopGroup workerGroup;
-  private Class<? extends ServerChannel> serverChannelClass;
+    private final MutableHandlerRegistry registry = new MutableHandlerRegistry();
+    private int port;
+    private Server server;
+    private EventLoopGroup bossGroup;
+    private EventLoopGroup workerGroup;
+    private Class<? extends ServerChannel> serverChannelClass;
 
-  public ServiceRegistryImpl() {
-  }
-
-  public ServiceRegistryImpl(int port) {
-    this.port = port;
-  }
-
-  @Override
-  public void register(BindableService service) {
-    registry.addService(service);
-  }
-
-  @Override
-  public CompletableFuture<Void> start() {
-    if (port == 0) {
-      port = clusterService.getLocalNode().port();
+    public ServiceRegistryImpl() {
     }
-    initEventLoopGroup();
-    server = NettyServerBuilder.forPort(port)
-        .fallbackHandlerRegistry(registry)
-        .channelType(serverChannelClass)
-        .bossEventLoopGroup(bossGroup)
-        .workerEventLoopGroup(workerGroup)
-        .build();
-    try {
-      server.start();
-    } catch (IOException e) {
-      return Futures.exceptionalFuture(e);
-    }
-    return CompletableFuture.completedFuture(null);
-  }
 
-  private void initEventLoopGroup() {
-    // try Epoll first and if that does work, use nio.
-    try {
-      workerGroup = new EpollEventLoopGroup(0, namedThreads("netty-messaging-event-epoll-client-%d", LOGGER));
-      bossGroup = new EpollEventLoopGroup(0, namedThreads("netty-messaging-event-epoll-server-%d", LOGGER));
-      serverChannelClass = EpollServerSocketChannel.class;
-      return;
-    } catch (Throwable e) {
-      LOGGER.debug("Failed to initialize native (epoll) transport. "
-          + "Reason: {}. Proceeding with nio.", e.getMessage());
+    public ServiceRegistryImpl(int port) {
+        this.port = port;
     }
-    workerGroup = new NioEventLoopGroup(0, namedThreads("netty-messaging-event-nio-client-%d", LOGGER));
-    bossGroup = new NioEventLoopGroup(0, namedThreads("netty-messaging-event-nio-server-%d", LOGGER));
-    serverChannelClass = NioServerSocketChannel.class;
-  }
+
+    @Override
+    public void register(BindableService service) {
+        registry.addService(service);
+    }
+
+    @Override
+    public CompletableFuture<Void> start() {
+        if (port == 0) {
+            port = clusterService.getLocalNode().port();
+        }
+        initEventLoopGroup();
+        server = NettyServerBuilder.forPort(port)
+            .fallbackHandlerRegistry(registry)
+            .channelType(serverChannelClass)
+            .bossEventLoopGroup(bossGroup)
+            .workerEventLoopGroup(workerGroup)
+            .build();
+        try {
+            server.start();
+        } catch (IOException e) {
+            return Futures.exceptionalFuture(e);
+        }
+        return CompletableFuture.completedFuture(null);
+    }
+
+    private void initEventLoopGroup() {
+        // try Epoll first and if that does work, use nio.
+        try {
+            workerGroup = new EpollEventLoopGroup(0, namedThreads("netty-messaging-event-epoll-client-%d", LOGGER));
+            bossGroup = new EpollEventLoopGroup(0, namedThreads("netty-messaging-event-epoll-server-%d", LOGGER));
+            serverChannelClass = EpollServerSocketChannel.class;
+            return;
+        } catch (Throwable e) {
+            LOGGER.debug("Failed to initialize native (epoll) transport. "
+                + "Reason: {}. Proceeding with nio.", e.getMessage());
+        }
+        workerGroup = new NioEventLoopGroup(0, namedThreads("netty-messaging-event-nio-client-%d", LOGGER));
+        bossGroup = new NioEventLoopGroup(0, namedThreads("netty-messaging-event-nio-server-%d", LOGGER));
+        serverChannelClass = NioServerSocketChannel.class;
+    }
 
 
-  @Override
-  public CompletableFuture<Void> stop() {
-    if (server != null) {
-      server.shutdownNow();
+    @Override
+    public CompletableFuture<Void> stop() {
+        if (server != null) {
+            server.shutdownNow();
+        }
+        return CompletableFuture.completedFuture(null);
     }
-    return CompletableFuture.completedFuture(null);
-  }
 }

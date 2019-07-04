@@ -22,33 +22,33 @@ import java.util.Collection;
  */
 public interface ClusterService {
 
-  /**
-   * Returns the local node.
-   *
-   * @return the local node
-   */
-  Node getLocalNode();
+    /**
+     * Returns the local node.
+     *
+     * @return the local node
+     */
+    Node getLocalNode();
 
-  /**
-   * Returns the controller node.
-   *
-   * @return the controller node
-   */
-  Node getControllerNode();
+    /**
+     * Returns the controller node.
+     *
+     * @return the controller node
+     */
+    Node getControllerNode();
 
-  /**
-   * Returns a collection of nodes in the cluster.
-   *
-   * @return a collection of nodes in the cluster
-   */
-  Collection<Node> getNodes();
+    /**
+     * Returns a collection of nodes in the cluster.
+     *
+     * @return a collection of nodes in the cluster
+     */
+    Collection<Node> getNodes();
 
-  /**
-   * Returns a node by ID.
-   *
-   * @param id the node ID
-   * @return the node
-   */
-  Node getNode(String id);
+    /**
+     * Returns a node by ID.
+     *
+     * @param id the node ID
+     * @return the node
+     */
+    Node getNode(String id);
 
 }

@@ -32,60 +32,60 @@ import io.atomix.utils.concurrent.ThreadService;
  */
 @Component
 public class ProtocolManager implements ProtocolManagementService {
-  @Dependency
-  private Protocol.Type protocolType;
-  @Dependency
-  private ClusterService clusterService;
-  @Dependency
-  private ServiceRegistry serviceRegistry;
-  @Dependency
-  private ServiceProvider serviceProvider;
-  @Dependency
-  private ThreadService threadService;
-  @Dependency
-  private ServiceTypeRegistry serviceTypeRegistry;
-  @Dependency
-  private PrimaryElectionService primaryElectionService;
-  @Dependency
-  private PartitionService partitionService;
+    @Dependency
+    private Protocol.Type protocolType;
+    @Dependency
+    private ClusterService clusterService;
+    @Dependency
+    private ServiceRegistry serviceRegistry;
+    @Dependency
+    private ServiceProvider serviceProvider;
+    @Dependency
+    private ThreadService threadService;
+    @Dependency
+    private ServiceTypeRegistry serviceTypeRegistry;
+    @Dependency
+    private PrimaryElectionService primaryElectionService;
+    @Dependency
+    private PartitionService partitionService;
 
-  @Override
-  public Protocol.Type getProtocolType() {
-    return protocolType;
-  }
+    @Override
+    public Protocol.Type getProtocolType() {
+        return protocolType;
+    }
 
-  @Override
-  public ClusterService getCluster() {
-    return clusterService;
-  }
+    @Override
+    public ClusterService getCluster() {
+        return clusterService;
+    }
 
-  @Override
-  public PartitionService getPartitionService() {
-    return partitionService;
-  }
+    @Override
+    public PartitionService getPartitionService() {
+        return partitionService;
+    }
 
-  @Override
-  public ServiceRegistry getServiceRegistry() {
-    return serviceRegistry;
-  }
+    @Override
+    public ServiceRegistry getServiceRegistry() {
+        return serviceRegistry;
+    }
 
-  @Override
-  public ServiceProvider getServiceProvider() {
-    return serviceProvider;
-  }
+    @Override
+    public ServiceProvider getServiceProvider() {
+        return serviceProvider;
+    }
 
-  @Override
-  public ThreadService getThreadService() {
-    return threadService;
-  }
+    @Override
+    public ThreadService getThreadService() {
+        return threadService;
+    }
 
-  @Override
-  public ServiceTypeRegistry getServiceTypeRegistry() {
-    return serviceTypeRegistry;
-  }
+    @Override
+    public ServiceTypeRegistry getServiceTypeRegistry() {
+        return serviceTypeRegistry;
+    }
 
-  @Override
-  public PrimaryElectionService getPrimaryElectionService() {
-    return primaryElectionService;
-  }
+    @Override
+    public PrimaryElectionService getPrimaryElectionService() {
+        return primaryElectionService;
+    }
 }

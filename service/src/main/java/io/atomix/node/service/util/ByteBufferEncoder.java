@@ -25,29 +25,29 @@ import io.atomix.node.service.ServiceException;
 @FunctionalInterface
 public interface ByteBufferEncoder<T> {
 
-  /**
-   * Encodes the given object.
-   *
-   * @param object the object to encode
-   * @param encoder the encoder with which to encode the object
-   * @param <T> the object type
-   * @return the decoded object
-   */
-  static <T> ByteBuffer encode(T object, ByteBufferEncoder<T> encoder) {
-    try {
-      return object != null ? encoder.encode(object) : ByteBuffer.allocate(0);
-    } catch (Exception e) {
-      throw new ServiceException.ApplicationException(e);
+    /**
+     * Encodes the given object.
+     *
+     * @param object  the object to encode
+     * @param encoder the encoder with which to encode the object
+     * @param <T>     the object type
+     * @return the decoded object
+     */
+    static <T> ByteBuffer encode(T object, ByteBufferEncoder<T> encoder) {
+        try {
+            return object != null ? encoder.encode(object) : ByteBuffer.allocate(0);
+        } catch (Exception e) {
+            throw new ServiceException.ApplicationException(e);
+        }
     }
-  }
 
-  /**
-   * Encodes the given object.
-   *
-   * @param object the object to encode
-   * @return the encoded object
-   * @throws Exception
-   */
-  ByteBuffer encode(T object) throws Exception;
+    /**
+     * Encodes the given object.
+     *
+     * @param object the object to encode
+     * @return the encoded object
+     * @throws Exception
+     */
+    ByteBuffer encode(T object) throws Exception;
 
 }

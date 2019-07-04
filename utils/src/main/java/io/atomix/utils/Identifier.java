@@ -20,10 +20,10 @@ package io.atomix.utils;
  */
 public interface Identifier<T extends Comparable<T>> {
 
-  /**
-   * Returns the backing identifier value.
-   *
-   * @return identifier
-   */
-  T id();
+    /**
+     * Returns the backing identifier value.
+     *
+     * @return identifier
+     */
+    T id();
 }

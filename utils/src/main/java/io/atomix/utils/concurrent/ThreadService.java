@@ -20,18 +20,18 @@ package io.atomix.utils.concurrent;
  */
 public interface ThreadService {
 
-  /**
-   * Returns the thread context factory.
-   *
-   * @return the thread context factory
-   */
-  ThreadContextFactory getFactory();
+    /**
+     * Returns the thread context factory.
+     *
+     * @return the thread context factory
+     */
+    ThreadContextFactory getFactory();
 
-  /**
-   * Creates a new thread context.
-   *
-   * @return a new thread context
-   */
-  ThreadContext createContext();
+    /**
+     * Creates a new thread context.
+     *
+     * @return a new thread context
+     */
+    ThreadContext createContext();
 
 }

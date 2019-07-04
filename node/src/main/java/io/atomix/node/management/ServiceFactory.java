@@ -20,21 +20,21 @@ package io.atomix.node.management;
  */
 public interface ServiceFactory<T> {
 
-  /**
-   * Returns a service for the given member.
-   *
-   * @param member the member
-   * @return the service for the given member
-   */
-  T getService(String member);
+    /**
+     * Returns a service for the given member.
+     *
+     * @param member the member
+     * @return the service for the given member
+     */
+    T getService(String member);
 
-  /**
-   * Returns a service for the given member.
-   *
-   * @param host the member host
-   * @param port the member port
-   * @return the service for the given member
-   */
-  T getService(String host, int port);
+    /**
+     * Returns a service for the given member.
+     *
+     * @param host the member host
+     * @param port the member port
+     * @return the service for the given member
+     */
+    T getService(String host, int port);
 
 }

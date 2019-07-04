@@ -26,34 +26,34 @@ import io.atomix.node.management.ConfigService;
  * Configuration service.
  */
 public class ConfigServiceImpl implements ConfigService {
-  private final NodeConfig node;
-  private final PartitionConfig config;
+    private final NodeConfig node;
+    private final PartitionConfig config;
 
-  public ConfigServiceImpl(String nodeId, PartitionConfig partitionConfig) {
-    this.config = partitionConfig;
-    this.node = partitionConfig.getMembersList().stream()
-        .filter(member -> member.getId().equals(nodeId))
-        .findFirst()
-        .orElse(null);
-  }
+    public ConfigServiceImpl(String nodeId, PartitionConfig partitionConfig) {
+        this.config = partitionConfig;
+        this.node = partitionConfig.getMembersList().stream()
+            .filter(member -> member.getId().equals(nodeId))
+            .findFirst()
+            .orElse(null);
+    }
 
-  @Override
-  public PartitionId getPartition() {
-    return config.getPartition();
-  }
+    @Override
+    public PartitionId getPartition() {
+        return config.getPartition();
+    }
 
-  @Override
-  public NodeConfig getController() {
-    return config.getController();
-  }
+    @Override
+    public NodeConfig getController() {
+        return config.getController();
+    }
 
-  @Override
-  public NodeConfig getNode() {
-    return node;
-  }
+    @Override
+    public NodeConfig getNode() {
+        return node;
+    }
 
-  @Override
-  public Collection<NodeConfig> getCluster() {
-    return config.getMembersList();
-  }
+    @Override
+    public Collection<NodeConfig> getCluster() {
+        return config.getMembersList();
+    }
 }

@@ -22,13 +22,13 @@ import java.util.concurrent.CompletableFuture;
  */
 @Component
 public class TestComponent1 implements TestComponentInterface1 {
-  @Override
-  public CompletableFuture<Void> start() {
-    return CompletableFuture.completedFuture(null);
-  }
+    @Override
+    public CompletableFuture<Void> start() {
+        return CompletableFuture.completedFuture(null);
+    }
 
-  @Override
-  public CompletableFuture<Void> stop() {
-    return CompletableFuture.completedFuture(null);
-  }
+    @Override
+    public CompletableFuture<Void> stop() {
+        return CompletableFuture.completedFuture(null);
+    }
 }

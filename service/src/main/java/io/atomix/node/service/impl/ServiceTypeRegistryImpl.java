@@ -34,33 +34,33 @@ import io.atomix.utils.component.Managed;
  */
 @Component
 public class ServiceTypeRegistryImpl implements ServiceTypeRegistry, Managed {
-  @Dependency(value = PrimitiveService.Type.class, cardinality = Cardinality.MULTIPLE)
-  private List<PrimitiveService.Type> types;
+    @Dependency(value = PrimitiveService.Type.class, cardinality = Cardinality.MULTIPLE)
+    private List<PrimitiveService.Type> types;
 
-  private final Map<String, PrimitiveService.Type> typeMap = new ConcurrentHashMap<>();
+    private final Map<String, PrimitiveService.Type> typeMap = new ConcurrentHashMap<>();
 
-  @Override
-  public Collection<PrimitiveService.Type> getServiceTypes() {
-    return types;
-  }
-
-  @Override
-  public PrimitiveService.Type getServiceType(String typeName) {
-    PrimitiveService.Type type = typeMap.get(typeName);
-    if (type == null) {
-      throw new ServiceException("Unknown service type " + typeName);
+    @Override
+    public Collection<PrimitiveService.Type> getServiceTypes() {
+        return types;
     }
-    return type;
-  }
 
-  @Override
-  public CompletableFuture<Void> start() {
-    types.forEach(type -> typeMap.put(type.name(), type));
-    return CompletableFuture.completedFuture(null);
-  }
+    @Override
+    public PrimitiveService.Type getServiceType(String typeName) {
+        PrimitiveService.Type type = typeMap.get(typeName);
+        if (type == null) {
+            throw new ServiceException("Unknown service type " + typeName);
+        }
+        return type;
+    }
 
-  @Override
-  public CompletableFuture<Void> stop() {
-    return CompletableFuture.completedFuture(null);
-  }
+    @Override
+    public CompletableFuture<Void> start() {
+        types.forEach(type -> typeMap.put(type.name(), type));
+        return CompletableFuture.completedFuture(null);
+    }
+
+    @Override
+    public CompletableFuture<Void> stop() {
+        return CompletableFuture.completedFuture(null);
+    }
 }

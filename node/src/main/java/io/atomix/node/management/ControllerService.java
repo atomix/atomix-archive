@@ -22,11 +22,11 @@ import io.grpc.Channel;
  */
 public interface ControllerService {
 
-  /**
-   * Returns a channel to the controller.
-   *
-   * @return a channel to the controller
-   */
-  Channel getChannel();
+    /**
+     * Returns a channel to the controller.
+     *
+     * @return a channel to the controller
+     */
+    Channel getChannel();
 
 }

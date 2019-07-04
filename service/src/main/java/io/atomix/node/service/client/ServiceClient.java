@@ -32,72 +32,72 @@ import org.apache.commons.lang3.tuple.Pair;
  */
 public interface ServiceClient {
 
-  /**
-   * Returns the service name.
-   *
-   * @return the service name
-   */
-  String name();
+    /**
+     * Returns the service name.
+     *
+     * @return the service name
+     */
+    String name();
 
-  /**
-   * Returns the service type.
-   *
-   * @return the service type
-   */
-  String type();
+    /**
+     * Returns the service type.
+     *
+     * @return the service type
+     */
+    String type();
 
-  /**
-   * Executes an operation on the primitive.
-   *
-   * @param operation the operation to execute
-   * @param context   the request context
-   * @param request   the request
-   * @param encoder   the request encoder
-   * @param decoder   the response decoder
-   * @param <T>       the request type
-   * @param <U>       the response type
-   * @return a future to be completed with the response
-   */
-  <T extends Message, U extends Message> CompletableFuture<Pair<ResponseContext, U>> execute(
-      OperationId operation,
-      RequestContext context,
-      T request,
-      ByteStringEncoder<T> encoder,
-      ByteBufferDecoder<U> decoder);
+    /**
+     * Executes an operation on the primitive.
+     *
+     * @param operation the operation to execute
+     * @param context   the request context
+     * @param request   the request
+     * @param encoder   the request encoder
+     * @param decoder   the response decoder
+     * @param <T>       the request type
+     * @param <U>       the response type
+     * @return a future to be completed with the response
+     */
+    <T extends Message, U extends Message> CompletableFuture<Pair<ResponseContext, U>> execute(
+        OperationId operation,
+        RequestContext context,
+        T request,
+        ByteStringEncoder<T> encoder,
+        ByteBufferDecoder<U> decoder);
 
-  /**
-   * Executes a streaming operation on the primitive.
-   *
-   * @param operation the operation to execute
-   * @param context   the request context
-   * @param request   the request
-   * @param encoder   the request encoder
-   * @param handler   the response handler
-   * @param decoder   the response decoder
-   * @param <T>       the request type
-   * @param <U>       the response type
-   * @return a future to be completed once the operation has been completed
-   */
-  <T extends Message, U extends Message> CompletableFuture<Void> execute(
-      OperationId operation,
-      RequestContext context,
-      T request,
-      ByteStringEncoder<T> encoder,
-      StreamHandler<Pair<StreamContext, U>> handler,
-      ByteBufferDecoder<U> decoder);
+    /**
+     * Executes a streaming operation on the primitive.
+     *
+     * @param operation the operation to execute
+     * @param context   the request context
+     * @param request   the request
+     * @param encoder   the request encoder
+     * @param handler   the response handler
+     * @param decoder   the response decoder
+     * @param <T>       the request type
+     * @param <U>       the response type
+     * @return a future to be completed once the operation has been completed
+     */
+    <T extends Message, U extends Message> CompletableFuture<Void> execute(
+        OperationId operation,
+        RequestContext context,
+        T request,
+        ByteStringEncoder<T> encoder,
+        StreamHandler<Pair<StreamContext, U>> handler,
+        ByteBufferDecoder<U> decoder);
 
-  /**
-   * Creates the primitive.
-   *
-   * @return a future to be completed once the primitive has been created
-   */
-  CompletableFuture<Void> create();
+    /**
+     * Creates the primitive.
+     *
+     * @return a future to be completed once the primitive has been created
+     */
+    CompletableFuture<Void> create();
 
-  /**
-   * Deletes the primitive.
-   *
-   * @return a future to be completed once the primitive has been deleted
-   */
-  CompletableFuture<Void> delete();
+    /**
+     * Deletes the primitive.
+     *
+     * @return a future to be completed once the primitive has been deleted
+     */
+    CompletableFuture<Void> delete();
 
 }

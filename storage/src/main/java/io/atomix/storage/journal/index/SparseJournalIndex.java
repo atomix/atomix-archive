@@ -22,29 +22,29 @@ import java.util.TreeMap;
  * Sparse index.
  */
 public class SparseJournalIndex implements JournalIndex {
-  private static final int MIN_DENSITY = 1000;
-  private final int density;
-  private final TreeMap<Long, Integer> positions = new TreeMap<>();
+    private static final int MIN_DENSITY = 1000;
+    private final int density;
+    private final TreeMap<Long, Integer> positions = new TreeMap<>();
 
-  public SparseJournalIndex(double density) {
-    this.density = (int) Math.ceil(MIN_DENSITY / (density * MIN_DENSITY));
-  }
-
-  @Override
-  public void index(long index, int position) {
-    if (index % density == 0) {
-      positions.put(index, position);
+    public SparseJournalIndex(double density) {
+        this.density = (int) Math.ceil(MIN_DENSITY / (density * MIN_DENSITY));
     }
-  }
 
-  @Override
-  public Position lookup(long index) {
-    Map.Entry<Long, Integer> entry = positions.floorEntry(index);
-    return entry != null ? new Position(entry.getKey(), entry.getValue()) : null;
-  }
+    @Override
+    public void index(long index, int position) {
+        if (index % density == 0) {
+            positions.put(index, position);
+        }
+    }
 
-  @Override
-  public void truncate(long index) {
-    positions.tailMap(index, false).clear();
-  }
+    @Override
+    public Position lookup(long index) {
+        Map.Entry<Long, Integer> entry = positions.floorEntry(index);
+        return entry != null ? new Position(entry.getKey(), entry.getValue()) : null;
+    }
+
+    @Override
+    public void truncate(long index) {
+        positions.tailMap(index, false).clear();
+    }
 }

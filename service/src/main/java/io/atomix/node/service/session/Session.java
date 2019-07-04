@@ -24,63 +24,63 @@ import io.atomix.node.service.operation.StreamType;
  */
 public interface Session {
 
-  /**
-   * Returns the session identifier.
-   *
-   * @return The session identifier.
-   */
-  SessionId sessionId();
+    /**
+     * Returns the session identifier.
+     *
+     * @return The session identifier.
+     */
+    SessionId sessionId();
 
-  /**
-   * Returns the session state.
-   *
-   * @return The session state.
-   */
-  State getState();
+    /**
+     * Returns the session state.
+     *
+     * @return The session state.
+     */
+    State getState();
 
-  /**
-   * Returns a stream by ID.
-   *
-   * @param streamId the stream ID
-   * @return the stream
-   */
-  default <T> SessionStreamHandler<T> getStream(long streamId) {
-    return getStream(new StreamId(sessionId(), streamId));
-  }
-
-  /**
-   * Returns a stream by ID.
-   *
-   * @param streamId the stream ID
-   * @return the stream
-   */
-  <T> SessionStreamHandler<T> getStream(StreamId streamId);
-
-  /**
-   * Returns the collection of open streams of the given type.
-   *
-   * @return the collection of open streams of the given type
-   */
-  <T> Collection<SessionStreamHandler<T>> getStreams(StreamType<T> streamType);
-
-  /**
-   * Session state enums.
-   */
-  enum State {
-    OPEN(true),
-    SUSPICIOUS(true),
-    EXPIRED(false),
-    CLOSED(false);
-
-    private final boolean active;
-
-    State(boolean active) {
-      this.active = active;
+    /**
+     * Returns a stream by ID.
+     *
+     * @param streamId the stream ID
+     * @return the stream
+     */
+    default <T> SessionStreamHandler<T> getStream(long streamId) {
+        return getStream(new StreamId(sessionId(), streamId));
     }
 
-    public boolean active() {
-      return active;
+    /**
+     * Returns a stream by ID.
+     *
+     * @param streamId the stream ID
+     * @return the stream
+     */
+    <T> SessionStreamHandler<T> getStream(StreamId streamId);
+
+    /**
+     * Returns the collection of open streams of the given type.
+     *
+     * @return the collection of open streams of the given type
+     */
+    <T> Collection<SessionStreamHandler<T>> getStreams(StreamType<T> streamType);
+
+    /**
+     * Session state enums.
+     */
+    enum State {
+        OPEN(true),
+        SUSPICIOUS(true),
+        EXPIRED(false),
+        CLOSED(false);
+
+        private final boolean active;
+
+        State(boolean active) {
+            this.active = active;
+        }
+
+        public boolean active() {
+            return active;
+        }
     }
-  }
 
 }

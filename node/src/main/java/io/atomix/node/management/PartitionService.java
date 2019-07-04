@@ -22,11 +22,11 @@ import io.atomix.api.controller.PartitionId;
  */
 public interface PartitionService {
 
-  /**
-   * Returns the partition ID.
-   *
-   * @return the partition ID
-   */
-  PartitionId getPartitionId();
+    /**
+     * Returns the partition ID.
+     *
+     * @return the partition ID
+     */
+    PartitionId getPartitionId();
 
 }

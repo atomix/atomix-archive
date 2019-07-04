@@ -22,6 +22,6 @@ import io.atomix.utils.component.Dependency;
  * Server manager.
  */
 public class ServerManager {
-  @Dependency
-  private Protocol protocol;
+    @Dependency
+    private Protocol protocol;
 }

@@ -24,25 +24,25 @@ import java.util.concurrent.CompletableFuture;
  */
 public interface Managed<T> {
 
-  /**
-   * Starts the managed object.
-   *
-   * @return A completable future to be completed once the object has been started.
-   */
-  CompletableFuture<T> start();
+    /**
+     * Starts the managed object.
+     *
+     * @return A completable future to be completed once the object has been started.
+     */
+    CompletableFuture<T> start();
 
-  /**
-   * Returns a boolean value indicating whether the managed object is running.
-   *
-   * @return Indicates whether the managed object is running.
-   */
-  boolean isRunning();
+    /**
+     * Returns a boolean value indicating whether the managed object is running.
+     *
+     * @return Indicates whether the managed object is running.
+     */
+    boolean isRunning();
 
-  /**
-   * Stops the managed object.
-   *
-   * @return A completable future to be completed once the object has been stopped.
-   */
-  CompletableFuture<Void> stop();
+    /**
+     * Stops the managed object.
+     *
+     * @return A completable future to be completed once the object has been stopped.
+     */
+    CompletableFuture<Void> stop();
 
 }

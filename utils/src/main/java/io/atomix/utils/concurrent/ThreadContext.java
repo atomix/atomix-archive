@@ -36,62 +36,62 @@ import static com.google.common.base.Preconditions.checkState;
  */
 public interface ThreadContext extends AutoCloseable, Executor, Scheduler {
 
-  /**
-   * Returns the current thread context.
-   *
-   * @return The current thread context or {@code null} if no context exists.
-   */
-  static ThreadContext currentContext() {
-    Thread thread = Thread.currentThread();
-    return thread instanceof AtomixThread ? ((AtomixThread) thread).getContext() : null;
-  }
+    /**
+     * Returns the current thread context.
+     *
+     * @return The current thread context or {@code null} if no context exists.
+     */
+    static ThreadContext currentContext() {
+        Thread thread = Thread.currentThread();
+        return thread instanceof AtomixThread ? ((AtomixThread) thread).getContext() : null;
+    }
 
-  /**
-   * @throws IllegalStateException if the current thread is not a catalyst thread
-   */
-  static ThreadContext currentContextOrThrow() {
-    ThreadContext context = currentContext();
-    checkState(context != null, "not on a Catalyst thread");
-    return context;
-  }
+    /**
+     * @throws IllegalStateException if the current thread is not a catalyst thread
+     */
+    static ThreadContext currentContextOrThrow() {
+        ThreadContext context = currentContext();
+        checkState(context != null, "not on a Catalyst thread");
+        return context;
+    }
 
-  /**
-   * Returns a boolean indicating whether the current thread is in this context.
-   *
-   * @return Indicates whether the current thread is in this context.
-   */
-  default boolean isCurrentContext() {
-    return currentContext() == this;
-  }
+    /**
+     * Returns a boolean indicating whether the current thread is in this context.
+     *
+     * @return Indicates whether the current thread is in this context.
+     */
+    default boolean isCurrentContext() {
+        return currentContext() == this;
+    }
 
-  /**
-   * Checks that the current thread is the correct context thread.
-   */
-  default void checkThread() {
-    checkState(currentContext() == this, "not on a Catalyst thread");
-  }
+    /**
+     * Checks that the current thread is the correct context thread.
+     */
+    default void checkThread() {
+        checkState(currentContext() == this, "not on a Catalyst thread");
+    }
 
-  /**
-   * Returns whether the thread context is currently marked blocked.
-   *
-   * @return whether the thread context is currently marked blocked
-   */
-  boolean isBlocked();
+    /**
+     * Returns whether the thread context is currently marked blocked.
+     *
+     * @return whether the thread context is currently marked blocked
+     */
+    boolean isBlocked();
 
-  /**
-   * Marks the thread context as blocked.
-   */
-  void block();
+    /**
+     * Marks the thread context as blocked.
+     */
+    void block();
 
-  /**
-   * Marks the thread context as unblocked.
-   */
-  void unblock();
+    /**
+     * Marks the thread context as unblocked.
+     */
+    void unblock();
 
-  /**
-   * Closes the context.
-   */
-  @Override
-  void close();
+    /**
+     * Closes the context.
+     */
+    @Override
+    void close();
 
 }

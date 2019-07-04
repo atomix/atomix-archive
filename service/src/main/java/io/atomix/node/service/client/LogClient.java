@@ -20,18 +20,18 @@ package io.atomix.node.service.client;
  */
 public interface LogClient {
 
-  /**
-   * Returns the log producer.
-   *
-   * @return the log producer
-   */
-  LogProducer producer();
+    /**
+     * Returns the log producer.
+     *
+     * @return the log producer
+     */
+    LogProducer producer();
 
-  /**
-   * Returns the log consumer.
-   *
-   * @return the log consumer
-   */
-  LogConsumer consumer();
+    /**
+     * Returns the log consumer.
+     *
+     * @return the log consumer
+     */
+    LogConsumer consumer();
 
 }

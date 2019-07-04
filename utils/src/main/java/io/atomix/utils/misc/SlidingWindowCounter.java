@@ -38,97 +38,97 @@ import static com.google.common.base.Preconditions.checkArgument;
  * total count for the last N window slots.
  */
 public final class SlidingWindowCounter {
-  private final Logger log = LoggerFactory.getLogger(getClass());
-  private volatile int headSlot;
-  private final int windowSlots;
+    private final Logger log = LoggerFactory.getLogger(getClass());
+    private volatile int headSlot;
+    private final int windowSlots;
 
-  private final List<AtomicLong> counters;
+    private final List<AtomicLong> counters;
 
-  private final Scheduled schedule;
+    private final Scheduled schedule;
 
-  private static final int SLIDE_WINDOW_PERIOD_SECONDS = 1;
+    private static final int SLIDE_WINDOW_PERIOD_SECONDS = 1;
 
-  public SlidingWindowCounter(int windowSlots) {
-    this(windowSlots, new SingleThreadContext("sliding-window-counter-%d"));
-  }
-
-  /**
-   * Creates a new sliding window counter with the given total number of
-   * window slots.
-   *
-   * @param windowSlots total number of window slots
-   */
-  public SlidingWindowCounter(int windowSlots, ThreadContext context) {
-    checkArgument(windowSlots > 0, "Window size must be a positive integer");
-
-    this.windowSlots = windowSlots;
-    this.headSlot = 0;
-
-    // Initialize each item in the list to an AtomicLong of 0
-    this.counters = Collections.nCopies(windowSlots, 0)
-        .stream()
-        .map(AtomicLong::new)
-        .collect(Collectors.toCollection(ArrayList::new));
-    this.schedule = context.schedule(0, SLIDE_WINDOW_PERIOD_SECONDS, TimeUnit.SECONDS, this::advanceHead);
-  }
-
-  /**
-   * Releases resources used by the SlidingWindowCounter.
-   */
-  public void destroy() {
-    schedule.cancel();
-  }
-
-  /**
-   * Increments the count of the current window slot by 1.
-   */
-  public void incrementCount() {
-    incrementCount(headSlot, 1);
-  }
-
-  /**
-   * Increments the count of the current window slot by the given value.
-   *
-   * @param value value to increment by
-   */
-  public void incrementCount(long value) {
-    incrementCount(headSlot, value);
-  }
-
-  private void incrementCount(int slot, long value) {
-    counters.get(slot).addAndGet(value);
-  }
-
-  /**
-   * Gets the total count for the last N window slots.
-   *
-   * @param slots number of slots to include in the count
-   * @return total count for last N slots
-   */
-  public long get(int slots) {
-    checkArgument(slots <= windowSlots,
-        "Requested window must be less than the total window slots");
-
-    long sum = 0;
-
-    for (int i = 0; i < slots; i++) {
-      int currentIndex = headSlot - i;
-      if (currentIndex < 0) {
-        currentIndex = counters.size() + currentIndex;
-      }
-      sum += counters.get(currentIndex).get();
+    public SlidingWindowCounter(int windowSlots) {
+        this(windowSlots, new SingleThreadContext("sliding-window-counter-%d"));
     }
 
-    return sum;
-  }
+    /**
+     * Creates a new sliding window counter with the given total number of
+     * window slots.
+     *
+     * @param windowSlots total number of window slots
+     */
+    public SlidingWindowCounter(int windowSlots, ThreadContext context) {
+        checkArgument(windowSlots > 0, "Window size must be a positive integer");
 
-  void advanceHead() {
-    counters.get(slotAfter(headSlot)).set(0);
-    headSlot = slotAfter(headSlot);
-  }
+        this.windowSlots = windowSlots;
+        this.headSlot = 0;
 
-  private int slotAfter(int slot) {
-    return (slot + 1) % windowSlots;
-  }
+        // Initialize each item in the list to an AtomicLong of 0
+        this.counters = Collections.nCopies(windowSlots, 0)
+            .stream()
+            .map(AtomicLong::new)
+            .collect(Collectors.toCollection(ArrayList::new));
+        this.schedule = context.schedule(0, SLIDE_WINDOW_PERIOD_SECONDS, TimeUnit.SECONDS, this::advanceHead);
+    }
+
+    /**
+     * Releases resources used by the SlidingWindowCounter.
+     */
+    public void destroy() {
+        schedule.cancel();
+    }
+
+    /**
+     * Increments the count of the current window slot by 1.
+     */
+    public void incrementCount() {
+        incrementCount(headSlot, 1);
+    }
+
+    /**
+     * Increments the count of the current window slot by the given value.
+     *
+     * @param value value to increment by
+     */
+    public void incrementCount(long value) {
+        incrementCount(headSlot, value);
+    }
+
+    private void incrementCount(int slot, long value) {
+        counters.get(slot).addAndGet(value);
+    }
+
+    /**
+     * Gets the total count for the last N window slots.
+     *
+     * @param slots number of slots to include in the count
+     * @return total count for last N slots
+     */
+    public long get(int slots) {
+        checkArgument(slots <= windowSlots,
+            "Requested window must be less than the total window slots");
+
+        long sum = 0;
+
+        for (int i = 0; i < slots; i++) {
+            int currentIndex = headSlot - i;
+            if (currentIndex < 0) {
+                currentIndex = counters.size() + currentIndex;
+            }
+            sum += counters.get(currentIndex).get();
+        }
+
+        return sum;
+    }
+
+    void advanceHead() {
+        counters.get(slotAfter(headSlot)).set(0);
+        headSlot = slotAfter(headSlot);
+    }
+
+    private int slotAfter(int slot) {
+        return (slot + 1) % windowSlots;
+    }
 
 }

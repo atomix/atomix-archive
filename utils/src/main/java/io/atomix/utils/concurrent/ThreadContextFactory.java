@@ -20,17 +20,17 @@ package io.atomix.utils.concurrent;
  */
 public interface ThreadContextFactory {
 
-  /**
-   * Creates a new thread context.
-   *
-   * @return a new thread context
-   */
-  ThreadContext createContext();
+    /**
+     * Creates a new thread context.
+     *
+     * @return a new thread context
+     */
+    ThreadContext createContext();
 
-  /**
-   * Closes the factory.
-   */
-  default void close() {
-  }
+    /**
+     * Closes the factory.
+     */
+    default void close() {
+    }
 
 }

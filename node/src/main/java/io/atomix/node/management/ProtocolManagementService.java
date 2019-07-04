@@ -24,60 +24,60 @@ import io.atomix.utils.concurrent.ThreadService;
  */
 public interface ProtocolManagementService {
 
-  /**
-   * Returns the protocol type.
-   *
-   * @return the protocol type
-   */
-  Protocol.Type getProtocolType();
+    /**
+     * Returns the protocol type.
+     *
+     * @return the protocol type
+     */
+    Protocol.Type getProtocolType();
 
-  /**
-   * Returns the cluster service.
-   *
-   * @return the cluster service
-   */
-  ClusterService getCluster();
+    /**
+     * Returns the cluster service.
+     *
+     * @return the cluster service
+     */
+    ClusterService getCluster();
 
-  /**
-   * Returns the partition service.
-   *
-   * @return the partition service
-   */
-  PartitionService getPartitionService();
+    /**
+     * Returns the partition service.
+     *
+     * @return the partition service
+     */
+    PartitionService getPartitionService();
 
-  /**
-   * Returns the service registry.
-   *
-   * @return the service registry
-   */
-  ServiceRegistry getServiceRegistry();
+    /**
+     * Returns the service registry.
+     *
+     * @return the service registry
+     */
+    ServiceRegistry getServiceRegistry();
 
-  /**
-   * Returns the service provider.
-   *
-   * @return the service provider
-   */
-  ServiceProvider getServiceProvider();
+    /**
+     * Returns the service provider.
+     *
+     * @return the service provider
+     */
+    ServiceProvider getServiceProvider();
 
-  /**
-   * Returns the thread service.
-   *
-   * @return the thread service
-   */
-  ThreadService getThreadService();
+    /**
+     * Returns the thread service.
+     *
+     * @return the thread service
+     */
+    ThreadService getThreadService();
 
-  /**
-   * Returns the service type registry.
-   *
-   * @return the service type registry
-   */
-  ServiceTypeRegistry getServiceTypeRegistry();
+    /**
+     * Returns the service type registry.
+     *
+     * @return the service type registry
+     */
+    ServiceTypeRegistry getServiceTypeRegistry();
 
-  /**
-   * Returns the primary election service.
-   *
-   * @return the primary election service
-   */
-  PrimaryElectionService getPrimaryElectionService();
+    /**
+     * Returns the primary election service.
+     *
+     * @return the primary election service
+     */
+    PrimaryElectionService getPrimaryElectionService();
 
 }

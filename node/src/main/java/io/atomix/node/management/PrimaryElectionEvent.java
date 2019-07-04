@@ -23,23 +23,23 @@ import io.atomix.utils.event.AbstractEvent;
  */
 public class PrimaryElectionEvent extends AbstractEvent<PrimaryElectionEvent.Type, PrimaryTerm> {
 
-  /**
-   * Primary election event type.
-   */
-  public enum Type {
-    TERM_CHANGED
-  }
+    /**
+     * Primary election event type.
+     */
+    public enum Type {
+        TERM_CHANGED
+    }
 
-  public PrimaryElectionEvent(PrimaryElectionEvent.Type type, PrimaryTerm subject) {
-    super(type, subject);
-  }
+    public PrimaryElectionEvent(PrimaryElectionEvent.Type type, PrimaryTerm subject) {
+        super(type, subject);
+    }
 
-  /**
-   * Returns the primary term.
-   *
-   * @return the primary term
-   */
-  public PrimaryTerm term() {
-    return subject();
-  }
+    /**
+     * Returns the primary term.
+     *
+     * @return the primary term
+     */
+    public PrimaryTerm term() {
+        return subject();
+    }
 }

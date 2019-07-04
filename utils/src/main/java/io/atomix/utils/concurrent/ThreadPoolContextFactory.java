@@ -27,27 +27,27 @@ import static io.atomix.utils.concurrent.Threads.namedThreads;
  * Thread pool context factory.
  */
 public class ThreadPoolContextFactory implements ThreadContextFactory {
-  private final ScheduledExecutorService executor;
+    private final ScheduledExecutorService executor;
 
-  public ThreadPoolContextFactory(String name, int threadPoolSize, Logger logger) {
-    this(threadPoolSize, namedThreads(name, logger));
-  }
+    public ThreadPoolContextFactory(String name, int threadPoolSize, Logger logger) {
+        this(threadPoolSize, namedThreads(name, logger));
+    }
 
-  public ThreadPoolContextFactory(int threadPoolSize, ThreadFactory threadFactory) {
-    this(Executors.newScheduledThreadPool(threadPoolSize, threadFactory));
-  }
+    public ThreadPoolContextFactory(int threadPoolSize, ThreadFactory threadFactory) {
+        this(Executors.newScheduledThreadPool(threadPoolSize, threadFactory));
+    }
 
-  public ThreadPoolContextFactory(ScheduledExecutorService executor) {
-    this.executor = executor;
-  }
+    public ThreadPoolContextFactory(ScheduledExecutorService executor) {
+        this.executor = executor;
+    }
 
-  @Override
-  public ThreadContext createContext() {
-    return new ThreadPoolContext(executor);
-  }
+    @Override
+    public ThreadContext createContext() {
+        return new ThreadPoolContext(executor);
+    }
 
-  @Override
-  public void close() {
-    executor.shutdownNow();
-  }
+    @Override
+    public void close() {
+        executor.shutdownNow();
+    }
 }

@@ -23,29 +23,29 @@ import io.atomix.node.service.ServiceException;
 @FunctionalInterface
 public interface ByteArrayEncoder<T> {
 
-  /**
-   * Encodes the given object.
-   *
-   * @param object the object to encode
-   * @param encoder the encoder with which to encode the object
-   * @param <T> the object type
-   * @return the decoded object
-   */
-  static <T> byte[] encode(T object, ByteArrayEncoder<T> encoder) {
-    try {
-      return object != null ? encoder.encode(object) : new byte[0];
-    } catch (Exception e) {
-      throw new ServiceException.ApplicationException(e);
+    /**
+     * Encodes the given object.
+     *
+     * @param object  the object to encode
+     * @param encoder the encoder with which to encode the object
+     * @param <T>     the object type
+     * @return the decoded object
+     */
+    static <T> byte[] encode(T object, ByteArrayEncoder<T> encoder) {
+        try {
+            return object != null ? encoder.encode(object) : new byte[0];
+        } catch (Exception e) {
+            throw new ServiceException.ApplicationException(e);
+        }
     }
-  }
 
-  /**
-   * Encodes the given object.
-   *
-   * @param object the object to encode
-   * @return the encoded object
-   * @throws Exception
-   */
-  byte[] encode(T object) throws Exception;
+    /**
+     * Encodes the given object.
+     *
+     * @param object the object to encode
+     * @return the encoded object
+     * @throws Exception
+     */
+    byte[] encode(T object) throws Exception;
 
 }

@@ -55,132 +55,132 @@ import static com.google.common.base.Preconditions.checkNotNull;
  * Primary interface for managing Atomix clusters and operating on distributed primitives.
  */
 public class AtomixNode {
-  private static final String VERSION_RESOURCE = "VERSION";
-  private static final String BUILD;
-  private static final Version VERSION;
+    private static final String VERSION_RESOURCE = "VERSION";
+    private static final String BUILD;
+    private static final Version VERSION;
 
-  static {
-    try {
-      BUILD = Resources.toString(checkNotNull(AtomixNode.class.getClassLoader().getResource(VERSION_RESOURCE),
-          VERSION_RESOURCE + " resource is null"), StandardCharsets.UTF_8);
-    } catch (IOException | NullPointerException e) {
-      throw new ConfigurationException("Failed to load Atomix version", e);
+    static {
+        try {
+            BUILD = Resources.toString(checkNotNull(AtomixNode.class.getClassLoader().getResource(VERSION_RESOURCE),
+                VERSION_RESOURCE + " resource is null"), StandardCharsets.UTF_8);
+        } catch (IOException | NullPointerException e) {
+            throw new ConfigurationException("Failed to load Atomix version", e);
+        }
+        VERSION = BUILD.trim().length() > 0 ? Version.from(BUILD.trim().split("\\s+")[0]) : null;
     }
-    VERSION = BUILD.trim().length() > 0 ? Version.from(BUILD.trim().split("\\s+")[0]) : null;
-  }
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(AtomixNode.class);
+    private static final Logger LOGGER = LoggerFactory.getLogger(AtomixNode.class);
 
-  private final String nodeId;
-  private final PartitionConfig partitionConfig;
-  private final Message protocolConfig;
-  private final Protocol.Type protocolType;
-  private volatile ComponentManager<ProtocolManager> manager;
-  private volatile ProtocolManager protocolManager;
-  private volatile Protocol protocol;
-  private final AtomicBoolean started = new AtomicBoolean();
-  private Thread shutdownHook = null;
+    private final String nodeId;
+    private final PartitionConfig partitionConfig;
+    private final Message protocolConfig;
+    private final Protocol.Type protocolType;
+    private volatile ComponentManager<ProtocolManager> manager;
+    private volatile ProtocolManager protocolManager;
+    private volatile Protocol protocol;
+    private final AtomicBoolean started = new AtomicBoolean();
+    private Thread shutdownHook = null;
 
-  public AtomixNode(String nodeId, PartitionConfig partitionConfig, Protocol.Type protocolType, Message protocolConfig) {
-    this.nodeId = nodeId;
-    this.partitionConfig = partitionConfig;
-    this.protocolType = protocolType;
-    this.protocolConfig = protocolConfig;
-  }
-
-  /**
-   * Returns the server version.
-   *
-   * @return the server version
-   */
-  public Version getVersion() {
-    return VERSION;
-  }
-
-  /**
-   * Starts the Atomix instance.
-   * <p>
-   * The returned future will be completed once this instance completes startup. Note that in order to complete startup,
-   * all partitions must be able to form. For Raft partitions, that requires that a majority of the nodes in each
-   * partition be started concurrently.
-   *
-   * @return a future to be completed once the instance has completed startup
-   */
-  @SuppressWarnings("unchecked")
-  public synchronized CompletableFuture<AtomixNode> start() {
-    manager = new ComponentManager<>(ProtocolManager.class, new Object[]{new ConfigServiceImpl(nodeId, partitionConfig)}, AtomixNode.class.getClassLoader());
-    return manager.start()
-        .thenCompose(protocolManager -> {
-          this.protocolManager = protocolManager;
-          this.protocol = protocolType.newProtocol(protocolConfig, protocolManager);
-          return protocol.start();
-        })
-        .thenRun(() -> {
-          if (protocol instanceof ServiceProtocol) {
-            ServiceProtocol serviceProtocol = (ServiceProtocol) protocol;
-            ClientFactory factory = new ClientFactory() {
-              @Override
-              public ServiceClient newServiceClient(ServiceId serviceId) {
-                return new DefaultServiceClient(serviceId, serviceProtocol.getServiceClient());
-              }
-
-              @Override
-              public SessionClient newSessionClient(ServiceId serviceId) {
-                return new DefaultSessionClient(serviceId, serviceProtocol.getServiceClient());
-              }
-            };
-            protocolManager.getServiceRegistry().register(new CounterServiceImpl(factory));
-            protocolManager.getServiceRegistry().register(new LeaderElectionServiceImpl(factory));
-            protocolManager.getServiceRegistry().register(new ListServiceImpl(factory));
-            protocolManager.getServiceRegistry().register(new LockServiceImpl(factory));
-            protocolManager.getServiceRegistry().register(new MapServiceImpl(factory));
-            protocolManager.getServiceRegistry().register(new SetServiceImpl(factory));
-            protocolManager.getServiceRegistry().register(new ValueServiceImpl(factory));
-          }
-          if (protocol instanceof LogProtocol) {
-            protocolManager.getServiceRegistry().register(new LogServiceImpl(((LogProtocol) protocol).getLogClient()));
-          }
-          LOGGER.info(getVersion().toString());
-          started.set(true);
-        }).thenRun(() -> {
-          if (shutdownHook == null) {
-            shutdownHook = new Thread(() -> manager.stop().join());
-            Runtime.getRuntime().addShutdownHook(shutdownHook);
-          }
-        }).thenApply(v -> this);
-  }
-
-  /**
-   * Returns a boolean indicating whether the instance is running.
-   *
-   * @return indicates whether the instance is running
-   */
-  public boolean isRunning() {
-    return started.get();
-  }
-
-  /**
-   * Stops the instance.
-   *
-   * @return a future to be completed once the instance has been stopped
-   */
-  public synchronized CompletableFuture<Void> stop() {
-    if (shutdownHook != null) {
-      try {
-        Runtime.getRuntime().removeShutdownHook(shutdownHook);
-        shutdownHook = null;
-      } catch (IllegalStateException e) {
-        // JVM shutting down
-      }
+    public AtomixNode(String nodeId, PartitionConfig partitionConfig, Protocol.Type protocolType, Message protocolConfig) {
+        this.nodeId = nodeId;
+        this.partitionConfig = partitionConfig;
+        this.protocolType = protocolType;
+        this.protocolConfig = protocolConfig;
     }
-    return manager.stop()
-        .thenRun(() -> started.set(false));
-  }
 
-  @Override
-  public String toString() {
-    return toStringHelper(this)
-        .add("version", getVersion())
-        .toString();
-  }
+    /**
+     * Returns the server version.
+     *
+     * @return the server version
+     */
+    public Version getVersion() {
+        return VERSION;
+    }
+
+    /**
+     * Starts the Atomix instance.
+     * <p>
+     * The returned future will be completed once this instance completes startup. Note that in order to complete startup,
+     * all partitions must be able to form. For Raft partitions, that requires that a majority of the nodes in each
+     * partition be started concurrently.
+     *
+     * @return a future to be completed once the instance has completed startup
+     */
+    @SuppressWarnings("unchecked")
+    public synchronized CompletableFuture<AtomixNode> start() {
+        manager = new ComponentManager<>(ProtocolManager.class, new Object[]{new ConfigServiceImpl(nodeId, partitionConfig)}, AtomixNode.class.getClassLoader());
+        return manager.start()
+            .thenCompose(protocolManager -> {
+                this.protocolManager = protocolManager;
+                this.protocol = protocolType.newProtocol(protocolConfig, protocolManager);
+                return protocol.start();
+            })
+            .thenRun(() -> {
+                if (protocol instanceof ServiceProtocol) {
+                    ServiceProtocol serviceProtocol = (ServiceProtocol) protocol;
+                    ClientFactory factory = new ClientFactory() {
+                        @Override
+                        public ServiceClient newServiceClient(ServiceId serviceId) {
+                            return new DefaultServiceClient(serviceId, serviceProtocol.getServiceClient());
+                        }
+
+                        @Override
+                        public SessionClient newSessionClient(ServiceId serviceId) {
+                            return new DefaultSessionClient(serviceId, serviceProtocol.getServiceClient());
+                        }
+                    };
+                    protocolManager.getServiceRegistry().register(new CounterServiceImpl(factory));
+                    protocolManager.getServiceRegistry().register(new LeaderElectionServiceImpl(factory));
+                    protocolManager.getServiceRegistry().register(new ListServiceImpl(factory));
+                    protocolManager.getServiceRegistry().register(new LockServiceImpl(factory));
+                    protocolManager.getServiceRegistry().register(new MapServiceImpl(factory));
+                    protocolManager.getServiceRegistry().register(new SetServiceImpl(factory));
+                    protocolManager.getServiceRegistry().register(new ValueServiceImpl(factory));
+                }
+                if (protocol instanceof LogProtocol) {
+                    protocolManager.getServiceRegistry().register(new LogServiceImpl(((LogProtocol) protocol).getLogClient()));
+                }
+                LOGGER.info(getVersion().toString());
+                started.set(true);
+            }).thenRun(() -> {
+                if (shutdownHook == null) {
+                    shutdownHook = new Thread(() -> manager.stop().join());
+                    Runtime.getRuntime().addShutdownHook(shutdownHook);
+                }
+            }).thenApply(v -> this);
+    }
+
+    /**
+     * Returns a boolean indicating whether the instance is running.
+     *
+     * @return indicates whether the instance is running
+     */
+    public boolean isRunning() {
+        return started.get();
+    }
+
+    /**
+     * Stops the instance.
+     *
+     * @return a future to be completed once the instance has been stopped
+     */
+    public synchronized CompletableFuture<Void> stop() {
+        if (shutdownHook != null) {
+            try {
+                Runtime.getRuntime().removeShutdownHook(shutdownHook);
+                shutdownHook = null;
+            } catch (IllegalStateException e) {
+                // JVM shutting down
+            }
+        }
+        return manager.stop()
+            .thenRun(() -> started.set(false));
+    }
+
+    @Override
+    public String toString() {
+        return toStringHelper(this)
+            .add("version", getVersion())
+            .toString();
+    }
 }

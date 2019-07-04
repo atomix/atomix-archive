@@ -20,14 +20,14 @@ package io.atomix.storage;
  */
 public enum StorageLevel {
 
-  /**
-   * Stores data in a memory-mapped file.
-   */
-  MAPPED,
+    /**
+     * Stores data in a memory-mapped file.
+     */
+    MAPPED,
 
-  /**
-   * Stores data on disk.
-   */
-  DISK
+    /**
+     * Stores data on disk.
+     */
+    DISK
 
 }

@@ -23,12 +23,12 @@ import io.atomix.storage.StorageLevel;
  * Memory mapped journal test.
  */
 public class MappedJournalTest extends PersistentJournalTest {
-  public MappedJournalTest(int maxSegmentSize, int cacheSize) throws IOException {
-    super(maxSegmentSize, cacheSize);
-  }
+    public MappedJournalTest(int maxSegmentSize, int cacheSize) throws IOException {
+        super(maxSegmentSize, cacheSize);
+    }
 
-  @Override
-  protected StorageLevel storageLevel() {
-    return StorageLevel.MAPPED;
-  }
+    @Override
+    protected StorageLevel storageLevel() {
+        return StorageLevel.MAPPED;
+    }
 }

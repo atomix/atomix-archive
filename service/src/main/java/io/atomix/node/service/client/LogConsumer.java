@@ -25,13 +25,13 @@ import io.atomix.node.service.protocol.LogRecord;
  */
 public interface LogConsumer {
 
-  /**
-   * Consumes records from the given offset.
-   *
-   * @param index the offset from which to consume records
-   * @param consumer the record consumer
-   * @return a future to be completed once consuming begins
-   */
-  CompletableFuture<Void> consume(long index, Consumer<LogRecord> consumer);
+    /**
+     * Consumes records from the given offset.
+     *
+     * @param index    the offset from which to consume records
+     * @param consumer the record consumer
+     * @return a future to be completed once consuming begins
+     */
+    CompletableFuture<Void> consume(long index, Consumer<LogRecord> consumer);
 
 }

@@ -20,11 +20,11 @@ package io.atomix.utils;
  */
 public interface Named {
 
-  /**
-   * Returns the object name.
-   *
-   * @return the object name
-   */
-  String name();
+    /**
+     * Returns the object name.
+     *
+     * @return the object name
+     */
+    String name();
 
 }

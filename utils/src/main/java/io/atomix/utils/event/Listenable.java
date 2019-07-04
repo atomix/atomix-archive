@@ -22,18 +22,18 @@ import java.util.function.Consumer;
  */
 public interface Listenable<E> {
 
-  /**
-   * Adds a listener.
-   *
-   * @param listener the listener to add
-   */
-  void addListener(Consumer<E> listener);
+    /**
+     * Adds a listener.
+     *
+     * @param listener the listener to add
+     */
+    void addListener(Consumer<E> listener);
 
-  /**
-   * Removes a listener.
-   *
-   * @param listener the listener to remove
-   */
-  void removeListener(Consumer<E> listener);
+    /**
+     * Removes a listener.
+     *
+     * @param listener the listener to remove
+     */
+    void removeListener(Consumer<E> listener);
 
 }

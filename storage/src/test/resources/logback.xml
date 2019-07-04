@@ -21,9 +21,9 @@
         </encoder>
     </appender>
 
-    <logger name="io.atomix.storage" level="INFO" />
+    <logger name="io.atomix.storage" level="INFO"/>
 
     <root level="${root.logging.level:-INFO}">
-        <appender-ref ref="STDOUT" />
+        <appender-ref ref="STDOUT"/>
     </root>
 </configuration>

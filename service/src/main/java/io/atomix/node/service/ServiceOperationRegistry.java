@@ -35,78 +35,78 @@ import io.atomix.utils.stream.StreamHandler;
  */
 public interface ServiceOperationRegistry {
 
-  /**
-   * Registers a operation callback.
-   *
-   * @param operationId the operation identifier
-   * @param callback    the operation callback
-   * @throws NullPointerException if the {@code operationId} or {@code callback} is null
-   */
-  void register(OperationId<Void, Void> operationId, Runnable callback);
+    /**
+     * Registers a operation callback.
+     *
+     * @param operationId the operation identifier
+     * @param callback    the operation callback
+     * @throws NullPointerException if the {@code operationId} or {@code callback} is null
+     */
+    void register(OperationId<Void, Void> operationId, Runnable callback);
 
-  /**
-   * Registers a no argument operation callback.
-   *
-   * @param operationId the operation identifier
-   * @param callback    the operation callback
-   * @param encoder     the response encoder
-   * @throws NullPointerException if the {@code operationId} or {@code callback} is null
-   */
-  <R> void register(OperationId<Void, R> operationId, Supplier<R> callback, ByteArrayEncoder<R> encoder);
+    /**
+     * Registers a no argument operation callback.
+     *
+     * @param operationId the operation identifier
+     * @param callback    the operation callback
+     * @param encoder     the response encoder
+     * @throws NullPointerException if the {@code operationId} or {@code callback} is null
+     */
+    <R> void register(OperationId<Void, R> operationId, Supplier<R> callback, ByteArrayEncoder<R> encoder);
 
-  /**
-   * Registers a operation callback.
-   *
-   * @param operationId the operation identifier
-   * @param callback    the operation callback
-   * @param decoder     the operation decoder
-   * @throws NullPointerException if the {@code operationId} or {@code callback} is null
-   */
-  <T> void register(OperationId<T, Void> operationId, Consumer<T> callback, ByteArrayDecoder<T> decoder);
+    /**
+     * Registers a operation callback.
+     *
+     * @param operationId the operation identifier
+     * @param callback    the operation callback
+     * @param decoder     the operation decoder
+     * @throws NullPointerException if the {@code operationId} or {@code callback} is null
+     */
+    <T> void register(OperationId<T, Void> operationId, Consumer<T> callback, ByteArrayDecoder<T> decoder);
 
-  /**
-   * Registers an operation callback.
-   *
-   * @param operationId the operation identifier
-   * @param callback    the operation callback
-   * @param decoder     the operation decoder
-   * @param encoder     the response encoder
-   * @throws NullPointerException if the {@code operationId} or {@code callback} is null
-   */
-  <T, R> void register(OperationId<T, R> operationId, Function<T, R> callback, ByteArrayDecoder<T> decoder, ByteArrayEncoder<R> encoder);
+    /**
+     * Registers an operation callback.
+     *
+     * @param operationId the operation identifier
+     * @param callback    the operation callback
+     * @param decoder     the operation decoder
+     * @param encoder     the response encoder
+     * @throws NullPointerException if the {@code operationId} or {@code callback} is null
+     */
+    <T, R> void register(OperationId<T, R> operationId, Function<T, R> callback, ByteArrayDecoder<T> decoder, ByteArrayEncoder<R> encoder);
 
-  /**
-   * Registers an asynchronous operation callback.
-   *
-   * @param operationId the operation identifier
-   * @param callback    the operation callback
-   * @param decoder     the operation decoder
-   * @param encoder     the response encoder
-   * @throws NullPointerException if the {@code operationId} or {@code callback} is null
-   */
-  <T, R> void register(OperationId<T, R> operationId, StreamType<R> streamType, Function<T, CompletableFuture<R>> callback, ByteArrayDecoder<T> decoder, ByteArrayEncoder<R> encoder);
+    /**
+     * Registers an asynchronous operation callback.
+     *
+     * @param operationId the operation identifier
+     * @param callback    the operation callback
+     * @param decoder     the operation decoder
+     * @param encoder     the response encoder
+     * @throws NullPointerException if the {@code operationId} or {@code callback} is null
+     */
+    <T, R> void register(OperationId<T, R> operationId, StreamType<R> streamType, Function<T, CompletableFuture<R>> callback, ByteArrayDecoder<T> decoder, ByteArrayEncoder<R> encoder);
 
-  /**
-   * Registers an operation callback.
-   *
-   * @param operationId the operation identifier
-   * @param streamType  the stream type
-   * @param callback    the operation callback
-   * @param encoder     the response encoder
-   * @throws NullPointerException if the {@code operationId} or {@code callback} is null
-   */
-  <R> void register(OperationId<Void, R> operationId, StreamType<R> streamType, Consumer<StreamHandler<R>> callback, ByteArrayEncoder<R> encoder);
+    /**
+     * Registers an operation callback.
+     *
+     * @param operationId the operation identifier
+     * @param streamType  the stream type
+     * @param callback    the operation callback
+     * @param encoder     the response encoder
+     * @throws NullPointerException if the {@code operationId} or {@code callback} is null
+     */
+    <R> void register(OperationId<Void, R> operationId, StreamType<R> streamType, Consumer<StreamHandler<R>> callback, ByteArrayEncoder<R> encoder);
 
-  /**
-   * Registers an operation callback.
-   *
-   * @param operationId the operation identifier
-   * @param streamType  the stream type
-   * @param callback    the operation callback
-   * @param decoder     the operation decoder
-   * @param encoder     the response encoder
-   * @throws NullPointerException if the {@code operationId} or {@code callback} is null
-   */
-  <T, R> void register(OperationId<T, R> operationId, StreamType<R> streamType, BiConsumer<T, StreamHandler<R>> callback, ByteArrayDecoder<T> decoder, ByteArrayEncoder<R> encoder);
+    /**
+     * Registers an operation callback.
+     *
+     * @param operationId the operation identifier
+     * @param streamType  the stream type
+     * @param callback    the operation callback
+     * @param decoder     the operation decoder
+     * @param encoder     the response encoder
+     * @throws NullPointerException if the {@code operationId} or {@code callback} is null
+     */
+    <T, R> void register(OperationId<T, R> operationId, StreamType<R> streamType, BiConsumer<T, StreamHandler<R>> callback, ByteArrayDecoder<T> decoder, ByteArrayEncoder<R> encoder);
 
 }

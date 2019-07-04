@@ -27,24 +27,24 @@ import static com.google.common.base.MoreObjects.toStringHelper;
  * @author <a href="http://github.com/kuujo">Jordan Halterman</a>
  */
 public class TestEntry implements Serializable {
-  private final byte[] bytes;
+    private final byte[] bytes;
 
-  public TestEntry(int size) {
-    this(new byte[size]);
-  }
+    public TestEntry(int size) {
+        this(new byte[size]);
+    }
 
-  public TestEntry(byte[] bytes) {
-    this.bytes = bytes;
-  }
+    public TestEntry(byte[] bytes) {
+        this.bytes = bytes;
+    }
 
-  public byte[] bytes() {
-    return bytes;
-  }
+    public byte[] bytes() {
+        return bytes;
+    }
 
-  @Override
-  public String toString() {
-    return toStringHelper(this)
-        .add("bytes", ArraySizeHashPrinter.of(bytes))
-        .toString();
-  }
+    @Override
+    public String toString() {
+        return toStringHelper(this)
+            .add("bytes", ArraySizeHashPrinter.of(bytes))
+            .toString();
+    }
 }

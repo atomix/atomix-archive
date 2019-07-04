@@ -22,19 +22,19 @@ import java.util.Collection;
  */
 public interface ServiceTypeRegistry {
 
-  /**
-   * Returns the collection of registered service types.
-   *
-   * @return the collection of registered service types
-   */
-  Collection<PrimitiveService.Type> getServiceTypes();
+    /**
+     * Returns the collection of registered service types.
+     *
+     * @return the collection of registered service types
+     */
+    Collection<PrimitiveService.Type> getServiceTypes();
 
-  /**
-   * Returns the service type for the given name.
-   *
-   * @param typeName the service type name
-   * @return the service type
-   */
-  PrimitiveService.Type getServiceType(String typeName);
+    /**
+     * Returns the service type for the given name.
+     *
+     * @param typeName the service type name
+     * @return the service type
+     */
+    PrimitiveService.Type getServiceType(String typeName);
 
 }

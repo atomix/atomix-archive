@@ -25,32 +25,32 @@ import io.atomix.api.controller.PartitionId;
  */
 public interface ConfigService {
 
-  /**
-   * Returns the partition ID.
-   *
-   * @return the partition ID
-   */
-  PartitionId getPartition();
+    /**
+     * Returns the partition ID.
+     *
+     * @return the partition ID
+     */
+    PartitionId getPartition();
 
-  /**
-   * Returns the controller configuration.
-   *
-   * @return the controller configuration
-   */
-  NodeConfig getController();
+    /**
+     * Returns the controller configuration.
+     *
+     * @return the controller configuration
+     */
+    NodeConfig getController();
 
-  /**
-   * Returns the node configuration.
-   *
-   * @return the node configuration
-   */
-  NodeConfig getNode();
+    /**
+     * Returns the node configuration.
+     *
+     * @return the node configuration
+     */
+    NodeConfig getNode();
 
-  /**
-   * Returns the cluster configuration.
-   *
-   * @return the cluster configuration
-   */
-  Collection<NodeConfig> getCluster();
+    /**
+     * Returns the cluster configuration.
+     *
+     * @return the cluster configuration
+     */
+    Collection<NodeConfig> getCluster();
 
 }

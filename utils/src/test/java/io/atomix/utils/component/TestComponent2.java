@@ -24,17 +24,17 @@ import static org.junit.Assert.assertNotNull;
  */
 @Component
 public class TestComponent2 implements TestComponentInterface2, Managed {
-  @Dependency
-  private TestComponent3 component3;
+    @Dependency
+    private TestComponent3 component3;
 
-  @Override
-  public CompletableFuture<Void> start() {
-    assertNotNull(component3);
-    return CompletableFuture.completedFuture(null);
-  }
+    @Override
+    public CompletableFuture<Void> start() {
+        assertNotNull(component3);
+        return CompletableFuture.completedFuture(null);
+    }
 
-  @Override
-  public CompletableFuture<Void> stop() {
-    return CompletableFuture.completedFuture(null);
-  }
+    @Override
+    public CompletableFuture<Void> stop() {
+        return CompletableFuture.completedFuture(null);
+    }
 }

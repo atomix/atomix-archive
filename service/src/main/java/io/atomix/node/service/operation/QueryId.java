@@ -19,12 +19,12 @@ package io.atomix.node.service.operation;
  * Query ID.
  */
 public class QueryId<T, U> extends OperationId<T, U> {
-  public QueryId(String id) {
-    super(id);
-  }
+    public QueryId(String id) {
+        super(id);
+    }
 
-  @Override
-  public OperationType type() {
-    return OperationType.QUERY;
-  }
+    @Override
+    public OperationType type() {
+        return OperationType.QUERY;
+    }
 }

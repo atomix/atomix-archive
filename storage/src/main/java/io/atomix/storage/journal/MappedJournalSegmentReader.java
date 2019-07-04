@@ -31,151 +31,151 @@ import io.atomix.storage.journal.index.Position;
  * @author <a href="http://github.com/kuujo">Jordan Halterman</a>
  */
 class MappedJournalSegmentReader<E> implements JournalReader<E> {
-  private final ByteBuffer buffer;
-  private final int maxEntrySize;
-  private final JournalIndex index;
-  private final JournalCodec<E> codec;
-  private final long firstIndex;
-  private Indexed<E> currentEntry;
-  private Indexed<E> nextEntry;
+    private final ByteBuffer buffer;
+    private final int maxEntrySize;
+    private final JournalIndex index;
+    private final JournalCodec<E> codec;
+    private final long firstIndex;
+    private Indexed<E> currentEntry;
+    private Indexed<E> nextEntry;
 
-  MappedJournalSegmentReader(
-      ByteBuffer buffer,
-      JournalSegment<E> segment,
-      int maxEntrySize,
-      JournalIndex index,
-      JournalCodec<E> codec) {
-    this.buffer = buffer.slice();
-    this.maxEntrySize = maxEntrySize;
-    this.index = index;
-    this.codec = codec;
-    this.firstIndex = segment.index();
-    reset();
-  }
-
-  @Override
-  public long getFirstIndex() {
-    return firstIndex;
-  }
-
-  @Override
-  public long getCurrentIndex() {
-    return currentEntry != null ? currentEntry.index() : 0;
-  }
-
-  @Override
-  public Indexed<E> getCurrentEntry() {
-    return currentEntry;
-  }
-
-  @Override
-  public long getNextIndex() {
-    return currentEntry != null ? currentEntry.index() + 1 : firstIndex;
-  }
-
-  @Override
-  public void reset(long index) {
-    reset();
-    Position position = this.index.lookup(index - 1);
-    if (position != null) {
-      currentEntry = new Indexed<>(position.index() - 1, null, 0);
-      buffer.position(position.position());
-      readNext();
-    }
-    while (getNextIndex() < index && hasNext()) {
-      next();
-    }
-  }
-
-  @Override
-  public void reset() {
-    buffer.position(JournalSegmentDescriptor.BYTES);
-    currentEntry = null;
-    nextEntry = null;
-    readNext();
-  }
-
-  @Override
-  public boolean hasNext() {
-    // If the next entry is null, check whether a next entry exists.
-    if (nextEntry == null) {
-      readNext();
-    }
-    return nextEntry != null;
-  }
-
-  @Override
-  public Indexed<E> next() {
-    if (!hasNext()) {
-      throw new NoSuchElementException();
+    MappedJournalSegmentReader(
+        ByteBuffer buffer,
+        JournalSegment<E> segment,
+        int maxEntrySize,
+        JournalIndex index,
+        JournalCodec<E> codec) {
+        this.buffer = buffer.slice();
+        this.maxEntrySize = maxEntrySize;
+        this.index = index;
+        this.codec = codec;
+        this.firstIndex = segment.index();
+        reset();
     }
 
-    // Set the current entry to the next entry.
-    currentEntry = nextEntry;
+    @Override
+    public long getFirstIndex() {
+        return firstIndex;
+    }
 
-    // Reset the next entry to null.
-    nextEntry = null;
+    @Override
+    public long getCurrentIndex() {
+        return currentEntry != null ? currentEntry.index() : 0;
+    }
 
-    // Read the next entry in the segment.
-    readNext();
+    @Override
+    public Indexed<E> getCurrentEntry() {
+        return currentEntry;
+    }
 
-    // Return the current entry.
-    return currentEntry;
-  }
+    @Override
+    public long getNextIndex() {
+        return currentEntry != null ? currentEntry.index() + 1 : firstIndex;
+    }
 
-  /**
-   * Reads the next entry in the segment.
-   */
-  @SuppressWarnings("unchecked")
-  private void readNext() {
-    // Compute the index of the next entry in the segment.
-    final long index = getNextIndex();
-
-    // Mark the buffer so it can be reset if necessary.
-    buffer.mark();
-
-    try {
-      // Read the length of the entry.
-      final int length = buffer.getInt();
-
-      // If the buffer length is zero then return.
-      if (length <= 0 || length > maxEntrySize) {
-        buffer.reset();
-        nextEntry = null;
-        return;
-      }
-
-      // Read the checksum of the entry.
-      long checksum = buffer.getInt() & 0xFFFFFFFFL;
-
-      // Compute the checksum for the entry bytes.
-      final CRC32 crc32 = new CRC32();
-      ByteBuffer slice = buffer.slice();
-      slice.limit(length);
-      crc32.update(slice);
-
-      // If the stored checksum equals the computed checksum, return the entry.
-      if (checksum == crc32.getValue()) {
-        slice.rewind();
-        try {
-          E entry = codec.decode(slice);
-          nextEntry = new Indexed<>(index, entry, length);
-          buffer.position(buffer.position() + length);
-        } catch (IOException e) {
-          throw new StorageException(e);
+    @Override
+    public void reset(long index) {
+        reset();
+        Position position = this.index.lookup(index - 1);
+        if (position != null) {
+            currentEntry = new Indexed<>(position.index() - 1, null, 0);
+            buffer.position(position.position());
+            readNext();
         }
-      } else {
-        buffer.reset();
-        nextEntry = null;
-      }
-    } catch (BufferUnderflowException e) {
-      buffer.reset();
-      nextEntry = null;
+        while (getNextIndex() < index && hasNext()) {
+            next();
+        }
     }
-  }
 
-  @Override
-  public void close() {
-    // Do nothing. The writer is responsible for cleaning the mapped buffer.
-  }
+    @Override
+    public void reset() {
+        buffer.position(JournalSegmentDescriptor.BYTES);
+        currentEntry = null;
+        nextEntry = null;
+        readNext();
+    }
+
+    @Override
+    public boolean hasNext() {
+        // If the next entry is null, check whether a next entry exists.
+        if (nextEntry == null) {
+            readNext();
+        }
+        return nextEntry != null;
+    }
+
+    @Override
+    public Indexed<E> next() {
+        if (!hasNext()) {
+            throw new NoSuchElementException();
+        }
+
+        // Set the current entry to the next entry.
+        currentEntry = nextEntry;
+
+        // Reset the next entry to null.
+        nextEntry = null;
+
+        // Read the next entry in the segment.
+        readNext();
+
+        // Return the current entry.
+        return currentEntry;
+    }
+
+    /**
+     * Reads the next entry in the segment.
+     */
+    @SuppressWarnings("unchecked")
+    private void readNext() {
+        // Compute the index of the next entry in the segment.
+        final long index = getNextIndex();
+
+        // Mark the buffer so it can be reset if necessary.
+        buffer.mark();
+
+        try {
+            // Read the length of the entry.
+            final int length = buffer.getInt();
+
+            // If the buffer length is zero then return.
+            if (length <= 0 || length > maxEntrySize) {
+                buffer.reset();
+                nextEntry = null;
+                return;
+            }
+
+            // Read the checksum of the entry.
+            long checksum = buffer.getInt() & 0xFFFFFFFFL;
+
+            // Compute the checksum for the entry bytes.
+            final CRC32 crc32 = new CRC32();
+            ByteBuffer slice = buffer.slice();
+            slice.limit(length);
+            crc32.update(slice);
+
+            // If the stored checksum equals the computed checksum, return the entry.
+            if (checksum == crc32.getValue()) {
+                slice.rewind();
+                try {
+                    E entry = codec.decode(slice);
+                    nextEntry = new Indexed<>(index, entry, length);
+                    buffer.position(buffer.position() + length);
+                } catch (IOException e) {
+                    throw new StorageException(e);
+                }
+            } else {
+                buffer.reset();
+                nextEntry = null;
+            }
+        } catch (BufferUnderflowException e) {
+            buffer.reset();
+            nextEntry = null;
+        }
+    }
+
+    @Override
+    public void close() {
+        // Do nothing. The writer is responsible for cleaning the mapped buffer.
+    }
 }

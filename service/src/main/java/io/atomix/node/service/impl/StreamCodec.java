@@ -23,19 +23,19 @@ import io.atomix.node.service.util.ByteArrayEncoder;
  * @param <T> the stream type
  */
 public class StreamCodec<T> {
-  private final ByteArrayEncoder<T> encoder;
+    private final ByteArrayEncoder<T> encoder;
 
-  StreamCodec(ByteArrayEncoder<T> encoder) {
-    this.encoder = encoder != null ? encoder : v -> null;
-  }
+    StreamCodec(ByteArrayEncoder<T> encoder) {
+        this.encoder = encoder != null ? encoder : v -> null;
+    }
 
-  /**
-   * Encodes the given value for the stream.
-   *
-   * @param value the value to encode
-   * @return the encoded value
-   */
-  public byte[] encode(T value) {
-    return ByteArrayEncoder.encode(value, encoder);
-  }
+    /**
+     * Encodes the given value for the stream.
+     *
+     * @param value the value to encode
+     * @return the encoded value
+     */
+    public byte[] encode(T value) {
+        return ByteArrayEncoder.encode(value, encoder);
+    }
 }

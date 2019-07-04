@@ -28,13 +28,13 @@ import io.grpc.Channel;
  */
 @Component
 public class ControllerServiceImpl implements ControllerService, Managed {
-  @Dependency
-  private ChannelService channelService;
-  @Dependency
-  private ClusterService clusterService;
+    @Dependency
+    private ChannelService channelService;
+    @Dependency
+    private ClusterService clusterService;
 
-  @Override
-  public Channel getChannel() {
-    return channelService.getChannel(clusterService.getControllerNode().host(), clusterService.getControllerNode().port());
-  }
+    @Override
+    public Channel getChannel() {
+        return channelService.getChannel(clusterService.getControllerNode().host(), clusterService.getControllerNode().port());
+    }
 }

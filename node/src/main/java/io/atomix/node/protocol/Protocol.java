@@ -28,28 +28,28 @@ import io.atomix.utils.component.Managed;
  */
 public interface Protocol extends Managed {
 
-  /**
-   * Service type.
-   */
-  interface Type<C extends Message> extends NamedType {
-
     /**
-     * Parses the configuration from the given bytes.
-     *
-     * @param is the configuration input stream
-     * @return the configuration
-     * @throws IOException
+     * Service type.
      */
-    C parseConfig(InputStream is) throws IOException;
+    interface Type<C extends Message> extends NamedType {
 
-    /**
-     * Creates a new protocol instance from the given configuration.
-     *
-     * @param config            the protocol configuration
-     * @param managementService the protocol management service
-     * @return the protocol instance
-     */
-    Protocol newProtocol(C config, ProtocolManagementService managementService);
-  }
+        /**
+         * Parses the configuration from the given bytes.
+         *
+         * @param is the configuration input stream
+         * @return the configuration
+         * @throws IOException
+         */
+        C parseConfig(InputStream is) throws IOException;
+
+        /**
+         * Creates a new protocol instance from the given configuration.
+         *
+         * @param config            the protocol configuration
+         * @param managementService the protocol management service
+         * @return the protocol instance
+         */
+        Protocol newProtocol(C config, ProtocolManagementService managementService);
+    }
 
 }

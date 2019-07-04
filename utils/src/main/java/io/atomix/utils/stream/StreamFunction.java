@@ -20,26 +20,26 @@ package io.atomix.utils.stream;
  */
 public interface StreamFunction<T, U> {
 
-  /**
-   * Called to handle the next value.
-   *
-   * @param value the value to handle
-   */
-  void next(T value);
+    /**
+     * Called to handle the next value.
+     *
+     * @param value the value to handle
+     */
+    void next(T value);
 
-  /**
-   * Called when the stream is complete.
-   *
-   * @return the result
-   */
-  U complete();
+    /**
+     * Called when the stream is complete.
+     *
+     * @return the result
+     */
+    U complete();
 
-  /**
-   * Called when a stream error occurs.
-   *
-   * @param error the stream error
-   * @return the result
-   */
-  U error(Throwable error);
+    /**
+     * Called when a stream error occurs.
+     *
+     * @param error the stream error
+     * @return the result
+     */
+    U error(Throwable error);
 
 }

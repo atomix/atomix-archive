@@ -29,52 +29,52 @@ import io.atomix.node.service.protocol.OpenSessionResponse;
  * Interface for session aware primitive proxies.
  */
 public abstract class SessionEnabledServiceProxy extends AbstractServiceProxy<SessionClient> {
-  public SessionEnabledServiceProxy(SessionClient client) {
-    super(client);
-  }
+    public SessionEnabledServiceProxy(SessionClient client) {
+        super(client);
+    }
 
-  @Override
-  public String name() {
-    return getClient().name();
-  }
+    @Override
+    public String name() {
+        return getClient().name();
+    }
 
-  @Override
-  public String type() {
-    return getClient().type();
-  }
+    @Override
+    public String type() {
+        return getClient().type();
+    }
 
-  /**
-   * Opens a primitive session.
-   *
-   * @param request the open session request
-   * @return a future to be completed with the open session response
-   */
-  public CompletableFuture<OpenSessionResponse> openSession(OpenSessionRequest request) {
-    return getClient().openSession(request);
-  }
+    /**
+     * Opens a primitive session.
+     *
+     * @param request the open session request
+     * @return a future to be completed with the open session response
+     */
+    public CompletableFuture<OpenSessionResponse> openSession(OpenSessionRequest request) {
+        return getClient().openSession(request);
+    }
 
-  /**
-   * Keeps a session alive.
-   *
-   * @param request the keep alive request
-   * @return a future to be completed with the keep-alive response
-   */
-  public CompletableFuture<KeepAliveResponse> keepAlive(KeepAliveRequest request) {
-    return getClient().keepAlive(request);
-  }
+    /**
+     * Keeps a session alive.
+     *
+     * @param request the keep alive request
+     * @return a future to be completed with the keep-alive response
+     */
+    public CompletableFuture<KeepAliveResponse> keepAlive(KeepAliveRequest request) {
+        return getClient().keepAlive(request);
+    }
 
-  /**
-   * Closes a session.
-   *
-   * @param request the close session request
-   * @return a future to be completed with the close session response
-   */
-  public CompletableFuture<CloseSessionResponse> closeSession(CloseSessionRequest request) {
-    return getClient().closeSession(request);
-  }
+    /**
+     * Closes a session.
+     *
+     * @param request the close session request
+     * @return a future to be completed with the close session response
+     */
+    public CompletableFuture<CloseSessionResponse> closeSession(CloseSessionRequest request) {
+        return getClient().closeSession(request);
+    }
 
-  @Override
-  public CompletableFuture<Void> delete() {
-    return getClient().delete();
-  }
+    @Override
+    public CompletableFuture<Void> delete() {
+        return getClient().delete();
+    }
 }

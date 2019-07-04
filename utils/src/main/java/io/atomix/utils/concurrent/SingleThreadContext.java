@@ -42,95 +42,95 @@ import static io.atomix.utils.concurrent.Threads.namedThreads;
  * @author <a href="http://github.com/kuujo">Jordan Halterman</a>
  */
 public class SingleThreadContext extends AbstractThreadContext {
-  protected static final Logger LOGGER = LoggerFactory.getLogger(SingleThreadContext.class);
-  private final ScheduledExecutorService executor;
-  private final Executor wrappedExecutor = new Executor() {
+    protected static final Logger LOGGER = LoggerFactory.getLogger(SingleThreadContext.class);
+    private final ScheduledExecutorService executor;
+    private final Executor wrappedExecutor = new Executor() {
+        @Override
+        public void execute(Runnable command) {
+            try {
+                executor.execute(() -> {
+                    try {
+                        command.run();
+                    } catch (Exception e) {
+                        LOGGER.error("An uncaught exception occurred", e);
+                    }
+                });
+            } catch (RejectedExecutionException e) {
+            }
+        }
+    };
+
+    /**
+     * Creates a new single thread context.
+     * <p>
+     * The provided context name will be passed to {@link AtomixThreadFactory} and used
+     * when instantiating the context thread.
+     *
+     * @param nameFormat The context nameFormat which will be formatted with a thread number.
+     */
+    public SingleThreadContext(String nameFormat) {
+        this(namedThreads(nameFormat, LOGGER));
+    }
+
+    /**
+     * Creates a new single thread context.
+     *
+     * @param factory The thread factory.
+     */
+    public SingleThreadContext(ThreadFactory factory) {
+        this(new ScheduledThreadPoolExecutor(1, factory));
+    }
+
+    /**
+     * Creates a new single thread context.
+     *
+     * @param executor The executor on which to schedule events. This must be a single thread scheduled executor.
+     */
+    protected SingleThreadContext(ScheduledExecutorService executor) {
+        this(getThread(executor), executor);
+    }
+
+    private SingleThreadContext(Thread thread, ScheduledExecutorService executor) {
+        this.executor = executor;
+        checkState(thread instanceof AtomixThread, "not a Catalyst thread");
+        ((AtomixThread) thread).setContext(this);
+    }
+
+    /**
+     * Gets the thread from a single threaded executor service.
+     */
+    protected static AtomixThread getThread(ExecutorService executor) {
+        final AtomicReference<AtomixThread> thread = new AtomicReference<>();
+        try {
+            executor.submit(() -> {
+                thread.set((AtomixThread) Thread.currentThread());
+            }).get();
+        } catch (InterruptedException | ExecutionException e) {
+            throw new IllegalStateException("failed to initialize thread state", e);
+        }
+        return thread.get();
+    }
+
     @Override
     public void execute(Runnable command) {
-      try {
-        executor.execute(() -> {
-          try {
-            command.run();
-          } catch (Exception e) {
-            LOGGER.error("An uncaught exception occurred", e);
-          }
-        });
-      } catch (RejectedExecutionException e) {
-      }
+        wrappedExecutor.execute(command);
     }
-  };
 
-  /**
-   * Creates a new single thread context.
-   * <p>
-   * The provided context name will be passed to {@link AtomixThreadFactory} and used
-   * when instantiating the context thread.
-   *
-   * @param nameFormat The context nameFormat which will be formatted with a thread number.
-   */
-  public SingleThreadContext(String nameFormat) {
-    this(namedThreads(nameFormat, LOGGER));
-  }
-
-  /**
-   * Creates a new single thread context.
-   *
-   * @param factory The thread factory.
-   */
-  public SingleThreadContext(ThreadFactory factory) {
-    this(new ScheduledThreadPoolExecutor(1, factory));
-  }
-
-  /**
-   * Creates a new single thread context.
-   *
-   * @param executor The executor on which to schedule events. This must be a single thread scheduled executor.
-   */
-  protected SingleThreadContext(ScheduledExecutorService executor) {
-    this(getThread(executor), executor);
-  }
-
-  private SingleThreadContext(Thread thread, ScheduledExecutorService executor) {
-    this.executor = executor;
-    checkState(thread instanceof AtomixThread, "not a Catalyst thread");
-    ((AtomixThread) thread).setContext(this);
-  }
-
-  /**
-   * Gets the thread from a single threaded executor service.
-   */
-  protected static AtomixThread getThread(ExecutorService executor) {
-    final AtomicReference<AtomixThread> thread = new AtomicReference<>();
-    try {
-      executor.submit(() -> {
-        thread.set((AtomixThread) Thread.currentThread());
-      }).get();
-    } catch (InterruptedException | ExecutionException e) {
-      throw new IllegalStateException("failed to initialize thread state", e);
+    @Override
+    public Scheduled schedule(Duration delay, Runnable runnable) {
+        ScheduledFuture<?> future = executor.schedule(runnable, delay.toMillis(), TimeUnit.MILLISECONDS);
+        return () -> future.cancel(false);
     }
-    return thread.get();
-  }
 
-  @Override
-  public void execute(Runnable command) {
-    wrappedExecutor.execute(command);
-  }
+    @Override
+    public Scheduled schedule(Duration delay, Duration interval, Runnable runnable) {
+        ScheduledFuture<?> future = executor.scheduleAtFixedRate(runnable, delay.toMillis(), interval.toMillis(), TimeUnit.MILLISECONDS);
+        return () -> future.cancel(false);
+    }
 
-  @Override
-  public Scheduled schedule(Duration delay, Runnable runnable) {
-    ScheduledFuture<?> future = executor.schedule(runnable, delay.toMillis(), TimeUnit.MILLISECONDS);
-    return () -> future.cancel(false);
-  }
-
-  @Override
-  public Scheduled schedule(Duration delay, Duration interval, Runnable runnable) {
-    ScheduledFuture<?> future = executor.scheduleAtFixedRate(runnable, delay.toMillis(), interval.toMillis(), TimeUnit.MILLISECONDS);
-    return () -> future.cancel(false);
-  }
-
-  @Override
-  public void close() {
-    executor.shutdownNow();
-  }
+    @Override
+    public void close() {
+        executor.shutdownNow();
+    }
 
 }

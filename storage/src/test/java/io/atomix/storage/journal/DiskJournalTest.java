@@ -23,12 +23,12 @@ import io.atomix.storage.StorageLevel;
  * Disk journal test.
  */
 public class DiskJournalTest extends PersistentJournalTest {
-  public DiskJournalTest(int maxSegmentSize, int cacheSize) throws IOException {
-    super(maxSegmentSize, cacheSize);
-  }
+    public DiskJournalTest(int maxSegmentSize, int cacheSize) throws IOException {
+        super(maxSegmentSize, cacheSize);
+    }
 
-  @Override
-  protected StorageLevel storageLevel() {
-    return StorageLevel.DISK;
-  }
+    @Override
+    protected StorageLevel storageLevel() {
+        return StorageLevel.DISK;
+    }
 }

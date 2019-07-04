@@ -23,20 +23,20 @@ import java.util.function.Consumer;
  */
 public interface AsyncListenable<E> {
 
-  /**
-   * Adds a listener.
-   *
-   * @param listener the listener to add
-   * @return a future to be completed once the listener has been added
-   */
-  CompletableFuture<Void> addListener(Consumer<E> listener);
+    /**
+     * Adds a listener.
+     *
+     * @param listener the listener to add
+     * @return a future to be completed once the listener has been added
+     */
+    CompletableFuture<Void> addListener(Consumer<E> listener);
 
-  /**
-   * Removes a listener.
-   *
-   * @param listener the listener to remove
-   * @return a future to be completed once the listener has been removed
-   */
-  CompletableFuture<Void> removeListener(Consumer<E> listener);
+    /**
+     * Removes a listener.
+     *
+     * @param listener the listener to remove
+     * @return a future to be completed once the listener has been removed
+     */
+    CompletableFuture<Void> removeListener(Consumer<E> listener);
 
 }

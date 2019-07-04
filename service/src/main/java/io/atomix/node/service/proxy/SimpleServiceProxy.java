@@ -23,31 +23,31 @@ import io.atomix.node.service.client.ServiceClient;
  * Base class for primitive proxies.
  */
 public abstract class SimpleServiceProxy extends AbstractServiceProxy<ServiceClient> {
-  protected SimpleServiceProxy(ServiceClient client) {
-    super(client);
-  }
+    protected SimpleServiceProxy(ServiceClient client) {
+        super(client);
+    }
 
-  @Override
-  public String name() {
-    return getClient().name();
-  }
+    @Override
+    public String name() {
+        return getClient().name();
+    }
 
-  @Override
-  public String type() {
-    return getClient().type();
-  }
+    @Override
+    public String type() {
+        return getClient().type();
+    }
 
-  /**
-   * Creates a service.
-   *
-   * @return a future to be completed once the service has been created
-   */
-  public CompletableFuture<Void> create() {
-    return getClient().create();
-  }
+    /**
+     * Creates a service.
+     *
+     * @return a future to be completed once the service has been created
+     */
+    public CompletableFuture<Void> create() {
+        return getClient().create();
+    }
 
-  @Override
-  public CompletableFuture<Void> delete() {
-    return getClient().delete();
-  }
+    @Override
+    public CompletableFuture<Void> delete() {
+        return getClient().delete();
+    }
 }

@@ -21,17 +21,17 @@ import java.util.function.Function;
  * State machine query.
  */
 public class Query<T> extends Operation<T> {
-  public Query(long index, long timestamp, T value) {
-    super(index, timestamp, value);
-  }
+    public Query(long index, long timestamp, T value) {
+        super(index, timestamp, value);
+    }
 
-  @Override
-  public Type type() {
-    return Type.COMMAND;
-  }
+    @Override
+    public Type type() {
+        return Type.COMMAND;
+    }
 
-  @Override
-  public <U> Query<U> map(Function<T, U> mapper) {
-    return new Query<>(index(), timestamp(), mapper.apply(value()));
-  }
+    @Override
+    public <U> Query<U> map(Function<T, U> mapper) {
+        return new Query<>(index(), timestamp(), mapper.apply(value()));
+    }
 }

@@ -21,11 +21,11 @@ import io.atomix.utils.AtomixRuntimeException;
  * Atomix configuration exception.
  */
 public class ConfigurationException extends AtomixRuntimeException {
-  public ConfigurationException(String message) {
-    super(message);
-  }
+    public ConfigurationException(String message) {
+        super(message);
+    }
 
-  public ConfigurationException(String message, Throwable cause) {
-    super(message, cause);
-  }
+    public ConfigurationException(String message, Throwable cause) {
+        super(message, cause);
+    }
 }

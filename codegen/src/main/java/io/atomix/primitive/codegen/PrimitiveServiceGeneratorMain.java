@@ -31,26 +31,26 @@ import io.atomix.node.service.ServiceDescriptorProto;
  * Primitive service generator main.
  */
 public class PrimitiveServiceGeneratorMain {
-  public static void main(String[] args) throws IOException, Descriptors.DescriptorValidationException {
-    InputStream is = System.in;
+    public static void main(String[] args) throws IOException, Descriptors.DescriptorValidationException {
+        InputStream is = System.in;
 
-    if (args.length > 0) {
-      File replayFile = new File(args[0]);
-      FileOutputStream fos = new FileOutputStream(replayFile);
+        if (args.length > 0) {
+            File replayFile = new File(args[0]);
+            FileOutputStream fos = new FileOutputStream(replayFile);
 
-      ByteStreams.copy(System.in, fos);
-      fos.close();
+            ByteStreams.copy(System.in, fos);
+            fos.close();
 
-      is = new FileInputStream(replayFile);
+            is = new FileInputStream(replayFile);
+        }
+
+        ExtensionRegistryLite registryLite = ExtensionRegistryLite.newInstance();
+        ServiceDescriptorProto.registerAllExtensions(registryLite);
+
+        PrimitiveServiceGenerator compiler = new PrimitiveServiceGenerator();
+        PluginProtos.CodeGeneratorRequest request = PluginProtos.CodeGeneratorRequest.parseFrom(is, registryLite);
+        PluginProtos.CodeGeneratorResponse response = compiler.generate(request);
+
+        response.writeTo(System.out);
     }
-
-    ExtensionRegistryLite registryLite = ExtensionRegistryLite.newInstance();
-    ServiceDescriptorProto.registerAllExtensions(registryLite);
-
-    PrimitiveServiceGenerator compiler = new PrimitiveServiceGenerator();
-    PluginProtos.CodeGeneratorRequest request = PluginProtos.CodeGeneratorRequest.parseFrom(is, registryLite);
-    PluginProtos.CodeGeneratorResponse response = compiler.generate(request);
-
-    response.writeTo(System.out);
-  }
 }

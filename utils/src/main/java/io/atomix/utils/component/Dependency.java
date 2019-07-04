@@ -27,16 +27,16 @@ import java.lang.annotation.Target;
 @Retention(RetentionPolicy.RUNTIME)
 public @interface Dependency {
 
-  /**
-   * The dependency type.
-   */
-  Class<?> value() default None.class;
+    /**
+     * The dependency type.
+     */
+    Class<?> value() default None.class;
 
-  /**
-   * The dependency cardinality.
-   */
-  Cardinality cardinality() default Cardinality.SINGLE;
+    /**
+     * The dependency cardinality.
+     */
+    Cardinality cardinality() default Cardinality.SINGLE;
 
-  class None {
-  }
+    class None {
+    }
 }

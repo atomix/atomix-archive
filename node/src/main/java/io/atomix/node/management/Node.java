@@ -21,63 +21,63 @@ import java.util.Objects;
  * Node info.
  */
 public class Node {
-  private final String id;
-  private final String host;
-  private final int port;
+    private final String id;
+    private final String host;
+    private final int port;
 
-  public Node(String id, String host, int port) {
-    this.id = id;
-    this.host = host;
-    this.port = port;
-  }
-
-  /**
-   * Returns the node ID.
-   *
-   * @return the node ID
-   */
-  public String id() {
-    return id;
-  }
-
-  /**
-   * Returns the node host.
-   *
-   * @return the node host
-   */
-  public String host() {
-    return host;
-  }
-
-  /**
-   * Returns the node port.
-   *
-   * @return the node port
-   */
-  public int port() {
-    return port;
-  }
-
-  /**
-   * Returns the node address.
-   *
-   * @return the node address
-   */
-  public String address() {
-    return port > 0 ? String.format("%s:%d", host, port) : host;
-  }
-
-  @Override
-  public int hashCode() {
-    return Objects.hash(id, host, port);
-  }
-
-  @Override
-  public boolean equals(Object object) {
-    if (object instanceof Node) {
-      Node that = (Node) object;
-      return this.id.equals(that.id) && this.host.equals(that.host) && this.port == that.port;
+    public Node(String id, String host, int port) {
+        this.id = id;
+        this.host = host;
+        this.port = port;
     }
-    return false;
-  }
+
+    /**
+     * Returns the node ID.
+     *
+     * @return the node ID
+     */
+    public String id() {
+        return id;
+    }
+
+    /**
+     * Returns the node host.
+     *
+     * @return the node host
+     */
+    public String host() {
+        return host;
+    }
+
+    /**
+     * Returns the node port.
+     *
+     * @return the node port
+     */
+    public int port() {
+        return port;
+    }
+
+    /**
+     * Returns the node address.
+     *
+     * @return the node address
+     */
+    public String address() {
+        return port > 0 ? String.format("%s:%d", host, port) : host;
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(id, host, port);
+    }
+
+    @Override
+    public boolean equals(Object object) {
+        if (object instanceof Node) {
+            Node that = (Node) object;
+            return this.id.equals(that.id) && this.host.equals(that.host) && this.port == that.port;
+        }
+        return false;
+    }
 }

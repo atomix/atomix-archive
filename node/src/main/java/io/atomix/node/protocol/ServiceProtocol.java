@@ -20,11 +20,11 @@ package io.atomix.node.protocol;
  */
 public interface ServiceProtocol extends Protocol {
 
-  /**
-   * Returns the service client.
-   *
-   * @return the service client
-   */
-  ProtocolClient getServiceClient();
+    /**
+     * Returns the service client.
+     *
+     * @return the service client
+     */
+    ProtocolClient getServiceClient();
 
 }

@@ -21,11 +21,11 @@ package io.atomix.utils.event;
 @FunctionalInterface
 public interface EventListener<E extends Event> extends EventFilter<E> {
 
-  /**
-   * Reacts to the specified event.
-   *
-   * @param event event to be processed
-   */
-  void event(E event);
+    /**
+     * Reacts to the specified event.
+     *
+     * @param event event to be processed
+     */
+    void event(E event);
 
 }

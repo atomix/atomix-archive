@@ -22,11 +22,11 @@ import io.grpc.BindableService;
  */
 public interface ServiceRegistry {
 
-  /**
-   * Registers the given service.
-   *
-   * @param service the service to register
-   */
-  void register(BindableService service);
+    /**
+     * Registers the given service.
+     *
+     * @param service the service to register
+     */
+    void register(BindableService service);
 
 }

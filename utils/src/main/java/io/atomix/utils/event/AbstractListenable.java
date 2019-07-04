@@ -25,24 +25,24 @@ import io.atomix.utils.event.Listenable;
  * Basis for components which need to export listener mechanism.
  */
 public abstract class AbstractListenable<E> implements Listenable<E> {
-  private final Set<Consumer<E>> listeners = new CopyOnWriteArraySet<>();
+    private final Set<Consumer<E>> listeners = new CopyOnWriteArraySet<>();
 
-  @Override
-  public void addListener(Consumer<E> listener) {
-    listeners.add(listener);
-  }
+    @Override
+    public void addListener(Consumer<E> listener) {
+        listeners.add(listener);
+    }
 
-  @Override
-  public void removeListener(Consumer<E> listener) {
-    listeners.remove(listener);
-  }
+    @Override
+    public void removeListener(Consumer<E> listener) {
+        listeners.remove(listener);
+    }
 
-  /**
-   * Posts the specified event to the local event dispatcher.
-   *
-   * @param event event to be posted; may be null
-   */
-  protected void post(E event) {
-    listeners.forEach(listener -> listener.accept(event));
-  }
+    /**
+     * Posts the specified event to the local event dispatcher.
+     *
+     * @param event event to be posted; may be null
+     */
+    protected void post(E event) {
+        listeners.forEach(listener -> listener.accept(event));
+    }
 }

@@ -22,22 +22,22 @@ import java.util.concurrent.CompletableFuture;
  */
 public interface Managed {
 
-  /**
-   * Starts the managed component.
-   *
-   * @return a future to be completed once the component has been started
-   */
-  default CompletableFuture<Void> start() {
-    return CompletableFuture.completedFuture(null);
-  }
+    /**
+     * Starts the managed component.
+     *
+     * @return a future to be completed once the component has been started
+     */
+    default CompletableFuture<Void> start() {
+        return CompletableFuture.completedFuture(null);
+    }
 
-  /**
-   * Stops the managed component.
-   *
-   * @return a future to be completed once the component has been stopped
-   */
-  default CompletableFuture<Void> stop() {
-    return CompletableFuture.completedFuture(null);
-  }
+    /**
+     * Stops the managed component.
+     *
+     * @return a future to be completed once the component has been stopped
+     */
+    default CompletableFuture<Void> stop() {
+        return CompletableFuture.completedFuture(null);
+    }
 
 }

@@ -21,39 +21,39 @@ import java.util.Objects;
  * Operation ID.
  */
 public abstract class OperationId<T, U> {
-  private final String id;
+    private final String id;
 
-  public OperationId(String id) {
-    this.id = id;
-  }
-
-  /**
-   * Returns the operation ID.
-   *
-   * @return the operation ID
-   */
-  public String id() {
-    return id;
-  }
-
-  /**
-   * Returns the operation type.
-   *
-   * @return the operation type
-   */
-  public abstract OperationType type();
-
-  @Override
-  public int hashCode() {
-    return Objects.hash(id(), type());
-  }
-
-  @Override
-  public boolean equals(Object object) {
-    if (object.getClass() == getClass()) {
-      OperationId that = (OperationId) object;
-      return this.id.equals(that.id) && this.type().equals(that.type());
+    public OperationId(String id) {
+        this.id = id;
     }
-    return false;
-  }
+
+    /**
+     * Returns the operation ID.
+     *
+     * @return the operation ID
+     */
+    public String id() {
+        return id;
+    }
+
+    /**
+     * Returns the operation type.
+     *
+     * @return the operation type
+     */
+    public abstract OperationType type();
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(id(), type());
+    }
+
+    @Override
+    public boolean equals(Object object) {
+        if (object.getClass() == getClass()) {
+            OperationId that = (OperationId) object;
+            return this.id.equals(that.id) && this.type().equals(that.type());
+        }
+        return false;
+    }
 }

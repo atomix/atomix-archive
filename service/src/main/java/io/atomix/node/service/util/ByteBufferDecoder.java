@@ -25,29 +25,29 @@ import io.atomix.node.service.ServiceException;
 @FunctionalInterface
 public interface ByteBufferDecoder<T> {
 
-  /**
-   * Decodes the given bytes.
-   *
-   * @param bytes the bytes to decode
-   * @param decoder the decoder with which to decode the bytes
-   * @param <T> the object type
-   * @return the decoded object
-   */
-  static <T> T decode(ByteBuffer bytes, ByteBufferDecoder<T> decoder) {
-    try {
-      return bytes != null ? decoder.decode(bytes) : null;
-    } catch (Exception e) {
-      throw new ServiceException.ApplicationException(e);
+    /**
+     * Decodes the given bytes.
+     *
+     * @param bytes   the bytes to decode
+     * @param decoder the decoder with which to decode the bytes
+     * @param <T>     the object type
+     * @return the decoded object
+     */
+    static <T> T decode(ByteBuffer bytes, ByteBufferDecoder<T> decoder) {
+        try {
+            return bytes != null ? decoder.decode(bytes) : null;
+        } catch (Exception e) {
+            throw new ServiceException.ApplicationException(e);
+        }
     }
-  }
 
-  /**
-   * Decodes the given bytes.
-   *
-   * @param bytes the bytes to decode
-   * @return the decoded object
-   * @throws Exception
-   */
-  T decode(ByteBuffer bytes) throws Exception;
+    /**
+     * Decodes the given bytes.
+     *
+     * @param bytes the bytes to decode
+     * @return the decoded object
+     * @throws Exception
+     */
+    T decode(ByteBuffer bytes) throws Exception;
 
 }

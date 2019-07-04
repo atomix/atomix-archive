@@ -27,32 +27,32 @@ import org.slf4j.LoggerFactory;
  */
 @Component
 public class ThreadManager implements ThreadService, Managed {
-  private static final Logger LOGGER = LoggerFactory.getLogger(ThreadManager.class);
+    private static final Logger LOGGER = LoggerFactory.getLogger(ThreadManager.class);
 
-  private ThreadContextFactory threadContextFactory;
+    private ThreadContextFactory threadContextFactory;
 
-  @Override
-  public ThreadContextFactory getFactory() {
-    return threadContextFactory;
-  }
+    @Override
+    public ThreadContextFactory getFactory() {
+        return threadContextFactory;
+    }
 
-  @Override
-  public ThreadContext createContext() {
-    return threadContextFactory.createContext();
-  }
+    @Override
+    public ThreadContext createContext() {
+        return threadContextFactory.createContext();
+    }
 
-  @Override
-  public CompletableFuture<Void> start() {
-    threadContextFactory = new ThreadPoolContextFactory(
-        "atomix-management-%d",
-        Math.max(Math.min(Runtime.getRuntime().availableProcessors() * 2, 32), 8),
-        LOGGER);
-    return CompletableFuture.completedFuture(null);
-  }
+    @Override
+    public CompletableFuture<Void> start() {
+        threadContextFactory = new ThreadPoolContextFactory(
+            "atomix-management-%d",
+            Math.max(Math.min(Runtime.getRuntime().availableProcessors() * 2, 32), 8),
+            LOGGER);
+        return CompletableFuture.completedFuture(null);
+    }
 
-  @Override
-  public CompletableFuture<Void> stop() {
-    threadContextFactory.close();
-    return CompletableFuture.completedFuture(null);
-  }
+    @Override
+    public CompletableFuture<Void> stop() {
+        threadContextFactory.close();
+        return CompletableFuture.completedFuture(null);
+    }
 }

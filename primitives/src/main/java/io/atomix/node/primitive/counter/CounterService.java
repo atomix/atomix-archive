@@ -27,88 +27,88 @@ import io.atomix.utils.component.Component;
  * Counter service.
  */
 public class CounterService extends AbstractCounterService {
-  public static final Type TYPE = new Type();
+    public static final Type TYPE = new Type();
 
-  /**
-   * Counter service type.
-   */
-  @Component
-  public static class Type implements PrimitiveService.Type {
-    private static final String NAME = "counter";
+    /**
+     * Counter service type.
+     */
+    @Component
+    public static class Type implements PrimitiveService.Type {
+        private static final String NAME = "counter";
+
+        @Override
+        public String name() {
+            return NAME;
+        }
+
+        @Override
+        public PrimitiveService newService() {
+            return new CounterService();
+        }
+    }
+
+    private final AtomicLong counter = new AtomicLong();
 
     @Override
-    public String name() {
-      return NAME;
+    public SetResponse set(SetRequest request) {
+        return SetResponse.newBuilder()
+            .setPreviousValue(counter.getAndSet(request.getValue()))
+            .build();
     }
 
     @Override
-    public PrimitiveService newService() {
-      return new CounterService();
+    public GetResponse get(GetRequest request) {
+        return GetResponse.newBuilder()
+            .setValue(counter.get())
+            .build();
     }
-  }
 
-  private final AtomicLong counter = new AtomicLong();
-
-  @Override
-  public SetResponse set(SetRequest request) {
-    return SetResponse.newBuilder()
-        .setPreviousValue(counter.getAndSet(request.getValue()))
-        .build();
-  }
-
-  @Override
-  public GetResponse get(GetRequest request) {
-    return GetResponse.newBuilder()
-        .setValue(counter.get())
-        .build();
-  }
-
-  @Override
-  public CheckAndSetResponse checkAndSet(CheckAndSetRequest request) {
-    return CheckAndSetResponse.newBuilder()
-        .setSucceeded(counter.compareAndSet(request.getExpect(), request.getUpdate()))
-        .build();
-  }
-
-  @Override
-  public IncrementResponse increment(IncrementRequest request) {
-    long previousValue;
-    if (request.getDelta() == 0) {
-      previousValue = counter.getAndIncrement();
-    } else {
-      previousValue = counter.getAndAdd(request.getDelta());
+    @Override
+    public CheckAndSetResponse checkAndSet(CheckAndSetRequest request) {
+        return CheckAndSetResponse.newBuilder()
+            .setSucceeded(counter.compareAndSet(request.getExpect(), request.getUpdate()))
+            .build();
     }
-    return IncrementResponse.newBuilder()
-        .setPreviousValue(previousValue)
-        .setNextValue(counter.get())
-        .build();
-  }
 
-  @Override
-  public DecrementResponse decrement(DecrementRequest request) {
-    long previousValue;
-    if (request.getDelta() == 0) {
-      previousValue = counter.getAndDecrement();
-    } else {
-      previousValue = counter.getAndAdd(-request.getDelta());
+    @Override
+    public IncrementResponse increment(IncrementRequest request) {
+        long previousValue;
+        if (request.getDelta() == 0) {
+            previousValue = counter.getAndIncrement();
+        } else {
+            previousValue = counter.getAndAdd(request.getDelta());
+        }
+        return IncrementResponse.newBuilder()
+            .setPreviousValue(previousValue)
+            .setNextValue(counter.get())
+            .build();
     }
-    return DecrementResponse.newBuilder()
-        .setPreviousValue(previousValue)
-        .setNextValue(counter.get())
-        .build();
-  }
 
-  @Override
-  public void backup(OutputStream output) throws IOException {
-    AtomicCounterSnapshot.newBuilder()
-        .setCounter(counter.get())
-        .build()
-        .writeTo(output);
-  }
+    @Override
+    public DecrementResponse decrement(DecrementRequest request) {
+        long previousValue;
+        if (request.getDelta() == 0) {
+            previousValue = counter.getAndDecrement();
+        } else {
+            previousValue = counter.getAndAdd(-request.getDelta());
+        }
+        return DecrementResponse.newBuilder()
+            .setPreviousValue(previousValue)
+            .setNextValue(counter.get())
+            .build();
+    }
 
-  @Override
-  public void restore(InputStream input) throws IOException {
-    AtomicCounterSnapshot snapshot = AtomicCounterSnapshot.parseFrom(input);
-    counter.set(snapshot.getCounter());
-  }
+    @Override
+    public void backup(OutputStream output) throws IOException {
+        AtomicCounterSnapshot.newBuilder()
+            .setCounter(counter.get())
+            .build()
+            .writeTo(output);
+    }
+
+    @Override
+    public void restore(InputStream input) throws IOException {
+        AtomicCounterSnapshot snapshot = AtomicCounterSnapshot.parseFrom(input);
+        counter.set(snapshot.getCounter());
+    }
 }

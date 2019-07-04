@@ -19,6 +19,6 @@ package io.atomix.node.service.operation;
  * Operation type.
  */
 public enum OperationType {
-  COMMAND,
-  QUERY,
+    COMMAND,
+    QUERY,
 }

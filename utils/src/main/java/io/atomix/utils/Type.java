@@ -20,11 +20,11 @@ package io.atomix.utils;
  */
 public interface Type {
 
-  /**
-   * Returns the type name.
-   *
-   * @return the type name
-   */
-  String name();
+    /**
+     * Returns the type name.
+     *
+     * @return the type name
+     */
+    String name();
 
 }

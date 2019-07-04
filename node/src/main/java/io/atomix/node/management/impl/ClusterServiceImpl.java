@@ -33,49 +33,49 @@ import io.atomix.utils.component.Managed;
  */
 @Component
 public class ClusterServiceImpl implements ClusterService, Managed {
-  @Dependency
-  private ConfigService configService;
+    @Dependency
+    private ConfigService configService;
 
-  private Node localNode;
-  private Node controllerNode;
-  private final Map<String, Node> nodes = new ConcurrentHashMap<>();
+    private Node localNode;
+    private Node controllerNode;
+    private final Map<String, Node> nodes = new ConcurrentHashMap<>();
 
-  @Override
-  public Node getLocalNode() {
-    return localNode;
-  }
-
-  @Override
-  public Node getControllerNode() {
-    return controllerNode;
-  }
-
-  @Override
-  public Collection<Node> getNodes() {
-    return nodes.values();
-  }
-
-  @Override
-  public Node getNode(String id) {
-    return nodes.get(id);
-  }
-
-  @Override
-  public CompletableFuture<Void> start() {
-    localNode = new Node(
-        configService.getNode().getId(),
-        configService.getNode().getHost(),
-        configService.getNode().getPort());
-    controllerNode = new Node(
-        configService.getController().getId(),
-        configService.getController().getHost(),
-        configService.getController().getPort());
-    for (NodeConfig node : configService.getCluster()) {
-      nodes.put(node.getId(), new Node(
-          node.getId(),
-          node.getHost(),
-          node.getPort()));
+    @Override
+    public Node getLocalNode() {
+        return localNode;
     }
-    return CompletableFuture.completedFuture(null);
-  }
+
+    @Override
+    public Node getControllerNode() {
+        return controllerNode;
+    }
+
+    @Override
+    public Collection<Node> getNodes() {
+        return nodes.values();
+    }
+
+    @Override
+    public Node getNode(String id) {
+        return nodes.get(id);
+    }
+
+    @Override
+    public CompletableFuture<Void> start() {
+        localNode = new Node(
+            configService.getNode().getId(),
+            configService.getNode().getHost(),
+            configService.getNode().getPort());
+        controllerNode = new Node(
+            configService.getController().getId(),
+            configService.getController().getHost(),
+            configService.getController().getPort());
+        for (NodeConfig node : configService.getCluster()) {
+            nodes.put(node.getId(), new Node(
+                node.getId(),
+                node.getHost(),
+                node.getPort()));
+        }
+        return CompletableFuture.completedFuture(null);
+    }
 }

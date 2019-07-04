@@ -24,9 +24,9 @@ import static org.junit.Assert.assertEquals;
  * Array size hash printer test.
  */
 public class ArraySizeHashPrinterTest {
-  @Test
-  public void testArraySizeHashPrinter() throws Exception {
-    ArraySizeHashPrinter printer = ArraySizeHashPrinter.of(new byte[]{1, 2, 3});
-    assertEquals("byte[]{length=3, hash=30817}", printer.toString());
-  }
+    @Test
+    public void testArraySizeHashPrinter() throws Exception {
+        ArraySizeHashPrinter printer = ArraySizeHashPrinter.of(new byte[]{1, 2, 3});
+        assertEquals("byte[]{length=3, hash=30817}", printer.toString());
+    }
 }

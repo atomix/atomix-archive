@@ -29,102 +29,102 @@ import org.slf4j.Logger;
  */
 public interface StateMachine {
 
-  /**
-   * State machine context.
-   */
-  interface Context {
+    /**
+     * State machine context.
+     */
+    interface Context {
+
+        /**
+         * Returns the current state machine index.
+         *
+         * @return the current state machine index
+         */
+        long getIndex();
+
+        /**
+         * Returns the current state machine timestamp.
+         *
+         * @return the current state machine timestamp
+         */
+        long getTimestamp();
+
+        /**
+         * Returns the current operation type.
+         *
+         * @return the current operation type
+         */
+        OperationType getOperationType();
+
+        /**
+         * Returns the state machine logger.
+         *
+         * @return the state machine logger
+         */
+        Logger getLogger();
+
+    }
 
     /**
-     * Returns the current state machine index.
+     * Initializes the state machine context.
      *
-     * @return the current state machine index
+     * @param context the state machine context
      */
-    long getIndex();
+    void init(Context context);
 
     /**
-     * Returns the current state machine timestamp.
+     * Takes a snapshot of the state machine.
      *
-     * @return the current state machine timestamp
+     * @param output the output
      */
-    long getTimestamp();
+    void snapshot(OutputStream output) throws IOException;
 
     /**
-     * Returns the current operation type.
+     * Installs a snapshot of the state machine state.
      *
-     * @return the current operation type
+     * @param input the input
      */
-    OperationType getOperationType();
+    void install(InputStream input) throws IOException;
 
     /**
-     * Returns the state machine logger.
+     * Returns whether the given index can be deleted.
      *
-     * @return the state machine logger
+     * @param index the index to check
+     * @return indicates whether the given index can be deleted
      */
-    Logger getLogger();
+    boolean canDelete(long index);
 
-  }
+    /**
+     * Applies the given command to the state machine.
+     *
+     * @param command the command to apply
+     * @return the state machine output
+     */
+    CompletableFuture<byte[]> apply(Command<byte[]> command);
 
-  /**
-   * Initializes the state machine context.
-   *
-   * @param context the state machine context
-   */
-  void init(Context context);
+    /**
+     * Applies the given command to the state machine.
+     *
+     * @param command the command to apply
+     * @param handler the response stream handler
+     * @return the state machine output
+     */
+    CompletableFuture<Void> apply(Command<byte[]> command, StreamHandler<byte[]> handler);
 
-  /**
-   * Takes a snapshot of the state machine.
-   *
-   * @param output the output
-   */
-  void snapshot(OutputStream output) throws IOException;
+    /**
+     * Applies the given query to the state machine.
+     *
+     * @param query the query to apply
+     * @return the state machine output
+     */
+    CompletableFuture<byte[]> apply(Query<byte[]> query);
 
-  /**
-   * Installs a snapshot of the state machine state.
-   *
-   * @param input the input
-   */
-  void install(InputStream input) throws IOException;
-
-  /**
-   * Returns whether the given index can be deleted.
-   *
-   * @param index the index to check
-   * @return indicates whether the given index can be deleted
-   */
-  boolean canDelete(long index);
-
-  /**
-   * Applies the given command to the state machine.
-   *
-   * @param command the command to apply
-   * @return the state machine output
-   */
-  CompletableFuture<byte[]> apply(Command<byte[]> command);
-
-  /**
-   * Applies the given command to the state machine.
-   *
-   * @param command the command to apply
-   * @param handler the response stream handler
-   * @return the state machine output
-   */
-  CompletableFuture<Void> apply(Command<byte[]> command, StreamHandler<byte[]> handler);
-
-  /**
-   * Applies the given query to the state machine.
-   *
-   * @param query the query to apply
-   * @return the state machine output
-   */
-  CompletableFuture<byte[]> apply(Query<byte[]> query);
-
-  /**
-   * Applies the given query to the state machine.
-   *
-   * @param query the query to apply
-   * @param handler the response stream handler
-   * @return the state machine output
-   */
-  CompletableFuture<Void> apply(Query<byte[]> query, StreamHandler<byte[]> handler);
+    /**
+     * Applies the given query to the state machine.
+     *
+     * @param query   the query to apply
+     * @param handler the response stream handler
+     * @return the state machine output
+     */
+    CompletableFuture<Void> apply(Query<byte[]> query, StreamHandler<byte[]> handler);
 
 }

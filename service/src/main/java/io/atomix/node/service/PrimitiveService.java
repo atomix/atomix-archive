@@ -22,23 +22,23 @@ import io.atomix.utils.NamedType;
  */
 public interface PrimitiveService extends StateMachine {
 
-  /**
-   * Service type.
-   */
-  interface Type extends NamedType {
+    /**
+     * Service type.
+     */
+    interface Type extends NamedType {
+
+        /**
+         * Creates a new service instance from the given configuration.
+         *
+         * @return the service instance
+         */
+        PrimitiveService newService();
+    }
 
     /**
-     * Creates a new service instance from the given configuration.
-     *
-     * @return the service instance
+     * Primitive service context.
      */
-    PrimitiveService newService();
-  }
-
-  /**
-   * Primitive service context.
-   */
-  interface Context extends StateMachine.Context {
-  }
+    interface Context extends StateMachine.Context {
+    }
 
 }

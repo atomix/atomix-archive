@@ -26,11 +26,11 @@ import io.atomix.utils.component.Dependency;
  */
 @Component
 public class PartitionServiceImpl implements PartitionService {
-  @Dependency
-  private ConfigService configService;
+    @Dependency
+    private ConfigService configService;
 
-  @Override
-  public PartitionId getPartitionId() {
-    return configService.getPartition();
-  }
+    @Override
+    public PartitionId getPartitionId() {
+        return configService.getPartition();
+    }
 }

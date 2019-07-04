@@ -23,18 +23,18 @@ import io.atomix.utils.stream.StreamHandler;
  */
 public interface SessionStreamHandler<T> extends StreamHandler<T> {
 
-  /**
-   * Returns the stream ID.
-   *
-   * @return the stream ID
-   */
-  StreamId id();
+    /**
+     * Returns the stream ID.
+     *
+     * @return the stream ID
+     */
+    StreamId id();
 
-  /**
-   * Returns the stream type.
-   *
-   * @return the stream type
-   */
-  StreamType<T> type();
+    /**
+     * Returns the stream type.
+     *
+     * @return the stream type
+     */
+    StreamType<T> type();
 
 }

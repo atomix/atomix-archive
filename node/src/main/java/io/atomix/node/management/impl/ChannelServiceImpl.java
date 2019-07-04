@@ -37,36 +37,36 @@ import static io.atomix.utils.concurrent.Threads.namedThreads;
  */
 @Component
 public class ChannelServiceImpl implements ChannelService, Managed {
-  private static final Logger LOGGER = LoggerFactory.getLogger(ChannelServiceImpl.class);
-  private EventLoopGroup clientGroup;
-  private Class<? extends io.netty.channel.Channel> clientChannelClass;
+    private static final Logger LOGGER = LoggerFactory.getLogger(ChannelServiceImpl.class);
+    private EventLoopGroup clientGroup;
+    private Class<? extends io.netty.channel.Channel> clientChannelClass;
 
-  @Override
-  public Channel getChannel(String host, int port) {
-    return NettyChannelBuilder.forAddress(host, port)
-        .channelType(clientChannelClass)
-        .eventLoopGroup(clientGroup)
-        .usePlaintext()
-        .build();
-  }
-
-  @Override
-  public CompletableFuture<Void> start() {
-    initEventLoopGroup();
-    return CompletableFuture.completedFuture(null);
-  }
-
-  private void initEventLoopGroup() {
-    // try Epoll first and if that does work, use nio.
-    try {
-      clientGroup = new EpollEventLoopGroup(0, namedThreads("netty-messaging-event-epoll-client-%d", LOGGER));
-      clientChannelClass = EpollSocketChannel.class;
-      return;
-    } catch (Throwable e) {
-      LOGGER.debug("Failed to initialize native (epoll) transport. "
-          + "Reason: {}. Proceeding with nio.", e.getMessage());
+    @Override
+    public Channel getChannel(String host, int port) {
+        return NettyChannelBuilder.forAddress(host, port)
+            .channelType(clientChannelClass)
+            .eventLoopGroup(clientGroup)
+            .usePlaintext()
+            .build();
     }
-    clientGroup = new NioEventLoopGroup(0, namedThreads("netty-messaging-event-nio-client-%d", LOGGER));
-    clientChannelClass = NioSocketChannel.class;
-  }
+
+    @Override
+    public CompletableFuture<Void> start() {
+        initEventLoopGroup();
+        return CompletableFuture.completedFuture(null);
+    }
+
+    private void initEventLoopGroup() {
+        // try Epoll first and if that does work, use nio.
+        try {
+            clientGroup = new EpollEventLoopGroup(0, namedThreads("netty-messaging-event-epoll-client-%d", LOGGER));
+            clientChannelClass = EpollSocketChannel.class;
+            return;
+        } catch (Throwable e) {
+            LOGGER.debug("Failed to initialize native (epoll) transport. "
+                + "Reason: {}. Proceeding with nio.", e.getMessage());
+        }
+        clientGroup = new NioEventLoopGroup(0, namedThreads("netty-messaging-event-nio-client-%d", LOGGER));
+        clientChannelClass = NioSocketChannel.class;
+    }
 }

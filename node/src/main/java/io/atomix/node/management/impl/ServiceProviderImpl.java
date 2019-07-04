@@ -33,45 +33,45 @@ import io.grpc.Channel;
  */
 @Component
 public class ServiceProviderImpl implements ServiceProvider {
-  @Dependency
-  private ClusterService clusterService;
-  @Dependency
-  private ChannelService channelService;
-
-  @Override
-  public <T> ServiceFactory<T> getFactory(Function<Channel, T> factory) {
-    return new ServiceFactoryImpl<>(factory);
-  }
-
-  private class ServiceFactoryImpl<T> implements ServiceFactory<T> {
-    private final Function<Channel, T> factory;
-    private final Map<Node, T> services = new ConcurrentHashMap<>();
-
-    ServiceFactoryImpl(Function<Channel, T> factory) {
-      this.factory = factory;
-    }
-
-    private T getService(Node node) {
-      T service = services.get(node);
-      if (service == null) {
-        service = services.compute(node, (id, value) -> {
-          if (value == null) {
-            value = factory.apply(channelService.getChannel(node.host(), node.port()));
-          }
-          return value;
-        });
-      }
-      return service;
-    }
+    @Dependency
+    private ClusterService clusterService;
+    @Dependency
+    private ChannelService channelService;
 
     @Override
-    public T getService(String nodeId) {
-      return getService(clusterService.getNode(nodeId));
+    public <T> ServiceFactory<T> getFactory(Function<Channel, T> factory) {
+        return new ServiceFactoryImpl<>(factory);
     }
 
-    @Override
-    public T getService(String host, int port) {
-      return getService(new Node(host, host, port));
+    private class ServiceFactoryImpl<T> implements ServiceFactory<T> {
+        private final Function<Channel, T> factory;
+        private final Map<Node, T> services = new ConcurrentHashMap<>();
+
+        ServiceFactoryImpl(Function<Channel, T> factory) {
+            this.factory = factory;
+        }
+
+        private T getService(Node node) {
+            T service = services.get(node);
+            if (service == null) {
+                service = services.compute(node, (id, value) -> {
+                    if (value == null) {
+                        value = factory.apply(channelService.getChannel(node.host(), node.port()));
+                    }
+                    return value;
+                });
+            }
+            return service;
+        }
+
+        @Override
+        public T getService(String nodeId) {
+            return getService(clusterService.getNode(nodeId));
+        }
+
+        @Override
+        public T getService(String host, int port) {
+            return getService(new Node(host, host, port));
+        }
     }
-  }
 }

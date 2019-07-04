@@ -22,11 +22,11 @@ import io.atomix.node.service.client.LogClient;
  */
 public interface LogProtocol extends Protocol {
 
-  /**
-   * Returns the log client.
-   *
-   * @return the log client
-   */
-  LogClient getLogClient();
+    /**
+     * Returns the log client.
+     *
+     * @return the log client
+     */
+    LogClient getLogClient();
 
 }
