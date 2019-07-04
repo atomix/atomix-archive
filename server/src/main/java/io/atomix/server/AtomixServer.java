@@ -23,6 +23,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import com.google.common.io.Resources;
 import com.google.protobuf.Message;
 import io.atomix.api.controller.PartitionConfig;
+import io.atomix.server.management.ServiceProvider;
 import io.atomix.server.management.impl.ConfigServiceImpl;
 import io.atomix.server.management.impl.ProtocolManager;
 import io.atomix.server.protocol.LogProtocol;
@@ -30,6 +31,7 @@ import io.atomix.server.protocol.Protocol;
 import io.atomix.server.protocol.ServiceProtocol;
 import io.atomix.server.service.counter.CounterServiceImpl;
 import io.atomix.server.service.election.LeaderElectionServiceImpl;
+import io.atomix.server.service.list.ListServiceImpl;
 import io.atomix.server.service.lock.LockServiceImpl;
 import io.atomix.server.service.log.LogServiceImpl;
 import io.atomix.server.service.map.MapServiceImpl;
@@ -112,6 +114,7 @@ public class AtomixServer {
           if (protocol instanceof ServiceProtocol) {
             protocolManager.getServiceRegistry().register(new CounterServiceImpl((ServiceProtocol) protocol));
             protocolManager.getServiceRegistry().register(new LeaderElectionServiceImpl((ServiceProtocol) protocol));
+            protocolManager.getServiceRegistry().register(new ListServiceImpl((ServiceProtocol) protocol));
             protocolManager.getServiceRegistry().register(new LockServiceImpl((ServiceProtocol) protocol));
             protocolManager.getServiceRegistry().register(new MapServiceImpl((ServiceProtocol) protocol));
             protocolManager.getServiceRegistry().register(new SetServiceImpl((ServiceProtocol) protocol));
