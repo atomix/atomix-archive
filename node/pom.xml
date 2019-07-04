@@ -23,7 +23,7 @@
         <version>4.0.0-SNAPSHOT</version>
     </parent>
 
-    <packaging>bundle</packaging>
+    <packaging>jar</packaging>
     <artifactId>atomix-node</artifactId>
     <name>Atomix Node</name>
 
@@ -124,8 +124,7 @@
                 <artifactId>license-maven-plugin</artifactId>
                 <version>1.16</version>
                 <configuration>
-                    <fileTemplate>${basedir}/src/main/resources/templates/third-party-file-groupByMultiLicense.ftl
-                    </fileTemplate>
+                    <fileTemplate>${basedir}/src/main/resources/templates/third-party-file-groupByMultiLicense.ftl</fileTemplate>
                 </configuration>
                 <executions>
                     <execution>
@@ -140,21 +139,6 @@
             <plugin>
                 <groupId>org.codehaus.mojo</groupId>
                 <artifactId>buildnumber-maven-plugin</artifactId>
-            </plugin>
-            <plugin>
-                <groupId>org.apache.felix</groupId>
-                <artifactId>maven-bundle-plugin</artifactId>
-                <extensions>true</extensions>
-                <configuration>
-                    <instructions>
-                        <Export-Package>
-                            io.atomix.node.*
-                        </Export-Package>
-                        <Import-Package>
-                            !sun.nio.ch,!sun.misc,*
-                        </Import-Package>
-                    </instructions>
-                </configuration>
             </plugin>
         </plugins>
     </build>
