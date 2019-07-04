@@ -13,448 +13,458 @@
   ~ See the License for the specific language governing permissions and
   ~ limitations under the License.
   -->
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-  <modelVersion>4.0.0</modelVersion>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
 
-  <parent>
-    <groupId>org.sonatype.oss</groupId>
-    <artifactId>oss-parent</artifactId>
-    <version>7</version>
-  </parent>
+    <parent>
+        <groupId>org.sonatype.oss</groupId>
+        <artifactId>oss-parent</artifactId>
+        <version>7</version>
+    </parent>
 
-  <groupId>io.atomix</groupId>
-  <artifactId>atomix-parent</artifactId>
-  <version>4.0.0-SNAPSHOT</version>
-  <packaging>pom</packaging>
-  <name>Atomix Parent Pom</name>
-  <description>Distributed systems framework.</description>
-  <url>http://github.com/atomix/atomix</url>
-  <inceptionYear>2013</inceptionYear>
+    <groupId>io.atomix</groupId>
+    <artifactId>atomix-parent</artifactId>
+    <version>4.0.0-SNAPSHOT</version>
+    <packaging>pom</packaging>
+    <name>Atomix Parent Pom</name>
+    <description>Distributed systems framework.</description>
+    <url>http://github.com/atomix/atomix</url>
+    <inceptionYear>2013</inceptionYear>
 
-  <properties>
-    <jv>${project.version}</jv>
+    <properties>
+        <jv>${project.version}</jv>
 
-    <!-- Java -->
-    <java.version>1.8</java.version>
+        <!-- Java -->
+        <java.version>1.8</java.version>
 
-    <!-- Logging -->
-    <slf4j.version>1.7.7</slf4j.version>
+        <!-- Logging -->
+        <slf4j.version>1.7.7</slf4j.version>
 
-    <!-- Testing -->
-    <junit.version>4.12</junit.version>
-    <hamcrest.version>1.3</hamcrest.version>
-    <mockito.version>1.10.19</mockito.version>
-    <concurrentunit.version>0.4.2</concurrentunit.version>
-    <logback.version>1.1.2</logback.version>
+        <!-- Testing -->
+        <junit.version>4.12</junit.version>
+        <hamcrest.version>1.3</hamcrest.version>
+        <mockito.version>1.10.19</mockito.version>
+        <concurrentunit.version>0.4.2</concurrentunit.version>
+        <logback.version>1.1.2</logback.version>
 
-    <!-- Core dependencies -->
-    <guava.version>22.0</guava.version>
-    <kryo.version>4.0.2</kryo.version>
-    <commons.lang3.version>3.7</commons.lang3.version>
-    <commons.math3.version>3.6.1</commons.math3.version>
-    <netty.version>4.1.27.Final</netty.version>
-    <vertx.version>3.5.0</vertx.version>
-    <jaxrs.version>2.0</jaxrs.version>
-    <jackson.version>2.9.8</jackson.version>
-    <config.version>1.3.2</config.version>
-    <classgraph.version>4.2.3</classgraph.version>
-    <resteasy.version>3.1.4.Final</resteasy.version>
-    <rest-assured.version>3.0.7</rest-assured.version>
-    <argparse4j.version>0.7.0</argparse4j.version>
-    <protobuf.version>3.6.1</protobuf.version>
-    <grpc.version>1.19.0</grpc.version>
-    <freemarker.version>2.3.28</freemarker.version>
+        <!-- Core dependencies -->
+        <guava.version>22.0</guava.version>
+        <kryo.version>4.0.2</kryo.version>
+        <commons.lang3.version>3.7</commons.lang3.version>
+        <commons.math3.version>3.6.1</commons.math3.version>
+        <netty.version>4.1.27.Final</netty.version>
+        <vertx.version>3.5.0</vertx.version>
+        <jaxrs.version>2.0</jaxrs.version>
+        <jackson.version>2.9.8</jackson.version>
+        <config.version>1.3.2</config.version>
+        <classgraph.version>4.2.3</classgraph.version>
+        <resteasy.version>3.1.4.Final</resteasy.version>
+        <rest-assured.version>3.0.7</rest-assured.version>
+        <argparse4j.version>0.7.0</argparse4j.version>
+        <protobuf.version>3.6.1</protobuf.version>
+        <grpc.version>1.19.0</grpc.version>
+        <freemarker.version>2.3.28</freemarker.version>
 
-    <!-- Maven plugins -->
-    <maven.source.plugin.version>2.2.1</maven.source.plugin.version>
-    <maven.compiler.plugin.version>3.7.0</maven.compiler.plugin.version>
-    <maven-jar-plugin.version>3.1.0</maven-jar-plugin.version>
-    <maven.failsafe.plugin.version>2.21.0</maven.failsafe.plugin.version>
-    <maven.surefire.plugin.version>2.22.0</maven.surefire.plugin.version>
-    <maven.clean.plugin.version>2.5</maven.clean.plugin.version>
-    <maven.resources.plugin.version>2.6</maven.resources.plugin.version>
-    <maven.dependency.plugin.version>2.7</maven.dependency.plugin.version>
-    <maven.assembly.plugin.version>2.4</maven.assembly.plugin.version>
-    <maven.javadoc.plugin.version>3.0.1</maven.javadoc.plugin.version>
-    <maven.bundle.plugin.version>2.5.3</maven.bundle.plugin.version>
-    <maven.checkstyle.plugin.version>2.17</maven.checkstyle.plugin.version>
-    <maven.dockerfile.plugin.version>1.4.3</maven.dockerfile.plugin.version>
+        <!-- Maven plugins -->
+        <maven.source.plugin.version>2.2.1</maven.source.plugin.version>
+        <maven.compiler.plugin.version>3.7.0</maven.compiler.plugin.version>
+        <maven-jar-plugin.version>3.1.0</maven-jar-plugin.version>
+        <maven.failsafe.plugin.version>2.21.0</maven.failsafe.plugin.version>
+        <maven.surefire.plugin.version>2.22.0</maven.surefire.plugin.version>
+        <maven.clean.plugin.version>2.5</maven.clean.plugin.version>
+        <maven.resources.plugin.version>2.6</maven.resources.plugin.version>
+        <maven.dependency.plugin.version>2.7</maven.dependency.plugin.version>
+        <maven.assembly.plugin.version>2.4</maven.assembly.plugin.version>
+        <maven.javadoc.plugin.version>3.0.1</maven.javadoc.plugin.version>
+        <maven.bundle.plugin.version>2.5.3</maven.bundle.plugin.version>
+        <maven.checkstyle.plugin.version>2.17</maven.checkstyle.plugin.version>
+        <maven.dockerfile.plugin.version>1.4.3</maven.dockerfile.plugin.version>
 
-    <dockerfile.version>latest</dockerfile.version>
+        <dockerfile.version>latest</dockerfile.version>
 
-    <argLine.common>-Xss256k -Xms512m -Xmx2G -XX:+UseConcMarkSweepGC -XX:+UseParNewGC -Dio.atomix.whitelistPackages=io.atomix</argLine.common>
-    <argLine.extras /> <!-- Overridden in some profiles -->
-    <argLine.javadocs />
-  </properties>
+        <argLine.common>-Xss256k -Xms512m -Xmx2G -XX:+UseConcMarkSweepGC -XX:+UseParNewGC
+            -Dio.atomix.whitelistPackages=io.atomix
+        </argLine.common>
+        <argLine.extras/> <!-- Overridden in some profiles -->
+        <argLine.javadocs/>
+    </properties>
 
-  <profiles>
-    <!-- JDK9+ -->
-    <profile>
-      <id>java9</id>
-      <properties>
-        <argLine.common>-Xss256k -Xms512m -Xmx2G -Dio.atomix.whitelistPackages=io.atomix</argLine.common>
-        <argLine.extras>--add-modules jdk.unsupported --add-opens=java.base/java.nio=ALL-UNNAMED</argLine.extras>
-        <argLine.javadocs>-html5</argLine.javadocs>
-        <!-- coverall version 4.3.0 does not work with java 9, see https://github.com/trautonen/coveralls-maven-plugin/issues/112 -->
-        <coveralls.skip>true</coveralls.skip>
-      </properties>
-      <activation>
-        <jdk>[1.9,)</jdk>
-      </activation>
-    </profile>
-    <profile>
-      <id>sonatype-oss-release</id>
-      <properties>
-        <dockerfile.version>${project.version}</dockerfile.version>
-      </properties>
-      <build>
-        <plugins>
-          <plugin>
-            <groupId>org.apache.maven.plugins</groupId>
-            <artifactId>maven-source-plugin</artifactId>
-            <version>2.1.2</version>
-            <executions>
-              <execution>
-                <id>attach-sources</id>
-                <goals>
-                  <goal>jar-no-fork</goal>
-                </goals>
-              </execution>
-            </executions>
-          </plugin>
-          <plugin>
-            <groupId>org.apache.maven.plugins</groupId>
-            <artifactId>maven-javadoc-plugin</artifactId>
-            <version>2.7</version>
-            <executions>
-              <execution>
-                <id>attach-javadocs</id>
-                <goals>
-                  <goal>jar</goal>
-                </goals>
-              </execution>
-            </executions>
-          </plugin>
-          <plugin>
-            <groupId>org.apache.maven.plugins</groupId>
-            <artifactId>maven-gpg-plugin</artifactId>
-            <version>1.1</version>
-            <executions>
-              <execution>
-                <id>sign-artifacts</id>
-                <phase>verify</phase>
-                <goals>
-                  <goal>sign</goal>
-                </goals>
-              </execution>
-            </executions>
-          </plugin>
-        </plugins>
-      </build>
-    </profile>
-  </profiles>
+    <profiles>
+        <!-- JDK9+ -->
+        <profile>
+            <id>java9</id>
+            <properties>
+                <argLine.common>-Xss256k -Xms512m -Xmx2G -Dio.atomix.whitelistPackages=io.atomix</argLine.common>
+                <argLine.extras>--add-modules jdk.unsupported --add-opens=java.base/java.nio=ALL-UNNAMED
+                </argLine.extras>
+                <argLine.javadocs>-html5</argLine.javadocs>
+                <!-- coverall version 4.3.0 does not work with java 9, see https://github.com/trautonen/coveralls-maven-plugin/issues/112 -->
+                <coveralls.skip>true</coveralls.skip>
+            </properties>
+            <activation>
+                <jdk>[1.9,)</jdk>
+            </activation>
+        </profile>
+        <profile>
+            <id>sonatype-oss-release</id>
+            <properties>
+                <dockerfile.version>${project.version}</dockerfile.version>
+            </properties>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-source-plugin</artifactId>
+                        <version>2.1.2</version>
+                        <executions>
+                            <execution>
+                                <id>attach-sources</id>
+                                <goals>
+                                    <goal>jar-no-fork</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-javadoc-plugin</artifactId>
+                        <version>2.7</version>
+                        <executions>
+                            <execution>
+                                <id>attach-javadocs</id>
+                                <goals>
+                                    <goal>jar</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-gpg-plugin</artifactId>
+                        <version>1.1</version>
+                        <executions>
+                            <execution>
+                                <id>sign-artifacts</id>
+                                <phase>verify</phase>
+                                <goals>
+                                    <goal>sign</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 
-  <licenses>
-    <license>
-      <name>Apache License, Version 2.0</name>
-      <url>http://apache.org/licenses/LICENSE-2.0</url>
-      <distribution>repo</distribution>
-    </license>
-  </licenses>
+    <licenses>
+        <license>
+            <name>Apache License, Version 2.0</name>
+            <url>http://apache.org/licenses/LICENSE-2.0</url>
+            <distribution>repo</distribution>
+        </license>
+    </licenses>
 
-  <developers>
-    <developer>
-      <name>Jordan Halterman</name>
-      <url>https://www.github.com/kuujo</url>
-    </developer>
-  </developers>
+    <developers>
+        <developer>
+            <name>Jordan Halterman</name>
+            <url>https://www.github.com/kuujo</url>
+        </developer>
+    </developers>
 
-  <scm>
-    <connection>scm:git:git@github.com:atomix/atomix.git</connection>
-    <developerConnection>scm:git:git@github.com:atomix/atomix.git</developerConnection>
-    <url>git@github.com:atomix/atomix.git</url>
-  </scm>
+    <scm>
+        <connection>scm:git:git@github.com:atomix/atomix.git</connection>
+        <developerConnection>scm:git:git@github.com:atomix/atomix.git</developerConnection>
+        <url>git@github.com:atomix/atomix.git</url>
+    </scm>
 
-  <issueManagement>
-    <system>GitHub</system>
-    <url>http://github.com/atomix/atomix/issues</url>
-  </issueManagement>
+    <issueManagement>
+        <system>GitHub</system>
+        <url>http://github.com/atomix/atomix/issues</url>
+    </issueManagement>
 
-  <modules>
-    <module>api</module>
-    <module>codegen</module>
-    <module>primitives</module>
-    <module>service</module>
-    <module>node</module>
-    <module>storage</module>
-    <module>utils</module>
-  </modules>
+    <modules>
+        <module>api</module>
+        <module>codegen</module>
+        <module>primitives</module>
+        <module>service</module>
+        <module>node</module>
+        <module>storage</module>
+        <module>utils</module>
+    </modules>
 
-  <dependencyManagement>
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>io.netty</groupId>
+                <artifactId>netty-bom</artifactId>
+                <version>${netty.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <dependency>
+                <groupId>com.fasterxml.jackson</groupId>
+                <artifactId>jackson-bom</artifactId>
+                <version>${jackson.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
     <dependencies>
-      <dependency>
-        <groupId>io.netty</groupId>
-        <artifactId>netty-bom</artifactId>
-        <version>${netty.version}</version>
-        <type>pom</type>
-        <scope>import</scope>
-      </dependency>
-      <dependency>
-        <groupId>com.fasterxml.jackson</groupId>
-        <artifactId>jackson-bom</artifactId>
-        <version>${jackson.version}</version>
-        <type>pom</type>
-        <scope>import</scope>
-      </dependency>
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+            <version>${slf4j.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>junit</groupId>
+            <artifactId>junit</artifactId>
+            <version>${junit.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.hamcrest</groupId>
+            <artifactId>hamcrest-all</artifactId>
+            <version>${hamcrest.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.google.guava</groupId>
+            <artifactId>guava-testlib</artifactId>
+            <version>${guava.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>net.jodah</groupId>
+            <artifactId>concurrentunit</artifactId>
+            <version>${concurrentunit.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.mockito</groupId>
+            <artifactId>mockito-core</artifactId>
+            <version>${mockito.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>ch.qos.logback</groupId>
+            <artifactId>logback-classic</artifactId>
+            <version>${logback.version}</version>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
-  </dependencyManagement>
 
-  <dependencies>
-    <dependency>
-      <groupId>org.slf4j</groupId>
-      <artifactId>slf4j-api</artifactId>
-      <version>${slf4j.version}</version>
-    </dependency>
-    <dependency>
-      <groupId>junit</groupId>
-      <artifactId>junit</artifactId>
-      <version>${junit.version}</version>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.hamcrest</groupId>
-      <artifactId>hamcrest-all</artifactId>
-      <version>${hamcrest.version}</version>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>com.google.guava</groupId>
-      <artifactId>guava-testlib</artifactId>
-      <version>${guava.version}</version>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>net.jodah</groupId>
-      <artifactId>concurrentunit</artifactId>
-      <version>${concurrentunit.version}</version>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.mockito</groupId>
-      <artifactId>mockito-core</artifactId>
-      <version>${mockito.version}</version>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>ch.qos.logback</groupId>
-      <artifactId>logback-classic</artifactId>
-      <version>${logback.version}</version>
-      <scope>test</scope>
-    </dependency>
-  </dependencies>
+    <build>
+        <pluginManagement>
+            <plugins>
+                <plugin>
+                    <groupId>org.codehaus.mojo</groupId>
+                    <artifactId>buildnumber-maven-plugin</artifactId>
+                    <version>1.4</version>
+                    <configuration>
+                        <revisionOnScmFailure>N/A</revisionOnScmFailure>
+                        <format>{0} (revision {1} built on {2,date,yyyy-MM-dd HH:mm:ss})</format>
+                        <items>
+                            <item>${project.version}</item>
+                            <item>scmVersion</item>
+                            <item>timestamp</item>
+                        </items>
+                        <shortRevisionLength>6</shortRevisionLength>
+                        <doCheck>false</doCheck>
+                        <doUpdate>false</doUpdate>
+                    </configuration>
+                    <executions>
+                        <execution>
+                            <id>configure-buildnumber</id>
+                            <phase>validate</phase>
+                            <goals>
+                                <goal>create</goal>
+                            </goals>
+                        </execution>
+                    </executions>
+                </plugin>
+            </plugins>
+        </pluginManagement>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>${maven.surefire.plugin.version}</version>
+                <configuration>
+                    <shutdown>kill</shutdown>
+                    <argLine>${argLine} ${argLine.extras} ${argLine.common}</argLine>
+                </configuration>
+            </plugin>
 
-  <build>
-    <pluginManagement>
-      <plugins>
-        <plugin>
-          <groupId>org.codehaus.mojo</groupId>
-          <artifactId>buildnumber-maven-plugin</artifactId>
-          <version>1.4</version>
-          <configuration>
-            <revisionOnScmFailure>N/A</revisionOnScmFailure>
-            <format>{0} (revision {1} built on {2,date,yyyy-MM-dd HH:mm:ss})</format>
-            <items>
-              <item>${project.version}</item>
-              <item>scmVersion</item>
-              <item>timestamp</item>
-            </items>
-            <shortRevisionLength>6</shortRevisionLength>
-            <doCheck>false</doCheck>
-            <doUpdate>false</doUpdate>
-          </configuration>
-          <executions>
-            <execution>
-              <id>configure-buildnumber</id>
-              <phase>validate</phase>
-              <goals>
-                <goal>create</goal>
-              </goals>
-            </execution>
-          </executions>
-        </plugin>
-      </plugins>
-    </pluginManagement>
-    <plugins>
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-surefire-plugin</artifactId>
-        <version>${maven.surefire.plugin.version}</version>
-        <configuration>
-          <shutdown>kill</shutdown>
-          <argLine>${argLine} ${argLine.extras} ${argLine.common}</argLine>
-        </configuration>
-      </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-source-plugin</artifactId>
+                <version>${maven.source.plugin.version}</version>
+                <executions>
+                    <execution>
+                        <id>attach-sources</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>jar-no-fork</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
 
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-source-plugin</artifactId>
-        <version>${maven.source.plugin.version}</version>
-        <executions>
-          <execution>
-            <id>attach-sources</id>
-            <phase>verify</phase>
-            <goals>
-              <goal>jar-no-fork</goal>
-            </goals>
-          </execution>
-        </executions>
-      </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>${maven.compiler.plugin.version}</version>
+                <configuration>
+                    <source>${java.version}</source>
+                    <target>${java.version}</target>
+                </configuration>
+            </plugin>
 
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-compiler-plugin</artifactId>
-        <version>${maven.compiler.plugin.version}</version>
-        <configuration>
-          <source>${java.version}</source>
-          <target>${java.version}</target>
-        </configuration>
-      </plugin>
+            <plugin>
+                <groupId>org.apache.felix</groupId>
+                <artifactId>maven-bundle-plugin</artifactId>
+                <version>${maven.bundle.plugin.version}</version>
+                <extensions>true</extensions>
+            </plugin>
 
-      <plugin>
-        <groupId>org.apache.felix</groupId>
-        <artifactId>maven-bundle-plugin</artifactId>
-        <version>${maven.bundle.plugin.version}</version>
-        <extensions>true</extensions>
-      </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-javadoc-plugin</artifactId>
+                <version>${maven.javadoc.plugin.version}</version>
+                <executions>
+                    <execution>
+                        <id>attach-javadocs</id>
+                        <goals>
+                            <goal>jar</goal>
+                        </goals>
+                    </execution>
+                </executions>
+                <configuration>
+                    <verbose>false</verbose>
+                    <!-- workaround for https://bugs.openjdk.java.net/browse/JDK-8212233 -->
+                    <javaApiLinks>
+                        <property>
+                            <name>foo</name>
+                            <value>bar</value>
+                        </property>
+                    </javaApiLinks>
+                    <quiet>true</quiet>
+                    <doclint>none</doclint>
+                    <additionalparam>${argLine.javadocs}</additionalparam>
+                    <show>public</show>
+                    <doctitle>Atomix API Reference (${jv})</doctitle>
+                    <windowtitle>Atomix API Reference (${jv})</windowtitle>
+                    <groups>
+                        <group>
+                            <title>Core</title>
+                            <packages>io.atomix.core*</packages>
+                        </group>
+                        <group>
+                            <title>Primitives</title>
+                            <packages>
+                                io.atomix.core.barrier:io.atomix.core.collection:io.atomix.client.counter:io.atomix.client.idgenerator:io.atomix.client.election:io.atomix.core.iterator:io.atomix.core.list:io.atomix.client.lock:io.atomix.client.map:io.atomix.core.multimap:io.atomix.core.multiset:io.atomix.core.queue:io.atomix.core.semaphore:io.atomix.client.set:io.atomix.client.transaction:io.atomix.core.tree:io.atomix.client.value:io.atomix.core.workqueue
+                            </packages>
+                        </group>
+                        <group>
+                            <title>Cluster Management</title>
+                            <packages>io.atomix.cluster*:io.atomix.cluster.discovery*:io.atomix.cluster.messaging*
+                            </packages>
+                        </group>
+                        <group>
+                            <title>Primitive API</title>
+                            <packages>
+                                io.atomix.primitive:io.atomix.primitive.config:io.atomix.primitive.event:io.io.atomix.node.service.operation:io.atomix.primitive.partition:io.io.atomix.node.service.proxy:io.atomix.primitive.resource:io.io.atomix.node.service.service:io.io.atomix.node.service.session
+                            </packages>
+                        </group>
+                        <group>
+                            <title>Protocol API</title>
+                            <packages>io.io.atomix.node.service.protocol*</packages>
+                        </group>
+                        <group>
+                            <title>Raft Protocol</title>
+                            <packages>io.atomix.protocols.raft*</packages>
+                        </group>
+                        <group>
+                            <title>Primary-Backup Protocol</title>
+                            <packages>io.atomix.protocols.backup*</packages>
+                        </group>
+                        <group>
+                            <title>Gossip Protocol</title>
+                            <packages>io.atomix.protocols.gossip</packages>
+                        </group>
+                        <group>
+                            <title>Storage</title>
+                            <packages>io.atomix.storage*</packages>
+                        </group>
+                        <group>
+                            <title>Utilities</title>
+                            <packages>io.atomix.utils*</packages>
+                        </group>
+                    </groups>
+                    <stylesheetfile>${basedir}/docs/style.css</stylesheetfile>
+                    <excludePackageNames>
+                        *.impl*:io.atomix.core.config.jackson:io.atomix.core.utils:io.atomix.rest*:io.atomix.agent*:io.atomix.storage.buffer:io.atomix.storage.journal*:io.atomix.storage.statistics:io.atomix.protocols.raft.utils:io.atomix.utils.serializer.serializers:io.atomix.utils.concurrent:io.atomix.utils.logging:io.atomix.utils.misc:io.atomix.utils.memory:io.atomix.protocols.raft.roles:io.atomix.protocols.raft.protocol:io.atomix.protocols.raft.storage:io.atomix.protocols.raft.cluster:io.atomix.protocols.raft.test:io.atomix.protocols.backup.roles:io.atomix.protocols.backup.protocol:io.atomix.protocols.gossip.*
+                    </excludePackageNames>
+                </configuration>
+            </plugin>
 
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-javadoc-plugin</artifactId>
-        <version>${maven.javadoc.plugin.version}</version>
-        <executions>
-          <execution>
-            <id>attach-javadocs</id>
-            <goals>
-              <goal>jar</goal>
-            </goals>
-          </execution>
-        </executions>
-        <configuration>
-          <verbose>false</verbose>
-          <!-- workaround for https://bugs.openjdk.java.net/browse/JDK-8212233 -->
-          <javaApiLinks>
-            <property>
-              <name>foo</name>
-              <value>bar</value>
-            </property>
-          </javaApiLinks>
-          <quiet>true</quiet>
-          <doclint>none</doclint>
-          <additionalparam>${argLine.javadocs}</additionalparam>
-          <show>public</show>
-          <doctitle>Atomix API Reference (${jv})</doctitle>
-          <windowtitle>Atomix API Reference (${jv})</windowtitle>
-          <groups>
-            <group>
-              <title>Core</title>
-              <packages>io.atomix.core*</packages>
-            </group>
-            <group>
-              <title>Primitives</title>
-              <packages>io.atomix.core.barrier:io.atomix.core.collection:io.atomix.client.counter:io.atomix.client.idgenerator:io.atomix.client.election:io.atomix.core.iterator:io.atomix.core.list:io.atomix.client.lock:io.atomix.client.map:io.atomix.core.multimap:io.atomix.core.multiset:io.atomix.core.queue:io.atomix.core.semaphore:io.atomix.client.set:io.atomix.client.transaction:io.atomix.core.tree:io.atomix.client.value:io.atomix.core.workqueue</packages>
-            </group>
-            <group>
-              <title>Cluster Management</title>
-              <packages>io.atomix.cluster*:io.atomix.cluster.discovery*:io.atomix.cluster.messaging*</packages>
-            </group>
-            <group>
-              <title>Primitive API</title>
-              <packages>io.atomix.primitive:io.atomix.primitive.config:io.atomix.primitive.event:io.io.atomix.node.service.operation:io.atomix.primitive.partition:io.io.atomix.node.service.proxy:io.atomix.primitive.resource:io.io.atomix.node.service.service:io.io.atomix.node.service.session</packages>
-            </group>
-            <group>
-              <title>Protocol API</title>
-              <packages>io.io.atomix.node.service.protocol*</packages>
-            </group>
-            <group>
-              <title>Raft Protocol</title>
-              <packages>io.atomix.protocols.raft*</packages>
-            </group>
-            <group>
-              <title>Primary-Backup Protocol</title>
-              <packages>io.atomix.protocols.backup*</packages>
-            </group>
-            <group>
-              <title>Gossip Protocol</title>
-              <packages>io.atomix.protocols.gossip</packages>
-            </group>
-            <group>
-              <title>Storage</title>
-              <packages>io.atomix.storage*</packages>
-            </group>
-            <group>
-              <title>Utilities</title>
-              <packages>io.atomix.utils*</packages>
-            </group>
-          </groups>
-          <stylesheetfile>${basedir}/docs/style.css</stylesheetfile>
-          <excludePackageNames>*.impl*:io.atomix.core.config.jackson:io.atomix.core.utils:io.atomix.rest*:io.atomix.agent*:io.atomix.storage.buffer:io.atomix.storage.journal*:io.atomix.storage.statistics:io.atomix.protocols.raft.utils:io.atomix.utils.serializer.serializers:io.atomix.utils.concurrent:io.atomix.utils.logging:io.atomix.utils.misc:io.atomix.utils.memory:io.atomix.protocols.raft.roles:io.atomix.protocols.raft.protocol:io.atomix.protocols.raft.storage:io.atomix.protocols.raft.cluster:io.atomix.protocols.raft.test:io.atomix.protocols.backup.roles:io.atomix.protocols.backup.protocol:io.atomix.protocols.gossip.*
-          </excludePackageNames>
-        </configuration>
-      </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-release-plugin</artifactId>
+                <version>2.1</version><!--$NO-MVN-MAN-VER$ -->
+                <configuration>
+                    <allowTimestampedSnapshots>true</allowTimestampedSnapshots>
+                    <arguments>-Psonatype-oss-release -DskipTests=${env.SKIP_TESTS}</arguments>
+                </configuration>
+            </plugin>
 
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-release-plugin</artifactId>
-        <version>2.1</version><!--$NO-MVN-MAN-VER$ -->
-        <configuration>
-          <allowTimestampedSnapshots>true</allowTimestampedSnapshots>
-          <arguments>-Psonatype-oss-release -DskipTests=${env.SKIP_TESTS}</arguments>
-        </configuration>
-      </plugin>
+            <!-- Coding standards -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-checkstyle-plugin</artifactId>
+                <version>3.0.0</version>
+                <configuration>
+                    <configLocation>src/main/resources/checkstyle.xml</configLocation>
+                    <includeTestSourceDirectory>true</includeTestSourceDirectory>
+                    <consoleOutput>true</consoleOutput>
+                </configuration>
+                <executions>
+                    <execution>
+                        <phase>validate</phase>
+                        <goals>
+                            <goal>check</goal>
+                        </goals>
+                        <configuration>
+                            <failsOnError>true</failsOnError>
+                            <failOnViolation>true</failOnViolation>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
 
-      <!-- Coding standards -->
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-checkstyle-plugin</artifactId>
-        <version>3.0.0</version>
-        <configuration>
-          <configLocation>src/main/resources/checkstyle.xml</configLocation>
-          <includeTestSourceDirectory>true</includeTestSourceDirectory>
-          <consoleOutput>true</consoleOutput>
-        </configuration>
-        <executions>
-          <execution>
-            <phase>validate</phase>
-            <goals>
-              <goal>check</goal>
-            </goals>
-            <configuration>
-              <failsOnError>true</failsOnError>
-              <failOnViolation>true</failOnViolation>
-            </configuration>
-          </execution>
-        </executions>
-      </plugin>
-
-      <!-- Coverage -->
-      <plugin>
-        <groupId>org.eluder.coveralls</groupId>
-        <artifactId>coveralls-maven-plugin</artifactId>
-        <version>4.3.0</version>
-      </plugin>
-      <plugin>
-        <groupId>org.jacoco</groupId>
-        <artifactId>jacoco-maven-plugin</artifactId>
-        <version>0.8.2</version>
-        <executions>
-          <execution>
-            <id>prepare-agent</id>
-            <goals>
-              <goal>prepare-agent</goal>
-            </goals>
-          </execution>
-        </executions>
-      </plugin>
-    </plugins>
-  </build>
+            <!-- Coverage -->
+            <plugin>
+                <groupId>org.eluder.coveralls</groupId>
+                <artifactId>coveralls-maven-plugin</artifactId>
+                <version>4.3.0</version>
+            </plugin>
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <version>0.8.2</version>
+                <executions>
+                    <execution>
+                        <id>prepare-agent</id>
+                        <goals>
+                            <goal>prepare-agent</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
 </project>
