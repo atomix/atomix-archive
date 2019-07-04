@@ -15,34 +15,29 @@
  */
 package io.atomix.node.service.client;
 
+import java.util.Collection;
+import java.util.concurrent.CompletableFuture;
+
 import io.atomix.node.service.protocol.ServiceId;
 
 /**
- * Client factory.
+ * Metadata client.
  */
-public interface ClientFactory {
+public interface MetadataClient {
 
     /**
-     * Returns a new metadata client.
+     * Returns a collection of all services.
      *
-     * @return a new metadata client
+     * @return a collection of all services
      */
-    MetadataClient newMetadataClient();
+    CompletableFuture<Collection<ServiceId>> getServices();
 
     /**
-     * Returns a new service client.
+     * Returns a collection of services of the given type.
      *
-     * @param serviceId the service ID
-     * @return the service client
+     * @param type the service type
+     * @return the services of the given type
      */
-    ServiceClient newServiceClient(ServiceId serviceId);
-
-    /**
-     * Returns a new session client.
-     *
-     * @param serviceId the service ID
-     * @return the session client
-     */
-    SessionClient newSessionClient(ServiceId serviceId);
+    CompletableFuture<Collection<ServiceId>> getServices(String type);
 
 }

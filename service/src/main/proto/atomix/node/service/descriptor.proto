@@ -41,3 +41,8 @@ message ServiceOperationInfo {
 extend google.protobuf.MethodOptions {
     ServiceOperationInfo operation = 50003;
 }
+
+message ServiceInfo {
+    string name = 1;
+    string type = 2;
+}

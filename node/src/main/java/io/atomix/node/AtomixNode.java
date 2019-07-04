@@ -27,6 +27,7 @@ import io.atomix.node.management.impl.ConfigServiceImpl;
 import io.atomix.node.management.impl.ProtocolManager;
 import io.atomix.node.primitive.counter.CounterServiceImpl;
 import io.atomix.node.primitive.election.LeaderElectionServiceImpl;
+import io.atomix.node.primitive.impl.PrimitiveServiceImpl;
 import io.atomix.node.primitive.list.ListServiceImpl;
 import io.atomix.node.primitive.lock.LockServiceImpl;
 import io.atomix.node.primitive.log.LogServiceImpl;
@@ -36,9 +37,11 @@ import io.atomix.node.primitive.value.ValueServiceImpl;
 import io.atomix.node.protocol.LogProtocol;
 import io.atomix.node.protocol.Protocol;
 import io.atomix.node.protocol.ServiceProtocol;
+import io.atomix.node.protocol.impl.DefaultMetadataClient;
 import io.atomix.node.protocol.impl.DefaultServiceClient;
 import io.atomix.node.protocol.impl.DefaultSessionClient;
 import io.atomix.node.service.client.ClientFactory;
+import io.atomix.node.service.client.MetadataClient;
 import io.atomix.node.service.client.ServiceClient;
 import io.atomix.node.service.client.SessionClient;
 import io.atomix.node.service.protocol.ServiceId;
@@ -120,6 +123,11 @@ public class AtomixNode {
                     ServiceProtocol serviceProtocol = (ServiceProtocol) protocol;
                     ClientFactory factory = new ClientFactory() {
                         @Override
+                        public MetadataClient newMetadataClient() {
+                            return new DefaultMetadataClient(serviceProtocol.getServiceClient());
+                        }
+
+                        @Override
                         public ServiceClient newServiceClient(ServiceId serviceId) {
                             return new DefaultServiceClient(serviceId, serviceProtocol.getServiceClient());
                         }
@@ -129,6 +137,7 @@ public class AtomixNode {
                             return new DefaultSessionClient(serviceId, serviceProtocol.getServiceClient());
                         }
                     };
+                    protocolManager.getServiceRegistry().register(new PrimitiveServiceImpl(factory));
                     protocolManager.getServiceRegistry().register(new CounterServiceImpl(factory));
                     protocolManager.getServiceRegistry().register(new LeaderElectionServiceImpl(factory));
                     protocolManager.getServiceRegistry().register(new ListServiceImpl(factory));

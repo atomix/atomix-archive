@@ -18,10 +18,13 @@ package io.atomix.node.service.impl;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.stream.Collectors;
 
+import com.google.common.base.Strings;
 import com.google.protobuf.ByteString;
 import io.atomix.node.service.Command;
 import io.atomix.node.service.PrimitiveService;
@@ -34,6 +37,7 @@ import io.atomix.node.service.protocol.DeleteResponse;
 import io.atomix.node.service.protocol.ServiceId;
 import io.atomix.node.service.protocol.ServiceRequest;
 import io.atomix.node.service.protocol.ServiceResponse;
+import io.atomix.node.service.protocol.MetadataResponse;
 import io.atomix.node.service.util.ByteArrayDecoder;
 import io.atomix.utils.concurrent.Futures;
 import io.atomix.utils.stream.StreamHandler;
@@ -43,7 +47,7 @@ import io.atomix.utils.stream.StreamHandler;
  */
 public class ServiceManagerStateMachine implements StateMachine {
     private final ServiceTypeRegistry serviceTypes;
-    private final Map<String, ServiceStateMachine> services = new HashMap<>();
+    private final Map<ServiceId, ServiceStateMachine> services = new HashMap<>();
     private Context context;
 
     public ServiceManagerStateMachine(ServiceTypeRegistry serviceTypes) {
@@ -72,7 +76,7 @@ public class ServiceManagerStateMachine implements StateMachine {
         services.clear();
         while (input.available() > 0) {
             ServiceId serviceId = ServiceId.parseDelimitedFrom(input);
-            services.put(serviceId.getName(), newService(serviceId));
+            services.put(serviceId, newService(serviceId));
         }
     }
 
@@ -98,7 +102,7 @@ public class ServiceManagerStateMachine implements StateMachine {
     public CompletableFuture<byte[]> apply(Command<byte[]> command) {
         Command<ServiceRequest> serviceCommand = command.map(bytes -> ByteArrayDecoder.decode(bytes, ServiceRequest::parseFrom));
         ServiceId id = serviceCommand.value().getId();
-        ServiceStateMachine service = services.computeIfAbsent(id.getName(), name -> newService(id));
+        ServiceStateMachine service = services.computeIfAbsent(id, name -> newService(id));
 
         // If the service is being created, just return an empty response.
         if (serviceCommand.value().hasCreate()) {
@@ -110,7 +114,7 @@ public class ServiceManagerStateMachine implements StateMachine {
 
         // If the service is being deleted, remove the service and return an empty response.
         if (serviceCommand.value().hasDelete()) {
-            services.remove(id.getName());
+            services.remove(id);
             return CompletableFuture.completedFuture(ServiceResponse.newBuilder()
                 .setDelete(DeleteResponse.newBuilder().build())
                 .build()
@@ -128,7 +132,7 @@ public class ServiceManagerStateMachine implements StateMachine {
     public CompletableFuture<Void> apply(Command<byte[]> command, StreamHandler<byte[]> handler) {
         Command<ServiceRequest> serviceCommand = command.map(bytes -> ByteArrayDecoder.decode(bytes, ServiceRequest::parseFrom));
         ServiceId id = serviceCommand.value().getId();
-        ServiceStateMachine service = services.computeIfAbsent(id.getName(), name -> newService(id));
+        ServiceStateMachine service = services.computeIfAbsent(id, i -> newService(id));
         return service.apply(serviceCommand.map(request -> request.getCommand().toByteArray()), new StreamHandler<byte[]>() {
             @Override
             public void next(byte[] response) {
@@ -153,8 +157,27 @@ public class ServiceManagerStateMachine implements StateMachine {
     @Override
     public CompletableFuture<byte[]> apply(Query<byte[]> query) {
         Query<ServiceRequest> serviceQuery = query.map(bytes -> ByteArrayDecoder.decode(bytes, ServiceRequest::parseFrom));
+
+        if (serviceQuery.value().hasMetadata()) {
+            String type = serviceQuery.value().getMetadata().getType();
+            Collection<ServiceId> services;
+            if (Strings.isNullOrEmpty(type)) {
+                services = this.services.keySet();
+            } else {
+                services = this.services.keySet().stream()
+                    .filter(id -> id.getType().equals(type))
+                    .collect(Collectors.toList());
+            }
+            return CompletableFuture.completedFuture(ServiceResponse.newBuilder()
+                .setMetadata(MetadataResponse.newBuilder()
+                    .addAllServices(services)
+                    .build())
+                .build()
+                .toByteArray());
+        }
+
         ServiceId id = serviceQuery.value().getId();
-        ServiceStateMachine service = services.get(id.getName());
+        ServiceStateMachine service = services.get(id);
         if (service == null) {
             service = newService(id);
         }
@@ -169,7 +192,7 @@ public class ServiceManagerStateMachine implements StateMachine {
     public CompletableFuture<Void> apply(Query<byte[]> query, StreamHandler<byte[]> handler) {
         Query<ServiceRequest> serviceQuery = query.map(bytes -> ByteArrayDecoder.decode(bytes, ServiceRequest::parseFrom));
         ServiceId id = serviceQuery.value().getId();
-        ServiceStateMachine service = services.get(id.getName());
+        ServiceStateMachine service = services.get(id);
         if (service == null) {
             return Futures.exceptionalFuture(new ServiceException.UnknownService());
         }
