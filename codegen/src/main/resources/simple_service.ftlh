@@ -15,8 +15,8 @@
  */
 package ${serviceClass.packageName};
 
-import io.atomix.service.ServiceOperationRegistry;
-import io.atomix.service.SimplePrimitiveService;
+import io.atomix.node.service.ServiceOperationRegistry;
+import io.atomix.node.service.SimplePrimitiveService;
 <#if hasStreams>
 import io.atomix.utils.stream.StreamHandler;
 </#if>

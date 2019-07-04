@@ -1,0 +1,327 @@
+// Copyright 2019-present Open Networking Foundation
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+syntax = "proto3";
+
+package atomix.node.primitive.map;
+
+import "atomix/node/service/descriptor.proto";
+
+option java_package = "io.atomix.node.primitive.map";
+option java_outer_classname = "AtomicMapProto";
+option java_multiple_files = true;
+
+// Atomic map snapshot
+message AtomicMapSnapshot {
+    repeated string prepared_keys = 1;
+    map<string, AtomicMapEntryValue> entries = 2;
+    map<string, AtomicMapTransaction> transactions = 3;
+    int64 version = 4;
+}
+
+// Atomic map entry value
+message AtomicMapEntryValue {
+    Type type = 1;
+    int64 version = 2;
+    bytes value = 3;
+    int64 created = 4;
+    int64 ttl = 5;
+
+    enum Type {
+        VALUE = 0;
+        TOMBSTONE = 1;
+    }
+}
+
+// Atomic map transaction
+message AtomicMapTransaction {
+    int64 version = 1;
+    repeated AtomicMapUpdate updates = 2;
+}
+
+// Transaction update
+message AtomicMapUpdate {
+    Type type = 1;
+    string key = 2;
+    bytes value = 3;
+    int64 version = 4;
+
+    enum Type {
+        LOCK = 0;
+        VERSION_MATCH = 1;
+        PUT_IF_VERSION_MATCH = 2;
+        REMOVE_IF_VERSION_MATCH = 3;
+        PUT_IF_ABSENT = 4;
+    }
+}
+
+message ContainsKeyRequest {
+    repeated string keys = 1;
+}
+
+message ContainsKeyResponse {
+    bool contains_key = 1;
+}
+
+message SizeRequest {
+
+}
+
+message SizeResponse {
+    int32 size = 1;
+}
+
+message KeysRequest {
+
+}
+
+message KeysResponse {
+    string key = 1;
+}
+
+message EntriesRequest {
+
+}
+
+message EntriesResponse {
+    string key = 1;
+    bytes value = 2;
+    int64 version = 3;
+}
+
+message PutRequest {
+    string key = 1;
+    bytes value = 2;
+    int64 version = 3;
+    int64 ttl = 4;
+}
+
+message PutResponse {
+    UpdateStatus status = 1;
+    bytes previous_value = 2;
+    int64 previous_version = 3;
+    int64 new_version = 4;
+}
+
+message ReplaceRequest {
+    string key = 1;
+    bytes previous_value = 2;
+    int64 previous_version = 3;
+    bytes new_value = 4;
+    int64 ttl = 5;
+}
+
+message ReplaceResponse {
+    UpdateStatus status = 1;
+    bytes previous_value = 2;
+    int64 previous_version = 3;
+    int64 new_version = 4;
+}
+
+message GetRequest {
+    string key = 1;
+}
+
+message GetResponse {
+    bytes value = 1;
+    int64 version = 2;
+}
+
+message RemoveRequest {
+    string key = 1;
+    bytes value = 2;
+    int64 version = 3;
+}
+
+message RemoveResponse {
+    UpdateStatus status = 1;
+    bytes previous_value = 2;
+    int64 previous_version = 3;
+}
+
+message ClearRequest {
+}
+
+message ClearResponse {
+}
+
+message ListenRequest {
+
+}
+
+message ListenResponse {
+    Type type = 1;
+    string key = 2;
+    bytes old_value = 3;
+    int64 old_version = 4;
+    bytes new_value = 5;
+    int64 new_version = 6;
+
+    enum Type {
+        INSERTED = 0;
+        UPDATED = 1;
+        REMOVED = 2;
+    }
+}
+
+message UnlistenRequest {
+    int64 stream_id = 1;
+}
+
+message UnlistenResponse {
+}
+
+enum UpdateStatus {
+    OK = 0;
+    NOOP = 1;
+    WRITE_LOCK = 2;
+    PRECONDITION_FAILED = 3;
+}
+
+message PrepareRequest {
+    string transaction_id = 1;
+    AtomicMapTransaction transaction = 2;
+}
+
+message PrepareResponse {
+    Status status = 1;
+
+    enum Status {
+        OK = 0;
+        PARTIAL_FAILURE = 1;
+        CONCURRENT_TRANSACTION = 2;
+        OPTIMISTIC_LOCK_FAILURE = 3;
+    }
+}
+
+message CommitRequest {
+    string transaction_id = 1;
+}
+
+message CommitResponse {
+    Status status = 1;
+
+    enum Status {
+        OK = 0;
+        UNKNOWN_TRANSACTION_ID = 1;
+        FAILURE_TO_PREPARE = 2;
+        FAILURE_DURING_COMMIT = 3;
+    }
+}
+
+message RollbackRequest {
+    string transaction_id = 1;
+}
+
+message RollbackResponse {
+    Status status = 1;
+
+    enum Status {
+        OK = 0;
+        UNKNOWN_TRANSACTION_ID = 1;
+    }
+}
+
+// Map service
+service MapService {
+    rpc Size(SizeRequest) returns (SizeResponse) {
+        option (atomix.node.service.operation) = {
+            name: "size"
+            type: QUERY
+        };
+    }
+    rpc Keys(KeysRequest) returns (stream KeysResponse) {
+        option (atomix.node.service.operation) = {
+            name: "keys"
+            type: QUERY
+        };
+    }
+    rpc Entries(EntriesRequest) returns (stream EntriesResponse) {
+        option (atomix.node.service.operation) = {
+            name: "entries"
+            type: QUERY
+        };
+    }
+    rpc ContainsKey(ContainsKeyRequest) returns (ContainsKeyResponse) {
+        option (atomix.node.service.operation) = {
+            name: "containsKey"
+            type: QUERY
+        };
+    }
+    rpc Put(PutRequest) returns (PutResponse) {
+        option (atomix.node.service.operation) = {
+            name: "put"
+            type: COMMAND
+        };
+    }
+    rpc Replace(ReplaceRequest) returns (ReplaceResponse) {
+        option (atomix.node.service.operation) = {
+            name: "replace"
+            type: COMMAND
+        };
+    }
+    rpc Get(GetRequest) returns (GetResponse) {
+        option (atomix.node.service.operation) = {
+            name: "get"
+            type: QUERY
+        };
+    }
+    rpc Remove(RemoveRequest) returns (RemoveResponse) {
+        option (atomix.node.service.operation) = {
+            name: "remove"
+            type: COMMAND
+        };
+    }
+    rpc Clear(ClearRequest) returns (ClearResponse) {
+        option (atomix.node.service.operation) = {
+            name: "clear"
+            type: COMMAND
+        };
+    }
+    rpc Listen(ListenRequest) returns (stream ListenResponse) {
+        option (atomix.node.service.operation) = {
+            name: "listen"
+            type: COMMAND
+        };
+    }
+    rpc Unlisten(UnlistenRequest) returns (UnlistenResponse) {
+        option (atomix.node.service.operation) = {
+            name: "unlisten"
+            type: COMMAND
+        };
+    }
+    rpc Prepare(PrepareRequest) returns (PrepareResponse) {
+        option (atomix.node.service.operation) = {
+            name: "prepare"
+            type: COMMAND
+        };
+    }
+    rpc PrepareAndCommit(PrepareRequest) returns (PrepareResponse) {
+        option (atomix.node.service.operation) = {
+            name: "prepareAndCommit"
+            type: COMMAND
+        };
+    }
+    rpc Commit(CommitRequest) returns (CommitResponse) {
+        option (atomix.node.service.operation) = {
+            name: "commit"
+            type: COMMAND
+        };
+    }
+    rpc Rollback(RollbackRequest) returns (RollbackResponse) {
+        option (atomix.node.service.operation) = {
+            name: "rollback"
+            type: COMMAND
+        };
+    }
+}

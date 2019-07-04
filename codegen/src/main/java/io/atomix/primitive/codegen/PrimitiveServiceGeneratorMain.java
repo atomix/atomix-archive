@@ -25,7 +25,7 @@ import com.google.common.io.ByteStreams;
 import com.google.protobuf.Descriptors;
 import com.google.protobuf.ExtensionRegistryLite;
 import com.google.protobuf.compiler.PluginProtos;
-import io.atomix.service.ServiceDescriptorProto;
+import io.atomix.node.service.ServiceDescriptorProto;
 
 /**
  * Primitive service generator main.

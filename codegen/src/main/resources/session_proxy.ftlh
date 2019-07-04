@@ -15,18 +15,18 @@
  */
 package ${proxyClass.packageName};
 
-import io.atomix.service.proxy.SessionEnabledServiceProxy;
-import io.atomix.service.protocol.ServiceId;
-import io.atomix.service.client.SessionClient;
-import io.atomix.service.protocol.SessionResponseContext;
+import io.atomix.node.service.proxy.SessionEnabledServiceProxy;
+import io.atomix.node.service.protocol.ServiceId;
+import io.atomix.node.service.client.SessionClient;
+import io.atomix.node.service.protocol.SessionResponseContext;
 <#if hasCommands>
-import io.atomix.service.protocol.SessionCommandContext;
+import io.atomix.node.service.protocol.SessionCommandContext;
 </#if>
 <#if hasQueries>
-import io.atomix.service.protocol.SessionQueryContext;
+import io.atomix.node.service.protocol.SessionQueryContext;
 </#if>
 <#if hasStreams>
-import io.atomix.service.protocol.SessionStreamContext;
+import io.atomix.node.service.protocol.SessionStreamContext;
 import io.atomix.utils.stream.StreamHandler;
 </#if>
 import io.atomix.utils.concurrent.ThreadContext;

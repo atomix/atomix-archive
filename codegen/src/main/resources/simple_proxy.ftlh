@@ -15,14 +15,14 @@
  */
 package ${proxyClass.packageName};
 
-import io.atomix.service.client.ServiceClient;
-import io.atomix.service.protocol.ServiceId;
-import io.atomix.service.protocol.RequestContext;
-import io.atomix.service.protocol.ResponseContext;
-import io.atomix.service.proxy.SimpleServiceProxy;
+import io.atomix.node.service.client.ServiceClient;
+import io.atomix.node.service.protocol.ServiceId;
+import io.atomix.node.service.protocol.RequestContext;
+import io.atomix.node.service.protocol.ResponseContext;
+import io.atomix.node.service.proxy.SimpleServiceProxy;
 <#if hasStreams>
 import io.atomix.utils.stream.StreamHandler;
-import io.atomix.service.protocol.StreamContext;
+import io.atomix.node.service.protocol.StreamContext;
 </#if>
 import io.atomix.utils.concurrent.ThreadContext;
 

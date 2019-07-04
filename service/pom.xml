@@ -88,7 +88,7 @@
         <configuration>
           <instructions>
             <Export-Package>
-              io.atomix.service.*
+                io.io.atomix.node.service.*
             </Export-Package>
             <Import-Package>
               !sun.nio.ch,!sun.misc,*

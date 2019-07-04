@@ -1,0 +1,110 @@
+// Copyright 2019-present Open Networking Foundation
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+syntax = "proto3";
+
+package atomix.node.service.protocol;
+
+option java_package = "io.atomix.node.service.protocol";
+option java_outer_classname = "ServiceProto";
+option java_multiple_files = true;
+
+message ServiceId {
+    string type = 1;
+    string name = 2;
+    string namespace = 3;
+}
+
+message ServiceSnapshot {
+    uint64 index = 1;
+    bytes snapshot = 2;
+}
+
+// Simple service snapshot
+message SimpleServiceSnapshot {
+    int64 index = 4;
+    int64 timestamp = 5;
+}
+
+message ServiceRequest {
+    ServiceId id = 1;
+    oneof request {
+        CreateRequest create = 2;
+        DeleteRequest delete = 3;
+        bytes command = 4;
+        bytes query = 5;
+    }
+}
+
+message ServiceResponse {
+    oneof response {
+        CreateResponse create = 1;
+        DeleteResponse delete = 2;
+        bytes command = 3;
+        bytes query = 4;
+    }
+}
+
+message CreateRequest {
+
+}
+
+message CreateResponse {
+
+}
+
+message DeleteRequest {
+
+}
+
+message DeleteResponse {
+
+}
+
+message CommandRequest {
+    RequestContext context = 1;
+    string name = 2;
+    bytes command = 3;
+}
+
+message CommandResponse {
+    ResponseContext context = 1;
+    bytes output = 2;
+}
+
+message QueryRequest {
+    RequestContext context = 1;
+    string name = 2;
+    bytes query = 3;
+}
+
+message QueryResponse {
+    ResponseContext context = 1;
+    bytes output = 2;
+}
+
+message RequestContext {
+    uint64 index = 1;
+}
+
+message ResponseContext {
+    uint64 index = 1;
+}
+
+message StreamResponse {
+    StreamContext context = 1;
+    bytes output = 2;
+}
+message StreamContext {
+    uint64 index = 1;
+}

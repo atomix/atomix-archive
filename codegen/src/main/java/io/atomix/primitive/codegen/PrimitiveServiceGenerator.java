@@ -31,9 +31,9 @@ import com.google.protobuf.compiler.PluginProtos;
 import freemarker.template.Configuration;
 import freemarker.template.Template;
 import freemarker.template.TemplateException;
-import io.atomix.service.ServiceDescriptorProto;
-import io.atomix.service.ServiceTypeInfo;
-import io.atomix.service.operation.OperationType;
+import io.atomix.node.service.ServiceDescriptorProto;
+import io.atomix.node.service.ServiceTypeInfo;
+import io.atomix.node.service.operation.OperationType;
 import org.apache.commons.lang3.tuple.Pair;
 
 /**

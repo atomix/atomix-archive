@@ -183,8 +183,9 @@
   <modules>
     <module>api</module>
     <module>codegen</module>
+    <module>primitives</module>
     <module>service</module>
-    <module>server</module>
+    <module>node</module>
     <module>storage</module>
     <module>utils</module>
   </modules>
@@ -368,11 +369,11 @@
             </group>
             <group>
               <title>Primitive API</title>
-              <packages>io.atomix.primitive:io.atomix.primitive.config:io.atomix.primitive.event:io.atomix.service.operation:io.atomix.primitive.partition:io.atomix.service.proxy:io.atomix.primitive.resource:io.atomix.service.service:io.atomix.service.session</packages>
+              <packages>io.atomix.primitive:io.atomix.primitive.config:io.atomix.primitive.event:io.io.atomix.node.service.operation:io.atomix.primitive.partition:io.io.atomix.node.service.proxy:io.atomix.primitive.resource:io.io.atomix.node.service.service:io.io.atomix.node.service.session</packages>
             </group>
             <group>
               <title>Protocol API</title>
-              <packages>io.atomix.service.protocol*</packages>
+              <packages>io.io.atomix.node.service.protocol*</packages>
             </group>
             <group>
               <title>Raft Protocol</title>
