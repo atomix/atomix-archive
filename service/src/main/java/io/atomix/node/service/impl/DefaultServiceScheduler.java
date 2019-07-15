@@ -24,7 +24,7 @@ import java.util.Queue;
 import java.util.concurrent.Executor;
 
 import io.atomix.node.service.operation.OperationType;
-import io.atomix.node.service.PrimitiveService;
+import io.atomix.node.service.PrimitiveStateMachine;
 import io.atomix.utils.concurrent.Scheduled;
 import io.atomix.utils.concurrent.Scheduler;
 import org.slf4j.Logger;
@@ -37,14 +37,14 @@ import static com.google.common.base.Preconditions.checkState;
  * Service scheduler.
  */
 public class DefaultServiceScheduler implements Scheduler, Executor {
-    private final PrimitiveService.Context context;
+    private final PrimitiveStateMachine.Context context;
     private final Logger log;
     private final Queue<Runnable> tasks = new LinkedList<>();
     private final List<ScheduledTask> scheduledTasks = new ArrayList<>();
     private final List<ScheduledTask> complete = new ArrayList<>();
     private long timestamp;
 
-    public DefaultServiceScheduler(PrimitiveService.Context context) {
+    public DefaultServiceScheduler(PrimitiveStateMachine.Context context) {
         this.context = context;
         this.log = context.getLogger();
     }

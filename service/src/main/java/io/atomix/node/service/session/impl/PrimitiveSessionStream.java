@@ -19,7 +19,7 @@ import java.util.LinkedList;
 import java.util.Queue;
 
 import com.google.protobuf.ByteString;
-import io.atomix.node.service.PrimitiveService;
+import io.atomix.node.service.PrimitiveStateMachine;
 import io.atomix.node.service.impl.StreamCodec;
 import io.atomix.node.service.operation.OperationType;
 import io.atomix.node.service.operation.StreamType;
@@ -39,7 +39,7 @@ public class PrimitiveSessionStream<T> implements SessionStreamHandler<T> {
     private final StreamType<T> streamType;
     private final StreamCodec<T> codec;
     private final PrimitiveStreamRegistry registry;
-    private final PrimitiveService.Context context;
+    private final PrimitiveStateMachine.Context context;
     private StreamHandler<SessionStreamResponse> handler;
     private long currentSequence;
     private long completeSequence;
@@ -52,7 +52,7 @@ public class PrimitiveSessionStream<T> implements SessionStreamHandler<T> {
         StreamType<T> streamType,
         StreamCodec<T> codec,
         PrimitiveStreamRegistry registry,
-        PrimitiveService.Context context) {
+        PrimitiveStateMachine.Context context) {
         this.streamId = streamId;
         this.streamType = streamType;
         this.codec = codec;

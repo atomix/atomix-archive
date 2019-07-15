@@ -20,7 +20,7 @@ import io.atomix.utils.NamedType;
 /**
  * Base class for user-provided services.
  */
-public interface PrimitiveService extends StateMachine {
+public interface PrimitiveStateMachine extends StateMachine {
 
     /**
      * Service type.
@@ -32,7 +32,7 @@ public interface PrimitiveService extends StateMachine {
          *
          * @return the service instance
          */
-        PrimitiveService newService();
+        PrimitiveStateMachine newService();
     }
 
     /**

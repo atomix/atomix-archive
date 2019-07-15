@@ -18,7 +18,7 @@ package io.atomix.node.primitive.util;
 import java.util.function.Function;
 
 import io.atomix.api.primitive.Name;
-import io.atomix.node.service.PrimitiveService;
+import io.atomix.node.service.PrimitiveStateMachine;
 import io.atomix.node.service.protocol.ServiceId;
 import io.atomix.node.service.proxy.ServiceProxy;
 
@@ -26,11 +26,11 @@ import io.atomix.node.service.proxy.ServiceProxy;
  * Primitive executor.
  */
 public class PrimitiveFactory<P extends ServiceProxy> {
-    private final PrimitiveService.Type serviceType;
+    private final PrimitiveStateMachine.Type serviceType;
     private final Function<ServiceId, P> primitiveFactory;
 
     public PrimitiveFactory(
-        PrimitiveService.Type serviceType,
+        PrimitiveStateMachine.Type serviceType,
         Function<ServiceId, P> primitiveFactory) {
         this.serviceType = serviceType;
         this.primitiveFactory = primitiveFactory;

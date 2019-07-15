@@ -15,322 +15,270 @@
  */
 package io.atomix.node.primitive.set;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.ConcurrentSkipListSet;
-import java.util.concurrent.CopyOnWriteArraySet;
+import java.time.Duration;
+import java.util.stream.Collectors;
 
-import com.google.common.collect.Sets;
-import io.atomix.node.service.PrimitiveService;
-import io.atomix.utils.component.Component;
-import io.atomix.utils.stream.StreamHandler;
+import io.atomix.api.headers.ResponseHeader;
+import io.atomix.api.headers.StreamHeader;
+import io.atomix.api.set.AddRequest;
+import io.atomix.api.set.AddResponse;
+import io.atomix.api.set.ClearRequest;
+import io.atomix.api.set.ClearResponse;
+import io.atomix.api.set.CloseRequest;
+import io.atomix.api.set.CloseResponse;
+import io.atomix.api.set.ContainsRequest;
+import io.atomix.api.set.ContainsResponse;
+import io.atomix.api.set.CreateRequest;
+import io.atomix.api.set.CreateResponse;
+import io.atomix.api.set.EventRequest;
+import io.atomix.api.set.EventResponse;
+import io.atomix.api.set.IterateRequest;
+import io.atomix.api.set.IterateResponse;
+import io.atomix.api.set.KeepAliveRequest;
+import io.atomix.api.set.KeepAliveResponse;
+import io.atomix.api.set.RemoveRequest;
+import io.atomix.api.set.RemoveResponse;
+import io.atomix.api.set.SetServiceGrpc;
+import io.atomix.api.set.SizeRequest;
+import io.atomix.api.set.SizeResponse;
+import io.atomix.node.primitive.util.PrimitiveFactory;
+import io.atomix.node.primitive.util.RequestExecutor;
+import io.atomix.node.service.client.ClientFactory;
+import io.atomix.node.service.protocol.CloseSessionRequest;
+import io.atomix.node.service.protocol.OpenSessionRequest;
+import io.atomix.node.service.protocol.SessionCommandContext;
+import io.atomix.node.service.protocol.SessionQueryContext;
+import io.atomix.node.service.protocol.SessionStreamContext;
+import io.grpc.stub.StreamObserver;
+import org.apache.commons.lang3.tuple.Pair;
 
 /**
- * Set service.
+ * Set service implementation.
  */
-public class SetService extends AbstractSetService {
-    public static final Type TYPE = new Type();
+public class SetService extends SetServiceGrpc.SetServiceImplBase {
+    private final RequestExecutor<SetProxy> executor;
 
-    /**
-     * Set service type.
-     */
-    @Component
-    public static class Type implements PrimitiveService.Type {
-        private static final String NAME = "set";
-
-        @Override
-        public String name() {
-            return NAME;
-        }
-
-        @Override
-        public PrimitiveService newService() {
-            return new SetService();
-        }
-    }
-
-    private Set<String> set = Sets.newConcurrentHashSet();
-    private Set<String> lockedElements = new ConcurrentSkipListSet<>();
-    private Map<String, DistributedSetTransaction> transactions = new HashMap<>();
-
-    @Override
-    public SizeResponse size(SizeRequest request) {
-        return SizeResponse.newBuilder()
-            .setSize(set.size())
-            .build();
+    public SetService(ClientFactory factory) {
+        this.executor = new RequestExecutor<>(new PrimitiveFactory<>(
+            SetStateMachine.TYPE,
+            id -> new SetProxy(factory.newSessionClient(id))));
     }
 
     @Override
-    public ContainsResponse contains(ContainsRequest request) {
-        boolean contains = request.getValuesCount() == 0
-            || request.getValuesCount() == 1 ? set.contains(request.getValues(0)) : set.containsAll(request.getValuesList());
-        return ContainsResponse.newBuilder()
-            .setContains(contains)
-            .build();
+    public void create(CreateRequest request, StreamObserver<CreateResponse> responseObserver) {
+        executor.execute(request.getHeader().getName(), CreateResponse::getDefaultInstance, responseObserver,
+            set -> set.openSession(OpenSessionRequest.newBuilder()
+                .setTimeout(Duration.ofSeconds(request.getTimeout().getSeconds())
+                    .plusNanos(request.getTimeout().getNanos())
+                    .toMillis())
+                .build())
+                .thenApply(response -> CreateResponse.newBuilder()
+                    .setHeader(ResponseHeader.newBuilder()
+                        .setSessionId(response.getSessionId())
+                        .build())
+                    .build()));
     }
 
     @Override
-    public AddResponse add(AddRequest request) {
-        if (request.getValuesCount() == 0) {
-            return AddResponse.newBuilder()
-                .setStatus(UpdateStatus.NOOP)
-                .setAdded(false)
-                .build();
-        } else if (request.getValuesCount() == 1) {
-            String value = request.getValues(0);
-            if (lockedElements.contains(value)) {
-                return AddResponse.newBuilder()
-                    .setStatus(UpdateStatus.WRITE_LOCK)
-                    .setAdded(false)
-                    .build();
-            } else {
-                boolean added = set.add(value);
-                if (added) {
-                    onEvent(ListenResponse.newBuilder()
-                        .setType(ListenResponse.Type.ADDED)
-                        .setValue(value)
-                        .build());
-                }
-                return AddResponse.newBuilder()
-                    .setStatus(UpdateStatus.OK)
-                    .setAdded(added)
-                    .build();
-            }
-        } else {
-            for (String value : request.getValuesList()) {
-                if (lockedElements.contains(value)) {
-                    return AddResponse.newBuilder()
-                        .setStatus(UpdateStatus.WRITE_LOCK)
-                        .setAdded(false)
-                        .build();
-                }
-            }
-            boolean added = set.addAll(request.getValuesList());
-            if (added) {
-                for (String value : request.getValuesList()) {
-                    onEvent(ListenResponse.newBuilder()
-                        .setType(ListenResponse.Type.ADDED)
-                        .setValue(value)
-                        .build());
-                }
-            }
-            return AddResponse.newBuilder()
-                .setStatus(UpdateStatus.OK)
-                .setAdded(added)
-                .build();
-        }
+    public void keepAlive(KeepAliveRequest request, StreamObserver<KeepAliveResponse> responseObserver) {
+        executor.execute(request.getHeader().getName(), KeepAliveResponse::getDefaultInstance, responseObserver,
+            set -> set.keepAlive(io.atomix.node.service.protocol.KeepAliveRequest.newBuilder()
+                .setSessionId(request.getHeader().getSessionId())
+                .setCommandSequence(request.getHeader().getSequenceNumber())
+                .build())
+                .thenApply(response -> KeepAliveResponse.newBuilder()
+                    .setHeader(ResponseHeader.newBuilder()
+                        .setSessionId(request.getHeader().getSessionId())
+                        .build())
+                    .build()));
     }
 
     @Override
-    public RemoveResponse remove(RemoveRequest request) {
-        if (request.getValuesCount() == 0) {
-            return RemoveResponse.newBuilder()
-                .setStatus(UpdateStatus.NOOP)
-                .setRemoved(false)
-                .build();
-        } else if (request.getValuesCount() == 1) {
-            String value = request.getValues(0);
-            if (lockedElements.contains(value)) {
-                return RemoveResponse.newBuilder()
-                    .setStatus(UpdateStatus.WRITE_LOCK)
-                    .setRemoved(false)
-                    .build();
-            } else {
-                boolean removed = set.remove(value);
-                if (removed) {
-                    onEvent(ListenResponse.newBuilder()
-                        .setType(ListenResponse.Type.REMOVED)
-                        .setValue(value)
-                        .build());
-                }
-                return RemoveResponse.newBuilder()
-                    .setStatus(UpdateStatus.OK)
-                    .setRemoved(removed)
-                    .build();
-            }
-        } else {
-            for (String value : request.getValuesList()) {
-                if (lockedElements.contains(value)) {
-                    return RemoveResponse.newBuilder()
-                        .setStatus(UpdateStatus.WRITE_LOCK)
-                        .setRemoved(false)
-                        .build();
-                }
-            }
-            boolean removed = set.removeAll(request.getValuesList());
-            if (removed) {
-                for (String value : request.getValuesList()) {
-                    onEvent(ListenResponse.newBuilder()
-                        .setType(ListenResponse.Type.REMOVED)
-                        .setValue(value)
-                        .build());
-                }
-            }
-            return RemoveResponse.newBuilder()
-                .setStatus(UpdateStatus.OK)
-                .setRemoved(removed)
-                .build();
-        }
+    public void close(CloseRequest request, StreamObserver<CloseResponse> responseObserver) {
+        executor.execute(request.getHeader().getName(), CloseResponse::getDefaultInstance, responseObserver,
+            set -> set.closeSession(CloseSessionRequest.newBuilder()
+                .setSessionId(request.getHeader().getSessionId())
+                .build())
+                .thenApply(response -> CloseResponse.newBuilder().build()));
     }
 
     @Override
-    public ClearResponse clear(ClearRequest request) {
-        for (String value : set) {
-            onEvent(ListenResponse.newBuilder()
-                .setType(ListenResponse.Type.REMOVED)
-                .setValue(value)
+    public void add(AddRequest request, StreamObserver<AddResponse> responseObserver) {
+        executor.execute(request.getHeader().getName(), AddResponse::getDefaultInstance, responseObserver,
+            set -> set.add(SessionCommandContext.newBuilder()
+                    .setSessionId(request.getHeader().getSessionId())
+                    .setSequenceNumber(request.getHeader().getSequenceNumber())
+                    .build(),
+                io.atomix.node.primitive.set.AddRequest.newBuilder()
+                    .addAllValues(request.getValuesList())
+                    .build())
+                .thenApply(response -> AddResponse.newBuilder()
+                    .setAdded(response.getRight().getAdded())
+                    .setHeader(ResponseHeader.newBuilder()
+                        .setSessionId(request.getHeader().getSessionId())
+                        .setIndex(response.getLeft().getIndex())
+                        .setSequenceNumber(response.getLeft().getSequence())
+                        .addAllStreams(response.getLeft().getStreamsList().stream()
+                            .map(stream -> StreamHeader.newBuilder()
+                                .setStreamId(stream.getStreamId())
+                                .setIndex(stream.getIndex())
+                                .setLastItemNumber(stream.getSequence())
+                                .build())
+                            .collect(Collectors.toList()))
+                        .build())
+                    .build()));
+    }
+
+    @Override
+    public void remove(RemoveRequest request, StreamObserver<RemoveResponse> responseObserver) {
+        executor.execute(request.getHeader().getName(), RemoveResponse::getDefaultInstance, responseObserver,
+            set -> set.remove(SessionCommandContext.newBuilder()
+                    .setSessionId(request.getHeader().getSessionId())
+                    .setSequenceNumber(request.getHeader().getSequenceNumber())
+                    .build(),
+                io.atomix.node.primitive.set.RemoveRequest.newBuilder()
+                    .addAllValues(request.getValuesList())
+                    .build())
+                .thenApply(response -> RemoveResponse.newBuilder()
+                    .setRemoved(response.getRight().getRemoved())
+                    .setHeader(ResponseHeader.newBuilder()
+                        .setSessionId(request.getHeader().getSessionId())
+                        .setIndex(response.getLeft().getIndex())
+                        .setSequenceNumber(response.getLeft().getSequence())
+                        .addAllStreams(response.getLeft().getStreamsList().stream()
+                            .map(stream -> StreamHeader.newBuilder()
+                                .setStreamId(stream.getStreamId())
+                                .setIndex(stream.getIndex())
+                                .setLastItemNumber(stream.getSequence())
+                                .build())
+                            .collect(Collectors.toList()))
+                        .build())
+                    .build()));
+    }
+
+    @Override
+    public void contains(ContainsRequest request, StreamObserver<ContainsResponse> responseObserver) {
+        executor.execute(request.getHeader().getName(), ContainsResponse::getDefaultInstance, responseObserver,
+            set -> set.contains(SessionQueryContext.newBuilder()
+                    .setSessionId(request.getHeader().getSessionId())
+                    .setLastIndex(request.getHeader().getIndex())
+                    .setLastSequenceNumber(request.getHeader().getSequenceNumber())
+                    .build(),
+                io.atomix.node.primitive.set.ContainsRequest.newBuilder()
+                    .addAllValues(request.getValuesList())
+                    .build())
+                .thenApply(response -> ContainsResponse.newBuilder()
+                    .setContains(response.getRight().getContains())
+                    .setHeader(ResponseHeader.newBuilder()
+                        .setSessionId(request.getHeader().getSessionId())
+                        .setIndex(response.getLeft().getIndex())
+                        .setSequenceNumber(response.getLeft().getSequence())
+                        .addAllStreams(response.getLeft().getStreamsList().stream()
+                            .map(stream -> StreamHeader.newBuilder()
+                                .setStreamId(stream.getStreamId())
+                                .setIndex(stream.getIndex())
+                                .setLastItemNumber(stream.getSequence())
+                                .build())
+                            .collect(Collectors.toList()))
+                        .build())
+                    .build()));
+    }
+
+    @Override
+    public void size(SizeRequest request, StreamObserver<SizeResponse> responseObserver) {
+        executor.execute(request.getHeader().getName(), SizeResponse::getDefaultInstance, responseObserver,
+            set -> set.size(SessionQueryContext.newBuilder()
+                    .setSessionId(request.getHeader().getSessionId())
+                    .setLastIndex(request.getHeader().getIndex())
+                    .setLastSequenceNumber(request.getHeader().getSequenceNumber())
+                    .build(),
+                io.atomix.node.primitive.set.SizeRequest.newBuilder().build())
+                .thenApply(response -> SizeResponse.newBuilder()
+                    .setSize(response.getRight().getSize())
+                    .setHeader(ResponseHeader.newBuilder()
+                        .setSessionId(request.getHeader().getSessionId())
+                        .setIndex(response.getLeft().getIndex())
+                        .setSequenceNumber(response.getLeft().getSequence())
+                        .addAllStreams(response.getLeft().getStreamsList().stream()
+                            .map(stream -> StreamHeader.newBuilder()
+                                .setStreamId(stream.getStreamId())
+                                .setIndex(stream.getIndex())
+                                .setLastItemNumber(stream.getSequence())
+                                .build())
+                            .collect(Collectors.toList()))
+                        .build())
+                    .build()));
+    }
+
+    @Override
+    public void clear(ClearRequest request, StreamObserver<ClearResponse> responseObserver) {
+        executor.execute(request.getHeader().getName(), ClearResponse::getDefaultInstance, responseObserver,
+            set -> set.clear(SessionCommandContext.newBuilder()
+                    .setSessionId(request.getHeader().getSessionId())
+                    .setSequenceNumber(request.getHeader().getSequenceNumber())
+                    .build(),
+                io.atomix.node.primitive.set.ClearRequest.newBuilder().build())
+                .thenApply(response -> ClearResponse.newBuilder()
+                    .setHeader(ResponseHeader.newBuilder()
+                        .setSessionId(request.getHeader().getSessionId())
+                        .setIndex(response.getLeft().getIndex())
+                        .setSequenceNumber(response.getLeft().getSequence())
+                        .addAllStreams(response.getLeft().getStreamsList().stream()
+                            .map(stream -> StreamHeader.newBuilder()
+                                .setStreamId(stream.getStreamId())
+                                .setIndex(stream.getIndex())
+                                .setLastItemNumber(stream.getSequence())
+                                .build())
+                            .collect(Collectors.toList()))
+                        .build())
+                    .build()));
+    }
+
+    @Override
+    public void listen(EventRequest request, StreamObserver<EventResponse> responseObserver) {
+        executor.<Pair<SessionStreamContext, ListenResponse>, EventResponse>execute(request.getHeader().getName(), EventResponse::getDefaultInstance, responseObserver,
+            (set, handler) -> set.listen(SessionCommandContext.newBuilder()
+                    .setSessionId(request.getHeader().getSessionId())
+                    .setSequenceNumber(request.getHeader().getSequenceNumber())
+                    .build(),
+                ListenRequest.newBuilder().build(), handler),
+            response -> EventResponse.newBuilder()
+                .setHeader(ResponseHeader.newBuilder()
+                    .setSessionId(request.getHeader().getSessionId())
+                    .setIndex(response.getLeft().getIndex())
+                    .setSequenceNumber(response.getLeft().getSequence())
+                    .addStreams(StreamHeader.newBuilder()
+                        .setStreamId(response.getLeft().getStreamId())
+                        .setIndex(response.getLeft().getIndex())
+                        .setLastItemNumber(response.getLeft().getSequence())
+                        .build())
+                    .build())
+                .setType(EventResponse.Type.valueOf(response.getRight().getType().name()))
+                .setValue(response.getRight().getValue())
                 .build());
-        }
-        set.clear();
-        return ClearResponse.newBuilder().build();
     }
 
     @Override
-    public void listen(ListenRequest request, StreamHandler<ListenResponse> handler) {
-        // Keep the stream open.
-    }
-
-    @Override
-    public UnlistenResponse unlisten(UnlistenRequest request) {
-        // Complete the stream.
-        StreamHandler<ListenResponse> stream = getCurrentSession().getStream(request.getStreamId());
-        if (stream != null) {
-            stream.complete();
-        }
-        return UnlistenResponse.newBuilder().build();
-    }
-
-    @Override
-    public void iterate(IterateRequest request, StreamHandler<IterateResponse> handler) {
-        for (String value : set) {
-            handler.next(IterateResponse.newBuilder()
-                .setValue(value)
+    public void iterate(IterateRequest request, StreamObserver<IterateResponse> responseObserver) {
+        executor.<Pair<SessionStreamContext, io.atomix.node.primitive.set.IterateResponse>, IterateResponse>execute(request.getHeader().getName(), IterateResponse::getDefaultInstance, responseObserver,
+            (set, handler) -> set.iterate(SessionQueryContext.newBuilder()
+                    .setSessionId(request.getHeader().getSessionId())
+                    .setLastIndex(request.getHeader().getIndex())
+                    .setLastSequenceNumber(request.getHeader().getSequenceNumber())
+                    .build(),
+                io.atomix.node.primitive.set.IterateRequest.newBuilder().build(), handler),
+            response -> IterateResponse.newBuilder()
+                .setHeader(ResponseHeader.newBuilder()
+                    .setSessionId(request.getHeader().getSessionId())
+                    .setIndex(response.getLeft().getIndex())
+                    .setSequenceNumber(response.getLeft().getSequence())
+                    .addStreams(StreamHeader.newBuilder()
+                        .setStreamId(response.getLeft().getStreamId())
+                        .setIndex(response.getLeft().getIndex())
+                        .setLastItemNumber(response.getLeft().getSequence())
+                        .build())
+                    .build())
+                .setValue(response.getRight().getValue())
                 .build());
-        }
-        handler.complete();
-    }
-
-    @Override
-    public PrepareResponse prepare(PrepareRequest request) {
-        for (DistributedSetUpdate update : request.getTransaction().getUpdatesList()) {
-            if (lockedElements.contains(update.getValue())) {
-                return PrepareResponse.newBuilder()
-                    .setStatus(PrepareResponse.Status.CONCURRENT_TRANSACTION)
-                    .build();
-            }
-        }
-
-        for (DistributedSetUpdate update : request.getTransaction().getUpdatesList()) {
-            String element = update.getValue();
-            switch (update.getType()) {
-                case ADD:
-                case NOT_CONTAINS:
-                    if (set.contains(element)) {
-                        return PrepareResponse.newBuilder()
-                            .setStatus(PrepareResponse.Status.OPTIMISTIC_LOCK_FAILURE)
-                            .build();
-                    }
-                    break;
-                case REMOVE:
-                case CONTAINS:
-                    if (!set.contains(element)) {
-                        return PrepareResponse.newBuilder()
-                            .setStatus(PrepareResponse.Status.OPTIMISTIC_LOCK_FAILURE)
-                            .build();
-                    }
-                    break;
-            }
-        }
-
-        for (DistributedSetUpdate update : request.getTransaction().getUpdatesList()) {
-            lockedElements.add(update.getValue());
-        }
-        transactions.put(request.getTransactionId(), request.getTransaction());
-        return PrepareResponse.newBuilder()
-            .setStatus(PrepareResponse.Status.OK)
-            .build();
-    }
-
-    @Override
-    public PrepareResponse prepareAndCommit(PrepareRequest request) {
-        PrepareResponse response = prepare(request);
-        if (response.getStatus() == PrepareResponse.Status.OK) {
-            commit(CommitRequest.newBuilder()
-                .setTransactionId(request.getTransactionId())
-                .build());
-        }
-        return response;
-    }
-
-    @Override
-    public CommitResponse commit(CommitRequest request) {
-        DistributedSetTransaction transaction = transactions.remove(request.getTransactionId());
-        if (transaction == null) {
-            return CommitResponse.newBuilder()
-                .setStatus(CommitResponse.Status.UNKNOWN_TRANSACTION_ID)
-                .build();
-        }
-
-        for (DistributedSetUpdate update : transaction.getUpdatesList()) {
-            switch (update.getType()) {
-                case ADD:
-                    set.add(update.getValue());
-                    break;
-                case REMOVE:
-                    set.remove(update.getValue());
-                    break;
-                default:
-                    break;
-            }
-            lockedElements.remove(update.getValue());
-        }
-        return CommitResponse.newBuilder()
-            .setStatus(CommitResponse.Status.OK)
-            .build();
-    }
-
-    @Override
-    public RollbackResponse rollback(RollbackRequest request) {
-        DistributedSetTransaction transaction = transactions.remove(request.getTransactionId());
-        if (transaction == null) {
-            return RollbackResponse.newBuilder()
-                .setStatus(RollbackResponse.Status.UNKNOWN_TRANSACTION_ID)
-                .build();
-        }
-
-        for (DistributedSetUpdate update : transaction.getUpdatesList()) {
-            lockedElements.remove(update.getValue());
-        }
-        return RollbackResponse.newBuilder()
-            .setStatus(RollbackResponse.Status.OK)
-            .build();
-    }
-
-    private void onEvent(ListenResponse event) {
-        getSessions()
-            .forEach(session -> session.getStreams(SetOperations.LISTEN_STREAM)
-                .forEach(stream -> stream.next(event)));
-    }
-
-    @Override
-    public void backup(OutputStream output) throws IOException {
-        DistributedSetSnapshot.newBuilder()
-            .addAllValues(set)
-            .addAllLockedElements(lockedElements)
-            .putAllTransactions(transactions)
-            .build()
-            .writeTo(output);
-    }
-
-    @Override
-    public void restore(InputStream input) throws IOException {
-        DistributedSetSnapshot snapshot = DistributedSetSnapshot.parseFrom(input);
-        set = Sets.newConcurrentHashSet(snapshot.getValuesList());
-        lockedElements = new CopyOnWriteArraySet<>(snapshot.getLockedElementsList());
-        transactions = new HashMap<>(snapshot.getTransactionsMap());
     }
 }

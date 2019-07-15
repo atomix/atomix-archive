@@ -13,10 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package ${serviceClass.packageName};
+package ${stateMachineClass.packageName};
 
+import io.atomix.node.service.session.SessionId;
+import io.atomix.node.service.SessionManagedPrimitiveStateMachine;
 import io.atomix.node.service.ServiceOperationRegistry;
-import io.atomix.node.service.SimplePrimitiveService;
 <#if hasStreams>
 import io.atomix.utils.stream.StreamHandler;
 </#if>
@@ -38,10 +39,9 @@ import java.util.concurrent.CompletableFuture;
 
 </#if>
 /**
- * Atomix generated service interface ${serviceClass.className}.
+ * Atomix generated service interface ${stateMachineClass.className}.
  */
-public abstract class ${serviceClass.className} extends SimplePrimitiveService {
-
+public abstract class ${stateMachineClass.className} extends SessionManagedPrimitiveStateMachine {
     @Override
     protected void configure(ServiceOperationRegistry registry) {
         <#list operations as operation>

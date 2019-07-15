@@ -15,415 +15,290 @@
  */
 package io.atomix.node.primitive.election;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.util.ArrayList;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Optional;
-import java.util.concurrent.atomic.AtomicLong;
+import java.time.Duration;
 import java.util.stream.Collectors;
 
-import com.google.common.base.MoreObjects;
-import com.google.common.base.Objects;
-import io.atomix.node.service.PrimitiveService;
-import io.atomix.node.service.session.Session;
-import io.atomix.utils.component.Component;
-import io.atomix.utils.stream.StreamHandler;
+import io.atomix.api.election.AnointRequest;
+import io.atomix.api.election.AnointResponse;
+import io.atomix.api.election.CloseRequest;
+import io.atomix.api.election.CloseResponse;
+import io.atomix.api.election.CreateRequest;
+import io.atomix.api.election.CreateResponse;
+import io.atomix.api.election.EnterRequest;
+import io.atomix.api.election.EnterResponse;
+import io.atomix.api.election.EventRequest;
+import io.atomix.api.election.EventResponse;
+import io.atomix.api.election.EvictRequest;
+import io.atomix.api.election.EvictResponse;
+import io.atomix.api.election.GetLeadershipRequest;
+import io.atomix.api.election.GetLeadershipResponse;
+import io.atomix.api.election.KeepAliveRequest;
+import io.atomix.api.election.KeepAliveResponse;
+import io.atomix.api.election.LeaderElectionServiceGrpc;
+import io.atomix.api.election.PromoteRequest;
+import io.atomix.api.election.PromoteResponse;
+import io.atomix.api.election.WithdrawRequest;
+import io.atomix.api.election.WithdrawResponse;
+import io.atomix.api.headers.ResponseHeader;
+import io.atomix.api.headers.StreamHeader;
+import io.atomix.node.primitive.util.PrimitiveFactory;
+import io.atomix.node.primitive.util.RequestExecutor;
+import io.atomix.node.service.client.ClientFactory;
+import io.atomix.node.service.protocol.CloseSessionRequest;
+import io.atomix.node.service.protocol.OpenSessionRequest;
+import io.atomix.node.service.protocol.SessionCommandContext;
+import io.atomix.node.service.protocol.SessionQueryContext;
+import io.atomix.node.service.protocol.SessionStreamContext;
+import io.grpc.stub.StreamObserver;
+import org.apache.commons.lang3.tuple.Pair;
 
 /**
- * Leader election service.
+ * gRPC leader election service implementation.
  */
-public class LeaderElectionService extends AbstractLeaderElectionService {
-    public static final Type TYPE = new Type();
+public class LeaderElectionService extends LeaderElectionServiceGrpc.LeaderElectionServiceImplBase {
+    private final RequestExecutor<LeaderElectionProxy> executor;
 
-    /**
-     * Lock service type.
-     */
-    @Component
-    public static class Type implements PrimitiveService.Type {
-        private static final String NAME = "election";
-
-        @Override
-        public String name() {
-            return NAME;
-        }
-
-        @Override
-        public PrimitiveService newService() {
-            return new LeaderElectionService();
-        }
-    }
-
-    private Registration leader;
-    private long term;
-    private long termStartTime;
-    private List<Registration> registrations = new LinkedList<>();
-    private AtomicLong termCounter = new AtomicLong();
-
-    @Override
-    public EnterResponse enter(EnterRequest request) {
-        LeaderElectionSnapshot oldLeadership = leadership();
-        Registration registration = new Registration(request.getId(), getCurrentSession().sessionId().id());
-        addRegistration(registration);
-        LeaderElectionSnapshot newLeadership = leadership();
-
-        if (!Objects.equal(oldLeadership, newLeadership)) {
-            onEvent(ListenResponse.newBuilder()
-                .setLeader(newLeadership.getLeader().getId())
-                .setTerm(newLeadership.getTerm())
-                .setTimestamp(newLeadership.getTimestamp())
-                .addAllCandidates(newLeadership.getCandidatesList().stream()
-                    .map(candidate -> candidate.getId())
-                    .collect(Collectors.toList()))
-                .build());
-        }
-        return EnterResponse.newBuilder()
-            .setLeader(newLeadership.getLeader().getId())
-            .setTerm(newLeadership.getTerm())
-            .setTimestamp(newLeadership.getTimestamp())
-            .addAllCandidates(newLeadership.getCandidatesList().stream()
-                .map(candidate -> candidate.getId())
-                .collect(Collectors.toList()))
-            .build();
+    public LeaderElectionService(ClientFactory factory) {
+        this.executor = new RequestExecutor<>(new PrimitiveFactory<>(
+            LeaderElectionStateMachine.TYPE,
+            id -> new LeaderElectionProxy(factory.newSessionClient(id))));
     }
 
     @Override
-    public WithdrawResponse withdraw(WithdrawRequest request) {
-        LeaderElectionSnapshot oldLeadership = leadership();
-        cleanup(request.getId());
-        LeaderElectionSnapshot newLeadership = leadership();
-        if (!Objects.equal(oldLeadership, newLeadership)) {
-            onEvent(ListenResponse.newBuilder()
-                .setLeader(newLeadership.getLeader().getId())
-                .setTerm(newLeadership.getTerm())
-                .setTimestamp(newLeadership.getTimestamp())
-                .addAllCandidates(newLeadership.getCandidatesList().stream()
-                    .map(candidate -> candidate.getId())
-                    .collect(Collectors.toList()))
-                .build());
-            return WithdrawResponse.newBuilder()
-                .setSucceeded(true)
-                .build();
-        }
-        return WithdrawResponse.newBuilder()
-            .setSucceeded(false)
-            .build();
+    public void create(CreateRequest request, StreamObserver<CreateResponse> responseObserver) {
+        executor.execute(request.getHeader().getName(), CreateResponse::getDefaultInstance, responseObserver,
+            election -> election.openSession(OpenSessionRequest.newBuilder()
+                .setTimeout(Duration.ofSeconds(request.getTimeout().getSeconds())
+                    .plusNanos(request.getTimeout().getNanos())
+                    .toMillis())
+                .build())
+                .thenApply(response -> CreateResponse.newBuilder()
+                    .setHeader(ResponseHeader.newBuilder()
+                        .setSessionId(response.getSessionId())
+                        .build())
+                    .build()));
     }
 
     @Override
-    public AnointResponse anoint(AnointRequest request) {
-        LeaderElectionSnapshot oldLeadership = leadership();
-        Registration newLeader = registrations.stream()
-            .filter(r -> r.id().equals(request.getId()))
-            .findFirst()
-            .orElse(null);
-        if (newLeader != null) {
-            this.leader = newLeader;
-            this.term = termCounter.incrementAndGet();
-            this.termStartTime = getCurrentTimestamp();
-        }
-        LeaderElectionSnapshot newLeadership = leadership();
-        if (!Objects.equal(oldLeadership, newLeadership)) {
-            onEvent(ListenResponse.newBuilder()
-                .setLeader(newLeadership.getLeader().getId())
-                .setTerm(newLeadership.getTerm())
-                .setTimestamp(newLeadership.getTimestamp())
-                .addAllCandidates(newLeadership.getCandidatesList().stream()
-                    .map(candidate -> candidate.getId())
-                    .collect(Collectors.toList()))
-                .build());
-        }
-        return AnointResponse.newBuilder()
-            .setSucceeded(leader != null && leader.id().equals(request.getId()))
-            .build();
+    public void keepAlive(KeepAliveRequest request, StreamObserver<KeepAliveResponse> responseObserver) {
+        executor.execute(request.getHeader().getName(), KeepAliveResponse::getDefaultInstance, responseObserver,
+            election -> election.keepAlive(io.atomix.node.service.protocol.KeepAliveRequest.newBuilder()
+                .setSessionId(request.getHeader().getSessionId())
+                .setCommandSequence(request.getHeader().getSequenceNumber())
+                .build())
+                .thenApply(response -> KeepAliveResponse.newBuilder()
+                    .setHeader(ResponseHeader.newBuilder()
+                        .setSessionId(request.getHeader().getSessionId())
+                        .build())
+                    .build()));
     }
 
     @Override
-    public PromoteResponse promote(PromoteRequest request) {
-        LeaderElectionSnapshot oldLeadership = leadership();
-        boolean containsCandidate = oldLeadership.getCandidatesList().stream()
-            .anyMatch(a -> a.getId().equals(request.getId()));
-        if (!containsCandidate) {
-            return PromoteResponse.newBuilder()
-                .setSucceeded(false)
-                .build();
-        }
-
-        Registration registration = registrations.stream()
-            .filter(r -> r.id().equals(request.getId()))
-            .findFirst()
-            .orElse(null);
-        List<Registration> updatedRegistrations = new ArrayList<>();
-        updatedRegistrations.add(registration);
-        registrations.stream()
-            .filter(r -> !r.id().equals(request.getId()))
-            .forEach(updatedRegistrations::add);
-        this.registrations = updatedRegistrations;
-        LeaderElectionSnapshot newLeadership = leadership();
-        if (!Objects.equal(oldLeadership, newLeadership)) {
-            onEvent(ListenResponse.newBuilder()
-                .setLeader(newLeadership.getLeader().getId())
-                .setTerm(newLeadership.getTerm())
-                .setTimestamp(newLeadership.getTimestamp())
-                .addAllCandidates(newLeadership.getCandidatesList().stream()
-                    .map(candidate -> candidate.getId())
-                    .collect(Collectors.toList()))
-                .build());
-        }
-        return PromoteResponse.newBuilder()
-            .setSucceeded(true)
-            .build();
+    public void close(CloseRequest request, StreamObserver<CloseResponse> responseObserver) {
+        executor.execute(request.getHeader().getName(), CloseResponse::getDefaultInstance, responseObserver,
+            election -> election.closeSession(CloseSessionRequest.newBuilder()
+                .setSessionId(request.getHeader().getSessionId())
+                .build()).thenApply(response -> CloseResponse.newBuilder().build()));
     }
 
     @Override
-    public EvictResponse evict(EvictRequest request) {
-        LeaderElectionSnapshot oldLeadership = leadership();
-        Optional<Registration> registration =
-            registrations.stream().filter(r -> r.id().equals(request.getId())).findFirst();
-        if (registration.isPresent()) {
-            List<Registration> updatedRegistrations =
-                registrations.stream()
-                    .filter(r -> !r.id().equals(request.getId()))
-                    .collect(Collectors.toList());
-            if (leader.id().equals(request.getId())) {
-                if (!updatedRegistrations.isEmpty()) {
-                    this.registrations = updatedRegistrations;
-                    this.leader = updatedRegistrations.get(0);
-                    this.term = termCounter.incrementAndGet();
-                    this.termStartTime = getCurrentTimestamp();
-                } else {
-                    this.registrations = updatedRegistrations;
-                    this.leader = null;
-                }
-            } else {
-                this.registrations = updatedRegistrations;
-            }
-        }
-        LeaderElectionSnapshot newLeadership = leadership();
-        if (!Objects.equal(oldLeadership, newLeadership)) {
-            onEvent(ListenResponse.newBuilder()
-                .setLeader(newLeadership.getLeader().getId())
-                .setTerm(newLeadership.getTerm())
-                .setTimestamp(newLeadership.getTimestamp())
-                .addAllCandidates(newLeadership.getCandidatesList().stream()
-                    .map(candidate -> candidate.getId())
-                    .collect(Collectors.toList()))
-                .build());
-            return EvictResponse.newBuilder()
-                .setSucceeded(true)
-                .build();
-        }
-        return EvictResponse.newBuilder()
-            .setSucceeded(false)
-            .build();
-    }
-
-    @Override
-    public GetLeadershipResponse getLeadership(GetLeadershipRequest request) {
-        LeaderElectionSnapshot leadership = leadership();
-        return GetLeadershipResponse.newBuilder()
-            .setLeader(leadership.getLeader().getId())
-            .setTerm(leadership.getTerm())
-            .setTimestamp(leadership.getTimestamp())
-            .addAllCandidates(leadership.getCandidatesList().stream()
-                .map(candidate -> candidate.getId())
-                .collect(Collectors.toList()))
-            .build();
-    }
-
-    @Override
-    public void listen(ListenRequest request, StreamHandler<ListenResponse> handler) {
-        // Keep the stream open.
-    }
-
-    @Override
-    public UnlistenResponse unlisten(UnlistenRequest request) {
-        // Close the stream.
-        StreamHandler<ListenRequest> stream = getCurrentSession().getStream(request.getStreamId());
-        if (stream != null) {
-            stream.complete();
-        }
-        return UnlistenResponse.newBuilder().build();
-    }
-
-    /**
-     * Publishes an election event to all registered sessions.
-     *
-     * @param event the event to publish
-     */
-    protected void onEvent(ListenResponse event) {
-        getSessions()
-            .forEach(session -> session.getStreams(LeaderElectionOperations.LISTEN_STREAM)
-                .forEach(stream -> stream.next(event)));
-    }
-
-    private void onSessionEnd(Session session) {
-        LeaderElectionSnapshot oldLeadership = leadership();
-        cleanup(session);
-        LeaderElectionSnapshot newLeadership = leadership();
-        if (!Objects.equal(oldLeadership, newLeadership)) {
-            onEvent(ListenResponse.newBuilder()
-                .setLeader(newLeadership.getLeader().getId())
-                .setTerm(newLeadership.getTerm())
-                .setTimestamp(newLeadership.getTimestamp())
-                .addAllCandidates(newLeadership.getCandidatesList().stream()
-                    .map(candidate -> candidate.getId())
-                    .collect(Collectors.toList()))
-                .build());
-        }
-    }
-
-    private static class Registration {
-        private final String id;
-        private final long sessionId;
-
-        protected Registration(String id, long sessionId) {
-            this.id = id;
-            this.sessionId = sessionId;
-        }
-
-        protected String id() {
-            return id;
-        }
-
-        protected long sessionId() {
-            return sessionId;
-        }
-
-        @Override
-        public String toString() {
-            return MoreObjects.toStringHelper(getClass())
-                .add("id", id)
-                .add("sessionId", sessionId)
-                .toString();
-        }
-    }
-
-    protected void cleanup(String id) {
-        Optional<Registration> registration =
-            registrations.stream().filter(r -> r.id().equals(id)).findFirst();
-        if (registration.isPresent()) {
-            List<Registration> updatedRegistrations =
-                registrations.stream()
-                    .filter(r -> !r.id().equals(id))
-                    .collect(Collectors.toList());
-            if (leader.id().equals(id)) {
-                if (!updatedRegistrations.isEmpty()) {
-                    this.registrations = updatedRegistrations;
-                    this.leader = updatedRegistrations.get(0);
-                    this.term = termCounter.incrementAndGet();
-                    this.termStartTime = getCurrentTimestamp();
-                } else {
-                    this.registrations = updatedRegistrations;
-                    this.leader = null;
-                }
-            } else {
-                this.registrations = updatedRegistrations;
-            }
-        }
-    }
-
-    protected void cleanup(Session session) {
-        Optional<Registration> registration =
-            registrations.stream().filter(r -> r.sessionId() == session.sessionId().id()).findFirst();
-        if (registration.isPresent()) {
-            List<Registration> updatedRegistrations =
-                registrations.stream()
-                    .filter(r -> r.sessionId() != session.sessionId().id())
-                    .collect(Collectors.toList());
-            if (leader.sessionId() == session.sessionId().id()) {
-                if (!updatedRegistrations.isEmpty()) {
-                    this.registrations = updatedRegistrations;
-                    this.leader = updatedRegistrations.get(0);
-                    this.term = termCounter.incrementAndGet();
-                    this.termStartTime = getCurrentTimestamp();
-                } else {
-                    this.registrations = updatedRegistrations;
-                    this.leader = null;
-                }
-            } else {
-                this.registrations = updatedRegistrations;
-            }
-        }
-    }
-
-    private LeaderElectionSnapshot leadership() {
-        LeaderElectionSnapshot.Builder builder = LeaderElectionSnapshot.newBuilder()
-            .setTerm(term)
-            .setTimestamp(termStartTime)
-            .addAllCandidates(registrations.stream()
-                .map(registration -> LeaderElectionRegistration.newBuilder()
-                    .setId(registration.id)
-                    .setSessionId(registration.sessionId)
+    public void enter(EnterRequest request, StreamObserver<EnterResponse> responseObserver) {
+        executor.execute(request.getHeader().getName(), EnterResponse::getDefaultInstance, responseObserver,
+            election -> election.enter(
+                SessionCommandContext.newBuilder()
+                    .setSessionId(request.getHeader().getSessionId())
+                    .setSequenceNumber(request.getHeader().getSequenceNumber())
+                    .build(),
+                io.atomix.node.primitive.election.EnterRequest.newBuilder()
+                    .setId(request.getCandidateId())
                     .build())
-                .collect(Collectors.toList()));
-        if (leader != null) {
-            builder.setLeader(LeaderElectionRegistration.newBuilder()
-                .setId(leader.id)
-                .setSessionId(leader.sessionId)
-                .build());
-        }
-        return builder.build();
-    }
-
-    protected void addRegistration(Registration registration) {
-        if (registrations.stream().noneMatch(r -> registration.id.equals(r.id()))) {
-            List<Registration> updatedRegistrations = new LinkedList<>(registrations);
-            updatedRegistrations.add(registration);
-            boolean newLeader = leader == null;
-            this.registrations = updatedRegistrations;
-            if (newLeader) {
-                this.leader = registration;
-                this.term = termCounter.incrementAndGet();
-                this.termStartTime = getCurrentTimestamp();
-            }
-        }
+                .thenApply(response -> EnterResponse.newBuilder()
+                    .setHeader(ResponseHeader.newBuilder()
+                        .setSessionId(request.getHeader().getSessionId())
+                        .setIndex(response.getLeft().getIndex())
+                        .setSequenceNumber(response.getLeft().getSequence())
+                        .addAllStreams(response.getLeft().getStreamsList().stream()
+                            .map(stream -> StreamHeader.newBuilder()
+                                .setStreamId(stream.getStreamId())
+                                .setIndex(stream.getIndex())
+                                .setLastItemNumber(stream.getSequence())
+                                .build())
+                            .collect(Collectors.toList()))
+                        .build())
+                    .setTerm(response.getRight().getTerm())
+                    .setTimestamp(response.getRight().getTimestamp())
+                    .setLeader(response.getRight().getLeader())
+                    .addAllCandidates(response.getRight().getCandidatesList())
+                    .build()));
     }
 
     @Override
-    protected void backup(OutputStream output) throws IOException {
-        LeaderElectionSnapshot.Builder builder = LeaderElectionSnapshot.newBuilder()
-            .setTerm(term)
-            .setTimestamp(termStartTime)
-            .addAllCandidates(registrations.stream()
-                .map(registration -> LeaderElectionRegistration.newBuilder()
-                    .setId(registration.id)
-                    .setSessionId(registration.sessionId)
+    public void withdraw(WithdrawRequest request, StreamObserver<WithdrawResponse> responseObserver) {
+        executor.execute(request.getHeader().getName(), WithdrawResponse::getDefaultInstance, responseObserver,
+            election -> election.withdraw(
+                SessionCommandContext.newBuilder()
+                    .setSessionId(request.getHeader().getSessionId())
+                    .setSequenceNumber(request.getHeader().getSequenceNumber())
+                    .build(),
+                io.atomix.node.primitive.election.WithdrawRequest.newBuilder()
+                    .setId(request.getCandidateId())
                     .build())
-                .collect(Collectors.toList()));
-        if (leader != null) {
-            builder.setLeader(LeaderElectionRegistration.newBuilder()
-                .setId(leader.id)
-                .setSessionId(leader.sessionId)
+                .thenApply(response -> WithdrawResponse.newBuilder()
+                    .setHeader(ResponseHeader.newBuilder()
+                        .setSessionId(request.getHeader().getSessionId())
+                        .setIndex(response.getLeft().getIndex())
+                        .setSequenceNumber(response.getLeft().getSequence())
+                        .addAllStreams(response.getLeft().getStreamsList().stream()
+                            .map(stream -> StreamHeader.newBuilder()
+                                .setStreamId(stream.getStreamId())
+                                .setIndex(stream.getIndex())
+                                .setLastItemNumber(stream.getSequence())
+                                .build())
+                            .collect(Collectors.toList()))
+                        .build())
+                    .setSucceeded(response.getRight().getSucceeded())
+                    .build()));
+    }
+
+    @Override
+    public void anoint(AnointRequest request, StreamObserver<AnointResponse> responseObserver) {
+        executor.execute(request.getHeader().getName(), AnointResponse::getDefaultInstance, responseObserver,
+            election -> election.anoint(
+                SessionCommandContext.newBuilder()
+                    .setSessionId(request.getHeader().getSessionId())
+                    .setSequenceNumber(request.getHeader().getSequenceNumber())
+                    .build(),
+                io.atomix.node.primitive.election.AnointRequest.newBuilder()
+                    .setId(request.getCandidateId())
+                    .build())
+                .thenApply(response -> AnointResponse.newBuilder()
+                    .setHeader(ResponseHeader.newBuilder()
+                        .setSessionId(request.getHeader().getSessionId())
+                        .setIndex(response.getLeft().getIndex())
+                        .setSequenceNumber(response.getLeft().getSequence())
+                        .addAllStreams(response.getLeft().getStreamsList().stream()
+                            .map(stream -> StreamHeader.newBuilder()
+                                .setStreamId(stream.getStreamId())
+                                .setIndex(stream.getIndex())
+                                .setLastItemNumber(stream.getSequence())
+                                .build())
+                            .collect(Collectors.toList()))
+                        .build())
+                    .setSucceeded(response.getRight().getSucceeded())
+                    .build()));
+    }
+
+    @Override
+    public void promote(PromoteRequest request, StreamObserver<PromoteResponse> responseObserver) {
+        executor.execute(request.getHeader().getName(), PromoteResponse::getDefaultInstance, responseObserver,
+            election -> election.promote(
+                SessionCommandContext.newBuilder()
+                    .setSessionId(request.getHeader().getSessionId())
+                    .setSequenceNumber(request.getHeader().getSequenceNumber())
+                    .build(),
+                io.atomix.node.primitive.election.PromoteRequest.newBuilder()
+                    .setId(request.getCandidateId())
+                    .build())
+                .thenApply(response -> PromoteResponse.newBuilder()
+                    .setHeader(ResponseHeader.newBuilder()
+                        .setSessionId(request.getHeader().getSessionId())
+                        .setIndex(response.getLeft().getIndex())
+                        .setSequenceNumber(response.getLeft().getSequence())
+                        .addAllStreams(response.getLeft().getStreamsList().stream()
+                            .map(stream -> StreamHeader.newBuilder()
+                                .setStreamId(stream.getStreamId())
+                                .setIndex(stream.getIndex())
+                                .setLastItemNumber(stream.getSequence())
+                                .build())
+                            .collect(Collectors.toList()))
+                        .build())
+                    .setSucceeded(response.getRight().getSucceeded())
+                    .build()));
+    }
+
+    @Override
+    public void evict(EvictRequest request, StreamObserver<EvictResponse> responseObserver) {
+        executor.execute(request.getHeader().getName(), EvictResponse::getDefaultInstance, responseObserver,
+            election -> election.evict(
+                SessionCommandContext.newBuilder()
+                    .setSessionId(request.getHeader().getSessionId())
+                    .setSequenceNumber(request.getHeader().getSequenceNumber())
+                    .build(),
+                io.atomix.node.primitive.election.EvictRequest.newBuilder()
+                    .setId(request.getCandidateId())
+                    .build())
+                .thenApply(response -> EvictResponse.newBuilder()
+                    .setHeader(ResponseHeader.newBuilder()
+                        .setSessionId(request.getHeader().getSessionId())
+                        .setIndex(response.getLeft().getIndex())
+                        .setSequenceNumber(response.getLeft().getSequence())
+                        .addAllStreams(response.getLeft().getStreamsList().stream()
+                            .map(stream -> StreamHeader.newBuilder()
+                                .setStreamId(stream.getStreamId())
+                                .setIndex(stream.getIndex())
+                                .setLastItemNumber(stream.getSequence())
+                                .build())
+                            .collect(Collectors.toList()))
+                        .build())
+                    .setSucceeded(response.getRight().getSucceeded())
+                    .build()));
+    }
+
+    @Override
+    public void getLeadership(GetLeadershipRequest request, StreamObserver<GetLeadershipResponse> responseObserver) {
+        executor.execute(request.getHeader().getName(), GetLeadershipResponse::getDefaultInstance, responseObserver,
+            election -> election.getLeadership(
+                SessionQueryContext.newBuilder()
+                    .setSessionId(request.getHeader().getSessionId())
+                    .setLastIndex(request.getHeader().getIndex())
+                    .setLastSequenceNumber(request.getHeader().getSequenceNumber())
+                    .build(),
+                io.atomix.node.primitive.election.GetLeadershipRequest.newBuilder().build())
+                .thenApply(response -> GetLeadershipResponse.newBuilder()
+                    .setHeader(ResponseHeader.newBuilder()
+                        .setSessionId(request.getHeader().getSessionId())
+                        .setIndex(response.getLeft().getIndex())
+                        .setSequenceNumber(response.getLeft().getSequence())
+                        .addAllStreams(response.getLeft().getStreamsList().stream()
+                            .map(stream -> StreamHeader.newBuilder()
+                                .setStreamId(stream.getStreamId())
+                                .setIndex(stream.getIndex())
+                                .setLastItemNumber(stream.getSequence())
+                                .build())
+                            .collect(Collectors.toList()))
+                        .build())
+                    .setTerm(response.getRight().getTerm())
+                    .setTimestamp(response.getRight().getTimestamp())
+                    .setLeader(response.getRight().getLeader())
+                    .addAllCandidates(response.getRight().getCandidatesList())
+                    .build()));
+    }
+
+    @Override
+    public void events(EventRequest request, StreamObserver<EventResponse> responseObserver) {
+        executor.<Pair<SessionStreamContext, ListenResponse>, EventResponse>execute(request.getHeader().getName(), EventResponse::getDefaultInstance, responseObserver,
+            (election, handler) -> election.listen(SessionCommandContext.newBuilder()
+                    .setSessionId(request.getHeader().getSessionId())
+                    .setSequenceNumber(request.getHeader().getSequenceNumber())
+                    .build(),
+                ListenRequest.newBuilder().build(), handler),
+            response -> EventResponse.newBuilder()
+                .setHeader(ResponseHeader.newBuilder()
+                    .setSessionId(request.getHeader().getSessionId())
+                    .setIndex(response.getLeft().getIndex())
+                    .setSequenceNumber(response.getLeft().getSequence())
+                    .addStreams(StreamHeader.newBuilder()
+                        .setStreamId(response.getLeft().getStreamId())
+                        .setIndex(response.getLeft().getIndex())
+                        .setLastItemNumber(response.getLeft().getSequence())
+                        .build())
+                    .build())
+                .setType(EventResponse.Type.valueOf(response.getRight().getType().name()))
+                .setTerm(response.getRight().getTerm())
+                .setTimestamp(response.getRight().getTimestamp())
+                .setLeader(response.getRight().getLeader())
+                .addAllCandidates(response.getRight().getCandidatesList())
                 .build());
-        }
-        builder.build().writeTo(output);
     }
 
-    @Override
-    protected void restore(InputStream input) throws IOException {
-        LeaderElectionSnapshot snapshot = LeaderElectionSnapshot.parseFrom(input);
-        term = snapshot.getTerm();
-        termStartTime = snapshot.getTimestamp();
-        if (snapshot.hasLeader()) {
-            leader = new Registration(snapshot.getLeader().getId(), snapshot.getLeader().getSessionId());
-        } else {
-            leader = null;
-        }
-        registrations = new LinkedList<>(snapshot.getCandidatesList().stream()
-            .map(registration -> new Registration(registration.getId(), registration.getSessionId()))
-            .collect(Collectors.toList()));
-    }
-
-    @Override
-    public void onExpire(Session session) {
-        onSessionEnd(session);
-    }
-
-    @Override
-    public void onClose(Session session) {
-        onSessionEnd(session);
-    }
 }

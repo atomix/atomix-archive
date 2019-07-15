@@ -24,7 +24,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 
-import io.atomix.node.service.PrimitiveService;
+import io.atomix.node.service.PrimitiveStateMachine;
 import io.atomix.node.service.ServiceException;
 import io.atomix.node.service.impl.ServiceCodec;
 import io.atomix.node.service.operation.StreamType;
@@ -47,7 +47,7 @@ public class PrimitiveSession implements Session {
     private final SessionId sessionId;
     private final long timeout;
     private final ServiceCodec codec;
-    private final PrimitiveService.Context context;
+    private final PrimitiveStateMachine.Context context;
     private volatile State state = State.CLOSED;
     private volatile long lastUpdated;
     private volatile long commandSequence;
@@ -64,7 +64,7 @@ public class PrimitiveSession implements Session {
         long timeout,
         long lastUpdated,
         ServiceCodec codec,
-        PrimitiveService.Context context) {
+        PrimitiveStateMachine.Context context) {
         this.sessionId = sessionId;
         this.timeout = timeout;
         this.lastUpdated = lastUpdated;

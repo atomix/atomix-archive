@@ -33,10 +33,10 @@ import io.grpc.stub.StreamObserver;
 /**
  * Primitive service implementation.
  */
-public class PrimitiveServiceImpl extends PrimitiveServiceGrpc.PrimitiveServiceImplBase {
+public class PrimitiveService extends PrimitiveServiceGrpc.PrimitiveServiceImplBase {
     private final MetadataClient client;
 
-    public PrimitiveServiceImpl(ClientFactory factory) {
+    public PrimitiveService(ClientFactory factory) {
         this.client = factory.newMetadataClient();
     }
 

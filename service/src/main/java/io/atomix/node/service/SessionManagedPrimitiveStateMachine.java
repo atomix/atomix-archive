@@ -70,18 +70,18 @@ import io.atomix.utils.stream.StreamHandler;
 /**
  * Session managed primitive service.
  */
-public abstract class SessionManagedPrimitiveService extends AbstractPrimitiveService implements PrimitiveService {
+public abstract class SessionManagedPrimitiveStateMachine extends AbstractPrimitiveStateMachine implements PrimitiveStateMachine {
     private final Map<SessionId, PrimitiveSession> sessions = new ConcurrentHashMap<>();
     private PrimitiveSession currentSession;
     private ServiceCodec codec;
-    private AbstractPrimitiveService.Context context;
+    private AbstractPrimitiveStateMachine.Context context;
     private DefaultServiceExecutor executor;
     private DefaultServiceScheduler scheduler;
 
     @Override
     public void init(StateMachine.Context context) {
         this.codec = new ServiceCodec();
-        this.context = new AbstractPrimitiveService.Context(context);
+        this.context = new AbstractPrimitiveStateMachine.Context(context);
         this.executor = new DefaultServiceExecutor(codec, this.context.getLogger());
         this.scheduler = new DefaultServiceScheduler(this.context);
         super.init(this.context, scheduler, scheduler);

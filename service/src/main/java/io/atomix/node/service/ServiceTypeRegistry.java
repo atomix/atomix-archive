@@ -27,7 +27,7 @@ public interface ServiceTypeRegistry {
      *
      * @return the collection of registered service types
      */
-    Collection<PrimitiveService.Type> getServiceTypes();
+    Collection<PrimitiveStateMachine.Type> getServiceTypes();
 
     /**
      * Returns the service type for the given name.
@@ -35,6 +35,6 @@ public interface ServiceTypeRegistry {
      * @param typeName the service type name
      * @return the service type
      */
-    PrimitiveService.Type getServiceType(String typeName);
+    PrimitiveStateMachine.Type getServiceType(String typeName);
 
 }

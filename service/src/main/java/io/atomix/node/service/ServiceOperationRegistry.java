@@ -31,7 +31,7 @@ import io.atomix.utils.stream.StreamHandler;
 /**
  * Facilitates registration and execution of state machine commands and provides deterministic scheduling.
  *
- * @see PrimitiveService
+ * @see PrimitiveStateMachine
  */
 public interface ServiceOperationRegistry {
 

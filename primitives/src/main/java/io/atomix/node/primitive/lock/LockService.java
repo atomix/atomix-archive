@@ -15,302 +15,165 @@
  */
 package io.atomix.node.primitive.lock;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
 import java.time.Duration;
-import java.util.ArrayDeque;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.Map;
-import java.util.Queue;
-import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
-import io.atomix.node.service.PrimitiveService;
-import io.atomix.node.service.session.Session;
-import io.atomix.node.service.session.SessionId;
-import io.atomix.utils.component.Component;
-import io.atomix.utils.concurrent.Scheduled;
-
-import static com.google.common.base.MoreObjects.toStringHelper;
+import io.atomix.api.headers.ResponseHeader;
+import io.atomix.api.headers.StreamHeader;
+import io.atomix.api.lock.CloseRequest;
+import io.atomix.api.lock.CloseResponse;
+import io.atomix.api.lock.CreateRequest;
+import io.atomix.api.lock.CreateResponse;
+import io.atomix.api.lock.IsLockedRequest;
+import io.atomix.api.lock.IsLockedResponse;
+import io.atomix.api.lock.KeepAliveRequest;
+import io.atomix.api.lock.KeepAliveResponse;
+import io.atomix.api.lock.LockRequest;
+import io.atomix.api.lock.LockResponse;
+import io.atomix.api.lock.LockServiceGrpc;
+import io.atomix.api.lock.UnlockRequest;
+import io.atomix.api.lock.UnlockResponse;
+import io.atomix.node.primitive.util.PrimitiveFactory;
+import io.atomix.node.primitive.util.RequestExecutor;
+import io.atomix.node.service.client.ClientFactory;
+import io.atomix.node.service.protocol.OpenSessionRequest;
+import io.atomix.node.service.protocol.SessionCommandContext;
+import io.atomix.node.service.protocol.SessionQueryContext;
+import io.grpc.stub.StreamObserver;
 
 /**
- * Lock service.
+ * Lock service implementation.
  */
-public class LockService extends AbstractLockService {
-    public static final Type TYPE = new Type();
+public class LockService extends LockServiceGrpc.LockServiceImplBase {
+    private final RequestExecutor<LockProxy> executor;
 
-    /**
-     * Lock service type.
-     */
-    @Component
-    public static class Type implements PrimitiveService.Type {
-        private static final String NAME = "lock";
-
-        @Override
-        public String name() {
-            return NAME;
-        }
-
-        @Override
-        public PrimitiveService newService() {
-            return new LockService();
-        }
-    }
-
-    LockHolder lock;
-    Queue<LockHolder> queue = new ArrayDeque<>();
-    final Map<Long, Scheduled> timers = new HashMap<>();
-
-    @Override
-    public CompletableFuture<LockResponse> lock(LockRequest request) {
-        Session session = getCurrentSession();
-        // If the lock is not already owned, immediately grant the lock to the requester.
-        // Note that we still have to publish an event to the session. The event is guaranteed to be received
-        // by the client-side primitive after the LOCK response.
-        if (lock == null) {
-            lock = new LockHolder(
-                getCurrentIndex(),
-                session.sessionId(),
-                0,
-                null);
-            return CompletableFuture.completedFuture(LockResponse.newBuilder()
-                .setIndex(getCurrentIndex())
-                .setAcquired(true)
-                .build());
-            // If the timeout is 0, that indicates this is a tryLock request. Immediately fail the request.
-        } else if (request.getTimeout() == 0) {
-            return CompletableFuture.completedFuture(LockResponse.newBuilder()
-                .setAcquired(false)
-                .build());
-            // If a timeout exists, add the request to the queue and set a timer. Note that the lock request expiration
-            // time is based on the *state machine* time - not the system time - to ensure consistency across servers.
-        } else if (request.getTimeout() > 0) {
-            CompletableFuture<LockResponse> future = new CompletableFuture<>();
-            LockHolder holder = new LockHolder(
-                getCurrentIndex(),
-                session.sessionId(),
-                getCurrentTimestamp() + request.getTimeout(),
-                future);
-            queue.add(holder);
-            timers.put(getCurrentIndex(), getScheduler().schedule(Duration.ofMillis(request.getTimeout()), () -> {
-                // When the lock request timer expires, remove the request from the queue and publish a FAILED
-                // event to the session. Note that this timer is guaranteed to be executed in the same thread as the
-                // state machine commands, so there's no need to use a lock here.
-                timers.remove(getCurrentIndex());
-                queue.remove(holder);
-                if (session.getState().active()) {
-                    future.complete(LockResponse.newBuilder()
-                        .setAcquired(false)
-                        .build());
-                }
-            }));
-            return future;
-            // If the lock is -1, just add the request to the queue with no expiration.
-        } else {
-            CompletableFuture<LockResponse> future = new CompletableFuture<>();
-            LockHolder holder = new LockHolder(
-                getCurrentIndex(),
-                session.sessionId(),
-                0,
-                future);
-            queue.add(holder);
-            return future;
-        }
+    public LockService(ClientFactory factory) {
+        this.executor = new RequestExecutor<>(new PrimitiveFactory<>(
+            LockStateMachine.TYPE,
+            id -> new LockProxy(factory.newSessionClient(id))));
     }
 
     @Override
-    public UnlockResponse unlock(UnlockRequest request) {
-        if (lock != null) {
-            // If the commit's session does not match the current lock holder, preserve the existing lock.
-            // If the current lock ID does not match the requested lock ID, preserve the existing lock.
-            // However, ensure the associated lock request is removed from the queue.
-            if ((request.getIndex() == 0 && !lock.session.equals(getCurrentSession().sessionId()))
-                || (request.getIndex() > 0 && lock.index != request.getIndex())) {
-                Iterator<LockHolder> iterator = queue.iterator();
-                while (iterator.hasNext()) {
-                    LockHolder lock = iterator.next();
-                    if ((request.getIndex() == 0 && lock.session.equals(getCurrentSession().sessionId()))
-                        || (request.getIndex() > 0 && lock.index == request.getIndex())) {
-                        iterator.remove();
-                        Scheduled timer = timers.remove(lock.index);
-                        if (timer != null) {
-                            timer.cancel();
-                        }
-                    }
-                }
-                return UnlockResponse.newBuilder()
-                    .setSucceeded(false)
-                    .build();
-            }
-
-            // The lock has been released. Populate the lock from the queue.
-            lock = queue.poll();
-            while (lock != null) {
-                // If the waiter has a lock timer, cancel the timer.
-                Scheduled timer = timers.remove(lock.index);
-                if (timer != null) {
-                    timer.cancel();
-                }
-
-                // Notify the client that it has acquired the lock.
-                Session lockSession = getSession(lock.session);
-                if (lockSession != null && lockSession.getState().active()) {
-                    lock.future.complete(LockResponse.newBuilder()
-                        .setIndex(lock.index)
-                        .setAcquired(true)
-                        .build());
-                    break;
-                }
-                lock = queue.poll();
-            }
-            return UnlockResponse.newBuilder()
-                .setSucceeded(true)
-                .build();
-        }
-        return UnlockResponse.newBuilder()
-            .setSucceeded(false)
-            .build();
-    }
-
-    @Override
-    public IsLockedResponse isLocked(IsLockedRequest request) {
-        boolean locked = lock != null && (request.getIndex() == 0 || lock.index == request.getIndex());
-        return IsLockedResponse.newBuilder()
-            .setLocked(locked)
-            .build();
-    }
-
-    @Override
-    public void backup(OutputStream output) throws IOException {
-        AtomicLockSnapshot.Builder builder = AtomicLockSnapshot.newBuilder();
-        if (lock != null) {
-            builder.setLock(LockCall.newBuilder()
-                .setIndex(lock.index)
-                .setSessionId(lock.session.id())
-                .setExpire(lock.expire)
-                .build());
-        }
-
-        builder.addAllQueue(queue.stream()
-            .map(lock -> LockCall.newBuilder()
-                .setIndex(lock.index)
-                .setSessionId(lock.session.id())
-                .setExpire(lock.expire)
+    public void create(CreateRequest request, StreamObserver<CreateResponse> responseObserver) {
+        executor.execute(request.getHeader().getName(), CreateResponse::getDefaultInstance, responseObserver,
+            lock -> lock.openSession(OpenSessionRequest.newBuilder()
+                .setTimeout(Duration.ofSeconds(request.getTimeout().getSeconds())
+                    .plusNanos(request.getTimeout().getNanos())
+                    .toMillis())
                 .build())
-            .collect(Collectors.toList()));
-
-        builder.build().writeTo(output);
+                .thenApply(response -> CreateResponse.newBuilder()
+                    .setHeader(ResponseHeader.newBuilder()
+                        .setSessionId(response.getSessionId())
+                        .build())
+                    .build()));
     }
 
     @Override
-    public void restore(InputStream input) throws IOException {
-        AtomicLockSnapshot snapshot = AtomicLockSnapshot.parseFrom(input);
-        if (snapshot.hasLock()) {
-            lock = new LockHolder(
-                snapshot.getLock().getIndex(),
-                SessionId.from(snapshot.getLock().getSessionId()),
-                snapshot.getLock().getExpire(),
-                CompletableFuture.completedFuture(null));
-        }
-
-        queue = snapshot.getQueueList().stream()
-            .map(lock -> new LockHolder(
-                lock.getIndex(),
-                SessionId.from(lock.getSessionId()),
-                lock.getExpire(),
-                CompletableFuture.completedFuture(null)))
-            .collect(Collectors.toCollection(ArrayDeque::new));
-
-        // After the snapshot is installed, we need to cancel any existing timers and schedule new ones based on the
-        // state provided by the snapshot.
-        timers.values().forEach(Scheduled::cancel);
-        timers.clear();
-        for (LockHolder holder : queue) {
-            if (holder.expire > 0) {
-                timers.put(holder.index, getScheduler().schedule(Duration.ofMillis(holder.expire - getCurrentTimestamp()), () -> {
-                    timers.remove(holder.index);
-                    queue.remove(holder);
-                    Session session = getSession(holder.session);
-                    if (session != null && session.getState().active()) {
-                        holder.future.complete(LockResponse.newBuilder()
-                            .setAcquired(false)
-                            .build());
-                    }
-                }));
-            }
-        }
+    public void keepAlive(KeepAliveRequest request, StreamObserver<KeepAliveResponse> responseObserver) {
+        executor.execute(request.getHeader().getName(), KeepAliveResponse::getDefaultInstance, responseObserver,
+            lock -> lock.keepAlive(io.atomix.node.service.protocol.KeepAliveRequest.newBuilder()
+                .setSessionId(request.getHeader().getSessionId())
+                .setCommandSequence(request.getHeader().getSequenceNumber())
+                .build())
+                .thenApply(response -> KeepAliveResponse.newBuilder()
+                    .setHeader(ResponseHeader.newBuilder()
+                        .setSessionId(request.getHeader().getSessionId())
+                        .build())
+                    .build()));
     }
 
     @Override
-    public void onExpire(Session session) {
-        releaseSession(session);
+    public void close(CloseRequest request, StreamObserver<CloseResponse> responseObserver) {
+        executor.execute(request.getHeader().getName(), CloseResponse::getDefaultInstance, responseObserver,
+            lock -> lock.closeSession(io.atomix.node.service.protocol.CloseSessionRequest.newBuilder()
+                .setSessionId(request.getHeader().getSessionId())
+                .build()).thenApply(response -> CloseResponse.newBuilder().build()));
     }
 
     @Override
-    public void onClose(Session session) {
-        releaseSession(session);
+    public void lock(LockRequest request, StreamObserver<LockResponse> responseObserver) {
+        executor.execute(request.getHeader().getName(), LockResponse::getDefaultInstance, responseObserver,
+            lock -> lock.lock(
+                SessionCommandContext.newBuilder()
+                    .setSessionId(request.getHeader().getSessionId())
+                    .setSequenceNumber(request.getHeader().getSequenceNumber())
+                    .build(),
+                io.atomix.node.primitive.lock.LockRequest.newBuilder()
+                    .setTimeout(Duration.ofSeconds(request.getTimeout().getSeconds())
+                        .plusNanos(request.getTimeout().getNanos())
+                        .toMillis())
+                    .build())
+                .thenApply(response -> LockResponse.newBuilder()
+                    .setHeader(ResponseHeader.newBuilder()
+                        .setSessionId(request.getHeader().getSessionId())
+                        .setIndex(response.getLeft().getIndex())
+                        .setSequenceNumber(response.getLeft().getSequence())
+                        .addAllStreams(response.getLeft().getStreamsList().stream()
+                            .map(stream -> StreamHeader.newBuilder()
+                                .setStreamId(stream.getStreamId())
+                                .setIndex(stream.getIndex())
+                                .setLastItemNumber(stream.getSequence())
+                                .build())
+                            .collect(Collectors.toList()))
+                        .build())
+                    .setVersion(response.getRight().getAcquired() ? response.getRight().getIndex() : 0)
+                    .build()));
     }
 
-    /**
-     * Handles a session that has been closed by a client or expired by the cluster.
-     * <p>
-     * When a session is removed, if the session is the current lock holder then the lock is released and the next
-     * session waiting in the queue is granted the lock. Additionally, all pending lock requests for the session
-     * are removed from the lock queue.
-     *
-     * @param session the closed session
-     */
-    private void releaseSession(Session session) {
-        // Remove all instances of the session from the lock queue.
-        queue.removeIf(lock -> lock.session.equals(session.sessionId()));
-
-        // If the removed session is the current holder of the lock, nullify the lock and attempt to grant it
-        // to the next waiter in the queue.
-        if (lock != null && lock.session.equals(session.sessionId())) {
-            lock = queue.poll();
-            while (lock != null) {
-                // If the waiter has a lock timer, cancel the timer.
-                Scheduled timer = timers.remove(lock.index);
-                if (timer != null) {
-                    timer.cancel();
-                }
-
-                // Notify the client that it has acquired the lock.
-                Session lockSession = getSession(lock.session);
-                if (lockSession != null && lockSession.getState().active()) {
-                    lock.future.complete(LockResponse.newBuilder()
-                        .setIndex(lock.index)
-                        .setAcquired(true)
-                        .build());
-                    break;
-                }
-                lock = queue.poll();
-            }
-        }
+    @Override
+    public void unlock(UnlockRequest request, StreamObserver<UnlockResponse> responseObserver) {
+        executor.execute(request.getHeader().getName(), UnlockResponse::getDefaultInstance, responseObserver,
+            lock -> lock.unlock(
+                SessionCommandContext.newBuilder()
+                    .setSessionId(request.getHeader().getSessionId())
+                    .setSequenceNumber(request.getHeader().getSequenceNumber())
+                    .build(),
+                io.atomix.node.primitive.lock.UnlockRequest.newBuilder()
+                    .setIndex(request.getVersion())
+                    .build())
+                .thenApply(response -> UnlockResponse.newBuilder()
+                    .setHeader(ResponseHeader.newBuilder()
+                        .setSessionId(request.getHeader().getSessionId())
+                        .setIndex(response.getLeft().getIndex())
+                        .setSequenceNumber(response.getLeft().getSequence())
+                        .addAllStreams(response.getLeft().getStreamsList().stream()
+                            .map(stream -> StreamHeader.newBuilder()
+                                .setStreamId(stream.getStreamId())
+                                .setIndex(stream.getIndex())
+                                .setLastItemNumber(stream.getSequence())
+                                .build())
+                            .collect(Collectors.toList()))
+                        .build())
+                    .setUnlocked(response.getRight().getSucceeded())
+                    .build()));
     }
 
-    class LockHolder {
-        final long index;
-        final SessionId session;
-        final long expire;
-        final CompletableFuture<LockResponse> future;
-
-        LockHolder(long index, SessionId session, long expire, CompletableFuture<LockResponse> future) {
-            this.index = index;
-            this.session = session;
-            this.expire = expire;
-            this.future = future;
-        }
-
-        @Override
-        public String toString() {
-            return toStringHelper(this)
-                .add("index", index)
-                .add("session", session)
-                .add("expire", expire)
-                .toString();
-        }
+    @Override
+    public void isLocked(IsLockedRequest request, StreamObserver<IsLockedResponse> responseObserver) {
+        executor.execute(request.getHeader().getName(), IsLockedResponse::getDefaultInstance, responseObserver,
+            lock -> lock.isLocked(
+                SessionQueryContext.newBuilder()
+                    .setSessionId(request.getHeader().getSessionId())
+                    .setLastIndex(request.getHeader().getIndex())
+                    .setLastSequenceNumber(request.getHeader().getSequenceNumber())
+                    .build(),
+                io.atomix.node.primitive.lock.IsLockedRequest.newBuilder()
+                    .setIndex(request.getVersion())
+                    .build())
+                .thenApply(response -> IsLockedResponse.newBuilder()
+                    .setHeader(ResponseHeader.newBuilder()
+                        .setSessionId(request.getHeader().getSessionId())
+                        .setIndex(response.getLeft().getIndex())
+                        .setSequenceNumber(response.getLeft().getSequence())
+                        .addAllStreams(response.getLeft().getStreamsList().stream()
+                            .map(stream -> StreamHeader.newBuilder()
+                                .setStreamId(stream.getStreamId())
+                                .setIndex(stream.getIndex())
+                                .setLastItemNumber(stream.getSequence())
+                                .build())
+                            .collect(Collectors.toList()))
+                        .build())
+                    .setIsLocked(response.getRight().getLocked())
+                    .build()));
     }
 }

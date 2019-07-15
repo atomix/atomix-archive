@@ -25,15 +25,15 @@ import com.google.protobuf.Message;
 import io.atomix.api.controller.PartitionConfig;
 import io.atomix.node.management.impl.ConfigServiceImpl;
 import io.atomix.node.management.impl.ProtocolManager;
-import io.atomix.node.primitive.counter.CounterServiceImpl;
-import io.atomix.node.primitive.election.LeaderElectionServiceImpl;
-import io.atomix.node.primitive.impl.PrimitiveServiceImpl;
-import io.atomix.node.primitive.list.ListServiceImpl;
-import io.atomix.node.primitive.lock.LockServiceImpl;
-import io.atomix.node.primitive.log.LogServiceImpl;
-import io.atomix.node.primitive.map.MapServiceImpl;
-import io.atomix.node.primitive.set.SetServiceImpl;
-import io.atomix.node.primitive.value.ValueServiceImpl;
+import io.atomix.node.primitive.counter.CounterService;
+import io.atomix.node.primitive.election.LeaderElectionService;
+import io.atomix.node.primitive.impl.PrimitiveService;
+import io.atomix.node.primitive.list.ListService;
+import io.atomix.node.primitive.lock.LockService;
+import io.atomix.node.primitive.log.LogService;
+import io.atomix.node.primitive.map.MapService;
+import io.atomix.node.primitive.set.SetService;
+import io.atomix.node.primitive.value.ValueService;
 import io.atomix.node.protocol.LogProtocol;
 import io.atomix.node.protocol.Protocol;
 import io.atomix.node.protocol.ServiceProtocol;
@@ -137,17 +137,17 @@ public class AtomixNode {
                             return new DefaultSessionClient(serviceId, serviceProtocol.getServiceClient());
                         }
                     };
-                    protocolManager.getServiceRegistry().register(new PrimitiveServiceImpl(factory));
-                    protocolManager.getServiceRegistry().register(new CounterServiceImpl(factory));
-                    protocolManager.getServiceRegistry().register(new LeaderElectionServiceImpl(factory));
-                    protocolManager.getServiceRegistry().register(new ListServiceImpl(factory));
-                    protocolManager.getServiceRegistry().register(new LockServiceImpl(factory));
-                    protocolManager.getServiceRegistry().register(new MapServiceImpl(factory));
-                    protocolManager.getServiceRegistry().register(new SetServiceImpl(factory));
-                    protocolManager.getServiceRegistry().register(new ValueServiceImpl(factory));
+                    protocolManager.getServiceRegistry().register(new PrimitiveService(factory));
+                    protocolManager.getServiceRegistry().register(new CounterService(factory));
+                    protocolManager.getServiceRegistry().register(new LeaderElectionService(factory));
+                    protocolManager.getServiceRegistry().register(new ListService(factory));
+                    protocolManager.getServiceRegistry().register(new LockService(factory));
+                    protocolManager.getServiceRegistry().register(new MapService(factory));
+                    protocolManager.getServiceRegistry().register(new SetService(factory));
+                    protocolManager.getServiceRegistry().register(new ValueService(factory));
                 }
                 if (protocol instanceof LogProtocol) {
-                    protocolManager.getServiceRegistry().register(new LogServiceImpl(((LogProtocol) protocol).getLogClient()));
+                    protocolManager.getServiceRegistry().register(new LogService(((LogProtocol) protocol).getLogClient()));
                 }
                 LOGGER.info(getVersion().toString());
                 started.set(true);

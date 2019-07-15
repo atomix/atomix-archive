@@ -27,7 +27,7 @@ import java.util.stream.Collectors;
 import com.google.common.base.Strings;
 import com.google.protobuf.ByteString;
 import io.atomix.node.service.Command;
-import io.atomix.node.service.PrimitiveService;
+import io.atomix.node.service.PrimitiveStateMachine;
 import io.atomix.node.service.Query;
 import io.atomix.node.service.ServiceException;
 import io.atomix.node.service.ServiceTypeRegistry;
@@ -81,7 +81,7 @@ public class ServiceManagerStateMachine implements StateMachine {
     }
 
     private ServiceStateMachine newService(ServiceId serviceId) {
-        PrimitiveService.Type serviceType = serviceTypes.getServiceType(serviceId.getType());
+        PrimitiveStateMachine.Type serviceType = serviceTypes.getServiceType(serviceId.getType());
         ServiceStateMachine service = new ServiceStateMachine(
             serviceId, serviceType.newService());
         service.init(context);

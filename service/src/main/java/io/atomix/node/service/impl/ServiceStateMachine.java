@@ -25,7 +25,7 @@ import java.util.concurrent.CompletableFuture;
 
 import com.google.protobuf.ByteString;
 import io.atomix.node.service.Command;
-import io.atomix.node.service.PrimitiveService;
+import io.atomix.node.service.PrimitiveStateMachine;
 import io.atomix.node.service.Query;
 import io.atomix.node.service.StateMachine;
 import io.atomix.node.service.operation.OperationType;
@@ -53,7 +53,7 @@ public class ServiceStateMachine implements StateMachine {
     public ServiceStateMachine(ServiceId serviceId, StateMachine stateMachine) {
         this.serviceId = serviceId;
         this.stateMachine = stateMachine;
-        this.log = ContextualLoggerFactory.getLogger(getClass(), LoggerContext.builder(PrimitiveService.class)
+        this.log = ContextualLoggerFactory.getLogger(getClass(), LoggerContext.builder(PrimitiveStateMachine.class)
             .add("name", serviceId.getName())
             .add("type", serviceId.getType())
             .build());

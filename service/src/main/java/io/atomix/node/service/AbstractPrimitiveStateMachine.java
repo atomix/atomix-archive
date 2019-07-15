@@ -27,7 +27,7 @@ import org.slf4j.Logger;
 /**
  * Abstract primitive service.
  */
-public abstract class AbstractPrimitiveService implements PrimitiveService {
+public abstract class AbstractPrimitiveStateMachine implements PrimitiveStateMachine {
     private Context context;
     private Scheduler scheduler;
     private Executor executor;
@@ -124,7 +124,7 @@ public abstract class AbstractPrimitiveService implements PrimitiveService {
     /**
      * Session managed service context.
      */
-    class Context implements PrimitiveService.Context {
+    class Context implements PrimitiveStateMachine.Context {
         private final StateMachine.Context parent;
         private OperationType operationType;
 

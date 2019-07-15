@@ -42,13 +42,14 @@ import org.apache.commons.lang3.tuple.Pair;
 public class PrimitiveServiceGenerator {
 
     private static final String OPERATIONS_TEMPLATE = "operations.ftlh";
-    private static final String SIMPLE_SERVICE_TEMPLATE = "simple_service.ftlh";
-    private static final String SESSION_SERVICE_TEMPLATE = "session_service.ftlh";
+    private static final String SIMPLE_SERVICE_TEMPLATE = "simple_state_machine.ftlh";
+    private static final String SESSION_SERVICE_TEMPLATE = "session_state_machine.ftlh";
     private static final String SIMPLE_PROXY_TEMPLATE = "simple_proxy.ftlh";
     private static final String SESSION_PROXY_TEMPLATE = "session_proxy.ftlh";
 
     private static final String OPERATIONS_SUFFIX = "Operations";
     private static final String SERVICE_SUFFIX = "Service";
+    private static final String STATE_MACHINE_SUFFIX = "StateMachine";
     private static final String PROXY_SUFFIX = "Proxy";
     private static final String ABSTRACT_PREFIX = "Abstract";
 
@@ -82,7 +83,7 @@ public class PrimitiveServiceGenerator {
         MessageTable messages,
         PluginProtos.CodeGeneratorResponse.Builder response) throws IOException {
         for (DescriptorProtos.ServiceDescriptorProto serviceDescriptor : fileDescriptor.getServiceList()) {
-            ServiceDescriptor serviceContext = buildServiceContext(serviceDescriptor, fileDescriptor, messages);
+            StateMachineDescriptor serviceContext = buildServiceContext(serviceDescriptor, fileDescriptor, messages);
 
             // Generate the primitive operations.
             if (!serviceContext.getOperations().isEmpty()) {
@@ -98,7 +99,7 @@ public class PrimitiveServiceGenerator {
                     // Generate the primitive service base class.
                     generate(
                         SESSION_SERVICE_TEMPLATE,
-                        serviceContext.getServiceClass(),
+                        serviceContext.getStateMachineClass(),
                         serviceContext,
                         response);
 
@@ -112,7 +113,7 @@ public class PrimitiveServiceGenerator {
                     // Generate the primitive service base class.
                     generate(
                         SIMPLE_SERVICE_TEMPLATE,
-                        serviceContext.getServiceClass(),
+                        serviceContext.getStateMachineClass(),
                         serviceContext,
                         response);
 
@@ -138,7 +139,7 @@ public class PrimitiveServiceGenerator {
     private void generate(
         String templateFileName,
         ClassDescriptor classDescriptor,
-        ServiceDescriptor serviceContext,
+        StateMachineDescriptor serviceContext,
         PluginProtos.CodeGeneratorResponse.Builder response) throws IOException {
         Configuration config = new Configuration();
         config.setClassForTemplateLoading(getClass(), "/");
@@ -167,13 +168,13 @@ public class PrimitiveServiceGenerator {
      * @param messages          the message lookup table
      * @return the generated service context
      */
-    private ServiceDescriptor buildServiceContext(
+    private StateMachineDescriptor buildServiceContext(
         DescriptorProtos.ServiceDescriptorProto serviceDescriptor,
         DescriptorProtos.FileDescriptorProto fileDescriptor,
         MessageTable messages) {
-        ServiceDescriptor context = new ServiceDescriptor();
-        context.setServiceName(getServiceName(serviceDescriptor));
-        context.setServiceClass(buildServiceClassDescriptor(serviceDescriptor, fileDescriptor));
+        StateMachineDescriptor context = new StateMachineDescriptor();
+        context.setStateMachineName(getStateMachineName(serviceDescriptor));
+        context.setStateMachineClass(buildStateMachineClassDescriptor(serviceDescriptor, fileDescriptor));
         context.setProxyClass(buildProxyClassDescriptor(serviceDescriptor, fileDescriptor));
         context.setOperationsClass(buildOperationsClassDescriptor(serviceDescriptor, fileDescriptor));
         context.setSession(isSessionService(serviceDescriptor));
@@ -192,14 +193,14 @@ public class PrimitiveServiceGenerator {
      * @param fileDescriptor    the descriptor for the file to which the service belongs
      * @return the generated service class
      */
-    private ClassDescriptor buildServiceClassDescriptor(
+    private ClassDescriptor buildStateMachineClassDescriptor(
         DescriptorProtos.ServiceDescriptorProto serviceDescriptor,
         DescriptorProtos.FileDescriptorProto fileDescriptor) {
-        ClassDescriptor serviceClass = new ClassDescriptor();
-        serviceClass.setPackageName(getPackageName(fileDescriptor));
-        serviceClass.setFileName(getAbstractFilePath(serviceDescriptor, fileDescriptor));
-        serviceClass.setClassName(getPrefixedClassName(ABSTRACT_PREFIX, serviceDescriptor));
-        return serviceClass;
+        ClassDescriptor stateMachineClass = new ClassDescriptor();
+        stateMachineClass.setPackageName(getPackageName(fileDescriptor));
+        stateMachineClass.setFileName(getAbstractFilePath(serviceDescriptor, fileDescriptor));
+        stateMachineClass.setClassName(ABSTRACT_PREFIX + getBaseName(serviceDescriptor) + STATE_MACHINE_SUFFIX);
+        return stateMachineClass;
     }
 
     /**
@@ -215,7 +216,7 @@ public class PrimitiveServiceGenerator {
         ClassDescriptor proxyClass = new ClassDescriptor();
         proxyClass.setPackageName(getPackageName(fileDescriptor));
         proxyClass.setFileName(getBaseFilePath(PROXY_SUFFIX, serviceDescriptor, fileDescriptor));
-        proxyClass.setClassName(getSuffixedClassName(PROXY_SUFFIX, serviceDescriptor));
+        proxyClass.setClassName(getBaseName(serviceDescriptor) + PROXY_SUFFIX);
         return proxyClass;
     }
 
@@ -232,7 +233,7 @@ public class PrimitiveServiceGenerator {
         ClassDescriptor operationsClass = new ClassDescriptor();
         operationsClass.setPackageName(getPackageName(fileDescriptor));
         operationsClass.setFileName(getBaseFilePath(OPERATIONS_SUFFIX, serviceDescriptor, fileDescriptor));
-        operationsClass.setClassName(getSuffixedClassName(OPERATIONS_SUFFIX, serviceDescriptor));
+        operationsClass.setClassName(getBaseName(serviceDescriptor) + OPERATIONS_SUFFIX);
         return operationsClass;
     }
 
@@ -367,7 +368,7 @@ public class PrimitiveServiceGenerator {
      * @param serviceDescriptor the service descriptor
      * @return the service name
      */
-    private static String getServiceName(DescriptorProtos.ServiceDescriptorProto serviceDescriptor) {
+    private static String getStateMachineName(DescriptorProtos.ServiceDescriptorProto serviceDescriptor) {
         if (serviceDescriptor.getOptions().hasExtension(ServiceDescriptorProto.name)) {
             return serviceDescriptor.getOptions().getExtension(ServiceDescriptorProto.name);
         }
@@ -426,29 +427,7 @@ public class PrimitiveServiceGenerator {
     private static String getAbstractFilePath(
         DescriptorProtos.ServiceDescriptorProto serviceDescriptor,
         DescriptorProtos.FileDescriptorProto fileDescriptor) {
-        return getPackagePath(fileDescriptor) + "/" + ABSTRACT_PREFIX + getClassName(serviceDescriptor) + ".java";
-    }
-
-    /**
-     * Returns the class name for the given service.
-     *
-     * @param prefix            the class name prefix
-     * @param serviceDescriptor the service descriptor
-     * @return the class name
-     */
-    private static String getPrefixedClassName(String prefix, DescriptorProtos.ServiceDescriptorProto serviceDescriptor) {
-        return prefix + getClassName(serviceDescriptor);
-    }
-
-    /**
-     * Returns the class name for the given service.
-     *
-     * @param suffix            the class name suffix
-     * @param serviceDescriptor the service descriptor
-     * @return the class name
-     */
-    private static String getSuffixedClassName(String suffix, DescriptorProtos.ServiceDescriptorProto serviceDescriptor) {
-        return getBaseName(serviceDescriptor) + suffix;
+        return getPackagePath(fileDescriptor) + "/" + ABSTRACT_PREFIX + getBaseName(serviceDescriptor) + STATE_MACHINE_SUFFIX + ".java";
     }
 
     /**
@@ -555,29 +534,29 @@ public class PrimitiveServiceGenerator {
         }
     }
 
-    public static class ServiceDescriptor {
-        private String serviceName;
-        private ClassDescriptor serviceClass;
+    public static class StateMachineDescriptor {
+        private String stateMachineName;
+        private ClassDescriptor stateMachineClass;
         private ClassDescriptor proxyClass;
         private ClassDescriptor operationsClass;
         private ClassDescriptor eventsClass;
         private List<OperationDescriptor> operations = new ArrayList<>();
         private boolean session;
 
-        public String getServiceName() {
-            return serviceName;
+        public String getStateMachineName() {
+            return stateMachineName;
         }
 
-        public void setServiceName(String serviceName) {
-            this.serviceName = serviceName;
+        public void setStateMachineName(String stateMachineName) {
+            this.stateMachineName = stateMachineName;
         }
 
-        public ClassDescriptor getServiceClass() {
-            return serviceClass;
+        public ClassDescriptor getStateMachineClass() {
+            return stateMachineClass;
         }
 
-        public void setServiceClass(ClassDescriptor serviceClass) {
-            this.serviceClass = serviceClass;
+        public void setStateMachineClass(ClassDescriptor stateMachineClass) {
+            this.stateMachineClass = stateMachineClass;
         }
 
         public ClassDescriptor getProxyClass() {

@@ -15,180 +15,333 @@
  */
 package io.atomix.node.primitive.list;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.util.LinkedList;
-import java.util.List;
+import java.time.Duration;
+import java.util.stream.Collectors;
 
-import com.google.common.collect.Lists;
-import io.atomix.node.service.PrimitiveService;
-import io.atomix.utils.component.Component;
-import io.atomix.utils.stream.StreamHandler;
+import io.atomix.api.headers.ResponseHeader;
+import io.atomix.api.headers.StreamHeader;
+import io.atomix.api.list.AppendRequest;
+import io.atomix.api.list.AppendResponse;
+import io.atomix.api.list.ClearRequest;
+import io.atomix.api.list.ClearResponse;
+import io.atomix.api.list.CloseRequest;
+import io.atomix.api.list.CloseResponse;
+import io.atomix.api.list.ContainsRequest;
+import io.atomix.api.list.ContainsResponse;
+import io.atomix.api.list.CreateRequest;
+import io.atomix.api.list.CreateResponse;
+import io.atomix.api.list.EventRequest;
+import io.atomix.api.list.EventResponse;
+import io.atomix.api.list.GetRequest;
+import io.atomix.api.list.GetResponse;
+import io.atomix.api.list.InsertRequest;
+import io.atomix.api.list.InsertResponse;
+import io.atomix.api.list.IterateRequest;
+import io.atomix.api.list.IterateResponse;
+import io.atomix.api.list.KeepAliveRequest;
+import io.atomix.api.list.KeepAliveResponse;
+import io.atomix.api.list.ListServiceGrpc;
+import io.atomix.api.list.RemoveRequest;
+import io.atomix.api.list.RemoveResponse;
+import io.atomix.api.list.ResponseStatus;
+import io.atomix.api.list.SizeRequest;
+import io.atomix.api.list.SizeResponse;
+import io.atomix.node.primitive.set.SetStateMachine;
+import io.atomix.node.primitive.util.PrimitiveFactory;
+import io.atomix.node.primitive.util.RequestExecutor;
+import io.atomix.node.service.client.ClientFactory;
+import io.atomix.node.service.protocol.CloseSessionRequest;
+import io.atomix.node.service.protocol.OpenSessionRequest;
+import io.atomix.node.service.protocol.SessionCommandContext;
+import io.atomix.node.service.protocol.SessionQueryContext;
+import io.atomix.node.service.protocol.SessionStreamContext;
+import io.grpc.stub.StreamObserver;
+import org.apache.commons.lang3.tuple.Pair;
 
 /**
- * List service implementation.
+ * gRPC list service implementation.
  */
-public class ListService extends AbstractListService {
-    public static final Type TYPE = new Type();
+public class ListService extends ListServiceGrpc.ListServiceImplBase {
+    private final RequestExecutor<ListProxy> executor;
 
-    /**
-     * Set service type.
-     */
-    @Component
-    public static class Type implements PrimitiveService.Type {
-        private static final String NAME = "list";
-
-        @Override
-        public String name() {
-            return NAME;
-        }
-
-        @Override
-        public PrimitiveService newService() {
-            return new ListService();
-        }
-    }
-
-    private List<String> list = new LinkedList<>();
-
-    @Override
-    public SizeResponse size(SizeRequest request) {
-        return SizeResponse.newBuilder()
-            .setSize(list.size())
-            .build();
+    public ListService(ClientFactory factory) {
+        this.executor = new RequestExecutor<>(new PrimitiveFactory<>(
+            SetStateMachine.TYPE,
+            id -> new ListProxy(factory.newSessionClient(id))));
     }
 
     @Override
-    public ContainsResponse contains(ContainsRequest request) {
-        return ContainsResponse.newBuilder()
-            .setContains(list.contains(request.getValue()))
-            .build();
+    public void create(CreateRequest request, StreamObserver<CreateResponse> responseObserver) {
+        executor.execute(request.getHeader().getName(), CreateResponse::getDefaultInstance, responseObserver,
+            list -> list.openSession(OpenSessionRequest.newBuilder()
+                .setTimeout(Duration.ofSeconds(request.getTimeout().getSeconds())
+                    .plusNanos(request.getTimeout().getNanos())
+                    .toMillis())
+                .build())
+                .thenApply(response -> CreateResponse.newBuilder()
+                    .setHeader(ResponseHeader.newBuilder()
+                        .setSessionId(response.getSessionId())
+                        .build())
+                    .build()));
     }
 
     @Override
-    public GetResponse get(GetRequest request) {
-        int index = request.getIndex();
-        if (index < 0 || index >= list.size()) {
-            return GetResponse.newBuilder()
-                .setStatus(ResponseStatus.OUT_OF_BOUNDS)
-                .build();
-        }
-        return GetResponse.newBuilder()
-            .setStatus(ResponseStatus.OK)
-            .setValue(list.get(index))
-            .build();
+    public void keepAlive(KeepAliveRequest request, StreamObserver<KeepAliveResponse> responseObserver) {
+        executor.execute(request.getHeader().getName(), KeepAliveResponse::getDefaultInstance, responseObserver,
+            list -> list.keepAlive(io.atomix.node.service.protocol.KeepAliveRequest.newBuilder()
+                .setSessionId(request.getHeader().getSessionId())
+                .setCommandSequence(request.getHeader().getSequenceNumber())
+                .build())
+                .thenApply(response -> KeepAliveResponse.newBuilder()
+                    .setHeader(ResponseHeader.newBuilder()
+                        .setSessionId(request.getHeader().getSessionId())
+                        .build())
+                    .build()));
     }
 
     @Override
-    public AppendResponse append(AppendRequest request) {
-        list.add(request.getValue());
-        onEvent(ListenResponse.newBuilder()
-            .setType(ListenResponse.Type.ADDED)
-            .setValue(request.getValue())
-            .build());
-        return AppendResponse.newBuilder()
-            .setStatus(ResponseStatus.OK)
-            .build();
+    public void close(CloseRequest request, StreamObserver<CloseResponse> responseObserver) {
+        executor.execute(request.getHeader().getName(), CloseResponse::getDefaultInstance, responseObserver,
+            list -> list.closeSession(CloseSessionRequest.newBuilder()
+                .setSessionId(request.getHeader().getSessionId())
+                .build())
+                .thenApply(response -> CloseResponse.newBuilder().build()));
     }
 
     @Override
-    public InsertResponse insert(InsertRequest request) {
-        int index = request.getIndex();
-        if (index < 0 || index >= list.size()) {
-            return InsertResponse.newBuilder()
-                .setStatus(ResponseStatus.OUT_OF_BOUNDS)
-                .build();
-        }
-
-        String oldValue = list.set(index, request.getValue());
-        onEvent(ListenResponse.newBuilder()
-            .setType(ListenResponse.Type.REMOVED)
-            .setValue(oldValue)
-            .build());
-        onEvent(ListenResponse.newBuilder()
-            .setType(ListenResponse.Type.ADDED)
-            .setValue(request.getValue())
-            .build());
-        return InsertResponse.newBuilder()
-            .setStatus(ResponseStatus.OK)
-            .build();
+    public void size(SizeRequest request, StreamObserver<SizeResponse> responseObserver) {
+        executor.execute(request.getHeader().getName(), SizeResponse::getDefaultInstance, responseObserver,
+            list -> list.size(SessionQueryContext.newBuilder()
+                    .setSessionId(request.getHeader().getSessionId())
+                    .setLastIndex(request.getHeader().getIndex())
+                    .setLastSequenceNumber(request.getHeader().getSequenceNumber())
+                    .build(),
+                io.atomix.node.primitive.list.SizeRequest.newBuilder().build())
+                .thenApply(response -> SizeResponse.newBuilder()
+                    .setSize(response.getRight().getSize())
+                    .setHeader(ResponseHeader.newBuilder()
+                        .setSessionId(request.getHeader().getSessionId())
+                        .setIndex(response.getLeft().getIndex())
+                        .setSequenceNumber(response.getLeft().getSequence())
+                        .addAllStreams(response.getLeft().getStreamsList().stream()
+                            .map(stream -> StreamHeader.newBuilder()
+                                .setStreamId(stream.getStreamId())
+                                .setIndex(stream.getIndex())
+                                .setLastItemNumber(stream.getSequence())
+                                .build())
+                            .collect(Collectors.toList()))
+                        .build())
+                    .build()));
     }
 
     @Override
-    public RemoveResponse remove(RemoveRequest request) {
-        int index = request.getIndex();
-        if (index < 0 || index >= list.size()) {
-            return RemoveResponse.newBuilder()
-                .setStatus(ResponseStatus.OUT_OF_BOUNDS)
-                .build();
-        }
-
-        String value = list.remove(index);
-        onEvent(ListenResponse.newBuilder()
-            .setType(ListenResponse.Type.REMOVED)
-            .setValue(value)
-            .build());
-        return RemoveResponse.newBuilder()
-            .setStatus(ResponseStatus.OK)
-            .setValue(value)
-            .build();
+    public void contains(ContainsRequest request, StreamObserver<ContainsResponse> responseObserver) {
+        executor.execute(request.getHeader().getName(), ContainsResponse::getDefaultInstance, responseObserver,
+            list -> list.contains(SessionQueryContext.newBuilder()
+                    .setSessionId(request.getHeader().getSessionId())
+                    .setLastIndex(request.getHeader().getIndex())
+                    .setLastSequenceNumber(request.getHeader().getSequenceNumber())
+                    .build(),
+                io.atomix.node.primitive.list.ContainsRequest.newBuilder()
+                    .setValue(request.getValue())
+                    .build())
+                .thenApply(response -> ContainsResponse.newBuilder()
+                    .setContains(response.getRight().getContains())
+                    .setHeader(ResponseHeader.newBuilder()
+                        .setSessionId(request.getHeader().getSessionId())
+                        .setIndex(response.getLeft().getIndex())
+                        .setSequenceNumber(response.getLeft().getSequence())
+                        .addAllStreams(response.getLeft().getStreamsList().stream()
+                            .map(stream -> StreamHeader.newBuilder()
+                                .setStreamId(stream.getStreamId())
+                                .setIndex(stream.getIndex())
+                                .setLastItemNumber(stream.getSequence())
+                                .build())
+                            .collect(Collectors.toList()))
+                        .build())
+                    .build()));
     }
 
     @Override
-    public ClearResponse clear(ClearRequest request) {
-        for (String value : list) {
-            onEvent(ListenResponse.newBuilder()
-                .setType(ListenResponse.Type.REMOVED)
-                .setValue(value)
+    public void get(GetRequest request, StreamObserver<GetResponse> responseObserver) {
+        executor.execute(request.getHeader().getName(), GetResponse::getDefaultInstance, responseObserver,
+            list -> list.get(SessionQueryContext.newBuilder()
+                    .setSessionId(request.getHeader().getSessionId())
+                    .setLastIndex(request.getHeader().getIndex())
+                    .setLastSequenceNumber(request.getHeader().getSequenceNumber())
+                    .build(),
+                io.atomix.node.primitive.list.GetRequest.newBuilder()
+                    .setIndex(request.getIndex())
+                    .build())
+                .thenApply(response -> GetResponse.newBuilder()
+                    .setStatus(ResponseStatus.valueOf(response.getRight().getStatus().name()))
+                    .setHeader(ResponseHeader.newBuilder()
+                        .setSessionId(request.getHeader().getSessionId())
+                        .setIndex(response.getLeft().getIndex())
+                        .setSequenceNumber(response.getLeft().getSequence())
+                        .addAllStreams(response.getLeft().getStreamsList().stream()
+                            .map(stream -> StreamHeader.newBuilder()
+                                .setStreamId(stream.getStreamId())
+                                .setIndex(stream.getIndex())
+                                .setLastItemNumber(stream.getSequence())
+                                .build())
+                            .collect(Collectors.toList()))
+                        .build())
+                    .setValue(response.getRight().getValue())
+                    .build()));
+    }
+
+    @Override
+    public void append(AppendRequest request, StreamObserver<AppendResponse> responseObserver) {
+        executor.execute(request.getHeader().getName(), AppendResponse::getDefaultInstance, responseObserver,
+            list -> list.append(SessionCommandContext.newBuilder()
+                    .setSessionId(request.getHeader().getSessionId())
+                    .setSequenceNumber(request.getHeader().getSequenceNumber())
+                    .build(),
+                io.atomix.node.primitive.list.AppendRequest.newBuilder()
+                    .setValue(request.getValue())
+                    .build())
+                .thenApply(response -> AppendResponse.newBuilder()
+                    .setStatus(ResponseStatus.valueOf(response.getRight().getStatus().name()))
+                    .setHeader(ResponseHeader.newBuilder()
+                        .setSessionId(request.getHeader().getSessionId())
+                        .setIndex(response.getLeft().getIndex())
+                        .setSequenceNumber(response.getLeft().getSequence())
+                        .addAllStreams(response.getLeft().getStreamsList().stream()
+                            .map(stream -> StreamHeader.newBuilder()
+                                .setStreamId(stream.getStreamId())
+                                .setIndex(stream.getIndex())
+                                .setLastItemNumber(stream.getSequence())
+                                .build())
+                            .collect(Collectors.toList()))
+                        .build())
+                    .build()));
+    }
+
+    @Override
+    public void insert(InsertRequest request, StreamObserver<InsertResponse> responseObserver) {
+        executor.execute(request.getHeader().getName(), InsertResponse::getDefaultInstance, responseObserver,
+            list -> list.insert(SessionCommandContext.newBuilder()
+                    .setSessionId(request.getHeader().getSessionId())
+                    .setSequenceNumber(request.getHeader().getSequenceNumber())
+                    .build(),
+                io.atomix.node.primitive.list.InsertRequest.newBuilder()
+                    .setIndex(request.getIndex())
+                    .setValue(request.getValue())
+                    .build())
+                .thenApply(response -> InsertResponse.newBuilder()
+                    .setStatus(ResponseStatus.valueOf(response.getRight().getStatus().name()))
+                    .setHeader(ResponseHeader.newBuilder()
+                        .setSessionId(request.getHeader().getSessionId())
+                        .setIndex(response.getLeft().getIndex())
+                        .setSequenceNumber(response.getLeft().getSequence())
+                        .addAllStreams(response.getLeft().getStreamsList().stream()
+                            .map(stream -> StreamHeader.newBuilder()
+                                .setStreamId(stream.getStreamId())
+                                .setIndex(stream.getIndex())
+                                .setLastItemNumber(stream.getSequence())
+                                .build())
+                            .collect(Collectors.toList()))
+                        .build())
+                    .build()));
+    }
+
+    @Override
+    public void remove(RemoveRequest request, StreamObserver<RemoveResponse> responseObserver) {
+        executor.execute(request.getHeader().getName(), RemoveResponse::getDefaultInstance, responseObserver,
+            list -> list.remove(SessionCommandContext.newBuilder()
+                    .setSessionId(request.getHeader().getSessionId())
+                    .setSequenceNumber(request.getHeader().getSequenceNumber())
+                    .build(),
+                io.atomix.node.primitive.list.RemoveRequest.newBuilder()
+                    .setIndex(request.getIndex())
+                    .build())
+                .thenApply(response -> RemoveResponse.newBuilder()
+                    .setValue(response.getRight().getValue())
+                    .setHeader(ResponseHeader.newBuilder()
+                        .setSessionId(request.getHeader().getSessionId())
+                        .setIndex(response.getLeft().getIndex())
+                        .setSequenceNumber(response.getLeft().getSequence())
+                        .addAllStreams(response.getLeft().getStreamsList().stream()
+                            .map(stream -> StreamHeader.newBuilder()
+                                .setStreamId(stream.getStreamId())
+                                .setIndex(stream.getIndex())
+                                .setLastItemNumber(stream.getSequence())
+                                .build())
+                            .collect(Collectors.toList()))
+                        .build())
+                    .build()));
+    }
+
+    @Override
+    public void clear(ClearRequest request, StreamObserver<ClearResponse> responseObserver) {
+        executor.execute(request.getHeader().getName(), ClearResponse::getDefaultInstance, responseObserver,
+            list -> list.clear(SessionCommandContext.newBuilder()
+                    .setSessionId(request.getHeader().getSessionId())
+                    .setSequenceNumber(request.getHeader().getSequenceNumber())
+                    .build(),
+                io.atomix.node.primitive.list.ClearRequest.newBuilder().build())
+                .thenApply(response -> ClearResponse.newBuilder()
+                    .setHeader(ResponseHeader.newBuilder()
+                        .setSessionId(request.getHeader().getSessionId())
+                        .setIndex(response.getLeft().getIndex())
+                        .setSequenceNumber(response.getLeft().getSequence())
+                        .addAllStreams(response.getLeft().getStreamsList().stream()
+                            .map(stream -> StreamHeader.newBuilder()
+                                .setStreamId(stream.getStreamId())
+                                .setIndex(stream.getIndex())
+                                .setLastItemNumber(stream.getSequence())
+                                .build())
+                            .collect(Collectors.toList()))
+                        .build())
+                    .build()));
+    }
+
+    @Override
+    public void listen(EventRequest request, StreamObserver<EventResponse> responseObserver) {
+        executor.<Pair<SessionStreamContext, ListenResponse>, EventResponse>execute(request.getHeader().getName(), EventResponse::getDefaultInstance, responseObserver,
+            (list, handler) -> list.listen(SessionCommandContext.newBuilder()
+                    .setSessionId(request.getHeader().getSessionId())
+                    .setSequenceNumber(request.getHeader().getSequenceNumber())
+                    .build(),
+                ListenRequest.newBuilder().build(), handler),
+            response -> EventResponse.newBuilder()
+                .setHeader(ResponseHeader.newBuilder()
+                    .setSessionId(request.getHeader().getSessionId())
+                    .setIndex(response.getLeft().getIndex())
+                    .setSequenceNumber(response.getLeft().getSequence())
+                    .addStreams(StreamHeader.newBuilder()
+                        .setStreamId(response.getLeft().getStreamId())
+                        .setIndex(response.getLeft().getIndex())
+                        .setLastItemNumber(response.getLeft().getSequence())
+                        .build())
+                    .build())
+                .setType(EventResponse.Type.valueOf(response.getRight().getType().name()))
+                .setValue(response.getRight().getValue())
                 .build());
-        }
-        list.clear();
-        return ClearResponse.newBuilder().build();
     }
 
     @Override
-    public void listen(ListenRequest request, StreamHandler<ListenResponse> handler) {
-        // Keep the stream open.
-    }
-
-    @Override
-    public UnlistenResponse unlisten(UnlistenRequest request) {
-        // Complete the stream.
-        StreamHandler<ListenResponse> stream = getCurrentSession().getStream(request.getStreamId());
-        if (stream != null) {
-            stream.complete();
-        }
-        return UnlistenResponse.newBuilder().build();
-    }
-
-    @Override
-    public void iterate(IterateRequest request, StreamHandler<IterateResponse> handler) {
-        for (String value : list) {
-            handler.next(IterateResponse.newBuilder()
-                .setValue(value)
+    public void iterate(IterateRequest request, StreamObserver<IterateResponse> responseObserver) {
+        executor.<Pair<SessionStreamContext, io.atomix.node.primitive.list.IterateResponse>, IterateResponse>execute(request.getHeader().getName(), IterateResponse::getDefaultInstance, responseObserver,
+            (list, handler) -> list.iterate(SessionQueryContext.newBuilder()
+                    .setSessionId(request.getHeader().getSessionId())
+                    .setLastIndex(request.getHeader().getIndex())
+                    .setLastSequenceNumber(request.getHeader().getSequenceNumber())
+                    .build(),
+                io.atomix.node.primitive.list.IterateRequest.newBuilder().build(), handler),
+            response -> IterateResponse.newBuilder()
+                .setHeader(ResponseHeader.newBuilder()
+                    .setSessionId(request.getHeader().getSessionId())
+                    .setIndex(response.getLeft().getIndex())
+                    .setSequenceNumber(response.getLeft().getSequence())
+                    .addStreams(StreamHeader.newBuilder()
+                        .setStreamId(response.getLeft().getStreamId())
+                        .setIndex(response.getLeft().getIndex())
+                        .setLastItemNumber(response.getLeft().getSequence())
+                        .build())
+                    .build())
+                .setValue(response.getRight().getValue())
                 .build());
-        }
-        handler.complete();
-    }
-
-    private void onEvent(ListenResponse event) {
-        getSessions()
-            .forEach(session -> session.getStreams(ListOperations.LISTEN_STREAM)
-                .forEach(stream -> stream.next(event)));
-    }
-
-    @Override
-    public void backup(OutputStream output) throws IOException {
-        DistributedListSnapshot.newBuilder()
-            .addAllValues(list)
-            .build()
-            .writeTo(output);
-    }
-
-    @Override
-    public void restore(InputStream input) throws IOException {
-        DistributedListSnapshot snapshot = DistributedListSnapshot.parseFrom(input);
-        list = Lists.newLinkedList(snapshot.getValuesList());
     }
 }

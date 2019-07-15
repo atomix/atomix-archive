@@ -15,173 +15,200 @@
  */
 package io.atomix.node.primitive.value;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.util.Arrays;
-import java.util.concurrent.atomic.AtomicLong;
+import java.time.Duration;
+import java.util.stream.Collectors;
 
-import com.google.protobuf.ByteString;
-import io.atomix.node.service.PrimitiveService;
-import io.atomix.utils.component.Component;
-import io.atomix.utils.stream.StreamHandler;
+import io.atomix.api.headers.ResponseHeader;
+import io.atomix.api.headers.StreamHeader;
+import io.atomix.api.value.CheckAndSetRequest;
+import io.atomix.api.value.CheckAndSetResponse;
+import io.atomix.api.value.CloseRequest;
+import io.atomix.api.value.CloseResponse;
+import io.atomix.api.value.CreateRequest;
+import io.atomix.api.value.CreateResponse;
+import io.atomix.api.value.EventRequest;
+import io.atomix.api.value.EventResponse;
+import io.atomix.api.value.GetRequest;
+import io.atomix.api.value.GetResponse;
+import io.atomix.api.value.KeepAliveRequest;
+import io.atomix.api.value.KeepAliveResponse;
+import io.atomix.api.value.SetRequest;
+import io.atomix.api.value.SetResponse;
+import io.atomix.api.value.ValueServiceGrpc;
+import io.atomix.node.primitive.util.PrimitiveFactory;
+import io.atomix.node.primitive.util.RequestExecutor;
+import io.atomix.node.service.client.ClientFactory;
+import io.atomix.node.service.protocol.OpenSessionRequest;
+import io.atomix.node.service.protocol.SessionCommandContext;
+import io.atomix.node.service.protocol.SessionQueryContext;
+import io.atomix.node.service.protocol.SessionStreamContext;
+import io.grpc.stub.StreamObserver;
+import org.apache.commons.lang3.tuple.Pair;
 
 /**
- * Value service.
+ * Value service implementation.
  */
-public class ValueService extends AbstractValueService {
-    public static final Type TYPE = new Type();
+public class ValueService extends ValueServiceGrpc.ValueServiceImplBase {
+    private final RequestExecutor<ValueProxy> executor;
 
-    /**
-     * Value service type.
-     */
-    @Component
-    public static class Type implements PrimitiveService.Type {
-        private static final String NAME = "value";
-
-        @Override
-        public String name() {
-            return NAME;
-        }
-
-        @Override
-        public PrimitiveService newService() {
-            return new ValueService();
-        }
-    }
-
-    private AtomicLong version = new AtomicLong();
-    private byte[] value = new byte[0];
-
-    @Override
-    public SetResponse set(SetRequest request) {
-        byte[] previousValue = this.value;
-        byte[] nextValue = request.getValue().toByteArray();
-
-        if (Arrays.equals(previousValue, nextValue)) {
-            return SetResponse.newBuilder()
-                .setVersion(version.get())
-                .setPreviousValue(request.getValue())
-                .setPreviousVersion(version.get())
-                .build();
-        }
-
-        this.value = nextValue;
-        long previousVersion = version.getAndIncrement();
-
-        onEvent(ListenResponse.newBuilder()
-            .setType(ListenResponse.Type.UPDATED)
-            .setPreviousValue(ByteString.copyFrom(previousValue))
-            .setPreviousVersion(previousVersion)
-            .setNewValue(request.getValue())
-            .setNewVersion(version.get())
-            .build());
-
-        return SetResponse.newBuilder()
-            .setVersion(version.get())
-            .setPreviousValue(ByteString.copyFrom(previousValue))
-            .setPreviousVersion(previousVersion)
-            .build();
+    public ValueService(ClientFactory factory) {
+        this.executor = new RequestExecutor<>(new PrimitiveFactory<>(
+            ValueStateMachine.TYPE,
+            id -> new ValueProxy(factory.newSessionClient(id))));
     }
 
     @Override
-    public GetResponse get(GetRequest request) {
-        return GetResponse.newBuilder()
-            .setValue(ByteString.copyFrom(value))
-            .setVersion(version.get())
-            .build();
+    public void create(CreateRequest request, StreamObserver<CreateResponse> responseObserver) {
+        executor.execute(request.getHeader().getName(), CreateResponse::getDefaultInstance, responseObserver,
+            value -> value.openSession(OpenSessionRequest.newBuilder()
+                .setTimeout(Duration.ofSeconds(request.getTimeout().getSeconds())
+                    .plusNanos(request.getTimeout().getNanos())
+                    .toMillis())
+                .build())
+                .thenApply(response -> CreateResponse.newBuilder()
+                    .setHeader(ResponseHeader.newBuilder()
+                        .setSessionId(response.getSessionId())
+                        .build())
+                    .build()));
     }
 
     @Override
-    public CheckAndSetResponse checkAndSet(CheckAndSetRequest request) {
-        byte[] previousValue = this.value;
-        if (request.getVersion() > 0) {
-            if (version.get() == request.getVersion()) {
-
-                byte[] nextValue = request.getUpdate().toByteArray();
-                long previousVersion = version.getAndIncrement();
-                this.value = nextValue;
-
-                onEvent(ListenResponse.newBuilder()
-                    .setType(ListenResponse.Type.UPDATED)
-                    .setPreviousValue(ByteString.copyFrom(previousValue))
-                    .setPreviousVersion(previousVersion)
-                    .setNewValue(request.getUpdate())
-                    .setNewVersion(version.get())
-                    .build());
-
-                return CheckAndSetResponse.newBuilder()
-                    .setSucceeded(true)
-                    .setVersion(version.get())
-                    .build();
-            } else {
-                return CheckAndSetResponse.newBuilder()
-                    .setSucceeded(false)
-                    .setVersion(version.get())
-                    .build();
-            }
-        } else {
-            byte[] checkValue = request.getCheck().toByteArray();
-            if (Arrays.equals(previousValue, checkValue)) {
-                byte[] nextValue = request.getUpdate().toByteArray();
-                long previousVersion = version.getAndIncrement();
-                this.value = nextValue;
-
-                onEvent(ListenResponse.newBuilder()
-                    .setType(ListenResponse.Type.UPDATED)
-                    .setPreviousValue(ByteString.copyFrom(previousValue))
-                    .setPreviousVersion(previousVersion)
-                    .setNewValue(request.getUpdate())
-                    .setNewVersion(version.get())
-                    .build());
-
-                return CheckAndSetResponse.newBuilder()
-                    .setSucceeded(true)
-                    .setVersion(version.get())
-                    .build();
-            } else {
-                return CheckAndSetResponse.newBuilder()
-                    .setSucceeded(false)
-                    .setVersion(version.get())
-                    .build();
-            }
-        }
+    public void keepAlive(KeepAliveRequest request, StreamObserver<KeepAliveResponse> responseObserver) {
+        executor.execute(request.getHeader().getName(), KeepAliveResponse::getDefaultInstance, responseObserver,
+            value -> value.keepAlive(io.atomix.node.service.protocol.KeepAliveRequest.newBuilder()
+                .setSessionId(request.getHeader().getSessionId())
+                .setCommandSequence(request.getHeader().getSequenceNumber())
+                .build())
+                .thenApply(response -> KeepAliveResponse.newBuilder()
+                    .setHeader(ResponseHeader.newBuilder()
+                        .setSessionId(request.getHeader().getSessionId())
+                        .build())
+                    .build()));
     }
 
     @Override
-    public void listen(ListenRequest request, StreamHandler<ListenResponse> handler) {
-        // Keep the stream open.
+    public void close(CloseRequest request, StreamObserver<CloseResponse> responseObserver) {
+        executor.execute(request.getHeader().getName(), CloseResponse::getDefaultInstance, responseObserver,
+            value -> value.closeSession(io.atomix.node.service.protocol.CloseSessionRequest.newBuilder()
+                .setSessionId(request.getHeader().getSessionId())
+                .build()).thenApply(response -> CloseResponse.newBuilder().build()));
     }
 
     @Override
-    public UnlistenResponse unlisten(UnlistenRequest request) {
-        // Complete the stream.
-        StreamHandler<ListenResponse> stream = getCurrentSession().getStream(request.getStreamId());
-        if (stream != null) {
-            stream.complete();
-        }
-        return UnlistenResponse.newBuilder().build();
-    }
-
-    private void onEvent(ListenResponse event) {
-        getSessions()
-            .forEach(session -> session.getStreams(ValueOperations.LISTEN_STREAM)
-                .forEach(stream -> stream.next(event)));
+    public void set(SetRequest request, StreamObserver<SetResponse> responseObserver) {
+        executor.execute(request.getHeader().getName(), SetResponse::getDefaultInstance, responseObserver,
+            value -> value.set(
+                SessionCommandContext.newBuilder()
+                    .setSessionId(request.getHeader().getSessionId())
+                    .setSequenceNumber(request.getHeader().getSequenceNumber())
+                    .build(),
+                io.atomix.node.primitive.value.SetRequest.newBuilder()
+                    .setValue(request.getValue())
+                    .build())
+                .thenApply(response -> SetResponse.newBuilder()
+                    .setHeader(ResponseHeader.newBuilder()
+                        .setSessionId(request.getHeader().getSessionId())
+                        .setIndex(response.getLeft().getIndex())
+                        .setSequenceNumber(response.getLeft().getSequence())
+                        .addAllStreams(response.getLeft().getStreamsList().stream()
+                            .map(stream -> StreamHeader.newBuilder()
+                                .setStreamId(stream.getStreamId())
+                                .setIndex(stream.getIndex())
+                                .setLastItemNumber(stream.getSequence())
+                                .build())
+                            .collect(Collectors.toList()))
+                        .build())
+                    .setPreviousValue(response.getRight().getPreviousValue())
+                    .setPreviousVersion(response.getRight().getPreviousVersion())
+                    .setVersion(response.getRight().getVersion())
+                    .build()));
     }
 
     @Override
-    public void backup(OutputStream output) throws IOException {
-        AtomicValueSnapshot.newBuilder()
-            .setValue(ByteString.copyFrom(value))
-            .setVersion(version.get())
-            .build()
-            .writeTo(output);
+    public void get(GetRequest request, StreamObserver<GetResponse> responseObserver) {
+        executor.execute(request.getHeader().getName(), GetResponse::getDefaultInstance, responseObserver,
+            value -> value.get(
+                SessionQueryContext.newBuilder()
+                    .setSessionId(request.getHeader().getSessionId())
+                    .setLastIndex(request.getHeader().getIndex())
+                    .setLastSequenceNumber(request.getHeader().getSequenceNumber())
+                    .build(),
+                io.atomix.node.primitive.value.GetRequest.newBuilder().build())
+                .thenApply(response -> GetResponse.newBuilder()
+                    .setHeader(ResponseHeader.newBuilder()
+                        .setSessionId(request.getHeader().getSessionId())
+                        .setIndex(response.getLeft().getIndex())
+                        .setSequenceNumber(response.getLeft().getSequence())
+                        .addAllStreams(response.getLeft().getStreamsList().stream()
+                            .map(stream -> StreamHeader.newBuilder()
+                                .setStreamId(stream.getStreamId())
+                                .setIndex(stream.getIndex())
+                                .setLastItemNumber(stream.getSequence())
+                                .build())
+                            .collect(Collectors.toList()))
+                        .build())
+                    .setValue(response.getRight().getValue())
+                    .setVersion(response.getRight().getVersion())
+                    .build()));
     }
 
     @Override
-    public void restore(InputStream input) throws IOException {
-        AtomicValueSnapshot snapshot = AtomicValueSnapshot.parseFrom(input);
-        value = snapshot.getValue().toByteArray();
-        version.set(snapshot.getVersion());
+    public void checkAndSet(CheckAndSetRequest request, StreamObserver<CheckAndSetResponse> responseObserver) {
+        executor.execute(request.getHeader().getName(), CheckAndSetResponse::getDefaultInstance, responseObserver,
+            value -> value.checkAndSet(
+                SessionCommandContext.newBuilder()
+                    .setSessionId(request.getHeader().getSessionId())
+                    .setSequenceNumber(request.getHeader().getSequenceNumber())
+                    .build(),
+                io.atomix.node.primitive.value.CheckAndSetRequest.newBuilder()
+                    .setCheck(request.getCheck())
+                    .setUpdate(request.getUpdate())
+                    .setVersion(request.getVersion())
+                    .build())
+                .thenApply(response -> CheckAndSetResponse.newBuilder()
+                    .setHeader(ResponseHeader.newBuilder()
+                        .setSessionId(request.getHeader().getSessionId())
+                        .setIndex(response.getLeft().getIndex())
+                        .setSequenceNumber(response.getLeft().getSequence())
+                        .addAllStreams(response.getLeft().getStreamsList().stream()
+                            .map(stream -> StreamHeader.newBuilder()
+                                .setStreamId(stream.getStreamId())
+                                .setIndex(stream.getIndex())
+                                .setLastItemNumber(stream.getSequence())
+                                .build())
+                            .collect(Collectors.toList()))
+                        .build())
+                    .setSucceeded(response.getRight().getSucceeded())
+                    .setVersion(response.getRight().getVersion())
+                    .build()));
+    }
+
+    @Override
+    public void event(EventRequest request, StreamObserver<EventResponse> responseObserver) {
+        executor.<Pair<SessionStreamContext, ListenResponse>, EventResponse>execute(request.getHeader().getName(), EventResponse::getDefaultInstance, responseObserver,
+            (value, handler) -> value.listen(
+                SessionCommandContext.newBuilder()
+                    .setSessionId(request.getHeader().getSessionId())
+                    .setSequenceNumber(request.getHeader().getSequenceNumber())
+                    .build(),
+                ListenRequest.newBuilder().build(),
+                handler),
+            response -> EventResponse.newBuilder()
+                .setHeader(ResponseHeader.newBuilder()
+                    .setSessionId(request.getHeader().getSessionId())
+                    .setIndex(response.getLeft().getIndex())
+                    .setSequenceNumber(response.getLeft().getSequence())
+                    .addStreams(StreamHeader.newBuilder()
+                        .setStreamId(response.getLeft().getStreamId())
+                        .setIndex(response.getLeft().getIndex())
+                        .setLastItemNumber(response.getLeft().getSequence())
+                        .build())
+                    .build())
+                .setType(EventResponse.Type.valueOf(response.getRight().getType().name()))
+                .setPreviousValue(response.getRight().getPreviousValue())
+                .setPreviousVersion(response.getRight().getPreviousVersion())
+                .setNewValue(response.getRight().getNewValue())
+                .setNewVersion(response.getRight().getNewVersion())
+                .build());
     }
 }

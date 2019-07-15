@@ -28,10 +28,10 @@ import io.grpc.stub.StreamObserver;
 /**
  * Log service implementation.
  */
-public class LogServiceImpl extends LogServiceGrpc.LogServiceImplBase {
+public class LogService extends LogServiceGrpc.LogServiceImplBase {
     private final LogClient client;
 
-    public LogServiceImpl(LogClient client) {
+    public LogService(LogClient client) {
         this.client = client;
     }
 

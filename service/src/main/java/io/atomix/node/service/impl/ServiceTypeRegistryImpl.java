@@ -21,7 +21,7 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 
-import io.atomix.node.service.PrimitiveService;
+import io.atomix.node.service.PrimitiveStateMachine;
 import io.atomix.node.service.ServiceTypeRegistry;
 import io.atomix.utils.ServiceException;
 import io.atomix.utils.component.Cardinality;
@@ -34,19 +34,19 @@ import io.atomix.utils.component.Managed;
  */
 @Component
 public class ServiceTypeRegistryImpl implements ServiceTypeRegistry, Managed {
-    @Dependency(value = PrimitiveService.Type.class, cardinality = Cardinality.MULTIPLE)
-    private List<PrimitiveService.Type> types;
+    @Dependency(value = PrimitiveStateMachine.Type.class, cardinality = Cardinality.MULTIPLE)
+    private List<PrimitiveStateMachine.Type> types;
 
-    private final Map<String, PrimitiveService.Type> typeMap = new ConcurrentHashMap<>();
+    private final Map<String, PrimitiveStateMachine.Type> typeMap = new ConcurrentHashMap<>();
 
     @Override
-    public Collection<PrimitiveService.Type> getServiceTypes() {
+    public Collection<PrimitiveStateMachine.Type> getServiceTypes() {
         return types;
     }
 
     @Override
-    public PrimitiveService.Type getServiceType(String typeName) {
-        PrimitiveService.Type type = typeMap.get(typeName);
+    public PrimitiveStateMachine.Type getServiceType(String typeName) {
+        PrimitiveStateMachine.Type type = typeMap.get(typeName);
         if (type == null) {
             throw new ServiceException("Unknown service type " + typeName);
         }

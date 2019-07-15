@@ -42,15 +42,15 @@ import io.atomix.utils.stream.StreamHandler;
 /**
  * Simple primitive service.
  */
-public abstract class SimplePrimitiveService extends AbstractPrimitiveService implements PrimitiveService {
-    private AbstractPrimitiveService.Context context;
+public abstract class SimplePrimitiveStateMachine extends AbstractPrimitiveStateMachine implements PrimitiveStateMachine {
+    private AbstractPrimitiveStateMachine.Context context;
     private DefaultServiceExecutor executor;
     private DefaultServiceScheduler scheduler;
     private final Map<Long, List<Runnable>> indexQueries = new HashMap<>();
 
     @Override
     public void init(StateMachine.Context context) {
-        this.context = new AbstractPrimitiveService.Context(context);
+        this.context = new AbstractPrimitiveStateMachine.Context(context);
         this.executor = new DefaultServiceExecutor(new ServiceCodec(), this.context.getLogger());
         this.scheduler = new DefaultServiceScheduler(this.context);
         super.init(this.context, scheduler, scheduler);
