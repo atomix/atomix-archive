@@ -67,6 +67,20 @@ public class ListService extends AbstractListService {
     }
 
     @Override
+    public GetResponse get(GetRequest request) {
+        int index = request.getIndex();
+        if (index < 0 || index >= list.size()) {
+            return GetResponse.newBuilder()
+                .setStatus(ResponseStatus.OUT_OF_BOUNDS)
+                .build();
+        }
+        return GetResponse.newBuilder()
+            .setStatus(ResponseStatus.OK)
+            .setValue(list.get(index))
+            .build();
+    }
+
+    @Override
     public AppendResponse append(AppendRequest request) {
         list.add(request.getValue());
         onEvent(ListenResponse.newBuilder()

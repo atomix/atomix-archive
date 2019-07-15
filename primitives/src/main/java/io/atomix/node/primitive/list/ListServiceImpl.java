@@ -32,6 +32,8 @@ import io.atomix.api.list.CreateRequest;
 import io.atomix.api.list.CreateResponse;
 import io.atomix.api.list.EventRequest;
 import io.atomix.api.list.EventResponse;
+import io.atomix.api.list.GetRequest;
+import io.atomix.api.list.GetResponse;
 import io.atomix.api.list.InsertRequest;
 import io.atomix.api.list.InsertResponse;
 import io.atomix.api.list.IterateRequest;
@@ -157,6 +159,35 @@ public class ListServiceImpl extends ListServiceGrpc.ListServiceImplBase {
                                 .build())
                             .collect(Collectors.toList()))
                         .build())
+                    .build()));
+    }
+
+    @Override
+    public void get(GetRequest request, StreamObserver<GetResponse> responseObserver) {
+        executor.execute(request.getHeader().getName(), GetResponse::getDefaultInstance, responseObserver,
+            list -> list.get(SessionQueryContext.newBuilder()
+                    .setSessionId(request.getHeader().getSessionId())
+                    .setLastIndex(request.getHeader().getIndex())
+                    .setLastSequenceNumber(request.getHeader().getSequenceNumber())
+                    .build(),
+                io.atomix.node.primitive.list.GetRequest.newBuilder()
+                    .setIndex(request.getIndex())
+                    .build())
+                .thenApply(response -> GetResponse.newBuilder()
+                    .setStatus(ResponseStatus.valueOf(response.getRight().getStatus().name()))
+                    .setHeader(ResponseHeader.newBuilder()
+                        .setSessionId(request.getHeader().getSessionId())
+                        .setIndex(response.getLeft().getIndex())
+                        .setSequenceNumber(response.getLeft().getSequence())
+                        .addAllStreams(response.getLeft().getStreamsList().stream()
+                            .map(stream -> StreamHeader.newBuilder()
+                                .setStreamId(stream.getStreamId())
+                                .setIndex(stream.getIndex())
+                                .setLastItemNumber(stream.getSequence())
+                                .build())
+                            .collect(Collectors.toList()))
+                        .build())
+                    .setValue(response.getRight().getValue())
                     .build()));
     }
 

@@ -131,6 +131,12 @@ service ListService {
             type: QUERY
         };
     }
+    rpc Get (GetRequest) returns (GetResponse) {
+        option (atomix.node.service.operation) = {
+            name: "get"
+            type: QUERY
+        };
+    }
     rpc Append (AppendRequest) returns (AppendResponse) {
         option (atomix.node.service.operation) = {
             name: "add"
