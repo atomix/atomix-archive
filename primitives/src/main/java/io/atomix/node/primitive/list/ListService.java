@@ -46,7 +46,6 @@ import io.atomix.api.list.RemoveResponse;
 import io.atomix.api.list.ResponseStatus;
 import io.atomix.api.list.SizeRequest;
 import io.atomix.api.list.SizeResponse;
-import io.atomix.node.primitive.set.SetStateMachine;
 import io.atomix.node.primitive.util.PrimitiveFactory;
 import io.atomix.node.primitive.util.RequestExecutor;
 import io.atomix.node.service.client.ClientFactory;
@@ -66,7 +65,7 @@ public class ListService extends ListServiceGrpc.ListServiceImplBase {
 
     public ListService(ClientFactory factory) {
         this.executor = new RequestExecutor<>(new PrimitiveFactory<>(
-            SetStateMachine.TYPE,
+            ListStateMachine.TYPE,
             id -> new ListProxy(factory.newSessionClient(id))));
     }
 

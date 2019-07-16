@@ -33,7 +33,7 @@ public class ListStateMachine extends AbstractListStateMachine {
     public static final Type TYPE = new Type();
 
     /**
-     * Set service type.
+     * List service type.
      */
     @Component
     public static class Type implements PrimitiveStateMachine.Type {
