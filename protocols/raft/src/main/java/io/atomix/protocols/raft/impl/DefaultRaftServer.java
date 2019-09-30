@@ -129,6 +129,11 @@ public class DefaultRaftServer implements RaftServer {
   }
 
   @Override
+  public CompletableFuture<Void> snapshot() {
+    return context.getServiceManager().compact();
+  }
+
+  @Override
   public CompletableFuture<RaftServer> promote() {
     return context.anoint().thenApply(v -> this);
   }

@@ -477,6 +477,13 @@ public interface RaftServer {
   CompletableFuture<RaftServer> listen(Collection<MemberId> cluster);
 
   /**
+   * Takes a snapshot of the server's state machine if possible.
+   *
+   * @return a future to be completed once the server has taken a snapshot
+   */
+  CompletableFuture<Void> snapshot();
+
+  /**
    * Promotes the server to leader if possible.
    *
    * @return a future to be completed once the server has been promoted
