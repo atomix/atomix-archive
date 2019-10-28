@@ -236,6 +236,7 @@ abstract class AbstractAppender implements AutoCloseable {
     // If the response failed, the follower should have provided the correct last index in their log. This helps
     // us converge on the matchIndex faster than by simply decrementing nextIndex one index at a time.
     else {
+      resetSnapshotIndex(member, response);
       resetMatchIndex(member, response);
       resetNextIndex(member, response);
 
@@ -291,6 +292,16 @@ abstract class AbstractAppender implements AutoCloseable {
   protected void updateMatchIndex(RaftMemberContext member, AppendResponse response) {
     // If the replica returned a valid match index then update the existing match index.
     member.setMatchIndex(response.lastLogIndex());
+  }
+
+  /**
+   * Resets the snapshot index when a response fails.
+   */
+  protected void resetSnapshotIndex(RaftMemberContext member, AppendResponse response) {
+    member.setSnapshotIndex(response.snapshotIndex());
+    member.setNextSnapshotIndex(0);
+    member.setNextSnapshotOffset(0);
+    log.trace("Reset snapshot index for {} to {}", member, member.getSnapshotIndex());
   }
 
   /**

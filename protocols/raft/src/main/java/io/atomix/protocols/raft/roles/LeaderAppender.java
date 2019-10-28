@@ -403,6 +403,7 @@ final class LeaderAppender extends AbstractAppender {
     // us converge on the matchIndex faster than by simply decrementing nextIndex one index at a time.
     else {
       member.appendFailed();
+      resetSnapshotIndex(member, response);
       resetMatchIndex(member, response);
       resetNextIndex(member, response);
 

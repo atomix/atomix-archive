@@ -67,6 +67,7 @@ import io.atomix.protocols.raft.storage.log.entry.MetadataEntry;
 import io.atomix.protocols.raft.storage.log.entry.OpenSessionEntry;
 import io.atomix.protocols.raft.storage.log.entry.QueryEntry;
 import io.atomix.protocols.raft.storage.log.entry.RaftLogEntry;
+import io.atomix.protocols.raft.storage.snapshot.Snapshot;
 import io.atomix.protocols.raft.storage.system.Configuration;
 import io.atomix.storage.StorageException;
 import io.atomix.storage.journal.Indexed;
@@ -609,11 +610,13 @@ public final class LeaderRole extends ActiveRole {
       return future;
     } else if (request.term() < raft.getTerm()) {
       logRequest(request);
+      Snapshot snapshot = raft.getSnapshotStore().getCurrentSnapshot();
       return CompletableFuture.completedFuture(logResponse(AppendResponse.newBuilder()
           .withStatus(RaftResponse.Status.OK)
           .withTerm(raft.getTerm())
           .withSucceeded(false)
           .withLastLogIndex(raft.getLogWriter().getLastIndex())
+          .withSnapshotIndex(snapshot != null ? snapshot.index() : 0)
           .build()));
     } else {
       raft.setLeader(request.leader());

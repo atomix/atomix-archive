@@ -356,11 +356,13 @@ public class PassiveRole extends InactiveRole {
    * @return the append response status
    */
   protected boolean completeAppend(boolean succeeded, long lastLogIndex, CompletableFuture<AppendResponse> future) {
+    Snapshot snapshot = raft.getSnapshotStore().getCurrentSnapshot();
     future.complete(logResponse(AppendResponse.newBuilder()
         .withStatus(RaftResponse.Status.OK)
         .withTerm(raft.getTerm())
         .withSucceeded(succeeded)
         .withLastLogIndex(lastLogIndex)
+        .withSnapshotIndex(snapshot != null ? snapshot.index() : 0)
         .build()));
     return succeeded;
   }

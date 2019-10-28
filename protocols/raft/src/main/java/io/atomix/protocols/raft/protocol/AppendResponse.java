@@ -39,12 +39,14 @@ public class AppendResponse extends AbstractRaftResponse {
   private final long term;
   private final boolean succeeded;
   private final long lastLogIndex;
+  private final long snapshotIndex;
 
-  public AppendResponse(Status status, RaftError error, long term, boolean succeeded, long lastLogIndex) {
+  public AppendResponse(Status status, RaftError error, long term, boolean succeeded, long lastLogIndex, long snapshotIndex) {
     super(status, error);
     this.term = term;
     this.succeeded = succeeded;
     this.lastLogIndex = lastLogIndex;
+    this.snapshotIndex = snapshotIndex;
   }
 
   /**
@@ -74,6 +76,15 @@ public class AppendResponse extends AbstractRaftResponse {
     return lastLogIndex;
   }
 
+  /**
+   * Returns the current snapshot index for the replica.
+   *
+   * @return the current snapshot index
+   */
+  public long snapshotIndex() {
+    return snapshotIndex;
+  }
+
   @Override
   public int hashCode() {
     return Objects.hash(getClass(), status, term, succeeded, lastLogIndex);
@@ -99,6 +110,7 @@ public class AppendResponse extends AbstractRaftResponse {
           .add("term", term)
           .add("succeeded", succeeded)
           .add("lastLogIndex", lastLogIndex)
+          .add("snapshotIndex", snapshotIndex)
           .toString();
     } else {
       return toStringHelper(this)
@@ -115,6 +127,7 @@ public class AppendResponse extends AbstractRaftResponse {
     private long term;
     private boolean succeeded;
     private long lastLogIndex;
+    private long snapshotIndex;
 
     /**
      * Sets the response term.
@@ -153,6 +166,18 @@ public class AppendResponse extends AbstractRaftResponse {
       return this;
     }
 
+    /**
+     * Sets the snapshot index.
+     *
+     * @param snapshotIndex the replica's snapshot index
+     * @return the append response builder
+     */
+    public Builder withSnapshotIndex(long snapshotIndex) {
+      checkArgument(snapshotIndex >= 0, "snapshotIndex must be positive");
+      this.snapshotIndex = snapshotIndex;
+      return this;
+    }
+
     @Override
     protected void validate() {
       super.validate();
@@ -168,7 +193,7 @@ public class AppendResponse extends AbstractRaftResponse {
     @Override
     public AppendResponse build() {
       validate();
-      return new AppendResponse(status, error, term, succeeded, lastLogIndex);
+      return new AppendResponse(status, error, term, succeeded, lastLogIndex, snapshotIndex);
     }
   }
 }
